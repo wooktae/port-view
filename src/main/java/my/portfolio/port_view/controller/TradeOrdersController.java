@@ -30,13 +30,18 @@ public class TradeOrdersController {
             @RequestParam(required = false) String accountNo,
             Model model
     ) {
-        String resolvedAccountNo = accountNoResolver.resolve(accountNo);
+        String resolvedAccountNo = resolveAndAddAccountNo(accountNo, model);
 
         List<TradeOrders> list = tradeOrdersService.listByAccount(resolvedAccountNo);
 
-        model.addAttribute("accountNo", resolvedAccountNo);
         model.addAttribute("tradeOrdersList", list);
 
         return ViewNames.TRADE_ORDERS;
+    }
+
+    private String resolveAndAddAccountNo(String accountNo, Model model) {
+        String resolvedAccountNo = accountNoResolver.resolve(accountNo);
+        model.addAttribute("accountNo", resolvedAccountNo);
+        return resolvedAccountNo;
     }
 }

@@ -30,13 +30,18 @@ public class HoldingsController {
             @RequestParam(required = false) String accountNo,
             Model model
     ) {
-        String resolvedAccountNo = accountNoResolver.resolve(accountNo);
+        String resolvedAccountNo = resolveAndAddAccountNo(accountNo, model);
 
         List<Holdings> list = holdingsService.listByAccount(resolvedAccountNo);
 
-        model.addAttribute("accountNo", resolvedAccountNo);
         model.addAttribute("holdingsList", list);
 
         return ViewNames.HOLDINGS;
+    }
+
+    private String resolveAndAddAccountNo(String accountNo, Model model) {
+        String resolvedAccountNo = accountNoResolver.resolve(accountNo);
+        model.addAttribute("accountNo", resolvedAccountNo);
+        return resolvedAccountNo;
     }
 }
