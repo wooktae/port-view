@@ -14,7 +14,7 @@
 
 <body class="app-body">
 <div class="app-shell"
-     th:with="resolvedAccountNo=${plan != null and plan.accountNo() != null ? plan.accountNo() : '50187518'}">
+     th:with="resolvedAccountNo=${plan != null and plan.accountNo() != null ? plan.accountNo() : '-'}">
 
     <aside th:replace="~{fragments/sidebar :: sidebar('strategy', ${resolvedAccountNo})}"></aside>
 
@@ -243,7 +243,7 @@
                         <span th:text="${plan.strategyVersion()}">RESEARCH_V3_EXIT_SOFTENED</span>
                         <small>
                             계좌:
-                            <b th:text="${plan.accountNo()}">50187518</b>
+                            <b th:text="${plan.accountNo()}">-</b>
                         </small>
                     </div>
 
