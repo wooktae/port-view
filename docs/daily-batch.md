@@ -1,5 +1,17 @@
 # Daily Batch
 
+## DailyBatchService 분리 계획 요약
+
+상세 계획은 [`daily-batch-service-refactoring-plan.md`](daily-batch-service-refactoring-plan.md)를 기준으로 관리한다.
+
+현재 `DailyBatchService`는 화면 조회, run 생성, step 정의, 외부 Python 실행, stdout/stderr 수집, timeout 처리, step/run 상태 저장, retry/from-step/rerun-failed, Slack summary 호출을 함께 담당한다. 실제 분리는 한 번에 진행하지 않고 다음 순서로 진행한다.
+
+1. `DailyBatchStepRegistry`, `DailyBatchSlackNotifier`, `DailyBatchResultPayloadBuilder`
+2. `DailyBatchQueryService`, `ExternalProcessRunner`, `ProcessOutputCollector`, `IntradayPositionMonitorService`
+3. `DailyBatchRunService`, `DailyBatchRetryPlanner`, `DailyBatchStepExecutor`, `DailyBatchOrchestrator`
+
+첫 실제 분리 후보는 `DailyBatchStepRegistry`이다. step 정의만 옮기면 DB 상태 전이와 외부 프로세스 실행을 건드리지 않아 가장 안전하다.
+
 Daily Batch는 portfolio 관련 외부 모듈을 순차 실행하고, 실행 상태를 화면에서 확인할 수 있도록 DB에 run/step 로그를 남기는 기능입니다.
 
 ## 목적

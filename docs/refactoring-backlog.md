@@ -1,5 +1,35 @@
 # Refactoring Backlog
 
+## DailyBatchService 분리 최신 계획
+
+상세 실행 계획: [`daily-batch-service-refactoring-plan.md`](daily-batch-service-refactoring-plan.md)
+
+`DailyBatchService`는 현재 batch run 생성/상태 전이, step registry, 외부 Python 프로세스 실행, stdout/stderr 수집, timeout 처리, result payload JSON 생성, step log 저장, retry/from-step/rerun-failed 흐름, Slack summary 호출, 화면 조회 DTO 조립을 함께 담당한다.
+
+분리 후보:
+
+- `DailyBatchStepRegistry`
+- `DailyBatchSlackNotifier`
+- `DailyBatchResultPayloadBuilder`
+- `DailyBatchQueryService`
+- `ExternalProcessRunner`
+- `ProcessOutputCollector`
+- `IntradayPositionMonitorService`
+- `DailyBatchRunService`
+- `DailyBatchRetryPlanner`
+- `DailyBatchStepExecutor`
+- `DailyBatchOrchestrator`
+
+가장 먼저 실제 코드로 분리할 후보는 `DailyBatchStepRegistry`이다. DB 상태 전이와 외부 프로세스 실행을 건드리지 않고, step code/order/name/workDir/command 정의만 옮길 수 있어 위험이 가장 낮다.
+
+먼저 건드리지 말아야 할 영역:
+
+- `executeDailyPipeline(...)` step loop
+- `isNoTarget(...)` stdout/stderr 문구 판정
+- retry/from-step/rerun-failed step slicing
+- 외부 프로세스 timeout/stream 처리
+- request/result payload key 변경
+
 이 문서는 현재 구조 분석 기준의 리팩토링 후보를 정리합니다. 실제 삭제나 리팩토링 작업을 의미하지 않으며, 검토 후보 목록입니다.
 
 ## 우선순위 요약
