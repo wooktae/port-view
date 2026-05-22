@@ -13,7 +13,7 @@
 </head>
 
 <body class="app-body">
-<div class="app-shell" th:with="resolvedAccountNo=${accountNo != null ? accountNo : '50187518'}">
+<div class="app-shell" th:with="resolvedAccountNo=${accountNo != null ? accountNo : '-'}">
 
     <aside th:replace="~{fragments/sidebar :: sidebar('orders', ${resolvedAccountNo})}"></aside>
 

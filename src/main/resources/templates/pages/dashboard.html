@@ -12,7 +12,7 @@
 </head>
 
 <body class="app-body">
-<div class="app-shell" th:with="resolvedAccountNo=${accountNo != null ? accountNo : '50187518'}">
+<div class="app-shell" th:with="resolvedAccountNo=${accountNo != null ? accountNo : '-'}">
 
     <aside th:replace="~{fragments/sidebar :: sidebar('dashboard', ${resolvedAccountNo})}"></aside>
 
@@ -30,7 +30,7 @@
                 <div class="account-hero-card">
                     <div class="account-hero-main">
                         <div class="section-label">계좌</div>
-                        <h2 th:text="${resolvedAccountNo}">50187518</h2>
+                        <h2 th:text="${resolvedAccountNo}">-</h2>
                         <p>
                             해당 계좌의 최신 잔고 스냅샷이 없음.
                             Connector 잔고 수집 실행 후 다시 확인하면 됨.
@@ -52,7 +52,7 @@
                     <div class="account-hero-card">
                         <div class="account-hero-main">
                             <div class="section-label">계좌</div>
-                            <h2 th:text="${dashboard.accountNo}">50187518</h2>
+                            <h2 th:text="${dashboard.accountNo}">-</h2>
                             <p>
                                 기준일:
                                 <span th:text="${dashboard.asOfDate}">-</span>
@@ -286,7 +286,7 @@
                             <div class="dashboard-plan-tail">
                                 <span class="dashboard-action-account"
                                       th:text="${latestExecutionPlan.accountNo() == null ? dashboard.accountNo : latestExecutionPlan.accountNo()}">
-                                    50187518
+                                    -
                                 </span>
                                 <span class="detail-arrow">보기 →</span>
                             </div>
@@ -310,7 +310,7 @@
 
                             <div class="dashboard-action-side">
                                 <span class="status-pill empty">상세 화면 연동</span>
-                                <span class="dashboard-action-account" th:text="${dashboard.accountNo}">50187518</span>
+                                <span class="dashboard-action-account" th:text="${dashboard.accountNo}">-</span>
                                 <span class="detail-arrow">보기 →</span>
                             </div>
                         </a>
