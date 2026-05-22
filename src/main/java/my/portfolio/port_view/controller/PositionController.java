@@ -50,7 +50,7 @@ public class PositionController {
 
         PositionPageDTO page = positionService.getPositionPage(resolvedAccountNo);
 
-        model.addAttribute("accountNo", resolvedAccountNo);
+        addAccountNo(model, resolvedAccountNo);
         model.addAttribute("page", page);
 
         return ViewNames.POSITIONS;
@@ -69,10 +69,14 @@ public class PositionController {
         PositionDetailPageDTO page =
                 positionService.getPositionDetailPage(resolvedAccountNo, tickerCode);
 
-        model.addAttribute("accountNo", resolvedAccountNo);
+        addAccountNo(model, resolvedAccountNo);
         model.addAttribute("tickerCode", tickerCode);
         model.addAttribute("page", page);
 
         return ViewNames.POSITION_DETAIL;
+    }
+
+    private void addAccountNo(Model model, String resolvedAccountNo) {
+        model.addAttribute("accountNo", resolvedAccountNo);
     }
 }
