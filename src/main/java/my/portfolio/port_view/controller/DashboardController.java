@@ -58,12 +58,16 @@ public class DashboardController {
         ReportBacktestSummaryDto latestBacktestSummary = reportService.getLatestBacktestSummaryOrNull();
         StrategyExecutionPlanDto latestExecutionPlan = strategyExecutionViewService.getLatestPlanOrNull();
 
-        model.addAttribute("accountNo", resolvedAccountNo);
+        addAccountNo(model, resolvedAccountNo);
         model.addAttribute("dashboard", dashboard);
         model.addAttribute("strategyPositionSummary", strategyExecutionViewService.getCurrentPositionSummary());
         model.addAttribute("latestBacktestSummary", latestBacktestSummary);
         model.addAttribute("latestExecutionPlan", latestExecutionPlan);
 
         return ViewNames.DASHBOARD;
+    }
+
+    private void addAccountNo(Model model, String resolvedAccountNo) {
+        model.addAttribute("accountNo", resolvedAccountNo);
     }
 }
