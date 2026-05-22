@@ -1,0 +1,906 @@
+/* =========================================================
+   Strategy Execution View
+   src/main/resources/static/css/strategy-execution.css
+   ========================================================= */
+
+/* dashboard.css 영향 보정 */
+body.dashboard-body {
+    display: block !important;
+    justify-content: initial !important;
+    align-items: initial !important;
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    background: #f5f7fb;
+    color: #0f172a;
+}
+
+/* 전체 화면 중앙 정렬 */
+.strategy-shell {
+    width: min(1480px, calc(100% - 56px));
+    max-width: 1480px;
+    margin: 0 auto !important;
+    padding: 32px 0 48px;
+}
+
+/* Header */
+.strategy-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 24px;
+    width: 100%;
+}
+
+.strategy-header h1 {
+    margin: 4px 0 8px;
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #0f172a;
+}
+
+.strategy-header .header-desc {
+    margin: 0;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.strategy-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Summary */
+.strategy-summary-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    background: linear-gradient(135deg, #ffffff 0%, #f7f9fc 100%);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 24px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+}
+
+.strategy-summary-card h2 {
+    margin: 4px 0 8px;
+    font-size: 24px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.strategy-summary-card p {
+    margin: 0;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.badge-strategy {
+    background: #eef2ff;
+    color: #3730a3;
+}
+
+/* Notice */
+.strategy-notice-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    width: 100%;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 20px;
+    padding: 18px;
+    margin-bottom: 20px;
+}
+
+.strategy-notice-card .notice-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    background: #f97316;
+    color: #fff;
+    font-weight: 900;
+}
+
+.strategy-notice-card h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 800;
+    color: #9a3412;
+}
+
+.strategy-notice-card p {
+    margin: 0;
+    color: #9a3412;
+    line-height: 1.5;
+}
+
+/* Metric Cards */
+.strategy-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.strategy-metric-card {
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.strategy-metric-card .metric-title {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+}
+
+.strategy-metric-card .metric-value {
+    margin-top: 8px;
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.strategy-metric-card .metric-value.small {
+    font-size: 24px;
+    line-height: 1.15;
+}
+
+.strategy-metric-card .metric-subtitle {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.strategy-metric-card.ready {
+    border-left: 5px solid #16a34a;
+}
+
+.strategy-metric-card.blocked {
+    border-left: 5px solid #dc2626;
+}
+
+.strategy-metric-card.total {
+    border-left: 5px solid #2563eb;
+}
+
+.strategy-metric-card.cash {
+    border-left: 5px solid #7c3aed;
+}
+
+/* Panel */
+.strategy-panel {
+    width: 100%;
+    margin-top: 20px;
+    overflow: hidden;
+}
+
+/* 기존 dashboard.css의 panel-card를 보완 */
+.panel-card.strategy-panel {
+    border-radius: 24px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+}
+
+.strategy-panel .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+/* Table */
+.strategy-table {
+    width: 100%;
+    font-size: 14px;
+}
+
+.strategy-table th {
+    white-space: nowrap;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.strategy-table td {
+    vertical-align: middle;
+}
+
+/* Cells */
+.plan-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.plan-cell strong {
+    color: #0f172a;
+}
+
+.plan-cell span {
+    color: #64748b;
+    font-size: 13px;
+}
+
+.strategy-name-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 260px;
+}
+
+.strategy-name {
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.strategy-version {
+    color: #64748b;
+    font-size: 12px;
+    word-break: break-word;
+}
+
+.stock-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.stock-name {
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.stock-code {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.signal-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.label-mini {
+    display: inline-block;
+    min-width: 58px;
+    color: #64748b;
+    font-size: 12px;
+}
+
+/* Badges */
+.market-badge,
+.execution-status-badge,
+.action-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.market-badge.large,
+.execution-status-badge.large {
+    padding: 8px 14px;
+    font-size: 13px;
+}
+
+.market-badge.block {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.market-badge.aggressive {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.market-badge.neutral {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.execution-status-badge.ready {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.execution-status-badge.blocked {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.execution-status-badge.partial {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.execution-status-badge.sent {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.execution-status-badge.default-status {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.action-badge.buy {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.action-badge.sell {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.action-badge.hold {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+/* Text */
+.score-text {
+    margin-top: 5px;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.status-reason {
+    margin-top: 6px;
+    max-width: 260px;
+    color: #991b1b;
+    font-size: 12px;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.strong-number {
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.danger-number {
+    color: #dc2626;
+}
+
+.danger-text {
+    color: #b91c1c !important;
+}
+
+/* Detail Grid */
+.strategy-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    padding: 4px 0 2px;
+}
+
+.detail-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 14px;
+    min-height: 76px;
+}
+
+.detail-item.wide {
+    grid-column: span 2;
+}
+
+.detail-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+}
+
+.detail-item strong {
+    color: #0f172a;
+    word-break: break-word;
+}
+
+/* Score / Amount Stack */
+.score-stack,
+.amount-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.score-stack div,
+.amount-stack div {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 130px;
+}
+
+.score-stack span,
+.amount-stack span {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.score-stack strong,
+.amount-stack strong {
+    color: #0f172a;
+    font-size: 12px;
+}
+/* Connector Link */
+
+.connector-link-cell {
+    min-width: 150px;
+}
+
+.connector-order-link {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    text-decoration: none;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
+    transition: all 0.15s ease;
+}
+
+.connector-order-link:hover {
+    background: #dbeafe;
+    border-color: #60a5fa;
+    color: #1e40af;
+    transform: translateY(-1px);
+}
+
+.connector-order-link span {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: #2563eb;
+}
+
+.connector-order-link strong {
+    font-size: 15px;
+    font-weight: 900;
+    color: #1e3a8a;
+}
+
+.connector-order-link em {
+    font-style: normal;
+    font-size: 12px;
+    font-weight: 700;
+    color: #2563eb;
+}
+
+.connector-empty-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 120px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+}
+
+.connector-empty-cell span {
+    font-size: 13px;
+    font-weight: 800;
+    color: #64748b;
+}
+
+.connector-empty-cell em {
+    font-style: normal;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.execution-status-badge.filled {
+    background: #dcfce7;
+    color: #166534;
+}
+
+/* Validation */
+.validation-reason {
+    max-width: 420px;
+    color: #b91c1c;
+    font-size: 13px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.validation-details {
+    margin-top: 8px;
+}
+
+.validation-details summary {
+    cursor: pointer;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.validation-details pre {
+    margin: 8px 0 0;
+    padding: 10px;
+    background: #f1f5f9;
+    border-radius: 12px;
+    color: #334155;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 560px;
+}
+
+/* Legacy class compatibility: 혹시 이전 HTML 일부가 남아도 깨지지 않게 유지 */
+.strategy-page {
+    background: #f7f8fa;
+    color: #222;
+}
+
+.strategy-container {
+    width: min(1480px, calc(100% - 56px));
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: 32px 0 48px;
+}
+
+.strategy-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.strategy-card-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.strategy-card-desc {
+    color: #555;
+    line-height: 1.5;
+}
+
+.strategy-empty {
+    padding: 24px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    color: #555;
+}
+
+.strategy-table-wrap {
+    overflow-x: auto;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .strategy-metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .strategy-detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .detail-item.wide {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 768px) {
+    .strategy-shell,
+    .strategy-container {
+        width: min(100% - 28px, 1480px);
+        padding: 20px 0 36px;
+    }
+
+    .strategy-header,
+    .strategy-summary-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .strategy-actions {
+        justify-content: flex-start;
+    }
+
+    .strategy-metric-grid,
+    .strategy-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .detail-item.wide {
+        grid-column: span 1;
+    }
+}
+
+/* =========================================================
+   Strategy Execution Fine Tuning
+   - UNKNOWN market badge
+   - PARTIALLY_BLOCKED status badge
+   - numeric/table readability
+   ========================================================= */
+
+/* Market Signal: UNKNOWN */
+.market-badge.unknown {
+    background: var(--gray-soft, #e2e8f0);
+    color: var(--gray, #64748b);
+    border: 1px solid #cbd5e1;
+}
+
+/* Plan / Order Status: PARTIALLY_BLOCKED */
+.execution-status-badge.partial {
+    background: var(--orange-soft, #fff7ed);
+    color: #c2410c;
+    border: 1px solid var(--orange-line, #fed7aa);
+}
+
+/* Table numeric readability */
+.strategy-table td.text-end,
+.strategy-table th.text-end {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.strategy-table .strong-number {
+    font-weight: 800;
+    color: var(--text-main, #0f172a);
+}
+
+.strategy-table .danger-number {
+    color: var(--red, #dc2626);
+}
+
+/* Amount / score stacks */
+.strategy-table .amount-stack strong,
+.strategy-table .score-stack strong {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Long text safety */
+.strategy-table .validation-reason,
+.strategy-table .event-key-text {
+    max-width: 360px;
+    overflow-wrap: anywhere;
+}
+
+/* Connector link hover refinement */
+.connector-order-link:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+}
+
+/* Details block readability */
+.validation-details summary {
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.validation-details pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Metric value overflow protection */
+.strategy-metric-card .metric-value,
+.strategy-metric-card .metric-value.small {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+
+/* Mobile table minimum width */
+.strategy-table {
+    min-width: 1080px;
+}
+
+/* =========================================================
+   Daily Strategy View
+   - strategy_daily.html 전용 보정
+   - 기존 Strategy Execution 스타일을 재사용하면서
+     Daily Signal / Position Decision 화면 가독성만 보완
+   ========================================================= */
+
+.compact-metrics {
+    margin-top: 18px;
+    margin-bottom: 22px;
+}
+
+.compact-metrics .strategy-metric-card {
+    min-height: 118px;
+}
+
+.strategy-panel .panel-subtitle {
+    margin-top: 6px;
+    margin-bottom: 0;
+    color: #6b7280;
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+
+.strategy-table .score-text {
+    margin-top: 8px;
+    color: #6b7280;
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+.strategy-table .validation-details {
+    margin-top: 6px;
+}
+
+.strategy-table .validation-details summary {
+    cursor: pointer;
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.strategy-table .validation-details pre {
+    max-height: 320px;
+    overflow: auto;
+    margin-top: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    color: #334155;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.strategy-table .validation-reason {
+    max-width: 260px;
+    color: #334155;
+    font-size: 0.86rem;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.strategy-table .status-reason {
+    margin-top: 6px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.strategy-table .amount-stack div,
+.strategy-table .score-stack div {
+    gap: 8px;
+}
+
+.strategy-table .amount-stack span,
+.strategy-table .score-stack span {
+    min-width: 56px;
+    color: #64748b;
+}
+
+.strategy-table .amount-stack strong,
+.strategy-table .score-stack strong {
+    color: #111827;
+    font-weight: 700;
+}
+
+.strategy-table .plan-cell strong {
+    color: #111827;
+}
+
+.strategy-table .plan-cell span {
+    color: #64748b;
+}
+
+.strategy-table .stock-cell .stock-name {
+    font-weight: 800;
+    color: #111827;
+}
+
+.strategy-table .stock-cell .stock-code {
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 0.82rem;
+}
+
+.empty-panel.compact {
+    margin-top: 14px;
+    padding: 22px 24px;
+}
+
+.empty-panel.compact .empty-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 1rem;
+}
+
+.empty-panel.compact h2 {
+    font-size: 1.05rem;
+    margin-bottom: 4px;
+}
+
+.empty-panel.compact p {
+    margin-bottom: 0;
+    color: #64748b;
+    line-height: 1.55;
+}
+
+/* Daily 화면에서 원본 JSON이 긴 경우 테이블 폭 튐 방지 */
+.strategy-table td details {
+    max-width: 420px;
+}
+
+/* 숫자/점수 컬럼이 너무 넓어지지 않도록 보정 */
+.strategy-table .score-stack {
+    min-width: 150px;
+}
+
+.strategy-table .amount-stack {
+    min-width: 130px;
+}
+
+/* Daily Run recent table */
+.strategy-panel .panel-link {
+    color: #2563eb;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.strategy-panel .panel-link:hover {
+    text-decoration: underline;
+}
+
+/* 모바일 대응 */
+@media (max-width: 768px) {
+    .compact-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .strategy-table .validation-details pre {
+        max-height: 240px;
+        font-size: 0.74rem;
+    }
+
+    .strategy-table td details {
+        max-width: 280px;
+    }
+
+    .strategy-table .amount-stack,
+    .strategy-table .score-stack {
+        min-width: 110px;
+    }
+}
+.pnl-rate-text {
+    font-style: normal;
+    color: #64748b;
+    font-weight: 850;
+}

@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Daily Strategy</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/css/bootstrap.min.css"
+          rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link th:href="@{/css/dashboard.css}" rel="stylesheet">
+    <link th:href="@{/css/strategy-execution.css}" rel="stylesheet">
+</head>
+
+<body class="dashboard-body">
+
+<div class="strategy-shell">
+
+    <!-- Header -->
+    <header class="strategy-header">
+        <div>
+            <div class="eyebrow">포트폴리오 운영</div>
+            <h1>Daily Strategy</h1>
+            <p class="header-desc">
+                오늘 기준 전략 매수 신호와 보유 포지션 HOLD / SELL 판단 결과를 확인
+            </p>
+        </div>
+
+        <div class="strategy-actions">
+            <a class="nav-button ghost" th:href="@{/dashboard}">
+                ← Dashboard
+            </a>
+            <a class="nav-button ghost" th:href="@{/strategy/execution/plans}">
+                실행 계획
+            </a>
+            <a class="nav-button ghost" th:href="@{/strategy/reports/latest}">
+                백테스트 리포트
+            </a>
+        </div>
+    </header>
+
+    <!-- Notice -->
+    <section class="strategy-notice-card">
+        <div class="notice-icon">D</div>
+        <div>
+            <h2>Daily Signal / Position Decision 화면</h2>
+            <p>
+                이 화면은 백테스트 결과가 아니라 실제 Daily Signal 실행 결과를 보여줌.
+                Daily Signal은 최신 feature 기준 매수 후보이고,
+                Daily Position Decision은 실제 보유 포지션 기준 HOLD / SELL / SKIP 판단 결과임.
+            </p>
+            <p>
+                Execution Plan으로 연결된 주문 후보는 Strategy Execution 화면에서 승인/전송 가능.
+                Daily Signal 단계의 목표금액/수량은 비워두고, 실제 주문수량은 Execution 단계에서 계좌 현금과 현재가 기준으로 계산됨.
+            </p>
+        </div>
+    </section>
+
+    <main>
+
+        <!-- Daily Run Summary -->
+        <section class="strategy-summary-card">
+            <div>
+                <div class="section-label">Daily Run</div>
+                <h2>
+                    <span th:text="'#' + ${run.id()}">#-</span>
+                    <span th:text="${run.runDate()}">-</span>
+                </h2>
+                <p>
+                    <span th:text="${run.strategyName()}">-</span>
+                    /
+                    <span th:text="${run.strategyVersion()}">-</span>
+                </p>
+            </div>
+
+            <div class="summary-badges">
+                <span th:class="'market-badge large ' + ${run.marketSignal() == 'BLOCK' ? 'block' : (run.marketSignal() == 'AGGRESSIVE' ? 'aggressive' : (run.marketSignal() == 'UNKNOWN' ? 'unknown' : 'neutral'))}"
+                      th:text="${run.marketSignalLabel()}">
+                    -
+                </span>
+
+                <span th:class="'execution-status-badge large ' + ${run.runStatus() == 'COMPLETED' ? 'filled' : (run.runStatus() == 'FAILED' ? 'blocked' : (run.runStatus() == 'RUNNING' ? 'sent' : 'default-status'))}"
+                      th:text="${run.runStatusLabel()}">
+                    -
+                </span>
+            </div>
+        </section>
+
+        <!-- Daily Run Metrics -->
+        <section class="strategy-metric-grid">
+            <article class="strategy-metric-card total">
+                <div class="metric-title">매수 후보</div>
+                <div class="metric-value" th:text="${run.candidateCount() != null ? run.candidateCount() : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">filter 통과 후보</div>
+            </article>
+
+            <article class="strategy-metric-card ready">
+                <div class="metric-title">매수 신호</div>
+                <div class="metric-value" th:text="${run.signalCount() != null ? run.signalCount() : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">Daily BUY Signal</div>
+            </article>
+
+            <article class="strategy-metric-card cash">
+                <div class="metric-title">포지션 판단</div>
+                <div class="metric-value"
+                     th:text="${summary['position_decision_count'] != null ? summary['position_decision_count'] : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">HOLD / SELL / SKIP</div>
+            </article>
+
+            <article class="strategy-metric-card blocked">
+                <div class="metric-title">실행 주문</div>
+                <div class="metric-value"
+                     th:text="${summary['execution_order_count'] != null ? summary['execution_order_count'] : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">Execution Order</div>
+            </article>
+        </section>
+
+        <!-- Daily Run Detail -->
+        <section class="panel-card strategy-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="section-label">Run Detail</div>
+                    <h3>Daily 실행 정보</h3>
+                </div>
+            </div>
+
+            <div class="strategy-detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Run Date</span>
+                    <strong th:text="${run.runDate()}">-</strong>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Data Date</span>
+                    <strong th:text="${run.dataDate()}">-</strong>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Run Type</span>
+                    <strong th:text="${run.runType()}">-</strong>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Base Exposure</span>
+                    <strong th:text="${run.baseExposureText()}">-</strong>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Max Positions</span>
+                    <strong th:text="${run.maxPositions() != null ? run.maxPositions() : '-'}">-</strong>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Ready Execution</span>
+                    <strong th:text="${summary['ready_execution_order_count'] != null ? summary['ready_execution_order_count'] : 0}">
+                        0
+                    </strong>
+                </div>
+
+                <div class="detail-item wide">
+                    <span class="detail-label">Run Note</span>
+                    <strong th:text="${run.runNote() != null ? run.runNote() : '-'}">
+                        -
+                    </strong>
+                </div>
+
+                <div class="detail-item wide">
+                    <span class="detail-label">Error</span>
+                    <strong class="danger-text"
+                            th:text="${run.errorMessage() != null ? run.errorMessage() : '-'}">
+                        -
+                    </strong>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Started</span>
+                    <strong th:text="${run.startedAtText()}">
+                        -
+                    </strong>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Finished</span>
+                    <strong th:text="${run.finishedAtText()}">
+                        -
+                    </strong>
+                </div>
+            </div>
+        </section>
+
+        <!-- Recent Runs -->
+        <section class="panel-card strategy-panel" th:if="${recentRuns != null and !#lists.isEmpty(recentRuns)}">
+            <div class="panel-header">
+                <div>
+                    <div class="section-label">Recent</div>
+                    <h3>최근 Daily Run</h3>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table dashboard-table strategy-table align-middle">
+                    <thead>
+                    <tr>
+                        <th>Run</th>
+                        <th>날짜</th>
+                        <th>시장</th>
+                        <th>상태</th>
+                        <th class="text-end">후보</th>
+                        <th class="text-end">신호</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="r : ${recentRuns}">
+                        <td>
+                            <a class="panel-link" th:href="@{/strategy/daily/{id}(id=${r.id()})}">
+                                <strong th:text="'#' + ${r.id()}">#-</strong>
+                            </a>
+                        </td>
+                        <td>
+                            <div class="amount-stack">
+                                <div>
+                                    <span>Run</span>
+                                    <strong th:text="${r.runDate()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>Data</span>
+                                    <strong th:text="${r.dataDate()}">-</strong>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span th:class="'market-badge ' + ${r.marketSignal() == 'BLOCK' ? 'block' : (r.marketSignal() == 'AGGRESSIVE' ? 'aggressive' : (r.marketSignal() == 'UNKNOWN' ? 'unknown' : 'neutral'))}"
+                                  th:text="${r.marketSignalLabel()}">
+                                -
+                            </span>
+                        </td>
+                        <td>
+                            <span th:class="'execution-status-badge ' + ${r.runStatus() == 'COMPLETED' ? 'filled' : (r.runStatus() == 'FAILED' ? 'blocked' : (r.runStatus() == 'RUNNING' ? 'sent' : 'default-status'))}"
+                                  th:text="${r.runStatusLabel()}">
+                                -
+                            </span>
+                        </td>
+                        <td class="text-end" th:text="${r.candidateCount() != null ? r.candidateCount() : 0}">
+                            0
+                        </td>
+                        <td class="text-end" th:text="${r.signalCount() != null ? r.signalCount() : 0}">
+                            0
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Daily BUY Signals -->
+        <section class="panel-card strategy-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="section-label">BUY Signal</div>
+                    <h3>Daily 매수 신호</h3>
+                    <p class="panel-subtitle">
+                        최신 feature 기준으로 생성된 오늘의 매수 후보.
+                        Execution 연결 시 source_type=DAILY_SIGNAL_BUY로 주문 후보 생성.
+                    </p>
+                </div>
+
+                <div class="panel-actions">
+                    <a class="panel-link" th:href="@{/strategy/execution/plans}">
+                        실행 계획 →
+                    </a>
+                </div>
+            </div>
+
+            <div class="empty-panel compact" th:if="${signals == null or #lists.isEmpty(signals)}">
+                <div class="empty-icon">!</div>
+                <div>
+                    <h2>Daily 매수 신호가 없어</h2>
+                    <p>이 Daily Run에 연결된 strategy_daily_signal 데이터가 없음.</p>
+                </div>
+            </div>
+
+            <div class="table-responsive" th:if="${signals != null and !#lists.isEmpty(signals)}">
+                <table class="table dashboard-table strategy-table align-middle">
+                    <thead>
+                    <tr>
+                        <th>순위</th>
+                        <th>종목</th>
+                        <th>상태</th>
+                        <th>시장</th>
+                        <th>점수</th>
+                        <th class="text-end">비중</th>
+                        <th>사유</th>
+                        <th>Execution</th>
+                        <th>원본</th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                    <tr th:each="s : ${signals}">
+                        <td>
+                            <div class="plan-cell">
+                                <strong th:text="${s.rankNo() != null ? '#' + s.rankNo() : '-'}">-</strong>
+                                <span th:text="'signal #' + ${s.id()}">-</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="stock-cell">
+                                <div class="stock-name"
+                                     th:text="${s.companyName() != null ? s.companyName() : '-'}">
+                                    -
+                                </div>
+                                <div class="stock-code"
+                                     th:text="${s.tickerCode() != null ? s.tickerCode() : '-'}">
+                                    -
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="amount-stack">
+                                <div>
+                                    <span>유형</span>
+                                    <strong th:text="${s.signalTypeLabel()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>상태</span>
+                                    <strong th:text="${s.signalStatusLabel()}">-</strong>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <span th:class="'market-badge ' + ${s.marketSignal() == 'BLOCK' ? 'block' : (s.marketSignal() == 'AGGRESSIVE' ? 'aggressive' : (s.marketSignal() == 'UNKNOWN' ? 'unknown' : 'neutral'))}"
+                                  th:text="${s.marketSignalLabel()}">
+                                -
+                            </span>
+                            <div class="score-text"
+                                 th:text="${s.baseExposure() != null ? 'exposure ' + s.baseExposureText() : '-'}">
+                                -
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="score-stack">
+                                <div>
+                                    <span>최종</span>
+                                    <strong th:text="${s.finalScoreText()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>수급</span>
+                                    <strong th:text="${s.flowScoreText()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>가격흐름</span>
+                                    <strong th:text="${s.tapeScoreText()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>정보</span>
+                                    <strong th:text="${s.infoScoreText()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>공매도</span>
+                                    <strong th:text="${s.shortScoreText()}">-</strong>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td class="text-end">
+                            <div class="amount-stack">
+                                <div>
+                                    <span>position</span>
+                                    <strong th:text="${s.positionSizeText()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>signal target</span>
+                                    <strong th:text="${s.targetAmount() != null ? #numbers.formatDecimal(s.targetAmount(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>signal qty</span>
+                                    <strong th:text="${s.targetQty() != null ? s.targetQty() + '주' : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="validation-reason"
+                                 th:text="${s.entryReason() != null ? s.entryReason() : '-'}">
+                                -
+                            </div>
+                            <div class="status-reason danger-text"
+                                 th:if="${s.blockReason() != null}"
+                                 th:text="${s.blockReason()}">
+                                -
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="connector-link-cell" th:if="${s.executionOrderId() != null}">
+                                <a class="connector-order-link compact"
+                                   th:href="@{/strategy/execution/plans/{id}(id=${s.executionPlanId()})}">
+                                    <span>Execution</span>
+                                    <strong th:text="'#' + ${s.executionOrderId()}">#-</strong>
+                                    <em th:text="${s.executionStatusLabel()}">상태</em>
+                                </a>
+
+                                <div class="connector-submit-hint">
+                                    <span th:text="${s.executionOrderQty() != null ? s.executionOrderQty() + '주' : '-'}">-</span>
+                                    <em th:text="${s.executionOrderPrice() != null ? #numbers.formatDecimal(s.executionOrderPrice(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">-</em>
+                                </div>
+
+                                <div class="connector-submit-hint" th:if="${s.executionTargetAmount() != null}">
+                                    <span>목표금액</span>
+                                    <em th:text="${#numbers.formatDecimal(s.executionTargetAmount(), 0, 'COMMA', 0, 'POINT') + '원'}">
+                                        -
+                                    </em>
+                                </div>
+                            </div>
+
+                            <div class="connector-empty-cell" th:if="${s.executionOrderId() == null}">
+                                <span>미연결</span>
+                                <em>Execution Order 없음</em>
+                            </div>
+                        </td>
+
+                        <td>
+                            <details class="validation-details" th:if="${s.buyInfo() != null}">
+                                <summary>buy_info</summary>
+                                <pre th:text="${s.buyInfo()}">-</pre>
+                            </details>
+
+                            <details class="validation-details" th:if="${s.rawFeatures() != null}">
+                                <summary>raw_features</summary>
+                                <pre th:text="${s.rawFeatures()}">-</pre>
+                            </details>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Daily Position Decisions -->
+        <section class="panel-card strategy-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="section-label">Position Decision</div>
+                    <h3>Daily 포지션 HOLD / SELL 판단</h3>
+                    <p class="panel-subtitle">
+                        실제 보유 포지션 기준으로 오늘 HOLD / SELL / SKIP 판단을 저장한 결과.
+                        OPEN 포지션이 없으면 결과가 비어 있는 것이 정상.
+                    </p>
+                </div>
+            </div>
+
+            <div class="strategy-metric-grid compact-metrics">
+                <article class="strategy-metric-card total">
+                    <div class="metric-title">전체 판단</div>
+                    <div class="metric-value"
+                         th:text="${summary['position_decision_count'] != null ? summary['position_decision_count'] : 0}">
+                        0
+                    </div>
+                    <div class="metric-subtitle">position decision</div>
+                </article>
+
+                <article class="strategy-metric-card blocked">
+                    <div class="metric-title">SELL</div>
+                    <div class="metric-value"
+                         th:text="${summary['sell_decision_count'] != null ? summary['sell_decision_count'] : 0}">
+                        0
+                    </div>
+                    <div class="metric-subtitle">매도 판단</div>
+                </article>
+
+                <article class="strategy-metric-card ready">
+                    <div class="metric-title">HOLD</div>
+                    <div class="metric-value"
+                         th:text="${summary['hold_decision_count'] != null ? summary['hold_decision_count'] : 0}">
+                        0
+                    </div>
+                    <div class="metric-subtitle">보유 판단</div>
+                </article>
+
+                <article class="strategy-metric-card cash">
+                    <div class="metric-title">SKIP</div>
+                    <div class="metric-value"
+                         th:text="${summary['skip_decision_count'] != null ? summary['skip_decision_count'] : 0}">
+                        0
+                    </div>
+                    <div class="metric-subtitle">제외</div>
+                </article>
+            </div>
+
+            <div class="empty-panel compact"
+                 th:if="${positionDecisions == null or #lists.isEmpty(positionDecisions)}">
+                <div class="empty-icon">0</div>
+                <div>
+                    <h2>포지션 판단 결과가 없어</h2>
+                    <p>
+                        현재 active position이 없거나 아직 Daily Position Decision을 실행하지 않은 상태.
+                        현재 보유 포지션이 생기면 이 영역에 HOLD / SELL / SKIP 결과가 표시됨.
+                    </p>
+                </div>
+            </div>
+
+            <div class="table-responsive"
+                 th:if="${positionDecisions != null and !#lists.isEmpty(positionDecisions)}">
+                <table class="table dashboard-table strategy-table align-middle">
+                    <thead>
+                    <tr>
+                        <th>판단</th>
+                        <th>종목</th>
+                        <th>상태</th>
+                        <th>진입/현재</th>
+                        <th class="text-end">수량</th>
+                        <th class="text-end">손익</th>
+                        <th>시장/점수</th>
+                        <th>Execution</th>
+                        <th>원본</th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                    <tr th:each="d : ${positionDecisions}">
+                        <td>
+                            <div class="plan-cell">
+                                <strong th:text="'#' + ${d.id()}">#-</strong>
+                                <span th:text="${d.decisionDate()}">-</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="stock-cell">
+                                <div class="stock-name"
+                                     th:text="${d.stockName() != null ? d.stockName() : '-'}">
+                                    -
+                                </div>
+                                <div class="stock-code"
+                                     th:text="${d.tickerCode() != null ? d.tickerCode() : '-'}">
+                                    -
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="amount-stack">
+                                <div>
+                                    <span>판단</span>
+                                    <strong th:text="${d.decisionTypeLabel()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>상태</span>
+                                    <strong th:text="${d.decisionStatusLabel()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>사유</span>
+                                    <strong th:text="${d.reasonText()}">-</strong>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="amount-stack">
+                                <div>
+                                    <span>진입일</span>
+                                    <strong th:text="${d.entryDate() != null ? d.entryDate() : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>진입가</span>
+                                    <strong th:text="${d.entryPrice() != null ? #numbers.formatDecimal(d.entryPrice(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>현재가</span>
+                                    <strong th:text="${d.currentPrice() != null ? #numbers.formatDecimal(d.currentPrice(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>보유일</span>
+                                    <strong th:text="${d.holdingDays() != null ? d.holdingDays() + '일' : '-'}">-</strong>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td class="text-end">
+                            <div class="amount-stack">
+                                <div>
+                                    <span>진입</span>
+                                    <strong th:text="${d.entryQty() != null ? d.entryQty() + '주' : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>잔여</span>
+                                    <strong th:text="${d.remainingQty() != null ? d.remainingQty() + '주' : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>현재</span>
+                                    <strong th:text="${d.currentQty() != null ? d.currentQty() + '주' : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>매도가능</span>
+                                    <strong th:text="${d.sellableQty() != null ? d.sellableQty() + '주' : '-'}">-</strong>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td class="text-end">
+                            <div class="amount-stack">
+                                <div>
+                                    <span>손익</span>
+                                    <strong th:class="${d.expectedPnlAmount() != null and d.expectedPnlAmount() < 0 ? 'danger-text' : ''}"
+                                            th:text="${d.expectedPnlAmount() != null ? #numbers.formatDecimal(d.expectedPnlAmount(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>손익률</span>
+                                    <strong th:class="${d.expectedPnlRate() != null and d.expectedPnlRate() < 0 ? 'danger-text' : ''}"
+                                            th:text="${d.expectedPnlRate() != null ? #numbers.formatDecimal(d.expectedPnlRate() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>주문수량</span>
+                                    <strong th:text="${d.orderQty() != null ? d.orderQty() + '주' : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>주문가</span>
+                                    <strong th:text="${d.orderPrice() != null ? #numbers.formatDecimal(d.orderPrice(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <span th:class="'market-badge ' + ${d.marketSignal() == 'BLOCK' ? 'block' : (d.marketSignal() == 'AGGRESSIVE' ? 'aggressive' : (d.marketSignal() == 'UNKNOWN' ? 'unknown' : 'neutral'))}"
+                                  th:text="${d.marketSignalLabel()}">
+                                -
+                            </span>
+
+                            <div class="score-stack">
+                                <div>
+                                    <span>최종</span>
+                                    <strong th:text="${d.finalScore() != null ? d.finalScore() : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>수급</span>
+                                    <strong th:text="${d.flowScore() != null ? d.flowScore() : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>정보</span>
+                                    <strong th:text="${d.infoScore() != null ? d.infoScore() : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>가격흐름</span>
+                                    <strong th:text="${d.tapeScore() != null ? d.tapeScore() : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>공매도</span>
+                                    <strong th:text="${d.shortPressureScore() != null ? d.shortPressureScore() : '-'}">-</strong>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="connector-link-cell" th:if="${d.executionOrderId() != null}">
+                                <a class="connector-order-link compact"
+                                   th:href="@{/strategy/execution/plans}">
+                                    <span>Execution</span>
+                                    <strong th:text="'#' + ${d.executionOrderId()}">#-</strong>
+                                    <em>실행 계획 →</em>
+                                </a>
+                            </div>
+
+                            <div class="connector-empty-cell" th:if="${d.executionOrderId() == null}">
+                                <span>미생성</span>
+                                <em>Execution Order 없음</em>
+                            </div>
+                        </td>
+
+                        <td>
+                            <details class="validation-details" th:if="${d.sellInfo() != null}">
+                                <summary>sell_info</summary>
+                                <pre th:text="${d.sellInfo()}">-</pre>
+                            </details>
+
+                            <details class="validation-details" th:if="${d.validationResult() != null}">
+                                <summary>validation</summary>
+                                <pre th:text="${d.validationResult()}">-</pre>
+                            </details>
+
+                            <details class="validation-details" th:if="${d.positionContext() != null}">
+                                <summary>position_context</summary>
+                                <pre th:text="${d.positionContext()}">-</pre>
+                            </details>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>

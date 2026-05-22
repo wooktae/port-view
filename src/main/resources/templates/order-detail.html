@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>주문 상세</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link th:href="@{/css/dashboard.css}" rel="stylesheet">
+    <link th:href="@{/css/orders.css}" rel="stylesheet">
+    <link th:href="@{/css/order-detail.css}" rel="stylesheet">
+</head>
+
+<body class="dashboard-body">
+
+<div class="order-detail-shell">
+
+    <!-- Header -->
+    <header class="order-detail-header">
+        <div>
+            <div class="eyebrow">포트폴리오 운영</div>
+            <h1>주문 상세</h1>
+            <p class="header-desc">
+                하나의 커넥터 주문 요청에 대한 상위/하위 주문 흐름, 이벤트 타임라인, 체결내역을 추적하는 주문 생명주기 화면
+            </p>
+        </div>
+
+        <div class="detail-actions">
+            <a class="nav-button ghost" th:href="@{/orders(accountNo=${accountNo})}">
+                ← 주문 목록
+            </a>
+            <a class="nav-button ghost" th:href="@{/dashboard(accountNo=${accountNo})}">
+                대시보드
+            </a>
+        </div>
+    </header>
+
+    <!-- Not Found -->
+    <section class="empty-panel" th:if="${!page.found}">
+        <div class="empty-icon">!</div>
+        <div>
+            <h2>주문을 찾을 수 없어</h2>
+            <p>
+                요청한 주문 ID가 없거나 계좌번호가 맞지 않음.
+            </p>
+        </div>
+    </section>
+
+    <main th:if="${page.found}">
+
+        <!-- Page Role Guide -->
+        <section class="detail-summary-card">
+            <div>
+                <div class="section-label">화면 역할</div>
+                <h2>커넥터 주문 생명주기</h2>
+                <p>
+                    이 화면은 connector_order_request 한 건을 기준으로 주문 요청, 정정/취소 연결 관계,
+                    주문 이벤트, 체결 내역을 한 번에 추적하는 상세 화면.
+                </p>
+                <p>
+                    전략 실행 상세에서 넘어온 주문이라면 실제 브로커 주문이 접수, 체결, 취소, 정정되었는지
+                    이 화면에서 최종 확인하면 됨.
+                </p>
+            </div>
+
+            <div class="detail-summary-badges">
+                <span class="soft-badge badge-connector">주문</span>
+                <span class="soft-badge badge-count">이벤트</span>
+                <span class="soft-badge badge-live">체결</span>
+            </div>
+        </section>
+
+        <!-- Current Order Summary -->
+        <section class="detail-summary-card">
+            <div>
+                <div class="section-label">현재 주문</div>
+                <h2 th:text="${page.titleText}">-</h2>
+                <p>
+                    주문 생명주기:
+                    <strong th:text="${page.lifecycleText}">-</strong>
+                </p>
+            </div>
+
+            <div class="detail-summary-badges">
+                <span class="soft-badge badge-connector">
+                    연결주문 <strong th:text="${page.chainCount}">0</strong>
+                </span>
+                <span class="soft-badge badge-count">
+                    이벤트 <strong th:text="${page.eventCount}">0</strong>
+                </span>
+                <span class="soft-badge badge-live">
+                    체결 <strong th:text="${page.fillCount}">0</strong>
+                </span>
+            </div>
+        </section>
+
+        <!-- Current Detail Cards -->
+        <section class="current-order-grid">
+            <article class="current-order-card">
+                <div class="metric-title">종목</div>
+                <div class="current-main">
+                    <span th:text="${page.currentOrder.stockName}">-</span>
+                    <em th:text="${page.currentOrder.tickerCode}">-</em>
+                </div>
+            </article>
+
+            <article class="current-order-card">
+                <div class="metric-title">주문 유형</div>
+                <div>
+                    <span th:class="'order-type-badge ' + ${page.currentOrder.requestTypeClass}"
+                          th:text="${page.currentOrder.requestTypeLabel}">
+                        -
+                    </span>
+                </div>
+            </article>
+
+            <article class="current-order-card">
+                <div class="metric-title">현재 상태</div>
+                <div>
+                    <span th:class="'order-status-badge ' + ${page.currentOrder.requestStatusClass}"
+                          th:text="${page.currentOrder.requestStatusLabel}">
+                        -
+                    </span>
+                </div>
+            </article>
+
+            <article class="current-order-card">
+                <div class="metric-title">브로커 주문번호</div>
+                <div class="current-main">
+                    <span th:text="${page.currentOrder.brokerOrderNo}">-</span>
+                    <em th:text="${page.currentOrder.brokerBranchCode}">-</em>
+                </div>
+            </article>
+        </section>
+
+        <!-- Chain -->
+        <section class="panel-card detail-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="section-label">주문 연결 흐름</div>
+                    <h3>상위/하위 주문 흐름</h3>
+                </div>
+            </div>
+
+            <div class="chain-flow">
+                <div th:each="node, stat : ${page.chain}"
+                     th:class="'chain-node ' + ${node.requestTypeClass} + (${node.current} ? ' current' : '')">
+
+                    <div class="chain-index">
+                        <span th:text="${stat.index + 1}">0</span>
+                    </div>
+
+                    <div class="chain-content">
+                        <div class="chain-top">
+                            <div>
+                                <h4>
+                                    <span th:text="'#' + ${node.id}">-</span>
+                                    <span th:text="${node.requestTypeLabel}">-</span>
+                                </h4>
+                                <p>
+                                    상위주문:
+                                    <strong th:text="${node.parentText}">-</strong>
+                                </p>
+                            </div>
+
+                            <div class="chain-badges">
+                                <span th:class="'order-type-badge ' + ${node.requestTypeClass}"
+                                      th:text="${node.requestTypeLabel}">
+                                    -
+                                </span>
+                                <span th:class="'order-status-badge ' + ${node.requestStatusClass}"
+                                      th:text="${node.requestStatusLabel}">
+                                    -
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="chain-info-grid">
+                            <div>
+                                <span>주문방식</span>
+                                <strong th:text="${T(my.portfolio.port_view.util.ConnectorLabelUtils).orderMethodLabel(node.orderMethod)}">-</strong>
+                            </div>
+                            <div>
+                                <span>수량</span>
+                                <strong th:text="${node.orderQtyText}">-</strong>
+                            </div>
+                            <div>
+                                <span>가격</span>
+                                <strong th:text="${node.orderPriceText}">-</strong>
+                            </div>
+                            <div>
+                                <span>브로커</span>
+                                <strong th:text="${node.brokerOrderNo}">-</strong>
+                            </div>
+                            <div>
+                                <span>요청시각</span>
+                                <strong th:text="${node.requestedAtText}">-</strong>
+                            </div>
+                            <div>
+                                <span>최종 이벤트</span>
+                                <strong th:text="${node.lastEventAtText}">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Event Timeline -->
+        <section class="panel-card detail-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="section-label">이벤트 타임라인</div>
+                    <h3>주문 이벤트 타임라인</h3>
+                </div>
+            </div>
+
+            <div class="timeline-empty" th:if="${#lists.isEmpty(page.events)}">
+                저장된 체결 row 없음. 미체결/취소/정정 주문에서는 정상일 수 있음.
+            </div>
+
+            <div class="event-timeline" th:if="${!#lists.isEmpty(page.events)}">
+                <div th:each="event : ${page.events}"
+                     th:class="'event-item ' + ${event.eventTypeClass}">
+
+                    <div class="event-dot"></div>
+
+                    <div class="event-card">
+                        <div class="event-card-top">
+                            <div>
+                                <h4>
+                                    <span th:text="'이벤트 #' + ${event.id}">-</span>
+                                    <em th:text="'요청 #' + ${event.orderRequestId}">-</em>
+                                </h4>
+                                <p th:text="${event.eventTsText}">-</p>
+                            </div>
+
+                            <div class="event-badges">
+                                <span th:class="'order-status-badge ' + ${event.eventTypeClass}"
+                                      th:text="${event.eventTypeLabel}">
+                                    -
+                                </span>
+                                <span th:class="'order-type-badge ' + ${event.sideClass}"
+                                      th:text="${event.sideLabel}">
+                                    -
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="event-info-grid">
+                            <div>
+                                <span>브로커</span>
+                                <strong th:text="${event.brokerOrderNo}">-</strong>
+                            </div>
+                            <div>
+                                <span>주문수량</span>
+                                <strong th:text="${event.orderQtyText}">-</strong>
+                            </div>
+                            <div>
+                                <span>체결수량</span>
+                                <strong th:text="${event.executedQtyText}">-</strong>
+                            </div>
+                            <div>
+                                <span>잔량</span>
+                                <strong th:text="${event.remainingQtyText}">-</strong>
+                            </div>
+                            <div>
+                                <span>평균체결가</span>
+                                <strong th:text="${event.avgExecPriceText}">-</strong>
+                            </div>
+                            <div>
+                                <span>체결금액</span>
+                                <strong th:text="${event.totalExecAmountText}">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Fills -->
+        <section class="panel-card detail-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="section-label">체결 내역</div>
+                    <h3>체결 내역</h3>
+                </div>
+            </div>
+
+            <div class="timeline-empty" th:if="${#lists.isEmpty(page.fills)}">
+                이 주문 chain에 연결된 체결 내역이 없음.
+            </div>
+
+            <div class="table-responsive" th:if="${!#lists.isEmpty(page.fills)}">
+                <table class="table dashboard-table align-middle fill-table">
+                    <thead>
+                    <tr>
+                        <th>체결</th>
+                        <th>요청</th>
+                        <th>브로커</th>
+                        <th>매매구분</th>
+                        <th class="text-end">체결수량</th>
+                        <th class="text-end">체결가</th>
+                        <th class="text-end">체결금액</th>
+                        <th>체결시각</th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                    <tr th:each="fill : ${page.fills}">
+                        <td th:text="'#' + ${fill.id}">-</td>
+                        <td th:text="'#' + ${fill.orderRequestId}">-</td>
+                        <td>
+                            <div class="broker-cell">
+                                <strong th:text="${fill.brokerOrderNo}">-</strong>
+                                <span th:text="${fill.brokerBranchCode}">-</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span th:class="'order-type-badge ' + ${fill.sideClass}"
+                                  th:text="${fill.sideLabel}">
+                                -
+                            </span>
+                        </td>
+                        <td class="text-end" th:text="${fill.fillQtyText}">-</td>
+                        <td class="text-end" th:text="${fill.fillPriceText}">-</td>
+                        <td class="text-end strong-number" th:text="${fill.fillAmountText}">-</td>
+                        <td th:text="${fill.fillTsText}">-</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,541 @@
+/* =========================================================
+   Positions View
+   src/main/resources/static/css/positions.css
+
+   Strategy Execution 화면 톤에 맞춘 Light Theme
+   - 밝은 회색 배경
+   - 흰색 카드
+   - 연한 border
+   - 부드러운 shadow
+   ========================================================= */
+
+/* 전체 화면 */
+.positions-shell {
+    width: min(1480px, calc(100% - 56px));
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: 32px 0 48px;
+}
+
+/* Header */
+.positions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    width: 100%;
+    margin-bottom: 24px;
+}
+
+.positions-header h1 {
+    margin: 4px 0 8px;
+    font-size: 32px;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text-main, #0f172a);
+}
+
+.positions-header .header-desc {
+    margin: 0;
+    color: var(--text-muted, #64748b);
+    line-height: 1.5;
+}
+
+.positions-actions {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* account-form compact 보정 */
+.account-form.compact {
+    min-width: 320px;
+    padding: 14px;
+}
+
+/* =========================================================
+   Summary
+   ========================================================= */
+
+.positions-summary-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    background: linear-gradient(135deg, #ffffff 0%, #f7f9fc 100%);
+    border: 1px solid var(--line, rgba(15, 23, 42, 0.08));
+    border-radius: 24px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-md, 0 14px 34px rgba(15, 23, 42, 0.06));
+}
+
+.positions-summary-card h2 {
+    margin: 4px 0 8px;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-main, #0f172a);
+}
+
+.positions-summary-card p {
+    margin: 0;
+    color: var(--text-muted, #64748b);
+    line-height: 1.5;
+}
+
+.summary-main {
+    min-width: 0;
+}
+
+.summary-badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* =========================================================
+   Metrics
+   ========================================================= */
+
+.position-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.position-metric-card {
+    min-height: 144px;
+    border-radius: 20px;
+    padding: 18px;
+    background: #ffffff;
+    color: var(--text-main, #0f172a);
+    border: 1px solid var(--line, rgba(15, 23, 42, 0.08));
+    box-shadow: var(--shadow-sm, 0 8px 22px rgba(15, 23, 42, 0.04));
+    position: relative;
+    overflow: hidden;
+}
+
+.position-metric-card::after {
+    content: "";
+    position: absolute;
+    right: -42px;
+    bottom: -46px;
+    width: 128px;
+    height: 128px;
+    border-radius: 999px;
+    background: var(--blue, #2563eb);
+    opacity: 0.10;
+}
+
+.position-metric-card .metric-title {
+    color: var(--text-muted, #64748b);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+}
+
+.position-metric-card .metric-value {
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    color: var(--text-main, #0f172a);
+}
+
+.position-metric-card .metric-value.small {
+    font-size: 24px;
+    line-height: 1.2;
+}
+
+.position-metric-card .metric-subtitle {
+    margin-top: 10px;
+    color: var(--text-muted, #64748b);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.position-metric-card.metric-profit {
+    border-left: 5px solid var(--red, #dc2626);
+}
+
+.position-metric-card.metric-loss {
+    border-left: 5px solid var(--blue, #2563eb);
+}
+
+.position-metric-card.metric-neutral {
+    border-left: 5px solid var(--gray, #64748b);
+}
+
+.position-metric-card.metric-profit .metric-value,
+.position-metric-card .profit-text {
+    color: var(--red, #dc2626);
+}
+
+.position-metric-card.metric-loss .metric-value {
+    color: var(--blue, #2563eb);
+}
+
+.position-metric-card.metric-neutral .metric-value {
+    color: var(--gray, #64748b);
+}
+
+/* =========================================================
+   Position Cards
+   ========================================================= */
+
+.position-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin-bottom: 20px;
+}
+
+.position-card {
+    background: #ffffff;
+    border: 1px solid var(--line, rgba(15, 23, 42, 0.08));
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: var(--shadow-md, 0 14px 34px rgba(15, 23, 42, 0.06));
+    position: relative;
+    overflow: hidden;
+}
+
+.position-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.10;
+}
+
+.position-card.profit::before {
+    background: radial-gradient(circle at top right, var(--red, #dc2626), transparent 34%);
+}
+
+.position-card.loss::before {
+    background: radial-gradient(circle at top right, var(--blue, #2563eb), transparent 34%);
+}
+
+.position-card.neutral::before {
+    background: radial-gradient(circle at top right, var(--gray, #64748b), transparent 34%);
+}
+
+.position-card-top,
+.position-card-numbers,
+.bar-section {
+    position: relative;
+    z-index: 1;
+}
+
+.position-card-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+    margin-bottom: 22px;
+}
+
+.stock-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+
+.stock-title-row h3 {
+    font-size: 24px;
+    font-weight: 850;
+    margin: 0;
+    color: var(--text-main, #0f172a);
+}
+
+.ticker-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: var(--blue-soft, #eff6ff);
+    color: var(--blue, #2563eb);
+    border: 1px solid var(--blue-line, #bfdbfe);
+    font-size: 12px;
+    font-weight: 850;
+}
+
+.position-card-top p {
+    margin: 0;
+    color: var(--text-muted, #64748b);
+    font-size: 14px;
+}
+
+.position-card-top p strong {
+    color: var(--text-main, #0f172a);
+}
+
+.position-profit-box {
+    flex: 0 0 auto;
+}
+
+/* =========================================================
+   Position Numbers
+   ========================================================= */
+
+.position-card-numbers {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.position-card-numbers div {
+    background: var(--card-bg-soft, #f8fafc);
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 14px;
+    min-width: 0;
+}
+
+.position-card-numbers span {
+    display: block;
+    color: var(--text-muted, #64748b);
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 6px;
+}
+
+.position-card-numbers strong {
+    display: block;
+    color: var(--text-main, #0f172a);
+    font-size: 15px;
+    font-weight: 850;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.position-card-numbers strong.profit {
+    color: var(--red, #dc2626);
+}
+
+.position-card-numbers strong.loss {
+    color: var(--blue, #2563eb);
+}
+
+.position-card-numbers strong.neutral {
+    color: var(--gray, #64748b);
+}
+
+/* =========================================================
+   Bars
+   ========================================================= */
+
+.bar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.bar-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.bar-label {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--text-muted, #64748b);
+    font-size: 13px;
+}
+
+.bar-label strong {
+    color: var(--text-main, #0f172a);
+}
+
+.progress-track {
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    min-width: 2px;
+}
+
+.progress-fill.weight {
+    background: linear-gradient(90deg, #2563eb, #38bdf8);
+}
+
+.progress-fill.profit {
+    background: linear-gradient(90deg, #f97316, #dc2626);
+}
+
+.progress-fill.loss {
+    background: linear-gradient(90deg, #38bdf8, #2563eb);
+}
+
+.progress-fill.neutral {
+    background: linear-gradient(90deg, #94a3b8, #64748b);
+}
+
+/* =========================================================
+   Detail Table
+   ========================================================= */
+
+.positions-detail-panel {
+    margin-top: 20px;
+    overflow: hidden;
+}
+
+.panel-card.positions-detail-panel {
+    background: #ffffff;
+    border: 1px solid var(--line, rgba(15, 23, 42, 0.08));
+    border-radius: 24px;
+    box-shadow: var(--shadow-md, 0 14px 34px rgba(15, 23, 42, 0.06));
+}
+
+.positions-detail-panel .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.positions-detail-panel table {
+    min-width: 1120px;
+}
+
+/* dashboard.css의 table 톤을 보정 */
+.positions-detail-panel .dashboard-table thead th {
+    background: #f8fafc;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.positions-detail-panel .dashboard-table tbody td {
+    color: var(--text-main, #0f172a);
+    border-bottom: 1px solid #edf2f7;
+}
+
+.positions-detail-panel .dashboard-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+/* =========================================================
+   Shared Text / Badges
+   ========================================================= */
+
+.profit-text {
+    color: var(--red, #dc2626) !important;
+}
+
+.loss-text {
+    color: var(--blue, #2563eb) !important;
+}
+
+.neutral-text {
+    color: var(--gray, #64748b) !important;
+}
+
+/* dashboard.css badge와 충돌 방지용 보정 */
+.rate-badge.profit,
+.pl-badge.profit {
+    background: var(--red-soft, #fee2e2);
+    color: #991b1b;
+}
+
+.rate-badge.loss,
+.pl-badge.loss {
+    background: var(--blue-soft, #eff6ff);
+    color: #1d4ed8;
+}
+
+.rate-badge.neutral,
+.pl-badge.neutral {
+    background: var(--gray-soft, #e2e8f0);
+    color: #334155;
+}
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+
+@media (max-width: 1180px) {
+    .position-metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .position-card-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .position-card-numbers {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .positions-shell {
+        width: min(100% - 28px, 1480px);
+        padding: 20px 0 36px;
+    }
+
+    .positions-header {
+        flex-direction: column;
+    }
+
+    .positions-actions {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .account-form.compact {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .nav-button {
+        min-height: 54px;
+    }
+
+    .positions-summary-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .summary-badges {
+        justify-content: flex-start;
+    }
+
+    .position-metric-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .position-card-top {
+        flex-direction: column;
+    }
+
+    .position-profit-box {
+        width: 100%;
+    }
+
+    .position-card-numbers {
+        grid-template-columns: 1fr;
+    }
+
+    .stock-title-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

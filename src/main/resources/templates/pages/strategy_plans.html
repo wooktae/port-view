@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>전략 운영</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/css/bootstrap.min.css"
+          rel="stylesheet">
+    <link href="/css/layout/app-layout.css" rel="stylesheet">
+    <link href="/css/pages/dashboard.css" rel="stylesheet">
+    <link href="/css/pages/strategy-execution.css" rel="stylesheet">
+</head>
+
+<body class="app-body">
+<div class="app-shell"
+     th:with="
+        resolvedAccountNo=${page != null
+            and page.plans != null
+            and !#lists.isEmpty(page.plans)
+            and page.plans[0].accountNo() != null
+                ? page.plans[0].accountNo()
+                : '50187518'},
+        latestPlan=${page != null
+            and page.plans != null
+            and !#lists.isEmpty(page.plans)
+                ? page.plans[0]
+                : null}
+     ">
+
+    <aside th:replace="~{fragments/sidebar :: sidebar('strategy', ${resolvedAccountNo})}"></aside>
+
+    <main class="app-main dashboard-main strategy-main">
+        <header class="dashboard-page-title">
+            <h1>전략 운영 현황</h1>
+            <p>최신 전략 판단 기준으로 매수/매도 후보와 현재 전략 포지션 상태를 확인하는 화면.</p>
+        </header>
+
+        <section class="dashboard-stage">
+
+            <!-- Empty -->
+            <section class="dashboard-section strategy-empty-section"
+                     th:if="${page == null or page.empty}">
+                <div class="strategy-empty-card">
+                    <div class="empty-mark">!</div>
+                    <div>
+                        <h2>전략 판단 결과 없음</h2>
+                        <p>
+                            아직 생성된 전략 실행 계획이 없음.
+                            Daily Signal / Execution 후보 생성 이후 다시 확인하면 됨.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <th:block th:if="${page != null and !page.empty}">
+
+                <!-- 오늘의 전략 판단 -->
+                <section class="dashboard-section strategy-ops-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">Today</div>
+                            <h2>최신 전략 판단</h2>
+                            <p class="section-description">
+                                가장 최근 Daily 실행 기준의 시장 상태, 매수/매도 후보, 실행 대기 주문을 표시함.
+                            </p>
+                        </div>
+
+                        <a class="strategy-detail-link"
+                           th:if="${latestPlan != null}"
+                           th:href="@{/strategy/execution/plans/{planId}(planId=${latestPlan.id()})}">
+                            최신 상세보기 →
+                        </a>
+                    </div>
+
+                    <div class="strategy-ops-card">
+                        <div class="strategy-ops-main">
+                            <div class="strategy-ops-title-row">
+                                <div>
+                                    <span class="strategy-ops-kicker">최근 판단</span>
+                                    <strong th:text="${page.latestMarketSignalText}">신규 매수 차단</strong>
+                                </div>
+
+                                <span th:class="'market-pill ' + ${
+                                        latestPlan != null and latestPlan.marketSignal() == 'BLOCK' ? 'block' :
+                                        (latestPlan != null and latestPlan.marketSignal() == 'AGGRESSIVE' ? 'aggressive' :
+                                        (latestPlan != null and latestPlan.marketSignal() == 'DEFENSIVE' ? 'defensive' : 'neutral'))
+                                    }"
+                                      th:text="${page.latestMarketSignalText}">
+                                    신규 매수 차단
+                                </span>
+                            </div>
+
+                            <p>
+                                마지막 판단:
+                                <b th:text="${page.latestCreatedAtText}">2026-05-16 18:01</b>
+                                <span>/</span>
+                                계획일:
+                                <b th:text="${page.latestPlanDateText}">2026-05-16</b>
+                            </p>
+                        </div>
+
+                        <div class="strategy-ops-grid">
+                            <article>
+                                <span>시장 상태</span>
+                                <strong th:text="${page.latestMarketSignalText}">신규 매수 차단</strong>
+                            </article>
+
+                            <article>
+                                <span>매수 후보</span>
+                                <strong>
+                                    <span th:text="${latestPlan != null ? page.buyCandidateCount(latestPlan.id()) : 0}">0</span>건
+                                </strong>
+                            </article>
+
+                            <article>
+                                <span>매도 후보</span>
+                                <strong>
+                                    <span th:text="${latestPlan != null ? page.sellCandidateCount(latestPlan.id()) : 0}">0</span>건
+                                </strong>
+                            </article>
+
+                            <article>
+                                <span>현재 대기</span>
+                                <strong>
+                                    <span th:text="${latestPlan != null ? page.readyOrderCount(latestPlan.id()) : 0}">0</span>건
+                                </strong>
+                            </article>
+
+                            <article>
+                                <span>판단 상태</span>
+                                <strong th:text="${page.latestPlanStatusText}">실행 후보 없음</strong>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 현재 전략 포지션 -->
+                <section class="dashboard-section strategy-position-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">Position</div>
+                            <h2>현재 전략 포지션</h2>
+                            <p class="section-description">
+                                실제 계좌 잔고가 아니라 전략 엔진이 관리하는 포지션 상태.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="strategy-position-card strategy-position-card-v2">
+                        <div class="position-summary-main">
+                            <strong>전략 엔진이 추적 중인 포지션</strong>
+                            <span>
+                                마지막 포지션 평가일:
+                                <b th:text="${positionSummary != null and positionSummary['latest_evaluated_date'] != null
+                                    ? positionSummary['latest_evaluated_date']
+                                    : '-'}">
+                                    -
+                                </b>
+                            </span>
+                        </div>
+
+                        <div class="position-summary-grid position-summary-grid-v2">
+                            <div>
+                                <span>보유 중</span>
+                                <strong>
+                                    <span th:text="${positionSummary != null and positionSummary['open_position_count'] != null
+                                        ? positionSummary['open_position_count']
+                                        : 0}">
+                                        0
+                                    </span>건
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>매도 준비</span>
+                                <strong>
+                                    <span th:text="${positionSummary != null and positionSummary['sell_ready_position_count'] != null
+                                        ? positionSummary['sell_ready_position_count']
+                                        : 0}">
+                                        0
+                                    </span>건
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>매도 주문 중</span>
+                                <strong>
+                                    <span th:text="${positionSummary != null and positionSummary['sell_ordered_position_count'] != null
+                                        ? positionSummary['sell_ordered_position_count']
+                                        : 0}">
+                                        0
+                                    </span>건
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>청산 완료</span>
+                                <strong>
+                                    <span th:text="${positionSummary != null and positionSummary['closed_position_count'] != null
+                                        ? positionSummary['closed_position_count']
+                                        : 0}">
+                                        0
+                                    </span>건
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 최근 실행 기록 -->
+                <section class="dashboard-section strategy-plan-list-section strategy-recent-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">History</div>
+                            <h2>최근 실행 기록</h2>
+                            <p class="section-description">
+                                최근 전략 실행 계획 10개를 표시함. 후보 수, 현재 대기 주문, 주문 예정금액은 상세 화면에서 확인 가능.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="strategy-recent-list">
+                        <article class="strategy-recent-row"
+                                 th:each="plan, stat : ${page.plans}"
+                                 th:if="${stat.index < 10}">
+
+                            <div class="recent-date">
+                                <strong th:text="${plan.planDate() != null ? plan.planDate() : '-'}">2026-05-16</strong>
+                                <span th:text="'#' + ${plan.id()}">#55</span>
+                            </div>
+
+                            <div class="recent-status">
+                                <span th:class="'market-pill ' + ${
+                                        plan.marketSignal() == 'BLOCK' ? 'block' :
+                                        (plan.marketSignal() == 'AGGRESSIVE' ? 'aggressive' :
+                                        (plan.marketSignal() == 'DEFENSIVE' ? 'defensive' : 'neutral'))
+                                    }"
+                                      th:text="${plan.marketSignalLabel()}">
+                                    신규 매수 차단
+                                </span>
+
+                                <span th:class="'plan-status-pill ' + ${
+                                        plan.planStatus() == 'READY' ? 'ready' :
+                                        (plan.planStatus() == 'BLOCKED' ? 'blocked' :
+                                        (plan.planStatus() == 'PARTIALLY_BLOCKED' ? 'partial' :
+                                        (plan.planStatus() == 'NO_CANDIDATE' ? 'empty' : 'default-status')))
+                                    }"
+                                      th:text="${plan.planStatusLabel()}">
+                                    실행 후보 없음
+                                </span>
+                            </div>
+
+                            <div class="recent-counts">
+                                <span>
+                                    매수
+                                    <b th:text="${page.buyCandidateCount(plan.id())}">0</b>
+                                </span>
+                                <span>
+                                    매도
+                                    <b th:text="${page.sellCandidateCount(plan.id())}">0</b>
+                                </span>
+                                <span>
+                                    현재 대기
+                                    <b th:text="${page.readyOrderCount(plan.id())}">0</b>
+                                </span>
+                            </div>
+
+                            <div class="recent-money">
+                                <span>주문 예정금액</span>
+                                <strong th:text="${plan.totalTargetAmount() != null
+                                    ? #numbers.formatDecimal(plan.totalTargetAmount(), 0, 'COMMA', 0, 'POINT') + '원'
+                                    : '-'}">
+                                    0원
+                                </strong>
+                            </div>
+
+                            <div class="recent-action">
+                                <a th:href="@{/strategy/execution/plans/{planId}(planId=${plan.id()})}">
+                                    상세보기
+                                </a>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+            </th:block>
+
+        </section>
+    </main>
+</div>
+</body>
+</html>

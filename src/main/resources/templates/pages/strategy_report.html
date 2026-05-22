@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${pageTitle != null ? pageTitle : '백테스트 리포트'}">백테스트 리포트</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+    <link href="/css/layout/app-layout.css" rel="stylesheet">
+    <link href="/css/pages/dashboard.css" rel="stylesheet">
+    <link href="/css/pages/strategy-report.css" rel="stylesheet">
+</head>
+
+<body class="app-body">
+<div class="app-shell" th:with="resolvedAccountNo=${accountNo != null ? accountNo : '50187518'}">
+
+    <aside th:replace="~{fragments/sidebar :: sidebar('report', ${resolvedAccountNo})}"></aside>
+
+    <main class="app-main dashboard-main report-main">
+        <header class="dashboard-page-title">
+            <h1>백테스트 리포트</h1>
+            <p>전략의 누적 성과, 리스크, 청산 사유, 일자별 매매 현황과 거래 상세를 확인하는 분석 화면.</p>
+        </header>
+
+        <section class="dashboard-stage">
+
+            <!-- Empty -->
+            <section class="dashboard-section report-empty-section"
+                     th:if="${page == null or page.summary() == null}">
+                <div class="report-empty-card">
+                    <div class="empty-mark">!</div>
+                    <div>
+                        <h2>표시할 백테스트 리포트 없음</h2>
+                        <p>백테스트 실행 결과가 생성된 뒤 다시 확인하면 됨.</p>
+                    </div>
+                </div>
+            </section>
+
+            <th:block th:if="${page != null and page.summary() != null}">
+
+                <!-- 최신 백테스트 요약 -->
+                <section class="dashboard-section report-hero-section">
+                    <div class="report-hero-card">
+                        <div class="report-hero-main">
+                            <div class="section-label">최신 백테스트</div>
+                            <h2 th:text="${page.summary().strategyName()}">strategy_ai</h2>
+                            <p>
+                                전략 버전:
+                                <strong th:text="${page.summary().engineVersion()}">RESEARCH_V3_EXIT_SOFTENED</strong>
+                                <br>
+                                구간:
+                                <strong th:text="${page.summary().startDate()}">2023-01-27</strong>
+                                ~
+                                <strong th:text="${page.summary().endDate()}">2026-05-04</strong>
+                            </p>
+                        </div>
+
+                        <div class="report-hero-badges">
+                            <span class="report-sharpe-badge">
+                                <em>Sharpe</em>
+                                <strong th:text="${page.summary().sharpeRatio() == null ? '-' : #numbers.formatDecimal(page.summary().sharpeRatio(), 1, 2)}">
+                                    2.68
+                                </strong>
+                            </span>
+                            <span class="soft-badge badge-count">
+                                거래 <strong th:text="${page.summary().totalTrades()}">0</strong>건
+                            </span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 핵심 성과 -->
+                <section class="dashboard-section report-kpi-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">성과 요약</div>
+                            <h2>핵심 성과 지표</h2>
+                            <p class="section-description">
+                                선택된 백테스트 실행 기준의 누적 수익률, 최대 낙폭, 샤프 지수, 거래 수를 요약함.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="metric-grid">
+                        <article class="metric-card report-metric-return">
+                            <div class="metric-title">누적 수익률</div>
+                            <div class="metric-value profit-green"
+                                 th:text="${page.summary().cumulativeReturn() == null ? '-' : #numbers.formatDecimal(page.summary().cumulativeReturn() * 100, 1, 2) + '%'}">
+                                452.71%
+                            </div>
+                            <div class="metric-subtitle">전체 백테스트 누적 성과</div>
+                        </article>
+
+                        <article class="metric-card report-metric-mdd">
+                            <div class="metric-title">최대 낙폭</div>
+                            <div class="metric-value loss-red"
+                                 th:text="${page.summary().maxDrawdown() == null ? '-' : #numbers.formatDecimal(page.summary().maxDrawdown() * 100, 1, 2) + '%'}">
+                                -9.13%
+                            </div>
+                            <div class="metric-subtitle">기간 중 가장 큰 하락폭</div>
+                        </article>
+
+                        <article class="metric-card report-metric-sharpe">
+                            <div class="metric-title">샤프 지수</div>
+                            <div class="metric-value"
+                                 th:text="${page.summary().sharpeRatio() == null ? '-' : #numbers.formatDecimal(page.summary().sharpeRatio(), 1, 2)}">
+                                2.68
+                            </div>
+                            <div class="metric-subtitle">위험 대비 수익성</div>
+                        </article>
+
+                        <article class="metric-card report-metric-trades">
+                            <div class="metric-title">총 거래수</div>
+                            <div class="metric-value" th:text="${page.summary().totalTrades()}">0</div>
+                            <div class="metric-subtitle">완료된 매매 건수</div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- 리포트 기본 정보 -->
+                <section class="dashboard-section report-info-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">Run 정보</div>
+                            <h2>백테스트 실행 정보</h2>
+                        </div>
+                    </div>
+
+                    <div class="report-info-card">
+                        <div>
+                            <span>Run ID</span>
+                            <strong th:text="${page.summary().runId()}">-</strong>
+                        </div>
+                        <div>
+                            <span>생성시각</span>
+                            <strong th:text="${page.summary().createdAt() == null ? '-' : #temporals.format(page.summary().createdAt(), 'yyyy-MM-dd HH:mm:ss')}">
+                                -
+                            </strong>
+                        </div>
+                        <div>
+                            <span>시작일</span>
+                            <strong th:text="${page.summary().startDate()}">-</strong>
+                        </div>
+                        <div>
+                            <span>종료일</span>
+                            <strong th:text="${page.summary().endDate()}">-</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 인사이트 -->
+                <section class="dashboard-section report-insight-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">인사이트</div>
+                            <h2>진단 / 강점 / 다음 액션</h2>
+                            <p class="section-description">
+                                통계 테이블을 보기 전에 전략의 강점, 취약 구간, 다음 개선 방향을 요약함.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="report-insight-grid">
+                        <article class="report-insight-card">
+                            <div class="insight-card-head">
+                                <h3>핵심 진단</h3>
+                                <span>Diagnosis</span>
+                            </div>
+
+                            <div class="insight-list">
+                                <div class="insight-item" th:each="item : ${page.diagnoses()}">
+                                    <div class="insight-top">
+                                        <strong th:text="${item.title()}">BLOCK 손실군 관리 필요</strong>
+                                        <span th:class="'insight-badge ' + ${item.badgeClass()}"
+                                              th:text="${item.badgeLabel()}">주의</span>
+                                    </div>
+                                    <p th:text="${item.description()}">설명</p>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="report-insight-card">
+                            <div class="insight-card-head">
+                                <h3>좋은 점</h3>
+                                <span>Strength</span>
+                            </div>
+
+                            <div class="insight-list">
+                                <div class="insight-item" th:each="item : ${page.goodPoints()}">
+                                    <div class="insight-top">
+                                        <strong th:text="${item.title()}">이익 보전 로직 작동</strong>
+                                        <span th:class="'insight-badge ' + ${item.badgeClass()}"
+                                              th:text="${item.badgeLabel()}">강점</span>
+                                    </div>
+                                    <p th:text="${item.description()}">설명</p>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="report-insight-card">
+                            <div class="insight-card-head">
+                                <h3>다음 액션</h3>
+                                <span>Next Action</span>
+                            </div>
+
+                            <div class="insight-list">
+                                <div class="insight-item" th:each="item : ${page.actionItems()}">
+                                    <div class="insight-top">
+                                        <strong th:text="${item.title()}">BLOCK 손실군 조건 재점검</strong>
+                                        <span th:class="'insight-badge ' + ${item.badgeClass()}"
+                                              th:text="${item.badgeLabel()}">1순위</span>
+                                    </div>
+                                    <p th:text="${item.description()}">설명</p>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- 일자별 매매 현황 -->
+                <section class="dashboard-section report-daily-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">일자별</div>
+                            <h2>일자별 매매 현황</h2>
+                            <p class="section-description">
+                                백테스트 날짜별 시장 상태, 보유 종목 수, 매수/매도 건수, 일일 수익률과 누적 수익률을 표시함.
+                            </p>
+                        </div>
+                        <span class="rows-badge" th:text="${#lists.size(page.dailyTrades())} + ' rows'">0 rows</span>
+                    </div>
+
+                    <div class="report-scroll-table daily-scroll">
+                        <table class="report-table">
+                            <thead>
+                            <tr>
+                                <th>일자</th>
+                                <th>시장</th>
+                                <th class="text-end">보유</th>
+                                <th class="text-end">일일 수익률</th>
+                                <th class="text-end">누적 수익률</th>
+                                <th class="text-end">매수</th>
+                                <th class="text-end">매도</th>
+                                <th class="text-end">매도 평균</th>
+                                <th class="text-end">승리 매도</th>
+                                <th>매수 종목</th>
+                                <th>매도 종목</th>
+                                <th>상태</th>
+                            </tr>
+                            </thead>
+
+                            <tbody>
+                            <tr th:each="day : ${page.dailyTrades()}">
+                                <td>
+                                    <strong th:text="${day.date()}">2026-05-06</strong>
+                                </td>
+
+                                <td>
+                                    <span th:class="'report-pill ' + ${day.marketSignalClass()}"
+                                          th:text="${day.marketSignalLabel()}">공격</span>
+                                    <small th:text="${day.marketSignal()}">AGGRESSIVE</small>
+                                </td>
+
+                                <td class="text-end">
+                                    <strong th:text="${(day.positionCount() == null ? 0 : day.positionCount()) + '개'}">0개</strong>
+                                </td>
+
+                                <td class="text-end"
+                                    th:classappend="${day.dailyReturn() != null and day.dailyReturn().signum() < 0} ? ' loss-red' : ' profit-green'"
+                                    th:text="${day.dailyReturn() == null ? '-' : #numbers.formatDecimal(day.dailyReturn() * 100, 1, 2) + '%'}">
+                                    -
+                                </td>
+
+                                <td class="text-end"
+                                    th:classappend="${day.cumulativeReturn() != null and day.cumulativeReturn().signum() < 0} ? ' loss-red' : ' profit-green'"
+                                    th:text="${day.cumulativeReturn() == null ? '-' : #numbers.formatDecimal(day.cumulativeReturn() * 100, 1, 2) + '%'}">
+                                    -
+                                </td>
+
+                                <td class="text-end">
+                                    <span class="trade-count buy" th:text="${day.buyCount() == null ? 0 : day.buyCount()}">0</span>
+                                </td>
+
+                                <td class="text-end">
+                                    <span class="trade-count sell" th:text="${day.sellCount() == null ? 0 : day.sellCount()}">0</span>
+                                </td>
+
+                                <td class="text-end"
+                                    th:classappend="${day.avgSellReturn() != null and day.avgSellReturn().signum() < 0} ? ' loss-red' : ' profit-green'"
+                                    th:text="${day.avgSellReturn() == null ? '-' : #numbers.formatDecimal(day.avgSellReturn() * 100, 1, 2) + '%'}">
+                                    -
+                                </td>
+
+                                <td class="text-end">
+                                    <strong th:text="${day.winSellCount() == null ? 0 : day.winSellCount()}">0</strong>
+                                </td>
+
+                                <td class="name-cell">
+                                    <span th:text="${day.buyNames()}">-</span>
+                                </td>
+
+                                <td class="name-cell">
+                                    <span th:text="${day.sellNames()}">-</span>
+                                </td>
+
+                                <td>
+                                    <span th:class="'report-pill ' + ${day.dayStatusClass()}"
+                                          th:text="${day.dayStatusLabel()}">보합</span>
+                                </td>
+                            </tr>
+
+                            <tr th:if="${#lists.isEmpty(page.dailyTrades())}">
+                                <td colspan="12" class="empty-row">일자별 매매 현황 데이터가 없음.</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 청산 사유 / 보유 기간 -->
+                <section class="dashboard-section report-stat-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">통계</div>
+                            <h2>청산 사유와 보유 기간</h2>
+                            <p class="section-description">
+                                청산 사유별 성과와 보유 기간별 수익률·승률을 확인함.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="report-two-column">
+                        <article class="report-sub-panel">
+                            <div class="sub-panel-head">
+                                <h3>청산 사유 통계</h3>
+                                <span th:text="${#lists.size(page.exitReasonStats())} + ' rows'">0 rows</span>
+                            </div>
+
+                            <div class="report-scroll-table compact-scroll">
+                                <table class="report-table compact">
+                                    <thead>
+                                    <tr>
+                                        <th>청산 사유</th>
+                                        <th class="text-end">거래수</th>
+                                        <th class="text-end">평균</th>
+                                        <th class="text-end">승률</th>
+                                        <th>상태</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="stat : ${page.exitReasonStats()}">
+                                        <td>
+                                            <strong th:text="${stat.reasonLabel()}">이익 보전</strong>
+                                            <small th:text="${stat.reason()}">profit_protect</small>
+                                        </td>
+                                        <td class="text-end" th:text="${stat.trades()}">0</td>
+                                        <td class="text-end"
+                                            th:classappend="${stat.avgReturn() != null and stat.avgReturn().signum() < 0} ? ' loss-red' : ' profit-green'"
+                                            th:text="${stat.avgReturn() == null ? '-' : #numbers.formatDecimal(stat.avgReturn() * 100, 1, 2) + '%'}">
+                                            -
+                                        </td>
+                                        <td class="text-end"
+                                            th:text="${stat.winRate() == null ? '-' : #numbers.formatDecimal(stat.winRate() * 100, 1, 1) + '%'}">
+                                            -
+                                        </td>
+                                        <td>
+                                            <span th:class="'report-pill ' + ${stat.statusClass()}"
+                                                  th:text="${stat.statusLabel()}">상태</span>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(page.exitReasonStats())}">
+                                        <td colspan="5" class="empty-row">청산 사유 통계가 없음.</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </article>
+
+                        <article class="report-sub-panel">
+                            <div class="sub-panel-head">
+                                <h3>보유 기간 통계</h3>
+                                <span th:text="${#lists.size(page.holdingPeriodStats())} + ' rows'">0 rows</span>
+                            </div>
+
+                            <div class="report-scroll-table compact-scroll">
+                                <table class="report-table compact">
+                                    <thead>
+                                    <tr>
+                                        <th>보유 기간</th>
+                                        <th class="text-end">거래수</th>
+                                        <th class="text-end">평균</th>
+                                        <th class="text-end">승률</th>
+                                        <th>상태</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="stat : ${page.holdingPeriodStats()}">
+                                        <td>
+                                            <strong th:text="${stat.holdingPeriod() == null ? '-' : stat.holdingPeriod() + '일'}">1일</strong>
+                                        </td>
+                                        <td class="text-end" th:text="${stat.trades()}">0</td>
+                                        <td class="text-end"
+                                            th:classappend="${stat.avgReturn() != null and stat.avgReturn().signum() < 0} ? ' loss-red' : ' profit-green'"
+                                            th:text="${stat.avgReturn() == null ? '-' : #numbers.formatDecimal(stat.avgReturn() * 100, 1, 2) + '%'}">
+                                            -
+                                        </td>
+                                        <td class="text-end"
+                                            th:text="${stat.winRate() == null ? '-' : #numbers.formatDecimal(stat.winRate() * 100, 1, 1) + '%'}">
+                                            -
+                                        </td>
+                                        <td>
+                                            <span th:class="'report-pill ' + ${stat.statusClass()}"
+                                                  th:text="${stat.statusLabel()}">상태</span>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(page.holdingPeriodStats())}">
+                                        <td colspan="5" class="empty-row">보유 기간 통계가 없음.</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- BLOCK 약세 구간 -->
+                <section class="dashboard-section report-block-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">BLOCK 분석</div>
+                            <h2>BLOCK 약세 구간 분석</h2>
+                            <p class="section-description">
+                                매매 차단 또는 약세장 관련 손실군을 세부 버킷으로 확인함.
+                            </p>
+                        </div>
+                        <span class="rows-badge" th:text="${#lists.size(page.blockWeakStats())} + ' rows'">0 rows</span>
+                    </div>
+
+                    <div class="report-scroll-table block-scroll">
+                        <table class="report-table">
+                            <thead>
+                            <tr>
+                                <th>보유 구간</th>
+                                <th>후보 유형</th>
+                                <th>Flow</th>
+                                <th>Final</th>
+                                <th>Profit</th>
+                                <th class="text-end">거래수</th>
+                                <th class="text-end">평균</th>
+                                <th class="text-end">승률</th>
+                                <th>상태</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="stat : ${page.blockWeakStats()}">
+                                <td th:text="${stat.holdingBucket()}">-</td>
+                                <td>
+                                    <strong th:text="${stat.candidateTypeLabel()}">-</strong>
+                                    <small th:text="${stat.candidateType()}">-</small>
+                                </td>
+                                <td th:text="${stat.flowBucket()}">-</td>
+                                <td th:text="${stat.finalBucket()}">-</td>
+                                <td th:text="${stat.profitBucket()}">-</td>
+                                <td class="text-end" th:text="${stat.trades()}">0</td>
+                                <td class="text-end"
+                                    th:classappend="${stat.avgReturn() != null and stat.avgReturn().signum() < 0} ? ' loss-red' : ' profit-green'"
+                                    th:text="${stat.avgReturn() == null ? '-' : #numbers.formatDecimal(stat.avgReturn() * 100, 1, 2) + '%'}">
+                                    -
+                                </td>
+                                <td class="text-end"
+                                    th:text="${stat.winRate() == null ? '-' : #numbers.formatDecimal(stat.winRate() * 100, 1, 1) + '%'}">
+                                    -
+                                </td>
+                                <td>
+                                    <span th:class="'report-pill ' + ${stat.statusClass()}"
+                                          th:text="${stat.statusLabel()}">상태</span>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(page.blockWeakStats())}">
+                                <td colspan="9" class="empty-row">BLOCK 약세 구간 데이터가 없음.</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 거래 상세 -->
+                <section class="dashboard-section report-trade-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">거래 상세</div>
+                            <h2>거래별 매수/매도 근거</h2>
+                            <p class="section-description">
+                                각 거래의 매수일, 매도일, 수익률, 진입 시장상태, 매도 사유를 확인함.
+                            </p>
+                        </div>
+                        <span class="rows-badge" th:text="${#lists.size(page.tradeDetails())} + ' rows'">0 rows</span>
+                    </div>
+
+                    <div class="trade-detail-list">
+                        <article class="trade-detail-row" th:each="trade : ${page.tradeDetails()}">
+                            <div class="trade-stock-main">
+                                <strong th:text="${trade.companyName()}">종목명</strong>
+                                <span th:text="${trade.tickerCode()}">000000</span>
+                                <small th:text="'거래 #' + ${trade.id()}">거래 #1</small>
+                            </div>
+
+                            <div class="trade-return-cell">
+                                <span th:class="'return-pill ' + ${trade.returnClass()}"
+                                      th:text="${trade.returnPct()}">+1.23%</span>
+                                <em th:text="${trade.holdingPeriod() == null ? '-' : trade.holdingPeriod() + '일 보유'}">
+                                    3일 보유
+                                </em>
+                            </div>
+
+                            <div class="trade-date-grid">
+                                <div>
+                                    <span>매수일</span>
+                                    <strong th:text="${trade.buyDate()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>매도일</span>
+                                    <strong th:text="${trade.sellDate()}">-</strong>
+                                </div>
+                                <div>
+                                    <span>진입시장</span>
+                                    <strong th:text="${trade.entryMarketSignalLabel()}">-</strong>
+                                </div>
+                            </div>
+
+                            <div class="trade-score-grid">
+                                <div>
+                                    <span>Buy Score</span>
+                                    <strong th:text="${trade.buyScore() != null ? trade.buyScore() : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>Flow</span>
+                                    <strong th:text="${trade.buyFlowScore() != null ? trade.buyFlowScore() : '-'}">-</strong>
+                                </div>
+                                <div>
+                                    <span>Sell Final</span>
+                                    <strong th:text="${trade.sellFinalScore() != null ? trade.sellFinalScore() : '-'}">-</strong>
+                                </div>
+                            </div>
+
+                            <div class="trade-reason-cell">
+                                <span>매도 사유</span>
+                                <strong th:text="${trade.sellReasonLabel()}">-</strong>
+                                <small th:text="${trade.sellReason()}">-</small>
+                            </div>
+                        </article>
+
+                        <div class="empty-row block-empty" th:if="${#lists.isEmpty(page.tradeDetails())}">
+                            거래 상세 데이터가 없음.
+                        </div>
+                    </div>
+                </section>
+
+            </th:block>
+
+        </section>
+    </main>
+</div>
+</body>
+</html>

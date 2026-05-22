@@ -1,0 +1,174 @@
+/* Balance Summary v1: Dashboard format aligned */
+
+.balance-main .balance-section {
+    background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.96));
+}
+
+.balance-empty-card {
+    width: 100%;
+    min-height: 92px;
+    border-radius: 18px;
+    border: 1px dashed #cbd5e1;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 850;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.balance-chart-card,
+.balance-detail-card {
+    width: 100%;
+    border-radius: 18px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.045);
+}
+
+.balance-chart-card {
+    padding: 15px 16px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+}
+
+.balance-chart-row {
+    display: grid;
+    grid-template-columns: minmax(170px, 0.28fr) minmax(0, 1fr) 70px;
+    align-items: center;
+    gap: 14px;
+}
+
+.chart-label {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.chart-label strong {
+    font-size: 12px;
+    line-height: 1.2;
+    color: #0f172a;
+    font-weight: 950;
+}
+
+.chart-label span {
+    font-size: 11px;
+    line-height: 1.2;
+    color: #64748b;
+    font-weight: 850;
+    white-space: nowrap;
+}
+
+.chart-track {
+    position: relative;
+    width: 100%;
+    height: 16px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+.chart-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--bar-width, 0%);
+    border-radius: 999px;
+}
+
+.chart-total {
+    background: linear-gradient(90deg, #14b8a6, #0f766e);
+}
+
+.chart-cash {
+    background: linear-gradient(90deg, #22c55e, #15803d);
+}
+
+.chart-stock {
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+}
+
+.chart-percent {
+    text-align: right;
+    font-size: 12px;
+    color: #0f172a;
+    font-weight: 950;
+    white-space: nowrap;
+}
+
+.balance-detail-card {
+    overflow: hidden;
+}
+
+.balance-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.balance-detail-item {
+    min-height: 68px;
+    padding: 13px 14px;
+    border-left: 1px solid #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+}
+
+.balance-detail-item:first-child {
+    border-left: 0;
+}
+
+.balance-detail-item span {
+    font-size: 10px;
+    line-height: 1.2;
+    color: #94a3b8;
+    font-weight: 900;
+}
+
+.balance-detail-item strong {
+    font-size: 13px;
+    line-height: 1.25;
+    color: #0f172a;
+    font-weight: 950;
+    white-space: nowrap;
+}
+
+@media (max-width: 1280px) {
+    .balance-detail-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .balance-detail-item:nth-child(4) {
+        border-left: 0;
+    }
+}
+
+@media (max-width: 860px) {
+    .balance-chart-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 7px;
+    }
+
+    .chart-percent {
+        text-align: left;
+    }
+
+    .balance-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .balance-detail-item,
+    .balance-detail-item:nth-child(4) {
+        border-left: 0;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .balance-detail-item:first-child {
+        border-top: 0;
+    }
+}

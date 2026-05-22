@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>전략 실행 계획 상세</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+    <link href="/css/layout/app-layout.css" rel="stylesheet">
+    <link href="/css/pages/dashboard.css" rel="stylesheet">
+    <link href="/css/pages/strategy-execution.css" rel="stylesheet">
+</head>
+
+<body class="app-body">
+<div class="app-shell"
+     th:with="resolvedAccountNo=${plan != null and plan.accountNo() != null ? plan.accountNo() : '50187518'}">
+
+    <aside th:replace="~{fragments/sidebar :: sidebar('strategy', ${resolvedAccountNo})}"></aside>
+
+    <main class="app-main dashboard-main strategy-detail-main">
+        <header class="dashboard-page-title">
+            <h1>전략 실행 계획 상세</h1>
+            <p>선택한 전략 판단이 어떤 주문 후보, 포지션, 커넥터 주문으로 이어졌는지 확인하는 화면.</p>
+        </header>
+
+        <section class="dashboard-stage">
+
+            <!-- Flash Message -->
+            <section class="dashboard-section strategy-message-section"
+                     th:if="${successMessage != null or errorMessage != null}">
+                <div class="strategy-message success" th:if="${successMessage != null}">
+                    <strong>성공</strong>
+                    <span th:text="${successMessage}">Connector 주문 전송 완료</span>
+                </div>
+
+                <div class="strategy-message error" th:if="${errorMessage != null}">
+                    <strong>실패</strong>
+                    <span th:text="${errorMessage}">Connector 주문 전송 실패</span>
+                </div>
+            </section>
+
+            <!-- 선택한 전략 판단 결과 -->
+            <section class="dashboard-section strategy-detail-hero-section">
+                <div class="strategy-detail-hero-card">
+                    <div class="strategy-detail-hero-main">
+                        <div class="section-label">선택한 전략 판단</div>
+                        <h2>
+                            <span th:text="'#' + ${plan.id()}">#27</span>
+                            <span th:text="${plan.planDate()}">2026-05-11</span>
+                        </h2>
+                        <p>
+                            이 실행 계획은 특정 날짜에 전략 엔진이 시장 상태와 종목 후보를 판단한 결과임.
+                            주문 후보가 있으면 여기서 커넥터 주문으로 이어질 수 있음.
+                        </p>
+                    </div>
+
+                    <div class="strategy-detail-hero-badges">
+                        <span th:class="'market-pill ' + ${
+                                plan.marketSignal() == 'BLOCK' ? 'block' :
+                                (plan.marketSignal() == 'AGGRESSIVE' ? 'aggressive' :
+                                (plan.marketSignal() == 'DEFENSIVE' ? 'defensive' : 'neutral'))
+                            }"
+                            th:text="${plan.marketSignalLabel()}">
+                            시장 상태
+                        </span>
+
+                        <span th:class="'plan-status-pill ' + ${
+                                plan.planStatus() == 'READY' ? 'ready' :
+                                (plan.planStatus() == 'BLOCKED' ? 'blocked' :
+                                (plan.planStatus() == 'PARTIALLY_BLOCKED' ? 'partial' :
+                                (plan.planStatus() == 'NO_CANDIDATE' ? 'empty' : 'default-status')))
+                            }"
+                              th:text="${plan.planStatusLabel()}">
+                            후보 없음
+                        </span>
+
+                        <a class="strategy-back-link"
+                           th:href="@{/strategy/execution/plans}">
+                            목록으로 →
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 계획 핵심 요약 -->
+            <section class="dashboard-section strategy-detail-summary-section">
+                <div class="section-head">
+                    <div>
+                        <div class="section-label">계획 요약</div>
+                        <h2>이 계획의 핵심 숫자</h2>
+                        <p class="section-description">
+                            이 실행 계획 하나에 대해서 생성된 주문 후보, 전송 가능 후보, 차단된 후보, 목표 주문금액을 보여줌.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="metric-grid">
+                    <article class="metric-card strategy-metric-total">
+                        <div class="metric-title">생성 후보</div>
+                        <div class="metric-value" th:text="${plan.totalCandidateCount()}">0</div>
+                        <div class="metric-subtitle">전략이 만든 주문 후보</div>
+                    </article>
+
+                    <article class="metric-card strategy-metric-ready">
+                        <div class="metric-title">전송 가능</div>
+                        <div class="metric-value" th:text="${plan.readyOrderCount()}">0</div>
+                        <div class="metric-subtitle">커넥터 주문 전송 가능 후보</div>
+                    </article>
+
+                    <article class="metric-card strategy-metric-blocked">
+                        <div class="metric-title">차단됨</div>
+                        <div class="metric-value" th:text="${plan.blockedOrderCount()}">0</div>
+                        <div class="metric-subtitle">시장/검증 조건으로 막힌 후보</div>
+                    </article>
+
+                    <article class="metric-card strategy-metric-cash">
+                        <div class="metric-title">주문 목표액</div>
+                        <div class="metric-value small"
+                             th:text="${plan.totalTargetAmount() != null ? #numbers.formatDecimal(plan.totalTargetAmount(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                            -
+                        </div>
+                        <div class="metric-subtitle">이 계획의 총 목표 주문금액</div>
+                    </article>
+                </div>
+            </section>
+            
+            <!-- 시장 운용 판단 분석 -->
+            <section class="dashboard-section strategy-market-reason-section"
+                    th:if="${marketBlockReason != null and marketBlockReason.hasData()}">
+                <div class="section-head">
+                    <div>
+                        <div class="section-label">Market Reason</div>
+                        <h2>오늘 시장 운용 판단</h2>
+                        <p class="section-description">
+                            실행 계획 기준일에 사용된 시장 피처를 바탕으로, 전략이 왜 이 운용 상태를 선택했는지 설명함.
+                        </p>
+                    </div>
+
+                    <span th:class="'market-pill ' + ${
+                            marketBlockReason.marketSignal() == 'BLOCK' ? 'block' :
+                            (marketBlockReason.marketSignal() == 'AGGRESSIVE' ? 'aggressive' :
+                            (marketBlockReason.marketSignal() == 'DEFENSIVE' ? 'defensive' : 'neutral'))
+                        }"
+                        th:text="${plan.marketSignalLabel()}">
+                        시장 상태
+                    </span>
+                </div>
+
+                <div class="market-reason-card">
+                    <div class="market-reason-main">
+                        <div class="market-reason-title-row">
+                            <div>
+                                <span class="market-reason-kicker"
+                                    th:text="${marketBlockReason.featureDate() != null ? marketBlockReason.featureDate() + ' 기준' : '기준일 미확인'}">
+                                    2026-05-15 기준
+                                </span>
+                                <strong th:text="${marketBlockReason.headline()}">
+                                    시장 수급 압력이 약해서 신규 매수를 차단했음
+                                </strong>
+                            </div>
+
+                            <span class="market-risk-pill"
+                                th:text="${marketBlockReason.featureRiskRegime() != null ? marketBlockReason.featureRiskRegime() : '-'}">
+                                RISK_OFF
+                            </span>
+                        </div>
+
+                        <p th:text="${marketBlockReason.summaryText()}">
+                            지수 자체보다 수급 쪽 약세가 핵심으로 보임.
+                        </p>
+                    </div>
+
+                    <div class="market-reason-metric-grid">
+                        <div>
+                            <span>시장 종합 점수</span>
+                            <strong th:text="${marketBlockReason.marketRegimeScore() != null ? #numbers.formatDecimal(marketBlockReason.marketRegimeScore(), 1, 'COMMA', 2, 'POINT') : '-'}">
+                                -
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>수급 압력</span>
+                            <strong th:text="${marketBlockReason.flowPressureScore() != null ? #numbers.formatDecimal(marketBlockReason.flowPressureScore(), 1, 'COMMA', 2, 'POINT') : '-'}">
+                                -
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>시장 수급 강도</span>
+                            <strong th:text="${marketBlockReason.marketFlowStrengthScore() != null ? #numbers.formatDecimal(marketBlockReason.marketFlowStrengthScore(), 1, 'COMMA', 2, 'POINT') : '-'}">
+                                -
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>시장 폭/확산도</span>
+                            <strong th:text="${marketBlockReason.breadthPressureScore() != null ? #numbers.formatDecimal(marketBlockReason.breadthPressureScore(), 1, 'COMMA', 2, 'POINT') : '-'}">
+                                -
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>외국인 5일 수급</span>
+                            <strong th:text="${marketBlockReason.marketForeignNetRatio5d() != null ? (marketBlockReason.marketForeignNetRatio5d() >= 0 ? '+' : '') + #numbers.formatDecimal(marketBlockReason.marketForeignNetRatio5d() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '-'}">
+                                -
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>기관 5일 수급</span>
+                            <strong th:text="${marketBlockReason.marketInstitutionNetRatio5d() != null ? (marketBlockReason.marketInstitutionNetRatio5d() >= 0 ? '+' : '') + #numbers.formatDecimal(marketBlockReason.marketInstitutionNetRatio5d() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '-'}">
+                                -
+                            </strong>
+                        </div>
+                    </div>
+
+                    <div class="market-reason-lines"
+                        th:if="${marketBlockReason.reasonLines() != null and !#lists.isEmpty(marketBlockReason.reasonLines())}">
+                        <div class="market-reason-line"
+                            th:each="line : ${marketBlockReason.reasonLines()}">
+                            <span></span>
+                            <p th:text="${line}">
+                                수급 압력 점수가 낮아서 신규 매수보다 방어가 우선임.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 계획 기본 정보 -->
+            <section class="dashboard-section strategy-plan-info-section">
+                <div class="section-head">
+                    <div>
+                        <div class="section-label">기본 정보</div>
+                        <h2>전략 판단 기준</h2>
+                    </div>
+                </div>
+
+                <div class="strategy-info-card">
+                    <div class="strategy-info-main">
+                        <strong th:text="${plan.strategyName()}">strategy_ai</strong>
+                        <span th:text="${plan.strategyVersion()}">RESEARCH_V3_EXIT_SOFTENED</span>
+                        <small>
+                            계좌:
+                            <b th:text="${plan.accountNo()}">50187518</b>
+                        </small>
+                    </div>
+
+                    <div class="strategy-info-grid">
+                        <div>
+                            <span>시장 점수</span>
+                            <strong th:text="${plan.marketRegimeScore() != null ? plan.marketRegimeScore() : '미확인'}">
+                                미확인
+                            </strong>
+                        </div>
+                        <div>
+                            <span>위험 상태</span>
+                            <strong th:text="${plan.riskRegimeLabel()}">-</strong>
+                        </div>
+                        <div>
+                            <span>주문 가능 현금</span>
+                            <strong th:text="${plan.availableCash() != null ? #numbers.formatDecimal(plan.availableCash(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">-</strong>
+                        </div>
+                        <div>
+                            <span>최대 주문 가능액</span>
+                            <strong th:text="${plan.maxOrderAmount() != null ? #numbers.formatDecimal(plan.maxOrderAmount(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">-</strong>
+                        </div>
+                        <div>
+                            <span>생성시각</span>
+                            <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatDateTime(plan.createdAt())}">
+                                -
+                            </strong>
+                        </div>
+                        <div>
+                            <span>수정시각</span>
+                            <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatDateTime(plan.updatedAt())}">
+                                -
+                            </strong>
+                        </div>
+                    </div>
+
+                    <div class="strategy-info-memo"
+                         th:if="${plan.memo() != null and !#strings.isEmpty(plan.memo())}">
+                        <span>메모</span>
+                        <strong th:text="${plan.memo()}">-</strong>
+                    </div>
+
+                    <div class="strategy-info-memo danger"
+                         th:if="${plan.blockedReason() != null and !#strings.isEmpty(plan.blockedReason())}">
+                        <span>차단 사유</span>
+                        <strong th:text="${plan.blockedReason()}">-</strong>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 주문 후보 -->
+            <section class="dashboard-section strategy-order-section">
+                <div class="section-head">
+                    <div>
+                        <div class="section-label">주문 후보</div>
+                        <h2>이 계획에서 생성된 주문 후보</h2>
+                        <p class="section-description">
+                            전략이 실제 주문으로 전송할 수 있다고 판단한 후보. READY 상태이고 수량이 있으면 승인/전송 가능.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="strategy-empty-card small"
+                     th:if="${orders == null or #lists.isEmpty(orders)}">
+                    <div class="empty-mark">!</div>
+                    <div>
+                        <h2>주문 후보 없음</h2>
+                        <p>선택한 전략 실행 계획에 연결된 주문 후보가 없음.</p>
+                    </div>
+                </div>
+
+                <div class="strategy-order-list"
+                     th:if="${orders != null and !#lists.isEmpty(orders)}">
+
+                    <article class="strategy-order-row"
+                             th:each="order : ${orders}">
+
+                        <div class="order-stock-main">
+                            <strong th:text="${order.stockName() != null and !#strings.isEmpty(order.stockName()) ? order.stockName() : '-'}">
+                                종목명
+                            </strong>
+                            <span th:text="${order.tickerCode() != null and !#strings.isEmpty(order.tickerCode()) ? order.tickerCode() : '-'}">
+                                000000
+                            </span>
+                            <small>
+                                후보
+                                <b th:text="'#' + ${order.id()}">#1</b>
+                                /
+                                신호일
+                                <b th:text="${order.signalDate() != null ? order.signalDate() : '-'}">-</b>
+                            </small>
+                        </div>
+
+                        <div class="order-action-cell">
+                            <span th:class="'action-pill ' + ${order.actionType() == 'BUY' ? 'buy' : (order.actionType() == 'SELL' ? 'sell' : 'hold')}"
+                                  th:text="${order.actionTypeLabel()}">
+                                매수
+                            </span>
+                            <em th:text="${order.sourceTypeLabel()}">오늘 매수 신호</em>
+                        </div>
+
+                        <div class="order-score-grid">
+                            <div>
+                                <span>최종 점수</span>
+                                <strong th:text="${order.finalScore() != null ? order.finalScore() : '-'}">-</strong>
+                            </div>
+                            <div>
+                                <span>수급</span>
+                                <strong th:text="${order.flowScore() != null ? order.flowScore() : '-'}">-</strong>
+                            </div>
+                            <div>
+                                <span>정보</span>
+                                <strong th:text="${order.infoScore() != null ? order.infoScore() : '-'}">-</strong>
+                            </div>
+                            <div>
+                                <span>가격흐름</span>
+                                <strong th:text="${order.tapeScore() != null ? order.tapeScore() : '-'}">-</strong>
+                            </div>
+                        </div>
+
+                        <div class="order-size-grid">
+                            <div>
+                                <span>주문수량</span>
+                                <strong th:text="${order.orderQty() != null ? order.orderQty() + '주' : '0주'}">0주</strong>
+                            </div>
+                            <div>
+                                <span>주문방식</span>
+                                <strong th:text="${order.orderMethodLabel()}">시장가</strong>
+                            </div>
+                            <div>
+                                <span>목표금액</span>
+                                <strong th:text="${order.targetAmount() != null ? #numbers.formatDecimal(order.targetAmount(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">-</strong>
+                            </div>
+                        </div>
+
+                        <div class="order-status-cell">
+                            <span th:class="'plan-status-pill ' + ${
+                                    order.executionStatus() == 'READY' ? 'ready' :
+                                    (order.executionStatus() == 'BLOCKED' ? 'blocked' :
+                                    (order.executionStatus() == 'FILLED' ? 'ready' :
+                                    (order.executionStatus() == 'SENT' || order.executionStatus() == 'ACCEPTED' || order.executionStatus() == 'SUBMITTED' ? 'partial' : 'default-status')))
+                                }"
+                                  th:text="${order.executionStatusLabel()}">
+                                READY
+                            </span>
+
+                            <small th:if="${order.blockReason() != null and !#strings.isEmpty(order.blockReason())}"
+                                th:text="${order.blockReasonLabel()}">
+                                -
+                            </small>
+                        </div>
+
+                        <div class="order-submit-cell">
+
+                            <a class="connector-order-link compact"
+                               th:if="${order.connectorOrderRequestId() != null}"
+                               th:href="@{/orders/{id}(id=${order.connectorOrderRequestId()}, accountNo=${resolvedAccountNo})}">
+                                <span>커넥터 주문</span>
+                                <strong th:text="'#' + ${order.connectorOrderRequestId()}">#1</strong>
+                                <em>상세 →</em>
+                            </a>
+
+                            <form th:if="${order.connectorOrderRequestId() == null
+                                           and order.executionStatus() == 'READY'
+                                           and order.orderQty() != null
+                                           and order.orderQty() > 0
+                                           and (order.actionType() == 'BUY' or order.actionType() == 'SELL')}"
+                                  th:action="@{/strategy/execution/orders/{orderId}/submit(orderId=${order.id()})}"
+                                  method="post"
+                                  class="submit-order-form">
+
+                                <input type="hidden" name="planId" th:value="${plan.id()}"/>
+
+                                <button type="submit"
+                                        th:class="'submit-order-button ' + ${order.actionType() == 'BUY' ? 'buy' : 'sell'}">
+                                    <span th:text="${order.actionType() == 'BUY' ? '매수 승인/전송' : '매도 승인/전송'}">
+                                        주문 승인/전송
+                                    </span>
+                                </button>
+                            </form>
+
+                            <div class="connector-empty-cell"
+                                 th:if="${order.connectorOrderRequestId() == null
+                                        and !(order.executionStatus() == 'READY'
+                                        and order.orderQty() != null
+                                        and order.orderQty() > 0
+                                        and (order.actionType() == 'BUY' or order.actionType() == 'SELL'))}">
+                                <span>미전송</span>
+                                <em>커넥터 주문 없음</em>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- 전략 기준 포지션 -->
+            <section class="dashboard-section strategy-position-detail-section">
+                <div class="section-head">
+                    <div>
+                        <div class="section-label">전략 기준 포지션</div>
+                        <h2>이 계획과 연결된 보유/청산 상태</h2>
+                        <p class="section-description">
+                            실제 계좌 잔고가 아니라 전략 엔진이 추적하는 포지션 상태. 매수 후 보유, 매도 판단, 청산 여부를 보여줌.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="strategy-empty-card small"
+                     th:if="${positionStates == null or #lists.isEmpty(positionStates)}">
+                    <div class="empty-mark">!</div>
+                    <div>
+                        <h2>연결된 전략 포지션 없음</h2>
+                        <p>현재 실행 계획에 연결된 전략 포지션이 없음.</p>
+                    </div>
+                </div>
+
+                <div class="position-state-list"
+                     th:if="${positionStates != null and !#lists.isEmpty(positionStates)}">
+
+                    <article class="position-state-row"
+                             th:each="ps : ${positionStates}">
+
+                        <div class="position-state-main">
+                            <strong th:text="${ps['stock_name'] != null ? ps['stock_name'] : '-'}">종목명</strong>
+                            <span th:text="${ps['ticker_code'] != null ? ps['ticker_code'] : '-'}">000000</span>
+                            <small>
+                                포지션
+                                <b th:text="'#' + ${ps['id']}">#1</b>
+                            </small>
+                        </div>
+
+                        <div class="position-state-status">
+                            <span th:text="${ps['position_status'] != null ? T(my.portfolio.port_view.util.ConnectorLabelUtils).positionStatusLabel(ps['position_status']) : '-'}">
+                                OPEN
+                            </span>
+                        </div>
+
+                        <div class="position-state-grid">
+                            <div>
+                                <span>진입일</span>
+                                <strong th:text="${ps['entry_date'] != null ? ps['entry_date'] : '-'}">-</strong>
+                            </div>
+                            <div>
+                                <span>진입가</span>
+                                <strong th:text="${ps['entry_price'] != null ? #numbers.formatDecimal(ps['entry_price'], 0, 'COMMA', 0, 'POINT') + '원' : '-'}">-</strong>
+                            </div>
+                            <div>
+                                <span>현재가</span>
+                                <strong th:text="${ps['current_price'] != null ? #numbers.formatDecimal(ps['current_price'], 0, 'COMMA', 0, 'POINT') + '원' : '-'}">-</strong>
+                            </div>
+                            <div>
+                                <span>보유일</span>
+                                <strong th:text="${ps['holding_days'] != null ? ps['holding_days'] + '일' : '-'}">-</strong>
+                            </div>
+                            <div>
+                                <span>손익</span>
+                                <strong>
+                                    <span th:text="${ps['expected_pnl_amount'] != null ? #numbers.formatDecimal(ps['expected_pnl_amount'], 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                                        -
+                                    </span>
+                                    <em class="pnl-rate-text"
+                                        th:if="${ps['expected_pnl_rate'] != null}"
+                                        th:text="${' / ' + (ps['expected_pnl_rate'] >= 0 ? '+' : '') + #numbers.formatDecimal(ps['expected_pnl_rate'] * 100, 1, 'COMMA', 2, 'POINT') + '%'}">
+                                        / +0.81%
+                                    </em>
+                                </strong>
+                            </div>
+                        </div>
+
+                        <div class="position-state-reason">
+                            <span>최근 판단</span>
+                            <strong th:text="${ps['latest_sell_reason'] != null ? ps['latest_sell_reason'] : '-'}">-</strong>
+                        </div>
+
+                        <div class="position-state-link">
+                            <a th:if="${ps['connector_order_request_id'] != null}"
+                               th:href="@{/orders/{id}(id=${ps['connector_order_request_id']}, accountNo=${resolvedAccountNo})}">
+                                주문 상세 →
+                            </a>
+
+                            <a th:if="${ps['connector_order_request_id'] == null and ps['buy_connector_request_id'] != null}"
+                               th:href="@{/orders/{id}(id=${ps['buy_connector_request_id']}, accountNo=${resolvedAccountNo})}">
+                                매수 주문 →
+                            </a>
+
+                            <span th:if="${ps['connector_order_request_id'] == null and ps['buy_connector_request_id'] == null}">
+                                연결 주문 없음
+                            </span>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- 커넥터 주문 요약 -->
+            <section class="dashboard-section connector-summary-section"
+                     th:if="${(connectorOrders != null and !#lists.isEmpty(connectorOrders))
+                              or (connectorEventsAndFills != null and !#lists.isEmpty(connectorEventsAndFills))}">
+                <div class="section-head">
+                    <div>
+                        <div class="section-label">커넥터 연결</div>
+                        <h2>실제 주문/체결 연결 요약</h2>
+                        <p class="section-description">
+                            전략 후보가 실제 커넥터 주문 요청, 주문 이벤트, 체결 데이터로 이어졌는지 확인하는 영역.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="connector-summary-grid">
+                    <div>
+                        <span>커넥터 주문</span>
+                        <strong th:text="${connectorOrders != null ? #lists.size(connectorOrders) : 0}">0</strong>
+                    </div>
+                    <div>
+                        <span>이벤트/체결 연결</span>
+                        <strong th:text="${connectorEventsAndFills != null ? #lists.size(connectorEventsAndFills) : 0}">0</strong>
+                    </div>
+                    <div>
+                        <span>주문 원장</span>
+                        <a th:href="@{/orders(accountNo=${resolvedAccountNo})}">전체 매매 내역 보기 →</a>
+                    </div>
+                </div>
+            </section>
+
+        </section>
+    </main>
+</div>
+</body>
+</html>

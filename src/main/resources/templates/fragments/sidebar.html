@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<aside class="app-sidebar" th:fragment="sidebar(activeMenu, accountNo)">
+    <div class="sidebar-brand">
+        <a class="brand-mark" th:href="@{/dashboard(accountNo=${accountNo})}" aria-label="Portfolio View Home">
+            <span>PV</span>
+        </a>
+        <div class="brand-copy">
+            <strong>Portfolio View</strong>
+            <small>Quant Ops Console</small>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav" aria-label="주요 메뉴">
+        <a class="sidebar-link"
+           th:classappend="${activeMenu == 'dashboard'} ? ' active' : ''"
+           th:href="@{/dashboard(accountNo=${accountNo})}">
+            <span class="sidebar-icon">⌂</span>
+            <span class="sidebar-text">대시보드</span>
+        </a>
+
+        <a class="sidebar-link"
+           th:classappend="${activeMenu == 'balance'} ? ' active' : ''"
+           th:href="@{/balance-summary(accountNo=${accountNo})}">
+            <span class="sidebar-icon">₩</span>
+            <span class="sidebar-text">잔고</span>
+        </a>
+
+        <a class="sidebar-link"
+           th:classappend="${activeMenu == 'positions'} ? ' active' : ''"
+           th:href="@{/positions(accountNo=${accountNo})}">
+            <span class="sidebar-icon">▦</span>
+            <span class="sidebar-text">보유 종목</span>
+        </a>
+
+        <a class="sidebar-link"
+           th:classappend="${activeMenu == 'orders'} ? ' active' : ''"
+           th:href="@{/orders(accountNo=${accountNo})}">
+            <span class="sidebar-icon">↕</span>
+            <span class="sidebar-text">매매 내역</span>
+        </a>
+
+        <a class="sidebar-link"
+           th:classappend="${activeMenu == 'strategy'} ? ' active' : ''"
+           th:href="@{/strategy/execution/plans}">
+            <span class="sidebar-icon">◇</span>
+            <span class="sidebar-text">전략 운영</span>
+        </a>
+        
+        <a class="sidebar-link"
+        th:classappend="${activeMenu == 'daily-batch'} ? ' active' : ''"
+        th:href="@{/daily-batch(accountNo=${accountNo})}">
+            <span class="sidebar-icon">⟳</span>
+            <span class="sidebar-text">Daily 배치</span>
+        </a>
+
+        <a class="sidebar-link"
+           th:classappend="${activeMenu == 'report'} ? ' active' : ''"
+           th:href="@{/strategy/reports/latest}">
+            <span class="sidebar-icon">⌁</span>
+            <span class="sidebar-text">백테스트 리포트</span>
+        </a>
+    </nav>
+
+    <div class="sidebar-spacer"></div>
+
+    <div class="sidebar-card">
+        <div class="sidebar-card-kicker">LIVE OPS</div>
+        <strong>운영 콘솔 v2</strong>
+        <p>좌측 메뉴와 우측 콘텐츠가 하나의 운영 화면처럼 이어지는 구조.</p>
+    </div>
+</aside>
+</body>
+</html>

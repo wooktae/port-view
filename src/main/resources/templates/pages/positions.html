@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>보유 종목</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+    <link href="/css/layout/app-layout.css" rel="stylesheet">
+    <link href="/css/pages/dashboard.css" rel="stylesheet">
+    <link href="/css/pages/positions.css" rel="stylesheet">
+</head>
+
+<body class="app-body">
+<div class="app-shell" th:with="resolvedAccountNo=${accountNo != null ? accountNo : '50187518'}">
+
+    <aside th:replace="~{fragments/sidebar :: sidebar('positions', ${resolvedAccountNo})}"></aside>
+
+    <main class="app-main dashboard-main positions-main">
+        <header class="dashboard-page-title">
+            <h1>보유 종목</h1>
+            <p>현재 계좌의 보유 종목, 평가금액, 수익률, 포트폴리오 비중을 확인하는 화면.</p>
+        </header>
+
+        <section class="dashboard-stage">
+
+            <!-- Empty -->
+            <section class="dashboard-section positions-empty-section"
+                     th:if="${page == null or !page.hasPositions}">
+                <div class="positions-empty-card">
+                    <div class="empty-mark">!</div>
+                    <div>
+                        <h2>현재 보유 종목 없음</h2>
+                        <p>
+                            현재 계좌에 표시할 보유 종목이 없음.
+                            필요 시 Connector 잔고 수집을 다시 실행하거나 계좌번호를 확인하면 됨.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <th:block th:if="${page != null and page.hasPositions}">
+
+                <!-- 계좌 -->
+                <section class="dashboard-section account-section">
+                    <div class="account-hero-card">
+                        <div class="account-hero-main">
+                            <div class="section-label">계좌</div>
+                            <h2 th:text="${page.accountNo != null ? page.accountNo : resolvedAccountNo}">
+                                50187518
+                            </h2>
+                            <p>
+                                기준일:
+                                <span th:text="${page.asOfDate}">2026-05-08</span>
+                                /
+                                갱신시각:
+                                <span th:text="${page.asOfTs}">2026-05-08 09:39:49</span>
+                            </p>
+                        </div>
+
+                        <div class="account-badges">
+                            <span class="soft-badge badge-live">모의투자</span>
+                            <span class="soft-badge badge-connector">커넥터</span>
+                            <span class="soft-badge badge-count">
+                                보유 <strong th:text="${page.positionCount}">2</strong> 종목
+                            </span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 요약 -->
+                <section class="dashboard-section positions-summary-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">보유 종목</div>
+                            <h2>보유 종목 요약</h2>
+                        </div>
+                    </div>
+
+                    <div class="metric-grid">
+                        <article class="metric-card metric-cash">
+                            <div class="metric-title">총 매수금액</div>
+                            <div class="metric-value" th:text="${page.totalBuyAmountText}">
+                                3,236,250원
+                            </div>
+                            <div class="metric-subtitle">보유종목 원금 기준</div>
+                        </article>
+
+                        <article class="metric-card metric-stock">
+                            <div class="metric-title">총 평가금액</div>
+                            <div class="metric-value" th:text="${page.totalEvalAmountText}">
+                                5,677,500원
+                            </div>
+                            <div class="metric-subtitle">현재가 기준 평가액</div>
+                        </article>
+
+                        <article class="metric-card metric-profit">
+                            <div class="metric-title">총 평가손익</div>
+                            <div class="metric-value"
+                                 th:classappend="${page.pageProfitClass == 'profit' ? ' profit-red' : (page.pageProfitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
+                                 th:text="${page.totalEvalProfitText}">
+                                +2,441,250원
+                            </div>
+                            <div class="metric-subtitle"
+                                 th:classappend="${page.pageProfitClass == 'profit' ? ' profit-red' : (page.pageProfitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
+                                 th:text="${page.totalProfitRateText}">
+                                +75.43%
+                            </div>
+                        </article>
+
+                        <article class="metric-card metric-primary">
+                            <div class="metric-title">최고 수익 종목</div>
+                            <div class="metric-value best-stock-name" th:text="${page.bestPositionName}">
+                                SK하이닉스
+                            </div>
+                            <div class="metric-subtitle profit-red" th:text="${page.bestPositionRateText}">
+                                +83.95%
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- 보유 종목 한 줄 요약 -->
+                <section class="dashboard-section positions-list-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">상세</div>
+                            <h2>현재 보유 종목</h2>
+                        </div>
+                    </div>
+
+                    <div class="position-line-list">
+                        <article class="position-line-card"
+                                 th:each="row, stat : ${page.rows}"
+                                 th:classappend="${row.profitClass}"
+                                 th:style="|--series-color: var(--series-color-${(stat.index % 6) + 1})|">
+
+                            <div class="position-line-stock">
+                                <span class="series-dot"></span>
+                                <div>
+                                    <a class="position-stock-link"
+                                    th:href="@{/positions/{tickerCode}(tickerCode=${row.tickerCode}, accountNo=${resolvedAccountNo})}"
+                                    th:text="${row.stockName}">
+                                        SK하이닉스
+                                    </a>
+                                    <span th:text="${row.tickerCode}">000660</span>
+                                    <small>
+                                        보유 <b th:text="${row.quantity}">3</b>주 /
+                                        매도가능 <b th:text="${row.sellableQuantity}">3</b>주
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="position-line-return">
+                                <span th:classappend="${row.profitClass == 'profit' ? ' profit-red' : (row.profitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
+                                      th:text="${row.evalProfitRateText}">
+                                    +83.95%
+                                </span>
+                            </div>
+
+                            <div class="position-line-metrics">
+                                <div>
+                                    <span>평균단가</span>
+                                    <strong th:text="${row.avgBuyPriceText}">885,000원</strong>
+                                </div>
+                                <div>
+                                    <span>현재가</span>
+                                    <strong th:text="${row.currentPriceText}">1,628,000원</strong>
+                                </div>
+                                <div>
+                                    <span>평가금액</span>
+                                    <strong th:text="${row.evalAmountText}">4,884,000원</strong>
+                                </div>
+                                <div>
+                                    <span>평가손익</span>
+                                    <strong th:classappend="${row.profitClass == 'profit' ? ' profit-red' : (row.profitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
+                                            th:text="${row.evalProfitText}">
+                                        +2,229,000원
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>비중</span>
+                                    <strong th:text="${row.weightRateText}">86.02%</strong>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- 통합 수익률 선 그래프 -->
+                <section class="dashboard-section positions-combined-chart-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">수익률 그래프</div>
+                            <h2>일자별 누적 수익률</h2>
+                        </div>
+                    </div>
+
+                    <article class="combined-chart-card">
+                        <div class="combined-chart-legend">
+                            <div class="legend-item"
+                                 th:each="row, stat : ${page.rows}"
+                                 th:style="|--series-color: var(--series-color-${(stat.index % 6) + 1})|">
+                                <span></span>
+                                <strong th:text="${row.stockName}">SK하이닉스</strong>
+                                <small th:text="${row.evalProfitRateText}">+83.95%</small>
+                            </div>
+                        </div>
+
+                        <div id="combinedPositionChart"
+                             class="combined-chart-root"
+                             th:if="${page.rows != null and !#lists.isEmpty(page.rows)}">
+
+                            <div class="combined-chart-y-axis"></div>
+
+                            <div class="combined-chart-plot">
+                                <svg class="combined-chart-svg"
+                                     viewBox="0 0 1000 300"
+                                     preserveAspectRatio="none"
+                                     aria-hidden="true">
+                                    <g class="grid-lines"></g>
+                                    <line class="zero-line" x1="0" y1="0" x2="1000" y2="0"></line>
+                                    <g class="series-lines"></g>
+                                    <g class="series-dots"></g>
+                                    <line class="hover-line" x1="0" y1="0" x2="0" y2="300"></line>
+                                </svg>
+
+                                <div class="combined-chart-hit-layer"></div>
+                                <div class="combined-chart-tooltip"></div>
+                            </div>
+
+                            <div class="combined-chart-x-axis"></div>
+
+                            <div class="combined-chart-source d-none">
+                                <div class="chart-series-source"
+                                     th:each="row, stat : ${page.rows}"
+                                     th:attr="data-name=${row.stockName},
+                                              data-code=${row.tickerCode},
+                                              data-color-index=${(stat.index % 6) + 1}">
+                                    <span class="chart-point-source-item"
+                                          th:each="p : ${row.profitPoints}"
+                                          th:attr="data-date=${p.date},
+                                                   data-label=${p.dateLabel},
+                                                   data-rate=${p.profitRate},
+                                                   data-text=${p.profitRateText}">
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </section>
+
+            </th:block>
+
+        </section>
+    </main>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const root = document.getElementById('combinedPositionChart');
+    if (!root) return;
+
+    const sourceSeries = Array.from(root.querySelectorAll('.chart-series-source'));
+    if (!sourceSeries.length) return;
+
+    const palette = [
+        '#dc2626',
+        '#2563eb',
+        '#0f766e',
+        '#7c3aed',
+        '#ea580c',
+        '#0891b2'
+    ];
+
+    const series = sourceSeries.map(function (seriesNode) {
+        const colorIndex = Number(seriesNode.dataset.colorIndex || '1') - 1;
+        const points = Array.from(seriesNode.querySelectorAll('.chart-point-source-item'))
+            .map(function (pointNode) {
+                return {
+                    date: pointNode.dataset.date || '',
+                    label: pointNode.dataset.label || '',
+                    rate: Number(pointNode.dataset.rate || 0),
+                    text: pointNode.dataset.text || '0%'
+                };
+            })
+            .filter(function (p) {
+                return p.date !== '';
+            });
+
+        return {
+            name: seriesNode.dataset.name || '-',
+            code: seriesNode.dataset.code || '',
+            color: palette[colorIndex % palette.length],
+            points: points
+        };
+    }).filter(function (s) {
+        return s.points.length > 0;
+    });
+
+    if (!series.length) return;
+
+    const dateMap = new Map();
+
+    series.forEach(function (s) {
+        s.points.forEach(function (p) {
+            if (!dateMap.has(p.date)) {
+                dateMap.set(p.date, p.label);
+            }
+        });
+    });
+
+    const dates = Array.from(dateMap.keys()).sort();
+    const labels = dates.map(function (d) {
+        return dateMap.get(d) || d;
+    });
+
+    const allRates = [];
+    series.forEach(function (s) {
+        s.points.forEach(function (p) {
+            allRates.push(p.rate);
+        });
+    });
+    allRates.push(0);
+
+    let minRate = Math.min.apply(null, allRates);
+    let maxRate = Math.max.apply(null, allRates);
+
+    if (minRate === maxRate) {
+        const pad = Math.abs(maxRate) > 0 ? Math.abs(maxRate) * 0.2 : 5;
+        minRate -= pad;
+        maxRate += pad;
+    }
+
+    const rawRange = maxRate - minRate;
+    const rangePad = rawRange * 0.12;
+
+    let yMin = minRate - rangePad;
+    let yMax = maxRate + rangePad;
+
+    if (yMin > 0) yMin = 0;
+    if (yMax < 0) yMax = 0;
+
+    const width = 1000;
+    const height = 300;
+    const padX = 36;
+    const padY = 24;
+    const usableW = width - (padX * 2);
+    const usableH = height - (padY * 2);
+
+    function xByDate(date) {
+        const index = dates.indexOf(date);
+        if (dates.length === 1) return width / 2;
+        return padX + (usableW * index / (dates.length - 1));
+    }
+
+    function yByRate(rate) {
+        return padY + ((yMax - rate) / (yMax - yMin)) * usableH;
+    }
+
+    function formatAxisRate(value) {
+        const fixed = Math.abs(value) >= 10 ? 0 : 1;
+        const sign = value > 0 ? '+' : '';
+        return sign + value.toFixed(fixed) + '%';
+    }
+
+    const svg = root.querySelector('.combined-chart-svg');
+    const gridGroup = root.querySelector('.grid-lines');
+    const linesGroup = root.querySelector('.series-lines');
+    const dotsGroup = root.querySelector('.series-dots');
+    const zeroLine = root.querySelector('.zero-line');
+    const hoverLine = root.querySelector('.hover-line');
+    const yAxis = root.querySelector('.combined-chart-y-axis');
+    const xAxis = root.querySelector('.combined-chart-x-axis');
+    const hitLayer = root.querySelector('.combined-chart-hit-layer');
+    const tooltip = root.querySelector('.combined-chart-tooltip');
+
+    gridGroup.innerHTML = '';
+    linesGroup.innerHTML = '';
+    dotsGroup.innerHTML = '';
+    yAxis.innerHTML = '';
+    xAxis.innerHTML = '';
+
+    const tickCount = 5;
+    const ticks = [];
+
+    for (let i = 0; i < tickCount; i++) {
+        const ratio = i / (tickCount - 1);
+        const value = yMax - ((yMax - yMin) * ratio);
+        const y = yByRate(value);
+        ticks.push({ value: value, y: y });
+
+        const grid = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        grid.setAttribute('x1', '0');
+        grid.setAttribute('x2', String(width));
+        grid.setAttribute('y1', y.toFixed(2));
+        grid.setAttribute('y2', y.toFixed(2));
+        grid.setAttribute('class', 'grid-line');
+        gridGroup.appendChild(grid);
+
+        const label = document.createElement('span');
+        label.className = 'y-axis-label';
+        label.style.top = (y / height * 100) + '%';
+        label.textContent = formatAxisRate(value);
+        yAxis.appendChild(label);
+    }
+
+    const zeroY = yByRate(0);
+    zeroLine.setAttribute('y1', zeroY.toFixed(2));
+    zeroLine.setAttribute('y2', zeroY.toFixed(2));
+
+    series.forEach(function (s, seriesIndex) {
+        const pointByDate = new Map();
+        s.points.forEach(function (p) {
+            pointByDate.set(p.date, p);
+        });
+
+        const coords = dates
+            .filter(function (date) {
+                return pointByDate.has(date);
+            })
+            .map(function (date) {
+                const point = pointByDate.get(date);
+                return {
+                    date: date,
+                    label: point.label,
+                    text: point.text,
+                    rate: point.rate,
+                    x: xByDate(date),
+                    y: yByRate(point.rate)
+                };
+            });
+
+        if (!coords.length) return;
+
+        const d = coords.map(function (p, i) {
+            return (i === 0 ? 'M ' : 'L ') + p.x.toFixed(2) + ' ' + p.y.toFixed(2);
+        }).join(' ');
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('class', 'series-line');
+        path.setAttribute('stroke', s.color);
+        linesGroup.appendChild(path);
+
+        coords.forEach(function (p) {
+            const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            dot.setAttribute('cx', p.x.toFixed(2));
+            dot.setAttribute('cy', p.y.toFixed(2));
+            dot.setAttribute('r', '4.5');
+            dot.setAttribute('class', 'series-dot');
+            dot.setAttribute('fill', '#ffffff');
+            dot.setAttribute('stroke', s.color);
+            dot.dataset.date = p.date;
+            dot.dataset.seriesIndex = String(seriesIndex);
+            dotsGroup.appendChild(dot);
+        });
+    });
+
+    dates.forEach(function (date, index) {
+        const label = document.createElement('span');
+        label.textContent = labels[index];
+        label.style.left = (xByDate(date) / width * 100) + '%';
+        xAxis.appendChild(label);
+    });
+
+    const chartValuesByDate = dates.map(function (date) {
+        return {
+            date: date,
+            label: dateMap.get(date) || date,
+            x: xByDate(date),
+            values: series.map(function (s) {
+                const found = s.points.find(function (p) {
+                    return p.date === date;
+                });
+
+                return {
+                    name: s.name,
+                    code: s.code,
+                    color: s.color,
+                    text: found ? found.text : '-',
+                    rate: found ? found.rate : null
+                };
+            })
+        };
+    });
+
+    function nearestDateByMouse(clientX) {
+        const rect = hitLayer.getBoundingClientRect();
+        const localRatio = (clientX - rect.left) / rect.width;
+        const svgX = Math.max(0, Math.min(width, localRatio * width));
+
+        let best = chartValuesByDate[0];
+        let bestDiff = Math.abs(best.x - svgX);
+
+        chartValuesByDate.forEach(function (item) {
+            const diff = Math.abs(item.x - svgX);
+            if (diff < bestDiff) {
+                best = item;
+                bestDiff = diff;
+            }
+        });
+
+        return best;
+    }
+
+    hitLayer.addEventListener('mousemove', function (event) {
+        const item = nearestDateByMouse(event.clientX);
+        if (!item) return;
+
+        hoverLine.style.opacity = '1';
+        hoverLine.setAttribute('x1', item.x.toFixed(2));
+        hoverLine.setAttribute('x2', item.x.toFixed(2));
+
+        const rect = hitLayer.getBoundingClientRect();
+        const localX = event.clientX - rect.left;
+        const localY = event.clientY - rect.top;
+
+        tooltip.innerHTML =
+            '<strong>' + item.label + '</strong>' +
+            item.values.map(function (v) {
+                return '<div class="tooltip-row">' +
+                    '<span style="background:' + v.color + '"></span>' +
+                    '<em>' + v.name + '</em>' +
+                    '<b>' + v.text + '</b>' +
+                    '</div>';
+            }).join('');
+
+        tooltip.style.opacity = '1';
+        tooltip.style.left = Math.min(Math.max(localX + 14, 8), rect.width - 190) + 'px';
+        tooltip.style.top = Math.min(Math.max(localY - 14, 8), rect.height - 96) + 'px';
+    });
+
+    hitLayer.addEventListener('mouseleave', function () {
+        hoverLine.style.opacity = '0';
+        tooltip.style.opacity = '0';
+    });
+});
+</script>
+</body>
+</html>

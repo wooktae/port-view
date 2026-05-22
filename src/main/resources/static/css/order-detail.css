@@ -1,0 +1,597 @@
+/* =========================================================
+   Order Detail View
+   src/main/resources/static/css/order-detail.css
+
+   Strategy Execution 화면 톤에 맞춘 Light Theme
+   - 밝은 회색 배경
+   - 흰색 카드
+   - 연한 border
+   - 부드러운 shadow
+   ========================================================= */
+
+/* 전체 화면 */
+.order-detail-shell {
+    width: min(1480px, calc(100% - 56px));
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: 32px 0 48px;
+}
+
+/* Header */
+.order-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    width: 100%;
+    margin-bottom: 24px;
+}
+
+.order-detail-header h1 {
+    margin: 4px 0 8px;
+    font-size: 32px;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text-main, #0f172a);
+}
+
+.order-detail-header .header-desc {
+    margin: 0;
+    color: var(--text-muted, #64748b);
+    line-height: 1.5;
+}
+
+.detail-actions {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* =========================================================
+   Summary
+   ========================================================= */
+
+.detail-summary-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    background: linear-gradient(135deg, #ffffff 0%, #f7f9fc 100%);
+    border: 1px solid var(--line, rgba(15, 23, 42, 0.08));
+    border-radius: 24px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-md, 0 14px 34px rgba(15, 23, 42, 0.06));
+}
+
+.detail-summary-card h2 {
+    margin: 4px 0 8px;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-main, #0f172a);
+}
+
+.detail-summary-card p {
+    margin: 0;
+    color: var(--text-muted, #64748b);
+    line-height: 1.5;
+}
+
+.detail-summary-card p strong {
+    color: var(--text-main, #0f172a);
+}
+
+.detail-summary-badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* =========================================================
+   Current Order Cards
+   ========================================================= */
+
+.current-order-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.current-order-card {
+    min-height: 132px;
+    border-radius: 20px;
+    padding: 18px;
+    background: #ffffff;
+    color: var(--text-main, #0f172a);
+    border: 1px solid var(--line, rgba(15, 23, 42, 0.08));
+    box-shadow: var(--shadow-sm, 0 8px 22px rgba(15, 23, 42, 0.04));
+    position: relative;
+    overflow: hidden;
+}
+
+.current-order-card::after {
+    content: "";
+    position: absolute;
+    right: -42px;
+    bottom: -46px;
+    width: 128px;
+    height: 128px;
+    border-radius: 999px;
+    background: var(--blue, #2563eb);
+    opacity: 0.08;
+}
+
+.current-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    z-index: 1;
+}
+
+.current-main span {
+    font-size: 22px;
+    font-weight: 850;
+    color: var(--text-main, #0f172a);
+}
+
+.current-main em {
+    font-style: normal;
+    color: var(--text-muted, #64748b);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+/* =========================================================
+   Detail Panels
+   ========================================================= */
+
+.detail-panel {
+    margin-top: 20px;
+    overflow: hidden;
+}
+
+.panel-card.detail-panel {
+    background: #ffffff;
+    border: 1px solid var(--line, rgba(15, 23, 42, 0.08));
+    border-radius: 24px;
+    box-shadow: var(--shadow-md, 0 14px 34px rgba(15, 23, 42, 0.06));
+}
+
+.detail-panel .panel-header {
+    margin-bottom: 18px;
+}
+
+/* =========================================================
+   Chain
+   ========================================================= */
+
+.chain-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.chain-node {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 16px;
+    position: relative;
+}
+
+.chain-node:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 23px;
+    top: 48px;
+    bottom: -16px;
+    width: 2px;
+    background: #dbe3ee;
+}
+
+.chain-index {
+    width: 48px;
+    height: 48px;
+    border-radius: 18px;
+    display: grid;
+    place-items: center;
+    background: var(--gray-soft, #e2e8f0);
+    color: #334155;
+    font-weight: 900;
+    position: relative;
+    z-index: 1;
+    border: 1px solid #cbd5e1;
+}
+
+.chain-node.buy .chain-index {
+    background: var(--red-soft, #fee2e2);
+    color: #991b1b;
+    border-color: #fecaca;
+}
+
+.chain-node.sell .chain-index {
+    background: var(--blue-soft, #eff6ff);
+    color: #1d4ed8;
+    border-color: var(--blue-line, #bfdbfe);
+}
+
+.chain-node.modify .chain-index {
+    background: var(--purple-soft, #f3e8ff);
+    color: #6d28d9;
+    border-color: #e9d5ff;
+}
+
+.chain-node.cancel .chain-index {
+    background: var(--gray-soft, #e2e8f0);
+    color: #334155;
+    border-color: #cbd5e1;
+}
+
+.chain-content {
+    background: var(--card-bg-soft, #f8fafc);
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 18px;
+}
+
+.chain-node.current .chain-content {
+    border-color: var(--blue-line, #bfdbfe);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+    background: #ffffff;
+}
+
+.chain-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 16px;
+}
+
+.chain-top h4 {
+    margin: 0 0 4px;
+    color: var(--text-main, #0f172a);
+    font-size: 20px;
+    font-weight: 850;
+}
+
+.chain-top p {
+    margin: 0;
+    color: var(--text-muted, #64748b);
+}
+
+.chain-top p strong {
+    color: var(--text-main, #0f172a);
+}
+
+.chain-badges {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.chain-info-grid,
+.event-info-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.chain-info-grid div,
+.event-info-grid div {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 12px;
+    min-width: 0;
+}
+
+.chain-info-grid span,
+.event-info-grid span {
+    display: block;
+    color: var(--text-muted, #64748b);
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 5px;
+}
+
+.chain-info-grid strong,
+.event-info-grid strong {
+    display: block;
+    color: var(--text-main, #0f172a);
+    font-size: 13px;
+    font-weight: 850;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* =========================================================
+   Event Timeline
+   ========================================================= */
+
+.timeline-empty {
+    color: var(--text-muted, #64748b);
+    background: var(--card-bg-soft, #f8fafc);
+    border: 1px dashed #cbd5e1;
+    border-radius: 18px;
+    padding: 22px;
+}
+
+.event-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+}
+
+.event-item {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 14px;
+    position: relative;
+}
+
+.event-item:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 11px;
+    top: 24px;
+    bottom: -16px;
+    width: 2px;
+    background: #dbe3ee;
+}
+
+.event-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    margin-top: 18px;
+    background: var(--gray, #64748b);
+    position: relative;
+    z-index: 1;
+    border: 4px solid #ffffff;
+    box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.event-item.accepted .event-dot {
+    background: var(--blue, #2563eb);
+}
+
+.event-item.filled .event-dot {
+    background: var(--green, #16a34a);
+}
+
+.event-item.cancel-accepted .event-dot {
+    background: var(--yellow, #f59e0b);
+}
+
+.event-item.canceled .event-dot {
+    background: var(--gray, #64748b);
+}
+
+.event-item.modify .event-dot {
+    background: var(--purple, #7c3aed);
+}
+
+.event-card {
+    background: var(--card-bg-soft, #f8fafc);
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 18px;
+}
+
+.event-card-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 16px;
+}
+
+.event-card-top h4 {
+    margin: 0 0 4px;
+    color: var(--text-main, #0f172a);
+    font-size: 18px;
+    font-weight: 850;
+}
+
+.event-card-top h4 em {
+    margin-left: 8px;
+    font-style: normal;
+    color: var(--text-muted, #64748b);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.event-card-top p {
+    margin: 0;
+    color: var(--text-muted, #64748b);
+}
+
+.event-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* =========================================================
+   Fill
+   ========================================================= */
+
+.fill-table {
+    min-width: 980px;
+}
+
+.fill-table thead th {
+    background: #f8fafc;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.fill-table tbody td {
+    color: var(--text-main, #0f172a);
+    border-bottom: 1px solid #edf2f7;
+}
+
+.fill-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+/* =========================================================
+   Shared Fixes
+   ========================================================= */
+
+.broker-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.broker-cell strong {
+    color: var(--text-main, #0f172a);
+    font-weight: 850;
+}
+
+.broker-cell span {
+    color: var(--text-muted, #64748b);
+    font-size: 12px;
+}
+
+.strong-number {
+    font-weight: 850;
+    color: var(--text-main, #0f172a);
+}
+
+/* dashboard.css / orders.css badge와 톤 맞춤 */
+.order-type-badge.buy {
+    background: var(--red-soft, #fee2e2);
+    color: #991b1b;
+}
+
+.order-type-badge.sell {
+    background: var(--blue-soft, #eff6ff);
+    color: #1d4ed8;
+}
+
+.order-type-badge.modify {
+    background: var(--purple-soft, #f3e8ff);
+    color: #6d28d9;
+}
+
+.order-type-badge.cancel {
+    background: var(--gray-soft, #e2e8f0);
+    color: #334155;
+}
+
+.order-type-badge.unknown {
+    background: var(--yellow-soft, #fef3c7);
+    color: #92400e;
+}
+
+.order-status-badge.accepted {
+    background: var(--blue-soft, #eff6ff);
+    color: #1d4ed8;
+}
+
+.order-status-badge.filled {
+    background: var(--green-soft, #dcfce7);
+    color: #166534;
+}
+
+.order-status-badge.modify,
+.order-status-badge.modified {
+    background: var(--purple-soft, #f3e8ff);
+    color: #6d28d9;
+}
+
+.order-status-badge.cancel-accepted {
+    background: var(--yellow-soft, #fef3c7);
+    color: #92400e;
+}
+
+.order-status-badge.canceled {
+    background: var(--gray-soft, #e2e8f0);
+    color: #334155;
+}
+
+.order-status-badge.rejected {
+    background: var(--red-soft, #fee2e2);
+    color: #991b1b;
+}
+
+.order-status-badge.unknown {
+    background: var(--gray-soft, #e2e8f0);
+    color: #334155;
+}
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+
+@media (max-width: 1180px) {
+    .current-order-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .chain-info-grid,
+    .event-info-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .order-detail-shell {
+        width: min(100% - 28px, 1480px);
+        padding: 20px 0 36px;
+    }
+
+    .order-detail-header {
+        flex-direction: column;
+    }
+
+    .detail-actions {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .nav-button {
+        min-height: 54px;
+    }
+
+    .detail-summary-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .detail-summary-badges {
+        justify-content: flex-start;
+    }
+
+    .current-order-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .chain-top,
+    .event-card-top {
+        flex-direction: column;
+    }
+
+    .chain-badges,
+    .event-badges {
+        justify-content: flex-start;
+    }
+
+    .chain-info-grid,
+    .event-info-grid {
+        grid-template-columns: 1fr;
+    }
+}

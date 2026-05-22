@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>실시간 시세 조회</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link th:href="@{/css/dashboard.css}" rel="stylesheet">
+</head>
+
+<body class="dashboard-body">
+
+<div class="dashboard-shell">
+
+    <!-- Header -->
+    <header class="legacy-page-header">
+        <div>
+            <div class="eyebrow">포트폴리오 운영</div>
+            <h1>실시간 시세 조회</h1>
+            <p class="header-desc">
+                커넥터 실시간 시세 API 기준 종목 현재가, 전일대비, 거래량, 시가/고가/저가를 조회함.
+            </p>
+        </div>
+
+        <div class="legacy-actions">
+            <a class="nav-button ghost" th:href="@{/dashboard}">
+                ← 대시보드
+            </a>
+            <a class="nav-button ghost" th:href="@{/positions}">
+                보유종목 상세
+            </a>
+            <a class="nav-button ghost" th:href="@{/orders}">
+                주문 원장
+            </a>
+        </div>
+    </header>
+
+    <!-- 화면 역할 -->
+    <section class="page-summary-card">
+        <div class="summary-main">
+            <div class="section-label">화면 역할</div>
+            <h2>실시간 시세 보조 조회</h2>
+            <p>
+                이 화면은 종목코드 하나를 입력해 커넥터 실시간 시세 API 응답을 빠르게 확인하는 보조 화면.
+            </p>
+            <p>
+                주문/전략 판단용 메인 화면은 아니며, API 연결 상태와 특정 종목 현재가 확인용으로 사용하면 됨.
+            </p>
+        </div>
+        <div class="summary-badges">
+            <span class="soft-badge badge-connector">시세 조회</span>
+            <span class="soft-badge badge-live">실시간</span>
+        </div>
+    </section>
+
+    <!-- Summary -->
+    <section class="page-summary-card">
+        <div class="summary-main">
+            <div class="section-label">실시간 시세</div>
+            <h2>종목 현재가 조회</h2>
+            <p>
+                종목코드를 입력하면 Market 커넥터를 통해 실시간 시세를 조회함.
+                예: 삼성전자 005930, SK하이닉스 000660, LG디스플레이 034220
+            </p>
+        </div>
+
+        <div class="summary-badges">
+            <span class="soft-badge badge-connector">커넥터 API</span>
+            <span class="soft-badge badge-live">실시간</span>
+            <span class="soft-badge badge-count">
+                종목 <strong th:text="${code != null and !#strings.isEmpty(code) ? code : '-'}">-</strong>
+            </span>
+        </div>
+    </section>
+
+    <!-- Search Form -->
+    <section class="legacy-form-card">
+        <form th:action="@{/get-price-realtime}" method="get">
+            <label for="code">종목코드</label>
+
+            <div class="legacy-form-row">
+                <input id="code"
+                       name="code"
+                       type="text"
+                       placeholder="예: 005930"
+                       th:value="${code}">
+
+                <button type="submit">시세 조회</button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Empty / Initial -->
+    <section class="empty-panel" th:if="${quote == null}">
+        <div class="empty-icon">i</div>
+        <div>
+            <h2>조회할 종목 코드를 입력해줘</h2>
+            <p>
+                종목코드를 입력하고 시세 조회를 누르면 커넥터 API 응답값을 화면에 표시함.
+            </p>
+        </div>
+    </section>
+
+    <!-- Quote Result -->
+    <section class="legacy-panel" th:if="${quote != null}">
+        <div class="legacy-panel-header">
+            <div>
+                <div class="section-label">시세 조회 결과</div>
+                <h3>
+                    실시간 시세
+                    <span th:text="${quote.code != null ? quote.code : '-'}">-</span>
+                </h3>
+                <p>
+                    커넥터 실시간 가격 조회 API에서 반환된 현재가 및 장중 가격 정보.
+                </p>
+            </div>
+
+            <div class="summary-badges">
+                <span class="soft-badge badge-connector">KIS 모의투자</span>
+                <span class="soft-badge badge-count">
+                    종목코드 <strong th:text="${quote.code != null ? quote.code : '-'}">-</strong>
+                </span>
+            </div>
+        </div>
+
+        <div class="quote-grid">
+            <article class="quote-card">
+                <div class="quote-label">현재가</div>
+                <div class="quote-value"
+                     th:text="${quote.currentPrice != null and !#strings.isEmpty(quote.currentPrice) ? quote.currentPrice : '-'}">
+                    -
+                </div>
+            </article>
+
+            <article class="quote-card">
+                <div class="quote-label">전일대비</div>
+                <div class="quote-value"
+                     th:text="${quote.diff != null and !#strings.isEmpty(quote.diff) ? quote.diff : '-'}">
+                    -
+                </div>
+            </article>
+
+            <article class="quote-card">
+                <div class="quote-label">거래량</div>
+                <div class="quote-value"
+                     th:text="${quote.volume != null and !#strings.isEmpty(quote.volume) ? quote.volume : '-'}">
+                    -
+                </div>
+            </article>
+
+            <article class="quote-card">
+                <div class="quote-label">시가</div>
+                <div class="quote-value"
+                     th:text="${quote.open != null and !#strings.isEmpty(quote.open) ? quote.open : '-'}">
+                    -
+                </div>
+            </article>
+
+            <article class="quote-card">
+                <div class="quote-label">고가</div>
+                <div class="quote-value"
+                     th:text="${quote.high != null and !#strings.isEmpty(quote.high) ? quote.high : '-'}">
+                    -
+                </div>
+            </article>
+
+            <article class="quote-card">
+                <div class="quote-label">저가</div>
+                <div class="quote-value"
+                     th:text="${quote.low != null and !#strings.isEmpty(quote.low) ? quote.low : '-'}">
+                    -
+                </div>
+            </article>
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Daily 배치</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- RUNNING 상태일 때만 5초마다 현재 Batch 상세 화면 자동 갱신 -->
+    <meta th:if="${selectedRun != null and selectedRun.isRunning()}"
+          http-equiv="refresh"
+          th:content="${'5;url=/daily-batch/' + selectedRun.id() + '?accountNo=' + accountNo}">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+    <link href="/css/layout/app-layout.css" rel="stylesheet">
+    <link href="/css/pages/dashboard.css" rel="stylesheet">
+    <link href="/css/pages/strategy-execution.css" rel="stylesheet">
+    <link href="/css/pages/daily-batch.css" rel="stylesheet">
+</head>
+
+<body class="app-body">
+<div class="app-shell" th:with="resolvedAccountNo=${accountNo != null ? accountNo : '50187518'}">
+
+    <aside th:replace="~{fragments/sidebar :: sidebar('daily-batch', ${resolvedAccountNo})}"></aside>
+
+    <main class="app-main dashboard-main daily-batch-main">
+        <header class="dashboard-page-title">
+            <h1>Daily 배치</h1>
+            <p>수집, 전처리, 전략 판단, 실행 후보 생성, 자동매도/자동매수, 체결 동기화, 잔고 최신화를 한 번에 실행하는 운영 콘솔.</p>
+        </header>
+
+        <section class="dashboard-stage">
+
+            <!-- Flash Message -->
+            <section class="dashboard-section batch-message-section"
+                     th:if="${successMessage != null or errorMessage != null}">
+                <div class="batch-message success" th:if="${successMessage != null}">
+                    <strong>성공</strong>
+                    <span th:text="${successMessage}">Daily Pipeline 실행 완료</span>
+                </div>
+
+                <div class="batch-message error" th:if="${errorMessage != null}">
+                    <strong>실패</strong>
+                    <span th:text="${errorMessage}">Daily Pipeline 실행 실패</span>
+                </div>
+            </section>
+
+            <!-- Hero -->
+            <section class="dashboard-section batch-hero-section">
+                <div class="batch-hero-card">
+                    <div class="batch-hero-main">
+                        <div class="section-label">Daily Operations</div>
+                        <h2>Daily 운영 파이프라인</h2>
+                        <p>
+                            Connector 잔고 확인부터 Interest 수집, 전처리, 백테스트, Daily Signal,
+                            Execution 연결, 자동매도/자동매수, 체결/포지션 동기화까지 순차 실행.
+                        </p>
+
+                        <div class="batch-hero-badges">
+                            <span class="soft-badge badge-live">모의투자</span>
+                            <span class="soft-badge badge-connector">Connector 사전 실행 필요</span>
+                            <span class="soft-badge badge-count">
+                                계좌 <strong th:text="${resolvedAccountNo}">50187518</strong>
+                            </span>
+                            <span class="soft-badge badge-count">
+                                총 <strong>16</strong> 단계
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="batch-action-panel">
+                        <div class="batch-action-copy">
+                            <span>Manual Trigger</span>
+                            <strong>운영 작업 수동 실행</strong>
+                            <small th:if="${!hasRunningBatch}">
+                                장중 포지션 점검은 현재가 조회/손절 후보 감지만 수행하고, Daily Pipeline은 전체 파이프라인을 실행함.
+                            </small>
+                            <small th:if="${hasRunningBatch}">
+                                이미 실행 중인 배치가 있음. 중복 실행은 차단됨.
+                            </small>
+                        </div>
+
+                        <div class="batch-action-button-row">
+
+                            <form th:action="@{/daily-batch/intraday-monitor/run}"
+                                method="post"
+                                class="batch-run-form batch-intraday-form">
+                                <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
+
+                                <button type="submit"
+                                        class="batch-intraday-button"
+                                        th:disabled="${hasRunningBatch}">
+                                    <span th:text="${hasRunningBatch ? '실행 중' : '장중 포지션 점검'}">
+                                        장중 포지션 점검
+                                    </span>
+                                </button>
+                            </form>
+
+                            <form th:action="@{/daily-batch/run}" method="post" class="batch-run-form">
+                                <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
+
+                                <button type="submit"
+                                        class="batch-run-button"
+                                        th:disabled="${hasRunningBatch}">
+                                    <span th:text="${hasRunningBatch ? '실행 중' : 'Daily Pipeline 실행'}">
+                                        Daily Pipeline 실행
+                                    </span>
+                                </button>
+                            </form>
+
+                        </div>
+
+                        <div class="batch-action-links">
+                            <a class="batch-refresh-button"
+                               th:href="@{/daily-batch(accountNo=${resolvedAccountNo})}">
+                                새로고침
+                            </a>
+
+                            <a class="batch-running-link"
+                               th:if="${hasRunningBatch and runningBatchRunId != null}"
+                               th:href="@{/daily-batch/{id}(id=${runningBatchRunId}, accountNo=${resolvedAccountNo})}">
+                                실행 중인 배치 보기 →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pre-run Metrics -->
+            <section class="dashboard-section batch-ready-section">
+                <div class="section-head compact-head">
+                    <div>
+                        <div class="section-label">Ready Check</div>
+                        <h2>실행 전 운영 기준</h2>
+                    </div>
+                </div>
+
+                <div class="metric-grid">
+                    <article class="metric-card batch-metric-total">
+                        <div class="metric-title">Pipeline 단계</div>
+                        <div class="metric-value">16</div>
+                        <div class="metric-subtitle">수집 → 전처리 → 전략 → 실행 → 동기화</div>
+                    </article>
+
+                    <article class="metric-card batch-metric-success">
+                        <div class="metric-title">자동매수</div>
+                        <div class="metric-value">ON</div>
+                        <div class="metric-subtitle">READY Daily BUY 주문만 PAPER_STRATEGY 실행</div>
+                    </article>
+
+                    <article class="metric-card batch-metric-warning">
+                        <div class="metric-title">자동매도</div>
+                        <div class="metric-value">ON</div>
+                        <div class="metric-subtitle">READY Daily/장중 SELL 주문만 PAPER_STRATEGY 실행</div>
+                    </article>
+
+                    <article class="metric-card batch-metric-neutral">
+                        <div class="metric-title">로그 저장</div>
+                        <div class="metric-value">Tail</div>
+                        <div class="metric-subtitle">stdout/stderr 마지막 로그 DB 저장</div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- Intraday Monitor Result -->
+            <section class="dashboard-section batch-intraday-section">
+                <div class="section-head">
+                    <div>
+                        <div class="section-label">Intraday Monitor</div>
+                        <h2>최근 장중 포지션 점검 결과</h2>
+                        <p class="section-description">
+                            장중 포지션 점검 버튼으로 실행된 실시간 현재가 조회와 손절 후보 판단 결과.
+                            운영 기준은 기본적으로 진입가 대비 -10% hard stop.
+                        </p>
+                    </div>
+
+                    <span class="soft-badge badge-count">
+                        최근 <strong th:text="${intradayChecks != null ? #lists.size(intradayChecks) : 0}">0</strong>건
+                    </span>
+                </div>
+
+                <div class="strategy-empty-card small"
+                    th:if="${intradayChecks == null or #lists.isEmpty(intradayChecks)}">
+                    <div class="empty-mark">!</div>
+                    <div>
+                        <h2>장중 점검 이력 없음</h2>
+                        <p>
+                            장중 포지션 점검 버튼을 실행하고, 손절 후보나 warning이 발생하면 이 영역에 표시됨.
+                            정상 점검이고 후보가 없으면 저장 row가 없을 수 있음.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="intraday-check-list"
+                    th:if="${intradayChecks != null and !#lists.isEmpty(intradayChecks)}">
+
+                    <article class="intraday-check-row"
+                            th:each="check : ${intradayChecks}"
+                            th:classappend="${check.shouldStopClass()}">
+
+                        <div class="intraday-check-main">
+                            <strong th:text="${check.stockName() != null ? check.stockName() : '-'}">
+                                앱클론
+                            </strong>
+                            <span th:text="${check.tickerCode() != null ? check.tickerCode() : '-'}">
+                                174900
+                            </span>
+                            <small>
+                                점검
+                                <b th:text="'#' + ${check.id()}">#1</b>
+                                /
+                                <b th:text="${check.checkTsText()}">
+                                    -
+                                </b>
+                            </small>
+                        </div>
+
+                        <div class="intraday-check-status">
+                            <span th:class="'intraday-status-pill ' + ${check.shouldStopClass()}"
+                                th:text="${check.shouldStopLabel()}">
+                                정상
+                            </span>
+                            <em th:text="${check.stopReasonLabel()}">
+                                -
+                            </em>
+                        </div>
+
+                        <div class="intraday-check-grid">
+                            <div>
+                                <span>현재가</span>
+                                <strong th:text="${check.currentPrice() != null ? #numbers.formatDecimal(check.currentPrice(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                                    -
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>손익률</span>
+                                <strong th:text="${check.pnlRate() != null ? (check.pnlRate() >= 0 ? '+' : '') + #numbers.formatDecimal(check.pnlRate() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '-'}">
+                                    -
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>손절 기준</span>
+                                <strong th:text="${check.hardStopRate() != null ? #numbers.formatDecimal(check.hardStopRate() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '-'}">
+                                    -
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Warning</span>
+                                <strong th:text="${check.warningLabel()}">
+                                    없음
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>연결 주문</span>
+                                <strong th:text="${check.executionOrderText()}">
+                                    -
+                                </strong>
+                            </div>
+                        </div>
+
+                        <div class="intraday-check-link">
+                            <a th:if="${check.createdExecutionOrderId() != null}"
+                            th:href="@{/strategy/execution/plans}">
+                                전략 실행 계획 보기 →
+                            </a>
+                            <span th:if="${check.createdExecutionOrderId() == null}">
+                                주문 후보 미생성
+                            </span>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- Pipeline Preview -->
+            <section class="dashboard-section batch-preview-section">
+                <div class="section-head">
+                    <div>
+                        <div class="section-label">Pipeline Map</div>
+                        <h2>오늘 실행될 단계</h2>
+                        <p class="section-description">
+                            버튼 클릭 시 아래 순서대로 Python 파이프라인이 실행되고, 각 결과가 step log로 저장됨.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="batch-pipeline-map">
+
+                    <div class="pipeline-group">
+                        <div class="pipeline-group-head">
+                            <span>01</span>
+                            <strong>계좌 / 수집</strong>
+                        </div>
+                        <div class="pipeline-chip-grid">
+                            <span class="pipeline-chip">잔고 확인</span>
+                            <span class="pipeline-chip">Interest 수집</span>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-group">
+                        <div class="pipeline-group-head">
+                            <span>02</span>
+                            <strong>전처리 / 분석</strong>
+                        </div>
+                        <div class="pipeline-chip-grid">
+                            <span class="pipeline-chip">Preprocessor</span>
+                            <span class="pipeline-chip">백테스트 분석</span>
+                            <span class="pipeline-chip">백테스트 리포트</span>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-group">
+                        <div class="pipeline-group-head">
+                            <span>03</span>
+                            <strong>Daily 판단</strong>
+                        </div>
+                        <div class="pipeline-chip-grid">
+                            <span class="pipeline-chip">매수 신호</span>
+                            <span class="pipeline-chip">포지션 신호</span>
+                            <span class="pipeline-chip">매수 연결</span>
+                            <span class="pipeline-chip">매도 연결</span>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-group">
+                        <div class="pipeline-group-head">
+                            <span>04</span>
+                            <strong>주문 / 동기화</strong>
+                        </div>
+                        <div class="pipeline-chip-grid">
+                            <span class="pipeline-chip strong">자동매도</span>
+                            <span class="pipeline-chip strong">자동매수</span>
+                            <span class="pipeline-chip">체결 조회</span>
+                            <span class="pipeline-chip">매도 체결/포지션 동기화</span>
+                            <span class="pipeline-chip">매수 체결 동기화</span>
+                            <span class="pipeline-chip">포지션 동기화</span>
+                            <span class="pipeline-chip">잔고 최신화</span>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Empty State -->
+            <section class="dashboard-section batch-empty-section"
+                     th:if="${page == null or page.empty}">
+                <div class="batch-empty-card">
+                    <div class="empty-mark">!</div>
+                    <div>
+                        <h2>아직 실행 기록 없음</h2>
+                        <p>
+                            위의 실행 버튼을 누르면 Daily Batch Run과 Step Log가 생성되고,
+                            최신 실행 요약과 단계별 로그가 여기에 표시됨.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <th:block th:if="${page != null and !page.empty}">
+
+                <!-- Selected Run Summary -->
+                <section class="dashboard-section batch-summary-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">Selected Run</div>
+                            <h2>선택한 Daily 배치 실행 요약</h2>
+                            <p class="section-description">
+                                현재 화면에서 보고 있는 Daily Pipeline 실행 1회의 전체 상태.
+                            </p>
+                        </div>
+
+                        <span th:class="'batch-status-pill ' + ${T(my.portfolio.port_view.util.DailyBatchLabelUtils).runStatusClass(selectedRun.runStatus())}"
+                              th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).runStatusLabel(selectedRun.runStatus())}">
+                            실행 중
+                        </span>
+                    </div>
+
+                    <div class="batch-run-hero">
+                        <div class="batch-run-title">
+                            <strong th:text="${selectedRun.displayTitle()}">Daily Pipeline #1</strong>
+                            <span>
+                                실행일
+                                <b th:text="${selectedRun.batchDate() != null ? selectedRun.batchDate() : '-'}">-</b>
+                                /
+                                실행 유형
+                                <b th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).runTypeLabel(selectedRun.runType())}">
+                                    수동 실행
+                                </b>
+                            </span>
+                        </div>
+
+                        <div class="batch-run-progress">
+                            <div class="progress-track">
+                                <div class="progress-fill"
+                                     th:style="'width:' + ${selectedRun.progressPercent()} + '%'"></div>
+                            </div>
+                            <small th:text="${selectedRun.progressPercent()} + '%'">0%</small>
+                        </div>
+                    </div>
+                    
+                    <div class="batch-rerun-actions"
+                        th:if="${selectedRun != null and selectedRun.isFailed()}">
+
+                        <form th:action="@{/daily-batch/{id}/rerun-failed(id=${selectedRun.id()})}"
+                            method="post"
+                            class="batch-rerun-failed-form">
+
+                            <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
+
+                            <button type="submit"
+                                    class="batch-rerun-failed-button"
+                                    th:disabled="${hasRunningBatch}">
+                                실패 단계부터 재실행
+                            </button>
+
+                            <span class="batch-rerun-help"
+                                th:if="${!hasRunningBatch}">
+                                첫 FAILED step부터 마지막 단계까지 새 RETRY 실행으로 재처리.
+                            </span>
+
+                            <span class="batch-rerun-help warning"
+                                th:if="${hasRunningBatch}">
+                                현재 실행 중인 Daily Batch가 있어 재실행할 수 없음.
+                            </span>
+                        </form>
+                    </div>
+
+                    <div class="metric-grid batch-metric-grid">
+                        <article class="metric-card batch-metric-total">
+                            <div class="metric-title">전체 단계</div>
+                            <div class="metric-value" th:text="${selectedRun.safeTotalStepCount()}">14</div>
+                            <div class="metric-subtitle">Daily Pipeline step</div>
+                        </article>
+
+                        <article class="metric-card batch-metric-success">
+                            <div class="metric-title">성공</div>
+                            <div class="metric-value" th:text="${selectedRun.safeSuccessStepCount()}">0</div>
+                            <div class="metric-subtitle">정상 완료 단계</div>
+                        </article>
+
+                        <article class="metric-card batch-metric-warning">
+                            <div class="metric-title">대상 없음</div>
+                            <div class="metric-value" th:text="${selectedRun.safeNoTargetStepCount()}">0</div>
+                            <div class="metric-subtitle">정상이나 실행 대상 없음</div>
+                        </article>
+
+                        <article class="metric-card batch-metric-failed">
+                            <div class="metric-title">실패 / 건너뜀</div>
+                            <div class="metric-value">
+                                <span th:text="${selectedRun.safeFailedStepCount()}">0</span>
+                                <small>/</small>
+                                <span th:text="${selectedRun.safeSkippedStepCount()}">0</span>
+                            </div>
+                            <div class="metric-subtitle">실패 단계 / 생략 단계</div>
+                        </article>
+                    </div>
+
+                    <div class="batch-info-grid">
+                        <div>
+                            <span>계좌</span>
+                            <strong th:text="${selectedRun.accountNo() != null ? selectedRun.accountNo() : resolvedAccountNo}">
+                                50187518
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>환경</span>
+                            <strong th:text="${selectedRun.environment() != null ? selectedRun.environment() : '-'}">
+                                local
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>요청자</span>
+                            <strong th:text="${selectedRun.requestedBy() != null ? selectedRun.requestedBy() : '-'}">
+                                VIEW_BUTTON
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>시작시각</span>
+                            <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatDateTime(selectedRun.startedAt())}">
+                                -
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>종료시각</span>
+                            <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatDateTime(selectedRun.finishedAt())}">
+                                -
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>소요시간</span>
+                            <strong th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).durationLabel(selectedRun.durationMs())}">
+                                -
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>현재 단계</span>
+                            <strong th:text="${selectedRun.currentStepName() != null ? selectedRun.currentStepName() : '-'}">
+                                -
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>실패 단계</span>
+                            <strong th:text="${selectedRun.errorStepCode() != null ? T(my.portfolio.port_view.util.DailyBatchLabelUtils).stepCodeLabel(selectedRun.errorStepCode()) : '-'}">
+                                -
+                            </strong>
+                        </div>
+                    </div>
+
+                    <div class="batch-error-box"
+                         th:if="${selectedRun.errorMessage() != null and !#strings.isEmpty(selectedRun.errorMessage())}">
+                        <span>오류 메시지</span>
+                        <pre th:text="${selectedRun.errorMessage()}">error</pre>
+                    </div>
+                </section>
+
+                <!-- Step Logs -->
+                <section class="dashboard-section batch-step-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">Step Logs</div>
+                            <h2>단계별 실행 결과</h2>
+                            <p class="section-description">
+                                Python 파이프라인 각 단계의 실행 상태, 종료코드, 작업 디렉토리, 마지막 로그를 표시함.
+                            </p>
+                        </div>
+
+                        <div class="batch-step-head-actions">
+                            <span class="soft-badge badge-count">
+                                단계 <strong th:text="${steps != null ? #lists.size(steps) : 0}">0</strong>개
+                            </span>
+
+                            <form th:if="${availableSteps != null and !#lists.isEmpty(availableSteps)}"
+                                th:action="@{/daily-batch/run-from-step}"
+                                method="post"
+                                class="batch-partial-run-form">
+
+                                <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
+
+                                <select name="fromStepCode"
+                                        class="batch-partial-select"
+                                        th:disabled="${hasRunningBatch}">
+                                    <option th:each="step : ${availableSteps}"
+                                            th:value="${step.stepCode()}"
+                                            th:text="${step.displayLabel()}">
+                                        1. 잔고/보유종목 확인
+                                    </option>
+                                </select>
+
+                                <button type="submit"
+                                        class="batch-partial-button"
+                                        th:disabled="${hasRunningBatch}">
+                                    선택 단계부터 재실행
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="strategy-empty-card small"
+                         th:if="${steps == null or #lists.isEmpty(steps)}">
+                        <div class="empty-mark">!</div>
+                        <div>
+                            <h2>단계 로그 없음</h2>
+                            <p>아직 단계별 실행 로그가 생성되지 않았음.</p>
+                        </div>
+                    </div>
+
+                    <div class="batch-step-list"
+                         th:if="${steps != null and !#lists.isEmpty(steps)}">
+
+                        <article class="batch-step-row"
+                                 th:each="step : ${steps}">
+                            <div class="step-order-cell">
+                                <strong th:text="${step.displayStepNo()}">1</strong>
+                            </div>
+
+                            <div class="step-main-cell">
+                                <strong th:text="${step.stepName() != null ? step.stepName() : T(my.portfolio.port_view.util.DailyBatchLabelUtils).stepCodeLabel(step.stepCode())}">
+                                    잔고/보유종목 확인
+                                </strong>
+                                <span th:text="${step.stepCode()}">CONNECTOR_BALANCE</span>
+                            </div>
+
+                            <div class="step-status-cell">
+                                <span th:class="'batch-step-pill ' + ${T(my.portfolio.port_view.util.DailyBatchLabelUtils).stepStatusClass(step.stepStatus())}"
+                                      th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).stepStatusLabel(step.stepStatus())}">
+                                    성공
+                                </span>
+                            </div>
+
+                            <div class="step-time-grid">
+                                <div>
+                                    <span>시작</span>
+                                    <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatTime(step.startedAt())}">
+                                        -
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>종료</span>
+                                    <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatTime(step.finishedAt())}">
+                                        -
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>소요</span>
+                                    <strong th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).durationLabel(step.durationMs())}">
+                                        -
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>종료코드</span>
+                                    <strong th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).exitCodeLabel(step.exitCode())}">
+                                        -
+                                    </strong>
+                                </div>
+                            </div>
+
+                            <div class="step-command-cell">
+                                <span>작업 디렉토리</span>
+                                <strong th:text="${step.workDir() != null ? step.workDir() : '-'}">
+                                    C:/Workspaces
+                                </strong>
+                                <em th:text="${step.commandText() != null ? step.commandText() : '-'}">
+                                    python script.py
+                                </em>
+                            </div>
+
+                            <details class="step-log-details"
+                                     th:if="${step.hasLog()}">
+                                <summary>로그 보기</summary>
+
+                                <div class="step-log-block"
+                                     th:if="${step.hasErrorMessage()}">
+                                    <span>error_message</span>
+                                    <pre th:text="${step.errorMessage()}">error</pre>
+                                </div>
+
+                                <div class="step-log-block"
+                                     th:if="${step.hasStderr()}">
+                                    <span>stderr_tail</span>
+                                    <pre th:text="${step.stderrTail()}">stderr</pre>
+                                </div>
+
+                                <div class="step-log-block"
+                                     th:if="${step.hasStdout()}">
+                                    <span>stdout_tail</span>
+                                    <pre th:text="${step.stdoutTail()}">stdout</pre>
+                                </div>
+                            </details>
+
+                            <div class="step-log-empty"
+                                 th:if="${!step.hasLog()}">
+                                로그 없음
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- Recent Run History -->
+                <section class="dashboard-section batch-history-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">History</div>
+                            <h2>Daily 배치 실행 히스토리</h2>
+                            <p class="section-description">
+                                최근 20개 Daily Pipeline 실행 기록. 각 행을 클릭하면 해당 실행 상세로 이동함.
+                            </p>
+                        </div>
+
+                        <span class="soft-badge badge-count">
+                            기록 <strong th:text="${recentRuns != null ? #lists.size(recentRuns) : 0}">0</strong>건
+                        </span>
+                    </div>
+
+                    <div class="strategy-empty-card small"
+                         th:if="${recentRuns == null or #lists.isEmpty(recentRuns)}">
+                        <div class="empty-mark">!</div>
+                        <div>
+                            <h2>실행 히스토리가 없음</h2>
+                            <p>Daily Pipeline 실행 후 이 영역에 기록이 표시됨.</p>
+                        </div>
+                    </div>
+
+                    <div class="batch-history-list"
+                         th:if="${recentRuns != null and !#lists.isEmpty(recentRuns)}">
+
+                        <a class="batch-history-row"
+                           th:each="run : ${recentRuns}"
+                           th:classappend="${selectedRun != null and selectedRun.id() == run.id()} ? ' selected' : ''"
+                           th:href="@{/daily-batch/{id}(id=${run.id()}, accountNo=${resolvedAccountNo})}">
+
+                            <div class="history-main">
+                                <strong th:text="'#' + ${run.id()}">#1</strong>
+                                <span th:text="${run.batchDate() != null ? run.batchDate() : '-'}">
+                                    2026-05-13
+                                </span>
+                            </div>
+
+                            <div class="history-status">
+                                <span th:class="'batch-status-pill mini ' + ${T(my.portfolio.port_view.util.DailyBatchLabelUtils).runStatusClass(run.runStatus())}"
+                                      th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).runStatusLabel(run.runStatus())}">
+                                    성공
+                                </span>
+                            </div>
+
+                            <div class="history-counts">
+                                <div>
+                                    <span>성공</span>
+                                    <strong th:text="${run.safeSuccessStepCount()}">0</strong>
+                                </div>
+                                <div>
+                                    <span>대상 없음</span>
+                                    <strong th:text="${run.safeNoTargetStepCount()}">0</strong>
+                                </div>
+                                <div>
+                                    <span>실패</span>
+                                    <strong th:text="${run.safeFailedStepCount()}">0</strong>
+                                </div>
+                                <div>
+                                    <span>건너뜀</span>
+                                    <strong th:text="${run.safeSkippedStepCount()}">0</strong>
+                                </div>
+                            </div>
+
+                            <div class="history-time">
+                                <span>시작</span>
+                                <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatMonthDayTime(run.startedAt())}">
+                                    -
+                                </strong>
+                            </div>
+
+                            <div class="history-time">
+                                <span>소요</span>
+                                <strong th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).durationLabel(run.durationMs())}">
+                                    -
+                                </strong>
+                            </div>
+
+                            <div class="history-link">
+                                상세 →
+                            </div>
+                        </a>
+                    </div>
+                </section>
+                
+                <!-- Block Watch Candidates -->
+                <section class="dashboard-section block-watch-section">
+                    <div class="section-head">
+                        <div>
+                            <div class="section-label">Block Watch</div>
+                            <h2>BLOCK Watch 후보</h2>
+                            <p class="section-description">
+                                시장이 BLOCK이라 실제 매수/주문은 만들지 않았지만,
+                                강한 예외 후보로 관찰 중인 종목. 성과 검증 후 예외 매수 실험 여부를 판단하기 위한 데이터임.
+                            </p>
+                        </div>
+
+                        <span class="soft-badge badge-count">
+                            후보 <strong th:text="${blockWatchCandidates != null ? #lists.size(blockWatchCandidates) : 0}">0</strong>건
+                        </span>
+                    </div>
+
+                    <div class="strategy-empty-card small"
+                         th:if="${blockWatchCandidates == null or #lists.isEmpty(blockWatchCandidates)}">
+                        <div class="empty-mark">!</div>
+                        <div>
+                            <h2>BLOCK Watch 후보 없음</h2>
+                            <p>
+                                최신 BLOCK 구간에서 관찰 기준을 통과한 후보가 없거나,
+                                아직 Daily Signal 실행으로 Watch 후보가 생성되지 않음.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="block-watch-notice"
+                         th:if="${blockWatchCandidates != null and !#lists.isEmpty(blockWatchCandidates)}">
+                        <strong>관찰 전용</strong>
+                        <span>
+                            이 후보들은 실제 주문 후보가 아니며, strategy_daily_signal / strategy_execution_order와 분리되어 있음.
+                            1D·3D·5D·10D 수익률은 이후 가격 데이터가 쌓이면 Research 검증 배치에서 채워짐.
+                        </span>
+                    </div>
+
+                    <div class="block-watch-list"
+                         th:if="${blockWatchCandidates != null and !#lists.isEmpty(blockWatchCandidates)}">
+
+                        <article class="block-watch-row"
+                                 th:each="watch : ${blockWatchCandidates}">
+
+                            <div class="block-watch-main">
+                                <strong th:text="${watch.displayName()}">한국가스공사</strong>
+                                <span th:text="${watch.tickerCode() != null ? watch.tickerCode() : '-'}">036460</span>
+                                <small>
+                                    기준일
+                                    <b th:text="${watch.dataDate() != null ? watch.dataDate() : '-'}">2026-05-19</b>
+                                    /
+                                    실행일
+                                    <b th:text="${watch.runDate() != null ? watch.runDate() : '-'}">2026-05-20</b>
+                                </small>
+                            </div>
+
+                            <div class="block-watch-reason">
+                                <span class="block-watch-pill">WATCH</span>
+                                <em th:text="${watch.watchReasonLabel()}">BLOCK 강한 예외 관찰</em>
+                            </div>
+
+                            <div class="block-watch-score-grid">
+                                <div>
+                                    <span>기준가</span>
+                                    <strong th:text="${watch.closePrice() != null ? #numbers.formatDecimal(watch.closePrice(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    <span>수급</span>
+                                    <strong th:text="${watch.flowScore() != null ? #numbers.formatDecimal(watch.flowScore(), 1, 'COMMA', 4, 'POINT') : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    <span>종합</span>
+                                    <strong th:text="${watch.finalScore() != null ? #numbers.formatDecimal(watch.finalScore(), 1, 'COMMA', 4, 'POINT') : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    <span>변동성</span>
+                                    <strong th:text="${watch.volatility20d() != null ? #numbers.formatDecimal(watch.volatility20d() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    <span>장중폭</span>
+                                    <strong th:text="${watch.intradayRange() != null ? #numbers.formatDecimal(watch.intradayRange() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '-'}">
+                                        -
+                                    </strong>
+                                </div>
+                            </div>
+
+                            <div class="block-watch-return-grid">
+                                <div>
+                                    <span>1D</span>
+                                    <strong th:classappend="${watch.return1d() != null ? (watch.return1d() >= 0 ? ' positive' : ' negative') : ' waiting'}"
+                                            th:text="${watch.return1d() != null ? (watch.return1d() >= 0 ? '+' : '') + #numbers.formatDecimal(watch.return1d() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '검증 대기'}">
+                                        검증 대기
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    <span>3D</span>
+                                    <strong th:classappend="${watch.return3d() != null ? (watch.return3d() >= 0 ? ' positive' : ' negative') : ' waiting'}"
+                                            th:text="${watch.return3d() != null ? (watch.return3d() >= 0 ? '+' : '') + #numbers.formatDecimal(watch.return3d() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '검증 대기'}">
+                                        검증 대기
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    <span>5D</span>
+                                    <strong th:classappend="${watch.return5d() != null ? (watch.return5d() >= 0 ? ' positive' : ' negative') : ' waiting'}"
+                                            th:text="${watch.return5d() != null ? (watch.return5d() >= 0 ? '+' : '') + #numbers.formatDecimal(watch.return5d() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '검증 대기'}">
+                                        검증 대기
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    <span>10D</span>
+                                    <strong th:classappend="${watch.return10d() != null ? (watch.return10d() >= 0 ? ' positive' : ' negative') : ' waiting'}"
+                                            th:text="${watch.return10d() != null ? (watch.return10d() >= 0 ? '+' : '') + #numbers.formatDecimal(watch.return10d() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '검증 대기'}">
+                                        검증 대기
+                                    </strong>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+            </th:block>
+
+        </section>
+    </main>
+</div>
+</body>
+</html>

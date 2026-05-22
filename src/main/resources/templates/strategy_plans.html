@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>전략 실행 계획</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link th:href="@{/css/dashboard.css}" rel="stylesheet">
+    <link th:href="@{/css/strategy-execution.css}" rel="stylesheet">
+</head>
+
+<body class="dashboard-body">
+
+<div class="strategy-shell">
+
+    <!-- Header -->
+    <header class="strategy-header">
+        <div>
+            <div class="eyebrow">포트폴리오 운영</div>
+            <h1>전략 실행 계획</h1>
+            <p class="header-desc">
+                전략 실행 계획, 주문 후보 상태, 현재 전략 포지션 요약을 확인하는 전략 운영 화면
+            </p>
+        </div>
+
+        <div class="strategy-actions">
+            <a class="nav-button ghost" th:href="@{/dashboard}">
+                ← 대시보드
+            </a>
+
+            <a class="nav-button ghost" th:href="@{/strategy/reports/latest}">
+                백테스트 리포트
+            </a>
+
+            <a class="nav-button ghost" th:href="@{/orders}">
+                주문 원장
+            </a>
+        </div>
+    </header>
+
+    <!-- Empty -->
+    <section class="empty-panel" th:if="${page.empty}">
+        <div class="empty-icon">!</div>
+        <div>
+            <h2>전략 실행 계획이 없어</h2>
+            <p>
+                strategy_execution_plan 데이터가 없음.
+                execution_build_candidates.py를 먼저 실행한 뒤 다시 조회 필요.
+            </p>
+        </div>
+    </section>
+
+    <main th:if="${!page.empty}">
+
+        <!-- Page Role Guide -->
+        <section class="strategy-notice-card">
+            <div class="notice-icon">i</div>
+            <div>
+                <h2>전략 실행 계획 화면</h2>
+                <p>
+                    이 화면은 백테스트/전략 결과를 실제 주문 후보로 변환한 실행 계획 목록을 보여줌.
+                    계획 단위로 후보 수, 주문 가능, 차단 주문, 최신 실행일을 확인하는 곳.
+                </p>
+                <p>
+                    여기서 보는 포지션 요약은 실제 브로커 잔고가 아니라 strategy_position_state 기준의
+                    전략 포지션 운영 상태임. 실제 보유종목은 대시보드 또는 보유종목 상세 화면에서 확인 필요.
+                </p>
+            </div>
+        </section>
+
+        <!-- Summary -->
+        <section class="strategy-summary-card">
+            <div>
+                <div class="section-label">전략 실행</div>
+                <h2>실행 계획 목록</h2>
+                <p>
+                    최근 실행 계획 기준으로 후보, 주문 가능, 차단, 상태별 계획 수를 집계함.
+                </p>
+            </div>
+
+            <div class="summary-badges">
+                <span class="soft-badge badge-strategy">전략</span>
+                <span class="soft-badge badge-count">
+                    총 <strong th:text="${page.totalPlanCount}">0</strong> 건
+                </span>
+                <span class="soft-badge badge-count">
+                    최신 <strong th:text="${page.latestPlanDateText}">-</strong>
+                </span>
+            </div>
+        </section>
+
+        <!-- Metric Cards -->
+        <section class="strategy-metric-grid">
+            <article class="strategy-metric-card total">
+                <div class="metric-title">계획</div>
+                <div class="metric-value" th:text="${page.totalPlanCount}">0</div>
+                <div class="metric-subtitle">최근 실행 계획</div>
+            </article>
+
+            <article class="strategy-metric-card ready">
+                <div class="metric-title">주문 가능</div>
+                <div class="metric-value" th:text="${page.totalReadyOrderCount}">0</div>
+                <div class="metric-subtitle">주문 가능 후보 합계</div>
+            </article>
+
+            <article class="strategy-metric-card blocked">
+                <div class="metric-title">차단 주문</div>
+                <div class="metric-value" th:text="${page.totalBlockedOrderCount}">0</div>
+                <div class="metric-subtitle">차단 후보 합계</div>
+            </article>
+
+            <article class="strategy-metric-card cash">
+                <div class="metric-title">최근 가용현금</div>
+                <div class="metric-value small" th:text="${page.latestAvailableCashText}">
+                    -
+                </div>
+                <div class="metric-subtitle">최신 계획의 가용 현금</div>
+            </article>
+        </section>
+
+        <!-- Status Summary -->
+        <section class="strategy-metric-grid">
+            <article class="strategy-metric-card ready">
+                <div class="metric-title">주문 가능 계획</div>
+                <div class="metric-value" th:text="${page.readyPlanCount}">0</div>
+                <div class="metric-subtitle">주문 가능 상태 계획</div>
+            </article>
+
+            <article class="strategy-metric-card blocked">
+                <div class="metric-title">차단 계획</div>
+                <div class="metric-value" th:text="${page.blockedPlanCount}">0</div>
+                <div class="metric-subtitle">차단 상태 계획</div>
+            </article>
+
+            <article class="strategy-metric-card total">
+                <div class="metric-title">후보 없음</div>
+                <div class="metric-value" th:text="${page.noCandidatePlanCount}">0</div>
+                <div class="metric-subtitle">후보 없음</div>
+            </article>
+
+            <article class="strategy-metric-card blocked">
+                <div class="metric-title">부분 차단</div>
+                <div class="metric-value" th:text="${page.partiallyBlockedPlanCount}">0</div>
+                <div class="metric-subtitle">부분 차단 계획</div>
+            </article>
+        </section>
+
+        <!-- Current Position Summary -->
+        <section id="current-positions" class="strategy-summary-card">
+            <div>
+                <div class="section-label">현재 전략 포지션</div>
+                <h2>전략 포지션 운영 상태</h2>
+                <p>
+                    현재 전략 포지션 상태 기준 보유, 유지 판단, 매도 준비/진행 상태를 집계함.
+                    최근 평가일:
+                    <strong th:text="${positionSummary != null and positionSummary['latest_evaluated_date'] != null ? positionSummary['latest_evaluated_date'] : '-'}">
+                        -
+                    </strong>
+                </p>
+
+                <div class="panel-actions" style="margin-top: 14px;">
+                    <a class="panel-link" href="#execution-plans">
+                        관련 실행 계획 목록 보기 →
+                    </a>
+                    <a class="panel-link" th:href="@{/dashboard}">
+                        대시보드 →
+                    </a>
+                </div>
+            </div>
+
+            <div class="summary-badges">
+                <span class="soft-badge badge-count">
+                    보유
+                    <strong th:text="${positionSummary != null and positionSummary['open_position_count'] != null ? positionSummary['open_position_count'] : 0}">
+                        0
+                    </strong>
+                </span>
+
+                <span class="soft-badge badge-count">
+                    유지
+                    <strong th:text="${positionSummary != null and positionSummary['hold_position_count'] != null ? positionSummary['hold_position_count'] : 0}">
+                        0
+                    </strong>
+                </span>
+
+                <span class="soft-badge badge-count">
+                    청산
+                    <strong th:text="${positionSummary != null and positionSummary['closed_position_count'] != null ? positionSummary['closed_position_count'] : 0}">
+                        0
+                    </strong>
+                </span>
+            </div>
+        </section>
+
+        <!-- Position Metric Cards -->
+        <section class="strategy-metric-grid">
+            <article class="strategy-metric-card total">
+                <div class="metric-title">보유 중</div>
+                <div class="metric-value"
+                     th:text="${positionSummary != null and positionSummary['open_position_count'] != null ? positionSummary['open_position_count'] : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">현재 전략 보유 포지션</div>
+            </article>
+
+            <article class="strategy-metric-card ready">
+                <div class="metric-title">유지 판단</div>
+                <div class="metric-value"
+                     th:text="${positionSummary != null and positionSummary['hold_position_count'] != null ? positionSummary['hold_position_count'] : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">최근 평가 결과 유지</div>
+            </article>
+
+            <article class="strategy-metric-card blocked">
+                <div class="metric-title">매도 준비</div>
+                <div class="metric-value"
+                     th:text="${positionSummary != null and positionSummary['sell_ready_position_count'] != null ? positionSummary['sell_ready_position_count'] : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">매도 주문 준비 포지션</div>
+            </article>
+
+            <article class="strategy-metric-card cash">
+                <div class="metric-title">매도 주문 중</div>
+                <div class="metric-value"
+                     th:text="${positionSummary != null and positionSummary['sell_ordered_position_count'] != null ? positionSummary['sell_ordered_position_count'] : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">매도 주문 진행 중</div>
+            </article>
+        </section>
+
+        <!-- Position Status Summary -->
+        <section class="strategy-metric-grid">
+            <article class="strategy-metric-card total">
+                <div class="metric-title">전체 포지션</div>
+                <div class="metric-value"
+                     th:text="${positionSummary != null and positionSummary['total_position_count'] != null ? positionSummary['total_position_count'] : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">전체 전략 포지션</div>
+            </article>
+
+            <article class="strategy-metric-card blocked">
+                <div class="metric-title">매도 평가</div>
+                <div class="metric-value"
+                     th:text="${positionSummary != null and positionSummary['sell_signal_position_count'] != null ? positionSummary['sell_signal_position_count'] : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">최근 평가 결과 매도</div>
+            </article>
+
+            <article class="strategy-metric-card blocked">
+                <div class="metric-title">평가 제외</div>
+                <div class="metric-value"
+                     th:text="${positionSummary != null and positionSummary['skip_position_count'] != null ? positionSummary['skip_position_count'] : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">최근 평가 결과 제외</div>
+            </article>
+
+            <article class="strategy-metric-card ready">
+                <div class="metric-title">청산 완료</div>
+                <div class="metric-value"
+                     th:text="${positionSummary != null and positionSummary['closed_position_count'] != null ? positionSummary['closed_position_count'] : 0}">
+                    0
+                </div>
+                <div class="metric-subtitle">청산 완료 포지션</div>
+            </article>
+        </section>
+
+        <!-- Plans Table -->
+        <section id="execution-plans" class="panel-card strategy-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="section-label">실행 계획 목록</div>
+                    <h3>전략 실행 계획 목록</h3>
+                    <p class="panel-subtitle">
+                        각 계획 상세 화면에서 실행 주문 후보와 포지션 생명주기를 함께 확인 가능.
+                    </p>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table dashboard-table strategy-table align-middle">
+                    <thead>
+                    <tr>
+                        <th>계획</th>
+                        <th>전략</th>
+                        <th>시장상태</th>
+                        <th>계획상태</th>
+                        <th class="text-end">후보</th>
+                        <th class="text-end">주문 가능</th>
+                        <th class="text-end">차단</th>
+                        <th class="text-end">제외</th>
+                        <th class="text-end">목표금액</th>
+                        <th class="text-end">가용현금</th>
+                        <th class="text-end">최대주문금액</th>
+                        <th>계좌</th>
+                        <th class="text-end">상세</th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                    <tr th:each="plan : ${page.plans}">
+                        <td>
+                            <div class="plan-cell">
+                                <strong th:text="'#' + ${plan.id()}">-</strong>
+                                <span th:text="${plan.planDate()}">-</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="strategy-name-cell">
+                                <div class="strategy-name" th:text="${plan.strategyName()}">-</div>
+                                <div class="strategy-version"
+                                     th:if="${plan.strategyVersion() != null and !#strings.isEmpty(plan.strategyVersion())}"
+                                     th:text="${plan.strategyVersion()}">
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <span th:class="'market-badge ' + ${plan.marketSignal() == 'BLOCK' ? 'block' : (plan.marketSignal() == 'AGGRESSIVE' ? 'aggressive' : (plan.marketSignal() == 'UNKNOWN' ? 'unknown' : 'neutral'))}"
+                                  th:text="${plan.marketSignalLabel()}">
+                                -
+                            </span>
+                            <div class="score-text"
+                                 th:if="${plan.marketRegimeScore() != null}"
+                                 th:text="${plan.marketRegimeScore()}">
+                            </div>
+                        </td>
+
+                        <td>
+                            <span th:class="'execution-status-badge ' + ${plan.planStatus() == 'READY' ? 'ready' : (plan.planStatus() == 'BLOCKED' ? 'blocked' : (plan.planStatus() == 'PARTIALLY_BLOCKED' ? 'partial' : 'default-status'))}"
+                                  th:text="${plan.planStatusLabel()}">
+                                -
+                            </span>
+                            <div class="status-reason"
+                                 th:if="${plan.blockedReason() != null and !#strings.isEmpty(plan.blockedReason())}"
+                                 th:text="${plan.blockedReason()}">
+                            </div>
+                        </td>
+
+                        <td class="text-end" th:text="${plan.totalCandidateCount()}">0</td>
+                        <td class="text-end strong-number" th:text="${plan.readyOrderCount()}">0</td>
+                        <td class="text-end strong-number danger-number" th:text="${plan.blockedOrderCount()}">0</td>
+                        <td class="text-end" th:text="${plan.skippedOrderCount()}">0</td>
+
+                        <td class="text-end"
+                            th:text="${plan.totalTargetAmount() != null ? #numbers.formatDecimal(plan.totalTargetAmount(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                            -
+                        </td>
+
+                        <td class="text-end strong-number"
+                            th:text="${plan.availableCash() != null ? #numbers.formatDecimal(plan.availableCash(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                            -
+                        </td>
+
+                        <td class="text-end"
+                            th:text="${plan.maxOrderAmount() != null ? #numbers.formatDecimal(plan.maxOrderAmount(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
+                            -
+                        </td>
+
+                        <td th:text="${plan.accountNo()}">-</td>
+
+                        <td class="text-end">
+                            <a class="detail-button"
+                               th:href="@{/strategy/execution/plans/{id}(id=${plan.id()})}">
+                                상세
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>
