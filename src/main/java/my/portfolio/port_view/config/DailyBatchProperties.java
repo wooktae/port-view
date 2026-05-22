@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
  * - Python 실행 명령어 관리
  * - 각 Microservice 작업 디렉토리 관리
  * - timeout / log tail 길이 관리
- * - Java 코드 내 C:/Workspaces 하드코딩 제거
+ * - Java 코드 내 로컬 workspace 경로 하드코딩 제거
  */
 @Component
 @ConfigurationProperties(prefix = "portfolio.batch")
@@ -32,40 +32,35 @@ public class DailyBatchProperties {
     /**
      * 전체 workspace root.
      *
-     * 예:
-     * - C:/Workspaces
+     * application-local.properties 또는 환경변수로 지정한다.
      */
-    private String workspaceRoot = "C:/Workspaces";
+    private String workspaceRoot = "";
 
     /**
      * Market Connector 작업 디렉토리.
      *
-     * 예:
-     * - C:/Workspaces/port-marketconnector
+     * application-local.properties 또는 환경변수로 지정한다.
      */
     private String marketconnectorDir;
 
     /**
      * Interest Crawler 작업 디렉토리.
      *
-     * 예:
-     * - C:/Workspaces/port_interest_crawler
+     * application-local.properties 또는 환경변수로 지정한다.
      */
     private String interestCrawlerDir;
 
     /**
      * Interest Preprocessor 작업 디렉토리.
      *
-     * 예:
-     * - C:/Workspaces/port_interest_preprocessor
+     * application-local.properties 또는 환경변수로 지정한다.
      */
     private String preprocessorDir;
 
     /**
      * Strategy Execution 작업 디렉토리.
      *
-     * 예:
-     * - C:/Workspaces/port_strategy_execution
+     * application-local.properties 또는 환경변수로 지정한다.
      */
     private String executionDir;
 

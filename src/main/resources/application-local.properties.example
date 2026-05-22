@@ -15,6 +15,12 @@ portfolio.batch.default-account-no=${PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO:<account
 # Connector
 connector.base-url=${CONNECTOR_BASE_URL:http://127.0.0.1:5000}
 
+# Snapshot refresh
+portfolio.snapshot-refresh.enabled=${PORTFOLIO_SNAPSHOT_REFRESH_ENABLED:true}
+portfolio.snapshot-refresh.marketconnector-dir=${PORTFOLIO_SNAPSHOT_REFRESH_MARKETCONNECTOR_DIR:<marketconnector-dir>}
+portfolio.snapshot-refresh.python-executable=${PORTFOLIO_SNAPSHOT_REFRESH_PYTHON_EXECUTABLE:python}
+portfolio.snapshot-refresh.balance-script-name=${PORTFOLIO_SNAPSHOT_REFRESH_BALANCE_SCRIPT_NAME:connector_balance.py}
+
 # Daily Batch paths
 portfolio.batch.workspace-root=${PORTFOLIO_BATCH_WORKSPACE_ROOT:<workspace-root>}
 portfolio.batch.marketconnector-dir=${PORTFOLIO_BATCH_MARKETCONNECTOR_DIR:<marketconnector-dir>}

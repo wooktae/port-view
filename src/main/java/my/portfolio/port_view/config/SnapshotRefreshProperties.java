@@ -21,7 +21,7 @@ public class SnapshotRefreshProperties {
 
     private String pythonExecutable = "python";
 
-    private String marketconnectorDir = "C:/Workspaces/port-marketconnector";
+    private String marketconnectorDir = "";
 
     private String balanceScriptName = "connector_balance.py";
 
