@@ -1,6 +1,7 @@
 package my.portfolio.port_view.controller;
 
 import lombok.RequiredArgsConstructor;
+import my.portfolio.port_view.common.ViewNames;
 import my.portfolio.port_view.service.StrategyDailyViewService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -20,7 +21,7 @@ public class StrategyDailyViewController {
 
         addDailyModel(model, page);
 
-        return "strategy_daily";
+        return ViewNames.STRATEGY_DAILY;
     }
 
     @GetMapping("/strategy/daily/{dailyRunId}")
@@ -33,7 +34,7 @@ public class StrategyDailyViewController {
 
         addDailyModel(model, page);
 
-        return "strategy_daily";
+        return ViewNames.STRATEGY_DAILY;
     }
 
     private void addDailyModel(

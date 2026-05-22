@@ -14,6 +14,7 @@ public final class ViewNames {
         // utility class
     }
 
+    // Migrated pages/* templates.
     public static final String DASHBOARD = "pages/dashboard";
 
     public static final String ORDERS = "pages/orders";
@@ -28,9 +29,11 @@ public final class ViewNames {
     public static final String DAILY_BATCH = "pages/daily_batch";
 
     public static final String BALANCE_SUMMARY = "pages/balance-summary";
+    public static final String STRATEGY_REPORT = "pages/strategy_report";
+
+    // Active root templates. Keep values unchanged until each view is migrated.
     public static final String HOLDINGS = "holdings";
     public static final String TRADE_ORDERS = "trade-orders";
     public static final String GET_PRICE_REALTIME = "get-price-realtime";
-
-    public static final String STRATEGY_REPORT = "pages/strategy_report";
+    public static final String STRATEGY_DAILY = "strategy_daily";
 }
