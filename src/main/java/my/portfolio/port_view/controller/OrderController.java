@@ -28,11 +28,10 @@ public class OrderController {
             @RequestParam(required = false) String accountNo,
             Model model
     ) {
-        String resolvedAccountNo = accountNoResolver.resolve(accountNo);
+        String resolvedAccountNo = resolveAndAddAccountNo(accountNo, model);
 
         OrderPageDTO page = orderService.getOrderPage(resolvedAccountNo);
 
-        model.addAttribute("accountNo", resolvedAccountNo);
         model.addAttribute("page", page);
 
         return ViewNames.ORDERS;
@@ -44,13 +43,18 @@ public class OrderController {
             @RequestParam(required = false) String accountNo,
             Model model
     ) {
-        String resolvedAccountNo = accountNoResolver.resolve(accountNo);
+        String resolvedAccountNo = resolveAndAddAccountNo(accountNo, model);
 
         OrderDetailPageDTO page = orderService.getOrderDetail(id, resolvedAccountNo);
 
-        model.addAttribute("accountNo", resolvedAccountNo);
         model.addAttribute("page", page);
 
         return ViewNames.ORDER_DETAIL;
+    }
+
+    private String resolveAndAddAccountNo(String accountNo, Model model) {
+        String resolvedAccountNo = accountNoResolver.resolve(accountNo);
+        model.addAttribute("accountNo", resolvedAccountNo);
+        return resolvedAccountNo;
     }
 }
