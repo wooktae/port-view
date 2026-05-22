@@ -47,7 +47,7 @@ public class BalanceController {
         BigDecimal cumulativeProfitAmount = balanceService.getCumulativeProfitAmount(resolvedAccountNo);
         BigDecimal cumulativeProfitRate = balanceService.getCumulativeProfitRate(resolvedAccountNo);
 
-        model.addAttribute("accountNo", resolvedAccountNo);
+        addAccountNo(model, resolvedAccountNo);
         model.addAttribute("balanceSummaryList", list);
         model.addAttribute("stockEvalAmount", stockEvalAmount);
         model.addAttribute("holdingCount", holdingCount);
@@ -57,5 +57,9 @@ public class BalanceController {
         model.addAttribute("cumulativeProfitRate", cumulativeProfitRate);
 
         return ViewNames.BALANCE_SUMMARY;
+    }
+
+    private void addAccountNo(Model model, String resolvedAccountNo) {
+        model.addAttribute("accountNo", resolvedAccountNo);
     }
 }
