@@ -19,7 +19,7 @@
 </head>
 
 <body class="app-body">
-<div class="app-shell" th:with="resolvedAccountNo=${accountNo != null ? accountNo : '50187518'}">
+<div class="app-shell" th:with="resolvedAccountNo=${accountNo != null ? accountNo : '-'}">
 
     <aside th:replace="~{fragments/sidebar :: sidebar('daily-batch', ${resolvedAccountNo})}"></aside>
 
@@ -60,7 +60,7 @@
                             <span class="soft-badge badge-live">모의투자</span>
                             <span class="soft-badge badge-connector">Connector 사전 실행 필요</span>
                             <span class="soft-badge badge-count">
-                                계좌 <strong th:text="${resolvedAccountNo}">50187518</strong>
+                                계좌 <strong th:text="${resolvedAccountNo}">-</strong>
                             </span>
                             <span class="soft-badge badge-count">
                                 총 <strong>16</strong> 단계
@@ -462,7 +462,7 @@
                         <div>
                             <span>계좌</span>
                             <strong th:text="${selectedRun.accountNo() != null ? selectedRun.accountNo() : resolvedAccountNo}">
-                                50187518
+                                -
                             </strong>
                         </div>
 
