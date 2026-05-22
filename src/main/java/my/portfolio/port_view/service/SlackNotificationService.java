@@ -17,15 +17,10 @@ import my.portfolio.port_view.repository.DailyBatchRepository;
 import my.portfolio.port_view.repository.StrategyDailyViewRepository;
 import my.portfolio.port_view.repository.StrategyExecutionQueryRepository;
 import my.portfolio.port_view.util.DailyBatchLabelUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -43,12 +38,7 @@ public class SlackNotificationService {
     private final StrategyExecutionQueryRepository strategyExecutionQueryRepository;
     private final ConnectorBalanceSnapshotRepository connectorBalanceSnapshotRepository;
     private final ConnectorPositionSnapshotRepository connectorPositionSnapshotRepository;
-
-    @Value("${slack.enabled:false}")
-    private boolean slackEnabled;
-
-    @Value("${slack.webhook-url:}")
-    private String webhookUrl;
+    private final SlackClient slackClient;
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -481,42 +471,7 @@ public class SlackNotificationService {
     // =====================================================
 
     private void sendText(String text) {
-        if (!slackEnabled) {
-            log.info("Slack notification skipped. slack.enabled=false");
-            return;
-        }
-
-        String normalizedWebhookUrl = normalizeWebhookUrl(webhookUrl);
-
-        if (normalizedWebhookUrl.isBlank()) {
-            log.warn("Slack notification skipped. slack.webhook-url is blank");
-            return;
-        }
-
-        try {
-            String payload = "{\"text\":\"" + jsonEscape(text) + "\"}";
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(normalizedWebhookUrl))
-                    .header("Content-Type", "application/json; charset=utf-8")
-                    .POST(HttpRequest.BodyPublishers.ofString(payload))
-                    .build();
-
-            HttpResponse<String> response = HttpClient.newHttpClient()
-                    .send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                log.warn(
-                        "Slack notification failed. statusCode={}, body={}",
-                        response.statusCode(),
-                        response.body()
-                );
-            } else {
-                log.info("Slack notification sent. statusCode={}", response.statusCode());
-            }
-        } catch (Exception e) {
-            log.warn("Slack notification failed.", e);
-        }
+        slackClient.sendText(text);
     }
 
     // =====================================================
@@ -602,58 +557,11 @@ public class SlackNotificationService {
         return value.substring(0, maxLength) + "...";
     }
 
-    private String normalizeWebhookUrl(String value) {
-        if (value == null) {
-            return "";
-        }
-
-        String normalized = value.trim();
-
-        if (normalized.length() >= 2
-                && normalized.startsWith("\"")
-                && normalized.endsWith("\"")) {
-            normalized = normalized.substring(1, normalized.length() - 1).trim();
-        }
-
-        return normalized;
-    }
-    
     private String formatKstDateTime(java.time.OffsetDateTime value) {
         if (value == null) {
             return "-";
         }
 
         return value.atZoneSameInstant(KST).format(DATE_TIME_FORMATTER);
-    }
-
-    private String jsonEscape(String value) {
-        if (value == null) {
-            return "";
-        }
-
-        StringBuilder sb = new StringBuilder();
-
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-
-            switch (c) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\b' -> sb.append("\\b");
-                case '\f' -> sb.append("\\f");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> {
-                    if (c < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
-                }
-            }
-        }
-
-        return sb.toString();
     }
 }
