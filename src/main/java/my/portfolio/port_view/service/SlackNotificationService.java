@@ -17,6 +17,7 @@ import my.portfolio.port_view.repository.DailyBatchRepository;
 import my.portfolio.port_view.repository.StrategyDailyViewRepository;
 import my.portfolio.port_view.repository.StrategyExecutionQueryRepository;
 import my.portfolio.port_view.util.DailyBatchLabelUtils;
+import my.portfolio.port_view.util.ViewTextUtils;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -389,7 +390,7 @@ public class SlackNotificationService {
     private void appendBalanceSummary(StringBuilder sb, String accountNo) {
         sb.append("\n[잔고]\n");
 
-        if (accountNo == null || accountNo.isBlank()) {
+        if (ViewTextUtils.isBlank(accountNo)) {
             sb.append("- 계좌번호 없음\n");
             return;
         }
@@ -424,7 +425,7 @@ public class SlackNotificationService {
     private void appendPositionSummary(StringBuilder sb, String accountNo) {
         sb.append("\n[보유 종목]\n");
 
-        if (accountNo == null || accountNo.isBlank()) {
+        if (ViewTextUtils.isBlank(accountNo)) {
             sb.append("- 계좌번호 없음\n");
             return;
         }
@@ -493,7 +494,7 @@ public class SlackNotificationService {
     }
 
     private String marketReasonText(DailyRunDto dailyRun) {
-        String signal = dailyRun.marketSignal() == null ? "" : dailyRun.marketSignal().trim().toUpperCase();
+        String signal = ViewTextUtils.upper(dailyRun.marketSignal());
 
         return switch (signal) {
             case "BLOCK" -> "신규 매수 차단 / 현금 방어 우선";
@@ -526,6 +527,10 @@ public class SlackNotificationService {
             return "-";
         }
 
+        if (durationMs >= 1000) {
+            return DailyBatchLabelUtils.durationLabel(durationMs);
+        }
+
         long totalSeconds = durationMs / 1000;
         long minutes = totalSeconds / 60;
         long seconds = totalSeconds % 60;
@@ -542,11 +547,11 @@ public class SlackNotificationService {
     }
 
     private String nullToDash(String value) {
-        return value == null || value.isBlank() ? "-" : value;
+        return ViewTextUtils.blankTo(value, "-");
     }
 
     private String shorten(String value, int maxLength) {
-        if (value == null || value.isBlank()) {
+        if (ViewTextUtils.isBlank(value)) {
             return "-";
         }
 

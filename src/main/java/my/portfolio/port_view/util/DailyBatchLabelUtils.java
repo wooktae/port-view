@@ -184,15 +184,11 @@ public final class DailyBatchLabelUtils {
     // =====================================================
 
     private static String normalize(String value) {
-        if (value == null) {
-            return "";
-        }
-
-        return value.trim().toUpperCase();
+        return ViewTextUtils.upper(value);
     }
 
     private static String fallbackLabel(String value) {
-        if (value == null || value.isBlank()) {
+        if (ViewTextUtils.isBlank(value)) {
             return "미확인";
         }
 
