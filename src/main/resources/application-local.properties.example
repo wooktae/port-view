@@ -1,0 +1,28 @@
+# Local configuration example for port-view.
+# Copy this file to application-local.properties for local development.
+# Do not commit application-local.properties.
+# Replace placeholder values locally only. Do not put real secrets in this example file.
+
+# Database
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://<host>:<port>/<database>}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:<db-username>}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:<db-password>}
+
+# Account
+portfolio.view.account.default-account-no=${PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO:<account-no>}
+portfolio.batch.default-account-no=${PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO:<account-no>}
+
+# Connector
+connector.base-url=${CONNECTOR_BASE_URL:http://127.0.0.1:5000}
+
+# Daily Batch paths
+portfolio.batch.workspace-root=${PORTFOLIO_BATCH_WORKSPACE_ROOT:<workspace-root>}
+portfolio.batch.marketconnector-dir=${PORTFOLIO_BATCH_MARKETCONNECTOR_DIR:<marketconnector-dir>}
+portfolio.batch.interest-crawler-dir=${PORTFOLIO_BATCH_INTEREST_CRAWLER_DIR:<interest-crawler-dir>}
+portfolio.batch.preprocessor-dir=${PORTFOLIO_BATCH_PREPROCESSOR_DIR:<preprocessor-dir>}
+portfolio.batch.execution-dir=${PORTFOLIO_BATCH_EXECUTION_DIR:<execution-dir>}
+portfolio.batch.environment=${PORTFOLIO_BATCH_ENVIRONMENT:local}
+
+# Slack
+slack.enabled=${SLACK_ENABLED:false}
+slack.webhook-url=${SLACK_WEBHOOK_URL:}
