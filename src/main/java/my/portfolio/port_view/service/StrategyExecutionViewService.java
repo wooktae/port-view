@@ -23,10 +23,6 @@ public class StrategyExecutionViewService {
 
     private final StrategyExecutionQueryRepository repository;
 
-    public List<StrategyExecutionPlanDto> getPlans() {
-        return repository.findPlans();
-    }
-
     public StrategyExecutionPlanDto getLatestPlanOrNull() {
         List<StrategyExecutionPlanDto> plans = repository.findPlans();
         return plans.isEmpty() ? null : plans.get(0);

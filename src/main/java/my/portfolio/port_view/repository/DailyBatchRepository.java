@@ -598,33 +598,6 @@ public class DailyBatchRepository {
         );
     }
 
-    public void markStepSkipped(
-            Long stepLogId,
-            String errorMessage,
-            String resultPayload
-    ) {
-        String sql = """
-                UPDATE strategy_daily_batch_step_log
-                SET
-                    step_status = 'SKIPPED',
-                    finished_at = now(),
-                    duration_ms = CASE
-                        WHEN started_at IS NULL THEN 0
-                        ELSE CAST(EXTRACT(EPOCH FROM (now() - started_at)) * 1000 AS BIGINT)
-                    END,
-                    error_message = ?,
-                    result_payload = ?::jsonb
-                WHERE id = ?
-                """;
-
-        jdbcTemplate.update(
-                sql,
-                truncate(errorMessage, 8000),
-                resultPayload,
-                stepLogId
-        );
-    }
-
     public void markPendingStepsSkippedAfterFailure(
             Long batchRunId,
             String failedStepCode,
