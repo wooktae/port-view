@@ -726,6 +726,10 @@ public class DailyBatchService {
         if ("DAILY_AUTO_BUY".equals(step.stepCode())) {
             return text.contains("자동매수 대상 ready daily buy 주문이 없음".toLowerCase())
                     || text.contains("자동매수 대상")
+                    || text.contains("한국 영업일이 아니므로 주문 관련 처리를 실행하지 않습니다".toLowerCase())
+                    || text.contains("connector_order_request를 생성하지 않고 종료합니다".toLowerCase())
+                    || text.contains("weekend")
+                    || text.contains("kr_holiday")
                     || text.contains("no target")
                     || text.contains("no ready");
         }
@@ -735,6 +739,10 @@ public class DailyBatchService {
                     || text.contains("자동매도 대상")
                     || text.contains("ready sell 주문이 없음".toLowerCase())
                     || text.contains("실행 가능한 자동매도 주문이 없음")
+                    || text.contains("한국 영업일이 아니므로 주문 관련 처리를 실행하지 않습니다".toLowerCase())
+                    || text.contains("connector_order_request를 생성하지 않고 종료합니다".toLowerCase())
+                    || text.contains("weekend")
+                    || text.contains("kr_holiday")
                     || text.contains("no target")
                     || text.contains("no ready");
         }
@@ -742,6 +750,9 @@ public class DailyBatchService {
         if ("DAILY_SELL_EXECUTION".equals(step.stepCode())) {
             return text.contains("생성할 daily position sell execution order 후보가 없음".toLowerCase())
                     || text.contains("sell execution order 후보가 없음".toLowerCase())
+                    || text.contains("한국 영업일이 아니므로 주문 관련 처리를 실행하지 않습니다".toLowerCase())
+                    || text.contains("weekend")
+                    || text.contains("kr_holiday")
                     || text.contains("no target")
                     || text.contains("no candidate");
         }
@@ -749,6 +760,9 @@ public class DailyBatchService {
         if ("DAILY_BUY_EXECUTION".equals(step.stepCode())) {
             return text.contains("생성할 daily signal execution order 후보가 없음".toLowerCase())
                     || text.contains("execution order 후보가 없음".toLowerCase())
+                    || text.contains("한국 영업일이 아니므로 주문 관련 처리를 실행하지 않습니다".toLowerCase())
+                    || text.contains("weekend")
+                    || text.contains("kr_holiday")
                     || text.contains("no target")
                     || text.contains("no candidate");
         }
