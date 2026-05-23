@@ -1,8 +1,8 @@
 package my.portfolio.port_view.controller;
 
 import my.portfolio.port_view.common.ViewNames;
-import my.portfolio.port_view.dto.PositionDetailPageDTO;
-import my.portfolio.port_view.dto.PositionPageDTO;
+import my.portfolio.port_view.dto.position.PositionDetailPageDTO;
+import my.portfolio.port_view.dto.position.PositionPageDTO;
 import my.portfolio.port_view.service.PositionService;
 import my.portfolio.port_view.util.AccountNoResolver;
 import org.springframework.stereotype.Controller;

@@ -1,9 +1,9 @@
 package my.portfolio.port_view.service;
 
-import my.portfolio.port_view.dto.DashboardMetricDTO;
-import my.portfolio.port_view.dto.DashboardPositionDTO;
-import my.portfolio.port_view.dto.DashboardRecentOrderDTO;
-import my.portfolio.port_view.dto.DashboardViewDTO;
+import my.portfolio.port_view.dto.dashboard.DashboardMetricDTO;
+import my.portfolio.port_view.dto.dashboard.DashboardPositionDTO;
+import my.portfolio.port_view.dto.dashboard.DashboardRecentOrderDTO;
+import my.portfolio.port_view.dto.dashboard.DashboardViewDTO;
 import my.portfolio.port_view.entity.ConnectorBalanceSnapshot;
 import my.portfolio.port_view.entity.ConnectorOrderRequest;
 import my.portfolio.port_view.entity.ConnectorPositionSnapshot;

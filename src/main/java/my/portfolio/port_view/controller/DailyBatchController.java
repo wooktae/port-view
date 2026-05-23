@@ -2,7 +2,7 @@ package my.portfolio.port_view.controller;
 
 import lombok.RequiredArgsConstructor;
 import my.portfolio.port_view.common.ViewNames;
-import my.portfolio.port_view.dto.DailyBatchPageDto;
+import my.portfolio.port_view.dto.dailybatch.DailyBatchPageDto;
 import my.portfolio.port_view.service.DailyBatchAsyncService;
 import my.portfolio.port_view.service.DailyBatchService;
 import my.portfolio.port_view.service.SlackNotificationService;

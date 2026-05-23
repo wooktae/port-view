@@ -1,9 +1,9 @@
 package my.portfolio.port_view.controller;
 
 import my.portfolio.port_view.common.ViewNames;
-import my.portfolio.port_view.dto.DashboardViewDTO;
-import my.portfolio.port_view.dto.ReportBacktestSummaryDto;
-import my.portfolio.port_view.dto.StrategyExecutionPlanDto;
+import my.portfolio.port_view.dto.dashboard.DashboardViewDTO;
+import my.portfolio.port_view.dto.strategy.ReportBacktestSummaryDto;
+import my.portfolio.port_view.dto.strategy.StrategyExecutionPlanDto;
 import my.portfolio.port_view.service.DashboardService;
 import my.portfolio.port_view.service.ReportService;
 import my.portfolio.port_view.service.StrategyExecutionViewService;

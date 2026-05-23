@@ -1,8 +1,8 @@
 package my.portfolio.port_view.repository;
 
-import my.portfolio.port_view.dto.PositionAgencyReportDTO;
-import my.portfolio.port_view.dto.PositionDetailSummaryDTO;
-import my.portfolio.port_view.dto.PositionNewsDTO;
+import my.portfolio.port_view.dto.position.PositionAgencyReportDTO;
+import my.portfolio.port_view.dto.position.PositionDetailSummaryDTO;
+import my.portfolio.port_view.dto.position.PositionNewsDTO;
 import my.portfolio.port_view.util.ViewFormatUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;

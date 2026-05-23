@@ -1,12 +1,12 @@
 package my.portfolio.port_view.service;
 
-import my.portfolio.port_view.dto.PositionAgencyReportDTO;
-import my.portfolio.port_view.dto.PositionDetailPageDTO;
-import my.portfolio.port_view.dto.PositionDetailSummaryDTO;
-import my.portfolio.port_view.dto.PositionNewsDTO;
-import my.portfolio.port_view.dto.PositionPageDTO;
-import my.portfolio.port_view.dto.PositionProfitPointDTO;
-import my.portfolio.port_view.dto.PositionRowDTO;
+import my.portfolio.port_view.dto.position.PositionAgencyReportDTO;
+import my.portfolio.port_view.dto.position.PositionDetailPageDTO;
+import my.portfolio.port_view.dto.position.PositionDetailSummaryDTO;
+import my.portfolio.port_view.dto.position.PositionNewsDTO;
+import my.portfolio.port_view.dto.position.PositionPageDTO;
+import my.portfolio.port_view.dto.position.PositionProfitPointDTO;
+import my.portfolio.port_view.dto.position.PositionRowDTO;
 import my.portfolio.port_view.entity.ConnectorPositionSnapshot;
 import my.portfolio.port_view.repository.ConnectorPositionSnapshotRepository;
 import my.portfolio.port_view.repository.PositionInsightRepository;

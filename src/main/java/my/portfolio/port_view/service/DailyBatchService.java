@@ -2,9 +2,9 @@ package my.portfolio.port_view.service;
 
 import lombok.RequiredArgsConstructor;
 import my.portfolio.port_view.config.DailyBatchProperties;
-import my.portfolio.port_view.dto.DailyBatchPageDto;
-import my.portfolio.port_view.dto.DailyBatchRunDto;
-import my.portfolio.port_view.dto.DailyBatchStepLogDto;
+import my.portfolio.port_view.dto.dailybatch.DailyBatchPageDto;
+import my.portfolio.port_view.dto.dailybatch.DailyBatchRunDto;
+import my.portfolio.port_view.dto.dailybatch.DailyBatchStepLogDto;
 import my.portfolio.port_view.repository.DailyBatchRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,11 +22,11 @@ import java.util.concurrent.TimeUnit;
 
 import java.util.Comparator;
 
-import my.portfolio.port_view.dto.DailyBatchStepOptionDto;
+import my.portfolio.port_view.dto.dailybatch.DailyBatchStepOptionDto;
 
-import my.portfolio.port_view.dto.IntradayPositionCheckDto;
+import my.portfolio.port_view.dto.dailybatch.IntradayPositionCheckDto;
 
-import my.portfolio.port_view.dto.BlockWatchCandidateDto;
+import my.portfolio.port_view.dto.dailybatch.BlockWatchCandidateDto;
 
 @Service
 @RequiredArgsConstructor

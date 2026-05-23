@@ -1,8 +1,8 @@
 package my.portfolio.port_view.controller;
 
 import my.portfolio.port_view.common.ViewNames;
-import my.portfolio.port_view.dto.OrderDetailPageDTO;
-import my.portfolio.port_view.dto.OrderPageDTO;
+import my.portfolio.port_view.dto.order.OrderDetailPageDTO;
+import my.portfolio.port_view.dto.order.OrderPageDTO;
 import my.portfolio.port_view.service.OrderService;
 import my.portfolio.port_view.util.AccountNoResolver;
 import org.springframework.stereotype.Controller;

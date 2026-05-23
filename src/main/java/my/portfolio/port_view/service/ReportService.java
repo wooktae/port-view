@@ -6,14 +6,14 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import my.portfolio.port_view.dto.ReportBacktestSummaryDto;
-import my.portfolio.port_view.dto.ReportBlockWeakStatDto;
-import my.portfolio.port_view.dto.ReportDailyTradeStatusDto;
-import my.portfolio.port_view.dto.ReportExitReasonStatDto;
-import my.portfolio.port_view.dto.ReportHoldingPeriodStatDto;
-import my.portfolio.port_view.dto.ReportInsightDto;
-import my.portfolio.port_view.dto.ReportStrategyPageDto;
-import my.portfolio.port_view.dto.ReportTradeDetailDto;
+import my.portfolio.port_view.dto.strategy.ReportBacktestSummaryDto;
+import my.portfolio.port_view.dto.strategy.ReportBlockWeakStatDto;
+import my.portfolio.port_view.dto.strategy.ReportDailyTradeStatusDto;
+import my.portfolio.port_view.dto.strategy.ReportExitReasonStatDto;
+import my.portfolio.port_view.dto.strategy.ReportHoldingPeriodStatDto;
+import my.portfolio.port_view.dto.strategy.ReportInsightDto;
+import my.portfolio.port_view.dto.strategy.ReportStrategyPageDto;
+import my.portfolio.port_view.dto.strategy.ReportTradeDetailDto;
 import my.portfolio.port_view.repository.ReportRepository;
 import my.portfolio.port_view.repository.ReportRepository.BacktestRunRow;
 import my.portfolio.port_view.repository.ReportRepository.BlockWeakStatRow;

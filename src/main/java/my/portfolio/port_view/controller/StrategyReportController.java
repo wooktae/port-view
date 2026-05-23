@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import my.portfolio.port_view.common.ViewNames;
-import my.portfolio.port_view.dto.ReportStrategyPageDto;
+import my.portfolio.port_view.dto.strategy.ReportStrategyPageDto;
 import my.portfolio.port_view.service.ReportService;
 
 @Controller

@@ -1,7 +1,7 @@
 package my.portfolio.port_view.repository;
 
-import my.portfolio.port_view.dto.StrategyExecutionOrderDto;
-import my.portfolio.port_view.dto.StrategyExecutionPlanDto;
+import my.portfolio.port_view.dto.strategy.StrategyExecutionOrderDto;
+import my.portfolio.port_view.dto.strategy.StrategyExecutionPlanDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import my.portfolio.port_view.dto.StrategyMarketBlockReasonDto;
+import my.portfolio.port_view.dto.strategy.StrategyMarketBlockReasonDto;
 
 @Repository
 @RequiredArgsConstructor

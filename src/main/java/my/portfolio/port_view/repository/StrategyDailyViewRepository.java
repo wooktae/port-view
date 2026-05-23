@@ -1,9 +1,9 @@
 package my.portfolio.port_view.repository;
 
 import lombok.RequiredArgsConstructor;
-import my.portfolio.port_view.dto.DailyPositionDecisionDto;
-import my.portfolio.port_view.dto.DailyRunDto;
-import my.portfolio.port_view.dto.DailySignalDto;
+import my.portfolio.port_view.dto.strategy.DailyPositionDecisionDto;
+import my.portfolio.port_view.dto.strategy.DailyRunDto;
+import my.portfolio.port_view.dto.strategy.DailySignalDto;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
