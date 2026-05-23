@@ -31,9 +31,4 @@ public final class ViewNames {
     public static final String BALANCE_SUMMARY = "pages/balance-summary";
     public static final String STRATEGY_REPORT = "pages/strategy_report";
 
-    // Active root templates. Keep values unchanged until each view is migrated.
-    public static final String HOLDINGS = "holdings";
-    public static final String TRADE_ORDERS = "trade-orders";
-    public static final String GET_PRICE_REALTIME = "get-price-realtime";
-    public static final String STRATEGY_DAILY = "strategy_daily";
 }
