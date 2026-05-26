@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 2026-05-26
+
+### Changed
+
+- Daily Batch의 `DAILY_AUTO_BUY` 단계가 한국 시간 09:00 이전에는 실제 자동 매수 실행 스크립트를 호출하지 않고 보류 메시지와 함께 NO_TARGET 성격으로 종료되도록 변경했다.
+
+### Notes
+
+- Daily Batch 실행, Slack Webhook 테스트, 외부 주문 API 호출, DB 명령은 실행하지 않았다.
+
 ## 2026-05-23
 
 ### Added

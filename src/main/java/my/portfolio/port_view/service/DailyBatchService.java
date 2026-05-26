@@ -15,6 +15,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +38,11 @@ public class DailyBatchService {
     private static final String RUN_TYPE_MANUAL_PARTIAL = "MANUAL_PARTIAL";
     private static final String RUN_TYPE_RETRY = "RETRY";
     private static final String REQUESTED_BY_VIEW_BUTTON = "VIEW_BUTTON";
+    private static final String DAILY_AUTO_BUY_STEP_CODE = "DAILY_AUTO_BUY";
+    private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
+    private static final LocalTime KOREA_REGULAR_MARKET_OPEN_TIME = LocalTime.of(9, 0);
+    private static final String DAILY_AUTO_BUY_BEFORE_MARKET_OPEN_MESSAGE =
+            "정규장 시작 전이므로 자동 매수 실행을 보류합니다. 09:00 이후 다시 실행하세요.";
 
     private final DailyBatchRepository repository;
     private final DailyBatchProperties properties;
@@ -650,6 +657,15 @@ public class DailyBatchService {
         Process process = null;
 
         try {
+            if (isDailyAutoBuyBlockedBeforeMarketOpen(step)) {
+                return new StepExecutionResult(
+                        0,
+                        DAILY_AUTO_BUY_BEFORE_MARKET_OPEN_MESSAGE,
+                        "",
+                        false
+                );
+            }
+
             ProcessBuilder processBuilder = new ProcessBuilder(step.command());
             processBuilder.directory(new File(step.workDir()));
 
@@ -723,9 +739,10 @@ public class DailyBatchService {
             return false;
         }
 
-        if ("DAILY_AUTO_BUY".equals(step.stepCode())) {
+        if (DAILY_AUTO_BUY_STEP_CODE.equals(step.stepCode())) {
             return text.contains("자동매수 대상 ready daily buy 주문이 없음".toLowerCase())
                     || text.contains("자동매수 대상")
+                    || text.contains(DAILY_AUTO_BUY_BEFORE_MARKET_OPEN_MESSAGE.toLowerCase())
                     || text.contains("한국 영업일이 아니므로 주문 관련 처리를 실행하지 않습니다".toLowerCase())
                     || text.contains("connector_order_request를 생성하지 않고 종료합니다".toLowerCase())
                     || text.contains("weekend")
@@ -768,6 +785,11 @@ public class DailyBatchService {
         }
 
         return false;
+    }
+
+    private boolean isDailyAutoBuyBlockedBeforeMarketOpen(BatchStep step) {
+        return DAILY_AUTO_BUY_STEP_CODE.equals(step.stepCode())
+                && LocalTime.now(KOREA_ZONE_ID).isBefore(KOREA_REGULAR_MARKET_OPEN_TIME);
     }
 
     // =====================================================
