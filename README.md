@@ -91,7 +91,7 @@ Daily Batch와 Connector 연동은 외부 프로젝트 및 API에 의존합니�
 
 주요 설정은 `src/main/resources/application.properties`와 `config` 패키지의 `@ConfigurationProperties` 객체에서 확인할 수 있습니다.
 
-- `spring.datasource.*`: PostgreSQL 연결 설정
+- `spring.datasource.*`: PostgreSQL 연결 설정. DB 접속정보는 `INTEREST_DB_*` 환경변수로 주입합니다.
 - `spring.jpa.*`: JPA/Hibernate 설정
 - `portfolio.view.*`: 화면 기본 계좌번호와 화면별 limit 설정
 - `connector.*`: Connector base URL과 API path 설정
@@ -100,6 +100,14 @@ Daily Batch와 Connector 연동은 외부 프로젝트 및 API에 의존합니�
 - `slack.*`: Slack 알림 활성화 여부와 webhook 설정
 
 민감정보 값은 저장소에 직접 두지 않고 환경변수 또는 로컬 전용 설정으로 분리해야 합니다.
+
+DB 접속 환경변수:
+
+- `INTEREST_DB_HOST`: PostgreSQL host. 기본값은 `localhost`
+- `INTEREST_DB_PORT`: PostgreSQL port. 기본값은 `5433`
+- `INTEREST_DB_NAME`: PostgreSQL database name. 기본값은 `interest_crawler`
+- `INTEREST_DB_USER`: PostgreSQL username. 기본값은 `postgres`
+- `INTEREST_DB_PASSWORD`: PostgreSQL password. 기본값 없음
 
 ## Daily Batch 요약
 

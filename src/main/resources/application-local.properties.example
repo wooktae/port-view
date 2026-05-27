@@ -4,9 +4,9 @@
 # Replace placeholder values locally only. Do not put real secrets in this example file.
 
 # Database
-spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://<host>:<port>/<database>}
-spring.datasource.username=${SPRING_DATASOURCE_USERNAME:<db-username>}
-spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:<db-password>}
+spring.datasource.url=jdbc:postgresql://${INTEREST_DB_HOST:localhost}:${INTEREST_DB_PORT:5433}/${INTEREST_DB_NAME:interest_crawler}
+spring.datasource.username=${INTEREST_DB_USER:postgres}
+spring.datasource.password=${INTEREST_DB_PASSWORD}
 
 # Account
 portfolio.view.account.default-account-no=${PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO:<account-no>}

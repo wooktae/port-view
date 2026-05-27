@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 2026-05-27
+
+### Changed
+
+- DB datasource 설정을 `INTEREST_DB_*` 환경변수 placeholder 기준으로 외부화했다.
+
+### Notes
+
+- 실제 DB 접속, 서버 실행, 외부 API 호출은 실행하지 않았다.
+
 ## 2026-05-26
 
 ### Changed
