@@ -105,9 +105,19 @@ DB 접속 환경변수:
 
 - `INTEREST_DB_HOST`: PostgreSQL host. 기본값은 `localhost`
 - `INTEREST_DB_PORT`: PostgreSQL port. 기본값은 `5433`
-- `INTEREST_DB_NAME`: PostgreSQL database name. 기본값은 `interest_crawler`
+- `INTEREST_DB_NAME`: PostgreSQL database name. 기본값은 `portfolio`
+- `PORTFOLIO_DB_NAME`: 별도 환경변수로 분리하는 경우 PostgreSQL database name. 기본값은 `portfolio`
 - `INTEREST_DB_USER`: PostgreSQL username. 기본값은 `postgres`
 - `INTEREST_DB_PASSWORD`: PostgreSQL password. 기본값 없음
+
+DB schema 구성:
+
+- AWS Migration 준비 관점에서 단일 PostgreSQL database `portfolio`와 schema-per-domain 구조를 사용합니다.
+- domain schema는 `reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`, `public`입니다.
+- port-view는 여러 domain schema를 통합 조회하는 운영 콘솔이므로 가장 넓은 `search_path`를 사용합니다.
+- `spring.datasource.hikari.connection-init-sql`로 `search_path`를 `ops, execution, decision, research, connector, preprocessor, interest, reference, legacy, public` 순서로 설정합니다.
+- schema-per-domain 전환 후에도 기존 SQL은 명시 schema prefix 없이 위 `search_path` 기반으로 동작합니다.
+- Dashboard, Balance, Holdings, Strategy Plan, Daily Batch, Report 화면 조회 검증이 완료된 구조입니다.
 
 ## Daily Batch 요약
 

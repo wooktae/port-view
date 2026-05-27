@@ -2,13 +2,19 @@
 
 ## 2026-05-27
 
+### Added
+
+- PostgreSQL 단일 DB `portfolio`와 schema-per-domain 구조, port-view `search_path` 문서화를 추가했다.
+
 ### Changed
 
 - DB datasource 설정을 `INTEREST_DB_*` 환경변수 placeholder 기준으로 외부화했다.
+- DB name 기본값 설명을 `portfolio` 기준으로 정리하고, 기존 SQL은 Hikari `connection-init-sql`의 `search_path` 기반으로 동작한다고 명시했다.
 
 ### Notes
 
-- 실제 DB 접속, 서버 실행, 외부 API 호출은 실행하지 않았다.
+- 사용자가 Dashboard, Balance, Holdings, Strategy Plan, Daily Batch, Report 화면 조회 검증을 완료했다.
+- 이번 문서 작업에서는 실제 DB 접속, 서버 실행, 외부 API 호출은 실행하지 않았다.
 
 ## 2026-05-26
 

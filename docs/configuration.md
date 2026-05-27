@@ -32,17 +32,36 @@ Spring Boot 내장 서버 포트를 설정합니다.
 - `spring.datasource.username`
 - `spring.datasource.password`
 - `spring.datasource.driver-class-name`
+- `spring.datasource.hikari.connection-init-sql`
 
 역할:
 
 - PostgreSQL 연결 정보
 - JPA Repository와 JdbcTemplate Repository가 공통으로 사용
+- 단일 DB `portfolio` 안의 domain schema를 `search_path` 기반으로 통합 조회
 
 관리 원칙:
 
 - DB password는 저장소에 커밋하지 않습니다.
 - 로컬 개발용 값은 local config 또는 환경변수로 분리합니다.
 - 운영 환경에서는 secret manager, environment variable, deployment config 등 외부 주입 방식을 사용합니다.
+- password, token, account, webhook 실제 값은 문서에 기록하지 않습니다.
+
+DB 이름과 schema 구성:
+
+- 기본 DB name은 `portfolio`입니다.
+- 기존 `INTEREST_DB_NAME`을 사용하는 경우 기본값은 `portfolio`입니다.
+- 환경변수명을 도메인 중립적으로 분리해 `PORTFOLIO_DB_NAME`을 사용하는 경우에도 기본값은 `portfolio`로 둡니다.
+- AWS Migration 준비 관점에서 단일 PostgreSQL DB `portfolio`와 schema-per-domain 구조를 사용합니다.
+- domain schema는 `reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`, `public`입니다.
+
+port-view `search_path`:
+
+- port-view는 Dashboard, Balance, Holdings, Strategy Plan, Daily Batch, Report 등 여러 domain schema를 통합 조회하는 운영 콘솔입니다.
+- 따라서 Hikari `spring.datasource.hikari.connection-init-sql`로 가장 넓은 `search_path`를 설정합니다.
+- 적용 순서는 `ops, execution, decision, research, connector, preprocessor, interest, reference, legacy, public`입니다.
+- schema-per-domain 전환 후에도 기존 SQL은 명시 schema prefix 없이 위 `search_path` 기반으로 동작합니다.
+- 로컬에서 Dashboard, Balance, Holdings, Strategy Plan, Daily Batch, Report 화면 조회 검증이 완료된 구성입니다.
 
 ## JPA 설정
 
