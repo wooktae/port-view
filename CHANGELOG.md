@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 2026-05-28
+
+### Added
+
+- AWS Migration 전 초기 정리를 위해 `docs/source-file-catalog.md`를 추가하고 주요 소스/설정/문서 파일의 역할과 운영 주의사항을 정리했습니다.
+- Connector 잔고/주문 갱신, 대시보드/보유 종목/리포트 관련 주요 Java 파일과 화면 template/CSS에 한글 설명 주석을 추가했습니다.
+
+### Changed
+
+- README에 소스 파일 카탈로그 안내를 추가했습니다.
+- 2026-05-27 이후 미커밋 변경사항을 문서화 대상으로 정리했습니다.
+
+### Notes
+
+- 기능 변경 없음.
+- commit/add/reset/checkout/stash는 실행하지 않았습니다.
+- Daily Batch 실행, Slack Webhook 테스트, 외부 주문/투자 API 호출, DB DDL/DML은 실행하지 않았습니다.
+
 ## 2026-05-27
 
 ### Added

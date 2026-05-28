@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 보유 종목 화면: 계좌별 포지션 스냅샷을 평가손익 카드와 종목 목록으로 표시한다. -->
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
@@ -95,26 +96,30 @@
                             <div class="metric-subtitle">현재가 기준 평가액</div>
                         </article>
 
-                        <article class="metric-card metric-profit">
+                        <article th:class="'metric-card ' + (${page.pageProfitClass == 'profit' ? 'metric-profit' : (page.pageProfitClass == 'loss' ? 'metric-loss' : 'metric-neutral')})">
                             <div class="metric-title">총 평가손익</div>
                             <div class="metric-value"
-                                 th:classappend="${page.pageProfitClass == 'profit' ? ' profit-red' : (page.pageProfitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
-                                 th:text="${page.totalEvalProfitText}">
-                                +2,441,250원
+                                th:text="${page.totalEvalProfitText}">
+                                -66,440원
                             </div>
                             <div class="metric-subtitle"
-                                 th:classappend="${page.pageProfitClass == 'profit' ? ' profit-red' : (page.pageProfitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
-                                 th:text="${page.totalProfitRateText}">
-                                +75.43%
+                                th:classappend="${page.pageProfitClass == 'profit' ? ' profit-red' : (page.pageProfitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
+                                th:text="${page.totalProfitRateText}">
+                                -3.45%
                             </div>
                         </article>
 
-                        <article class="metric-card metric-primary">
-                            <div class="metric-title">최고 수익 종목</div>
+                        <article th:class="'metric-card ' + (${page.bestPositionProfitClass == 'profit' ? 'metric-profit' : (page.bestPositionProfitClass == 'loss' ? 'metric-loss' : 'metric-neutral')})">
+                            <div class="metric-title"
+                                th:text="${page.bestPositionTitleText != null ? page.bestPositionTitleText : '최고 수익 종목'}">
+                                최고 수익 종목
+                            </div>
                             <div class="metric-value best-stock-name" th:text="${page.bestPositionName}">
                                 SK하이닉스
                             </div>
-                            <div class="metric-subtitle profit-red" th:text="${page.bestPositionRateText}">
+                            <div class="metric-subtitle"
+                                th:classappend="${page.bestPositionProfitClass == 'profit' ? ' profit-red' : (page.bestPositionProfitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
+                                th:text="${page.bestPositionRateText}">
                                 +83.95%
                             </div>
                         </article>

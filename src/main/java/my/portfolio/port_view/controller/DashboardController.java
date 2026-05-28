@@ -52,7 +52,7 @@ public class DashboardController {
     ) {
         String resolvedAccountNo = accountNoResolver.resolve(accountNo);
 
-        connectorSnapshotRefreshService.refreshIfStale(resolvedAccountNo);
+        connectorSnapshotRefreshService.refreshNow(resolvedAccountNo);
 
         DashboardViewDTO dashboard = dashboardService.getDashboard(resolvedAccountNo);
         ReportBacktestSummaryDto latestBacktestSummary = reportService.getLatestBacktestSummaryOrNull();

@@ -27,6 +27,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 보유 종목 목록/상세 화면의 평가금액, 수익률, 리서치 보조 정보를 조립한다.
+ * Connector 포지션 스냅샷과 리서치 insight 조회 결과를 화면 표시용 DTO로 변환한다.
+ */
 @Service
 public class PositionService {
 
@@ -72,10 +76,13 @@ public class PositionService {
             page.setTotalEvalAmountText("-");
             page.setTotalEvalProfitText("-");
             page.setTotalProfitRateText("-");
+            page.setBestPositionTitleText("최고 수익 종목");
             page.setBestPositionName("-");
             page.setBestPositionRateText("-");
+            page.setBestPositionProfitClass("neutral");
             page.setWorstPositionName("-");
             page.setWorstPositionRateText("-");
+            page.setWorstPositionProfitClass("neutral");        
             page.setPageProfitClass("neutral");
             page.setRows(new ArrayList<>());
             return page;
@@ -127,11 +134,19 @@ public class PositionService {
         page.setTotalProfitRateText(ViewFormatUtils.formatSignedPercentAlready(totalProfitRate));
         page.setPageProfitClass(ProfitClassUtils.toProfitClass(totalEvalProfit));
 
+        boolean hasPositivePosition = rows.stream()
+                .anyMatch(row -> row.getEvalProfitRate() != null
+                        && row.getEvalProfitRate().compareTo(BigDecimal.ZERO) > 0);
+
+        page.setBestPositionTitleText(hasPositivePosition ? "최고 수익 종목" : "최소 손실 종목");
+
         page.setBestPositionName(best == null ? "-" : ViewFormatUtils.emptyIfNull(best.getStockName()));
         page.setBestPositionRateText(best == null ? "-" : best.getEvalProfitRateText());
+        page.setBestPositionProfitClass(best == null ? "neutral" : best.getProfitClass());
 
         page.setWorstPositionName(worst == null ? "-" : ViewFormatUtils.emptyIfNull(worst.getStockName()));
         page.setWorstPositionRateText(worst == null ? "-" : worst.getEvalProfitRateText());
+        page.setWorstPositionProfitClass(worst == null ? "neutral" : worst.getProfitClass());
 
         page.setRows(rows);
 

@@ -37,7 +37,7 @@ public class BalanceController {
     ) {
         String resolvedAccountNo = accountNoResolver.resolve(accountNo);
 
-        connectorSnapshotRefreshService.refreshIfStale(resolvedAccountNo);
+        connectorSnapshotRefreshService.refreshNow(resolvedAccountNo);
         
         List<BalanceSummary> list = balanceService.listByAccount(resolvedAccountNo);
         BigDecimal stockEvalAmount = balanceService.getLatestStockEvalAmount(resolvedAccountNo);

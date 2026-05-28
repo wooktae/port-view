@@ -115,4 +115,33 @@ public interface ConnectorOrderRequestRepository extends JpaRepository<Connector
             @Param("orderRequestId") Long orderRequestId,
             @Param("accountNo") String accountNo
     );
+
+    /**
+     * View 매매 내역 진입 시 최신 체결 확인이 필요한 주문 목록.
+     *
+     * 대상:
+     * - ACCEPTED / SUBMITTED / PENDING / PARTIAL_FILLED 상태
+     * - broker_order_no가 있는 주문
+     * - 최근 N일 이내 주문
+     */
+    @Query(
+        value = """
+                SELECT *
+                FROM connector_order_request
+                WHERE account_no = :accountNo
+                  AND request_status IN ('ACCEPTED', 'SUBMITTED', 'PENDING', 'PARTIAL_FILLED')
+                  AND broker_order_no IS NOT NULL
+                  AND broker_order_no <> ''
+                  AND requested_at >= (CURRENT_TIMESTAMP - (:lookbackDays * INTERVAL '1 day'))
+                ORDER BY requested_at DESC, id DESC
+                LIMIT :limit
+                """,
+            nativeQuery = true
+    )
+    List<ConnectorOrderRequest> findRefreshTargetOrders(
+            @Param("accountNo") String accountNo,
+            @Param("lookbackDays") int lookbackDays,
+            @Param("limit") int limit
+    );
+
 }

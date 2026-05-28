@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 잔고 요약 화면: Connector 잔고 스냅샷과 보유 종목 평가금액을 조합해 계좌 구성과 손익을 표시한다. -->
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
@@ -18,13 +19,14 @@
         resolvedAccountNo=${accountNo != null ? accountNo : '-'},
         b=${balanceSummaryList != null and not #lists.isEmpty(balanceSummaryList) ? balanceSummaryList[0] : null},
         resolvedStockEvalAmount=${stockEvalAmount != null ? stockEvalAmount : 0},
+        resolvedDisplayCashAmount=${b != null and b.totalEvalAmount != null ? b.totalEvalAmount - resolvedStockEvalAmount : 0},
         resolvedHoldingCount=${holdingCount != null ? holdingCount : 0},
         resolvedInitialCapitalAmount=${initialCapitalAmount != null ? initialCapitalAmount : 0},
         resolvedCumulativeProfitAmount=${cumulativeProfitAmount != null ? cumulativeProfitAmount : 0},
         resolvedCumulativeProfitRate=${cumulativeProfitRate != null ? cumulativeProfitRate : 0},
-        resolvedSettlementPendingAmount=${b != null and b.totalEvalAmount != null
-            ? b.totalEvalAmount - (b.cashBalance != null ? b.cashBalance : 0) - resolvedStockEvalAmount
-            : 0}
+        resolvedCumulativeProfitCardClass=${resolvedCumulativeProfitAmount > 0 ? 'metric-profit' : (resolvedCumulativeProfitAmount < 0 ? 'metric-loss' : 'metric-neutral')},
+        resolvedCumulativeProfitRateCardClass=${resolvedCumulativeProfitRate > 0 ? 'metric-profit' : (resolvedCumulativeProfitRate < 0 ? 'metric-loss' : 'metric-neutral')},
+        resolvedEvalProfitCardClass=${b != null and b.evalProfit != null and b.evalProfit > 0 ? 'metric-profit' : (b != null and b.evalProfit != null and b.evalProfit < 0 ? 'metric-loss' : 'metric-neutral')}
      ">
 
     <aside th:replace="~{fragments/sidebar :: sidebar('balance', ${resolvedAccountNo})}"></aside>
@@ -83,7 +85,7 @@
                     <article class="metric-card metric-primary">
                         <div class="metric-title">총 평가금액</div>
                         <div class="metric-value"
-                            th:text="${#numbers.formatInteger(b.totalEvalAmount != null ? b.totalEvalAmount : 0, 1, 'COMMA')} + '원'">
+                             th:text="${#numbers.formatInteger(b.totalEvalAmount != null ? b.totalEvalAmount : 0, 1, 'COMMA')} + '원'">
                             9,997,822원
                         </div>
                         <div class="metric-subtitle">커넥터 잔고 기준 총 평가금액</div>
@@ -92,17 +94,16 @@
                     <article class="metric-card metric-cash">
                         <div class="metric-title">초기 투자금</div>
                         <div class="metric-value"
-                            th:text="${#numbers.formatInteger(resolvedInitialCapitalAmount, 1, 'COMMA')} + '원'">
+                             th:text="${#numbers.formatInteger(resolvedInitialCapitalAmount, 1, 'COMMA')} + '원'">
                             10,000,000원
                         </div>
                         <div class="metric-subtitle">계좌 최초 잔고 스냅샷 기준</div>
                     </article>
 
-                    <article class="metric-card metric-profit">
+                    <article th:class="'metric-card ' + ${resolvedCumulativeProfitCardClass}">
                         <div class="metric-title">누적 손익</div>
                         <div class="metric-value"
-                            th:classappend="${resolvedCumulativeProfitAmount > 0 ? ' profit-red' : (resolvedCumulativeProfitAmount < 0 ? ' loss-blue' : '')}"
-                            th:text="${resolvedCumulativeProfitAmount > 0
+                             th:text="${resolvedCumulativeProfitAmount > 0
                                         ? '+' + #numbers.formatInteger(resolvedCumulativeProfitAmount, 1, 'COMMA') + '원'
                                         : #numbers.formatInteger(resolvedCumulativeProfitAmount, 1, 'COMMA') + '원'}">
                             -2,178원
@@ -110,11 +111,10 @@
                         <div class="metric-subtitle">총 평가금액 - 초기 투자금</div>
                     </article>
 
-                    <article class="metric-card metric-profit">
+                    <article th:class="'metric-card ' + ${resolvedCumulativeProfitRateCardClass}">
                         <div class="metric-title">누적 수익률</div>
                         <div class="metric-value"
-                            th:classappend="${resolvedCumulativeProfitRate > 0 ? ' profit-red' : (resolvedCumulativeProfitRate < 0 ? ' loss-blue' : '')}"
-                            th:text="${resolvedCumulativeProfitRate > 0
+                             th:text="${resolvedCumulativeProfitRate > 0
                                         ? '+' + #numbers.formatDecimal(resolvedCumulativeProfitRate, 1, 2) + '%'
                                         : #numbers.formatDecimal(resolvedCumulativeProfitRate, 1, 2) + '%'}">
                             -0.02%
@@ -125,38 +125,28 @@
                     <article class="metric-card metric-cash">
                         <div class="metric-title">현금</div>
                         <div class="metric-value"
-                            th:text="${#numbers.formatInteger(b.cashBalance != null ? b.cashBalance : 0, 1, 'COMMA')} + '원'">
-                            9,958,850원
+                             th:text="${#numbers.formatInteger(resolvedDisplayCashAmount, 1, 'COMMA')} + '원'">
+                            8,072,062원
                         </div>
-                        <div class="metric-subtitle">현재 현금성 잔고</div>
-                    </article>
-                    
-                    <article class="metric-card metric-cash">
-                        <div class="metric-title">정산 대기금액</div>
-                        <div class="metric-value"
-                            th:text="${#numbers.formatInteger(resolvedSettlementPendingAmount, 1, 'COMMA')} + '원'">
-                            38,972원
-                        </div>
-                        <div class="metric-subtitle">총 평가금액과 현금/주식 평가금액의 차이</div>
+                        <div class="metric-subtitle">총 평가금액 - 주식 평가금액</div>
                     </article>
 
                     <article class="metric-card metric-stock">
                         <div class="metric-title">주식 평가금액</div>
                         <div class="metric-value"
-                            th:text="${#numbers.formatInteger(resolvedStockEvalAmount, 1, 'COMMA')} + '원'">
-                            0원
+                             th:text="${#numbers.formatInteger(resolvedStockEvalAmount, 1, 'COMMA')} + '원'">
+                            1,859,060원
                         </div>
                         <div class="metric-subtitle">최신 보유 종목 평가금액 합계</div>
                     </article>
 
-                    <article class="metric-card metric-profit">
+                    <article th:class="'metric-card ' + ${resolvedEvalProfitCardClass}">
                         <div class="metric-title">평가손익</div>
                         <div class="metric-value"
-                            th:classappend="${b.evalProfit != null and b.evalProfit > 0 ? ' profit-red' : (b.evalProfit != null and b.evalProfit < 0 ? ' loss-blue' : '')}"
-                            th:text="${b.evalProfit != null and b.evalProfit > 0
+                             th:text="${b.evalProfit != null and b.evalProfit > 0
                                         ? '+' + #numbers.formatInteger(b.evalProfit, 1, 'COMMA') + '원'
                                         : #numbers.formatInteger(b.evalProfit != null ? b.evalProfit : 0, 1, 'COMMA') + '원'}">
-                            0원
+                            -66,440원
                         </div>
                         <div class="metric-subtitle">현재 보유 주식 기준 평가손익</div>
                     </article>
@@ -176,8 +166,8 @@
                     <div class="balance-chart-row">
                         <div class="chart-label">
                             <strong>총 평가금액</strong>
-                            <span th:text="${#numbers.formatInteger(b.totalEvalAmount != null ? b.totalEvalAmount : 0, 3, 'COMMA')} + '원'">
-                                12,472,447원
+                            <span th:text="${#numbers.formatInteger(b.totalEvalAmount != null ? b.totalEvalAmount : 0, 1, 'COMMA')} + '원'">
+                                9,931,122원
                             </span>
                         </div>
                         <div class="chart-track">
@@ -189,19 +179,19 @@
                     <div class="balance-chart-row">
                         <div class="chart-label">
                             <strong>현금</strong>
-                            <span th:text="${#numbers.formatInteger(b.cashBalance != null ? b.cashBalance : 0, 3, 'COMMA')} + '원'">
-                                6,794,947원
+                            <span th:text="${#numbers.formatInteger(resolvedDisplayCashAmount, 1, 'COMMA')} + '원'">
+                                8,072,062원
                             </span>
                         </div>
                         <div class="chart-track">
                             <div class="chart-fill chart-cash"
-                                 style="--bar-width:54.48%"
-                                 th:style="|--bar-width:${b.totalEvalAmount != null and b.totalEvalAmount > 0 and b.cashBalance != null ? (b.cashBalance * 100 / b.totalEvalAmount) : 0}%|">
+                                 style="--bar-width:0%"
+                                 th:style="|--bar-width:${b.totalEvalAmount != null and b.totalEvalAmount > 0 ? (resolvedDisplayCashAmount * 100 / b.totalEvalAmount) : 0}%|">
                             </div>
                         </div>
                         <div class="chart-percent"
-                             th:text="${b.totalEvalAmount != null and b.totalEvalAmount > 0 and b.cashBalance != null ? #numbers.formatDecimal((b.cashBalance * 100 / b.totalEvalAmount), 1, 1) + '%' : '0.0%'}">
-                            54.5%
+                             th:text="${b.totalEvalAmount != null and b.totalEvalAmount > 0 ? #numbers.formatDecimal((resolvedDisplayCashAmount * 100 / b.totalEvalAmount), 1, 1) + '%' : '0.0%'}">
+                            81.3%
                         </div>
                     </div>
 
@@ -209,7 +199,7 @@
                         <div class="chart-label">
                             <strong>주식 평가금액</strong>
                             <span th:text="${#numbers.formatInteger(resolvedStockEvalAmount, 1, 'COMMA')} + '원'">
-                                0원
+                                1,859,060원
                             </span>
                         </div>
                         <div class="chart-track">
@@ -220,7 +210,7 @@
                         </div>
                         <div class="chart-percent"
                              th:text="${b.totalEvalAmount != null and b.totalEvalAmount > 0 ? #numbers.formatDecimal((resolvedStockEvalAmount * 100 / b.totalEvalAmount), 1, 1) + '%' : '0.0%'}">
-                            0.0%
+                            18.7%
                         </div>
                     </div>
                 </article>

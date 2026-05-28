@@ -11,6 +11,10 @@ import java.util.List;
 @Getter
 @Setter
 @NoArgsConstructor
+/**
+ * 보유 종목 목록 화면에 필요한 요약 카드, 수익률 표시값, 종목 row를 담는 View DTO.
+ * 금액/수익률 문구와 CSS class는 Service에서 계산해 Thymeleaf가 그대로 표시한다.
+ */
 public class PositionPageDTO {
 
     private String accountNo;
@@ -33,11 +37,14 @@ public class PositionPageDTO {
 
     private String pageProfitClass;
 
+    private String bestPositionTitleText;
     private String bestPositionName;
     private String bestPositionRateText;
+    private String bestPositionProfitClass;
 
     private String worstPositionName;
     private String worstPositionRateText;
+    private String worstPositionProfitClass;
 
     private List<PositionRowDTO> rows = new ArrayList<>();
 }

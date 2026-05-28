@@ -16,6 +16,11 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * 잔고/대시보드/보유 종목 화면에서 필요한 최신 Connector 잔고 스냅샷을 갱신한다.
+ * 외부 Python 스크립트를 실행하므로 작업 디렉터리, 실행 파일, timeout 설정에 의존한다.
+ * 중복 실행은 인스턴스 내부 AtomicBoolean으로 방지한다.
+ */
 @Service
 public class ConnectorSnapshotRefreshService {
 
@@ -36,6 +41,9 @@ public class ConnectorSnapshotRefreshService {
         this.properties = properties;
     }
 
+    /**
+     * 최신 스냅샷이 stale 기준을 넘은 경우에만 Connector 잔고 스크립트를 실행한다.
+     */
     public void refreshIfStale(String accountNo) {
         if (!properties.isEnabled()) {
             return;
@@ -81,10 +89,58 @@ public class ConnectorSnapshotRefreshService {
         return ageMinutes >= properties.getStaleMinutes();
     }
 
+    /**
+     * 화면 진입 시 stale 여부와 무관하게 Connector 잔고 스크립트를 즉시 실행한다.
+     */
+    public void refreshNow(String accountNo) {
+        System.out.println("[ConnectorSnapshotRefreshService] refreshNow called. accountNo=" + accountNo);
+
+        if (!properties.isEnabled()) {
+            System.out.println("[ConnectorSnapshotRefreshService] refresh disabled.");
+            return;
+        }
+
+        if (accountNo == null || accountNo.isBlank()) {
+            System.out.println("[ConnectorSnapshotRefreshService] accountNo blank.");
+            return;
+        }
+
+        if (!running.compareAndSet(false, true)) {
+            System.out.println("[ConnectorSnapshotRefreshService] refresh already running.");
+            return;
+        }
+
+        try {
+            System.out.println("[ConnectorSnapshotRefreshService] run connector balance start.");
+            runConnectorBalance();
+
+            balanceSnapshotRepository
+                    .findTopByAccountNoOrderByAsOfDateDescAsOfTsDesc(accountNo)
+                    .ifPresent(snapshot -> System.out.println(
+                            "[ConnectorSnapshotRefreshService] latest after refresh. "
+                                    + "id=" + snapshot.getId()
+                                    + ", accountNo=" + snapshot.getAccountNo()
+                                    + ", asOfDate=" + snapshot.getAsOfDate()
+                                    + ", asOfTs=" + snapshot.getAsOfTs()
+                                    + ", cashBalance=" + snapshot.getCashBalance()
+                                    + ", totalEvalAmount=" + snapshot.getTotalEvalAmount()
+                                    + ", evalProfit=" + snapshot.getEvalProfit()
+                    ));
+
+            System.out.println("[ConnectorSnapshotRefreshService] run connector balance finished.");
+        } finally {
+            running.set(false);
+        }
+    }
+
     private void runConnectorBalance() {
         Process process = null;
 
         try {
+            System.out.println("[ConnectorSnapshotRefreshService] dir=" + properties.getMarketconnectorDir());
+            System.out.println("[ConnectorSnapshotRefreshService] python=" + properties.getPythonExecutable());
+            System.out.println("[ConnectorSnapshotRefreshService] script=" + properties.getBalanceScriptName());
+
             ProcessBuilder processBuilder = new ProcessBuilder(
                     properties.getPythonExecutable(),
                     properties.getBalanceScriptName()

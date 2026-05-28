@@ -46,7 +46,7 @@ public class PositionController {
     ) {
         String resolvedAccountNo = accountNoResolver.resolve(accountNo);
 
-        connectorSnapshotRefreshService.refreshIfStale(resolvedAccountNo);
+        connectorSnapshotRefreshService.refreshNow(resolvedAccountNo);
 
         PositionPageDTO page = positionService.getPositionPage(resolvedAccountNo);
 

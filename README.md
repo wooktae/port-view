@@ -46,6 +46,11 @@ Spring MVC 기반 Portfolio View 모듈입니다. 포트폴리오 현황, 잔고
 - `util`: 화면 포맷팅, label 변환, account resolver, CSS class helper입니다.
 - `common`: Thymeleaf view 이름 상수(`ViewNames`)를 관리합니다.
 
+## 소스 파일 카탈로그
+
+AWS Migration 전 초기 정리를 위해 주요 소스/설정/문서 파일의 역할을 [docs/source-file-catalog.md](docs/source-file-catalog.md)에 정리했습니다.
+파일 삭제 없이 Java/Thymeleaf/CSS/properties/docs 파일의 책임과 운영 주의사항을 한글로 기록합니다.
+
 ## 실행 방법
 
 로컬 실행 전 PostgreSQL, Connector API, Daily Batch에서 호출하는 외부 모듈 경로가 준비되어 있어야 합니다.

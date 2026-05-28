@@ -3,6 +3,10 @@ package my.portfolio.port_view.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+/**
+ * Connector 잔고 스냅샷 갱신 실행 옵션을 바인딩한다.
+ * 운영 환경별 경로와 Python 실행 파일은 환경변수 또는 local 설정에서 주입하는 것을 기본으로 한다.
+ */
 @Component
 @ConfigurationProperties(prefix = "portfolio.snapshot-refresh")
 public class SnapshotRefreshProperties {
@@ -21,7 +25,7 @@ public class SnapshotRefreshProperties {
 
     private String pythonExecutable = "python";
 
-    private String marketconnectorDir = "";
+    private String marketconnectorDir = "C:/Workspaces/port-marketconnector";
 
     private String balanceScriptName = "connector_balance.py";
 
