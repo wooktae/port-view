@@ -31,12 +31,24 @@
 ├── WORKLOG.md          # 간단 작업 로그(누적형, 단일 파일)
 └── specs/              # AWS Migration spec 및 루트 공통 참조 문서
     ├── 01-aws-migration-foundation/
+    │   ├── requirements.md
+    │   ├── design.md
+    │   ├── tasks.md
+    │   └── traceability-matrix.md
     ├── 02-aws-network-and-rds/
+    │   ├── requirements.md
+    │   ├── design.md
+    │   ├── tasks.md
+    │   ├── decision-matrix.md
+    │   ├── runbook.md
+    │   ├── validation-checklist.md
+    │   └── traceability-matrix.md
     ├── operator-decisions.md
     ├── ms-aws-service-decision-matrix.md
     ├── cost-simulation.md
     ├── followups-overview.md
     ├── aws-resource-glossary.md
+    ├── risk-register.md
     └── note-aws-landscape-2021-vs-2026.md
 ```
 
@@ -57,7 +69,17 @@
 - `specs/cost-simulation.md` — 비용 가정, 환경별 월 예상 비용의 단일 기준 문서. RDS 크기, VPC Endpoint 수, ALB/NAT 사용 여부, Fargate 사용량 가정을 정리한다.
 - `specs/followups-overview.md` — 후속 spec(03 ~ 10) 진행 순서와 의존성 맵의 단일 기준 문서.
 - `specs/aws-resource-glossary.md` — AWS 용어 설명의 단일 기준 문서.
+- `specs/risk-register.md` — AWS Migration 운영 / 보안 / 비용 리스크의 단일 누적 기록 문서. 후속 spec(03 ~ 10)에서 새 리스크가 식별되면 동일 형식으로 누적.
 - `specs/note-aws-landscape-2021-vs-2026.md` — 2021년 AWS 구성과 2026년 권고안 비교 노트.
+
+## Spec 보조 문서 (runbook / validation / traceability / risk)
+
+01-aws-migration-foundation, 02-aws-network-and-rds 같은 각 spec은 본문(`requirements.md`, `design.md`, `tasks.md`, 필요 시 `decision-matrix.md`)에 더해 다음 보조 문서를 가질 수 있다.
+
+- `runbook.md` — 운영자가 AWS Console에서 한 단계씩 따라 할 수 있는 실행 절차서. 각 Step은 목적 / 사전 확인 / Console 작업 순서 / 생성 후 확인 / 실패 시 조치로 구성한다.
+- `validation-checklist.md` — runbook을 진행한 뒤 통과 여부를 체크박스 단위로 점검하는 문서.
+- `traceability-matrix.md` — 요구사항 → 설계 → 작업 → 검증 → 운영자 결정의 매핑 표.
+- 루트 공통 `risk-register.md` — 모든 spec에 걸친 리스크를 단일 표로 누적 관리.
 
 ## Spec 작성 원칙
 

@@ -196,6 +196,14 @@
 - 조심할 점: 환경변수 키 호환성을 위해 키 이름은 그대로 유지. 잘못된 환경에 잘못된 값을 넣으면 paper에서 live broker로 호출 가능 → live 자동매매 사고 위험.
 - 관련 spec: 06 secrets-and-iam.
 
+## IAM User
+
+- 한 줄 설명: AWS 계정 안에서 사람(또는 외부 system)이 콘솔 / API에 로그인할 때 쓰는 신원.
+- 역할: 본 프로젝트는 운영자 1인이 사용하는 IAM 관리자 사용자 `portadmin`을 만들고 모든 일상 작업을 portadmin으로 수행한다. Root 계정은 비상용(청구 / 계정 폐쇄 / IAM 정책 변경)으로만 보관한다. 02 runbook Step 0에서 portadmin 생성 / AdministratorAccess 부여 / 콘솔 sign-in URL 확보 / MFA 활성 / Root 보안 강화 절차를 다룬다.
+- 비용 발생: IAM User 자체는 무료.
+- 조심할 점: portadmin 비밀번호 / MFA 시리얼 / 백업 코드, Root MFA 시리얼은 본 작업공간 어떤 문서에도 평문 기록 금지(모두 `[REDACTED]`). Root access key는 발급되어 있으면 즉시 삭제. 비밀번호 분실 / MFA 분실 시 복구 절차는 R-SEC-002, R-SEC-003 참조([`./risk-register.md`](./risk-register.md)).
+- 관련 spec: 02(Step 0 portadmin 생성), 06(IAM 권한 매트릭스 / portadmin 외 추가 사용자 검토).
+
 ## IAM Role
 
 - 한 줄 설명: AWS 리소스가 다른 AWS 리소스를 호출할 때 쓰는 권한 묶음.
