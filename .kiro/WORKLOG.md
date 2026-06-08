@@ -26,6 +26,17 @@
 - 8개 MS의 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 없음.
 - 민감정보(secret / token / password / app key / app secret / 계좌번호 / webhook URL / portadmin 비밀번호 / Root·portadmin MFA 시리얼 / 백업 코드) 기록 없음(`[REDACTED]` 또는 placeholder만 사용).
 
+## 2026-06-08
+
+- 운영자가 AWS Console에서 02 spec Foundation(VPC / Subnet / IGW / Route Table / SG 8종 / VPC Endpoint 6종 / RDS subnet group / parameter group / `portfolio-paper-rds` / Secrets Manager `/portfolio/paper/rds/master`)을 직접 구축 완료. Kiro는 ReadOnly 검증과 문서화만 수행.
+- `.kiro/docs/kiro-readonly-validator-iam.md` 신규 생성. ReadOnly 전용 IAM 사용자 `portfolio-kiro-readonly-validator` / 정책 `PortfolioKiroReadOnlyValidatorPolicy` 설계, Allow / Deny 정책 JSON, Console 절차, AWS CLI 절차, 검증 명령 모음, 자동 검증 가능 / 수동 확인 분류 정리. `secretsmanager:GetSecretValue`와 KMS Decrypt는 명시 Deny.
+- `.kiro/specs/02-aws-network-and-rds/operation-notes.md` 신규 생성. AWS Foundation 실행 기록(SG 이름 prefix `sgroup-` 결정, RDS 생성 결과, KMS default 등)과 후속 검증 세션 누적 기록 추가.
+- `.kiro/specs/02-aws-network-and-rds/validation-checklist.md` 상태 라벨 시스템 신규 도입. 기존 체크박스(`- [ ]`)를 4종 라벨(`[O]` / `[X]` / `[Kiro 후속 작업 필요]` / `[운영자 확인 필요]`)로 전환하고 AWS ReadOnly 자동 검증 + 문서 비교 + grep 결과를 반영. 최종 카운트 [O] 78 / [X] 0 / [Kiro 후속] 2 / [운영자] 20.
+- AWS ReadOnly 자동 검증으로 VPC / Subnet 6개 / IGW / NAT 미생성 / Route Table / SG 8종 / VPC Endpoint 6종 / RDS instance / Secrets metadata / ALB·ELB 0건 / Cost Anomaly Detection 0건 모두 기대값 일치 확인.
+- secret value 조회 없음(`DescribeSecret` metadata만 사용). KMS Decrypt 호출 없음. AWS 리소스 생성 / 수정 / 삭제 없음.
+- 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 없음(`git status --short` 8개 워크스페이스 모두 무변경 확인).
+- 민감정보(secret / password / access key / token / webhook URL / 계좌번호) 기록 없음. `.kiro/**/*.md` grep 결과 평문 패턴 0건.
+
 ## 2026-06-05
 
 - `.kiro/README.md`, `.kiro/CHANGELOG.md`, `.kiro/WORKLOG.md` 생성 작업을 진행했다.
