@@ -24,6 +24,12 @@
 8. `07-cicd-pipelines`
 9. `10-cutover-and-validation-runbook`
 
+### 2026-06-10 후속 메모 (이월 / 우선순위 보정)
+
+- 2026-06-09 작업 결과(`02-aws-network-and-rds`의 RDS 재생성 + DB role 1차 적용)는 [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md), [`../02-aws-network-and-rds/validation-checklist.md`](../02-aws-network-and-rds/validation-checklist.md), [`../02-aws-network-and-rds/db-roles-and-grants.md`](../02-aws-network-and-rds/db-roles-and-grants.md)에 반영 완료. 03 / 06 spec 입력으로 사용한다.
+- `03-marketconnector-ec2` 기본 포팅이 2026-06-09에서 2026-06-10으로 이월. EC2 자체는 RDS restore runner로 이미 생성됐으므로 03 spec은 EC2 재생성보다 Python 실행환경 구성 / 설정 외부화 / connector 검증부터 진행한다.
+- 원래 계획이던 `08-interest-crawler-and-preprocessor-ecs` 기본 포팅도 2026-06-10에 진행 후보이지만, 03 이월 작업이 06 단계 결정(KIS / RDS 비밀 주입)과 맞물리므로 03을 우선한다. 08은 03이 안정된 뒤 / 또는 06과 병렬로 진입한다.
+
 ## 각 후속 Spec 요약
 
 ### 02-aws-network-and-rds
@@ -55,6 +61,7 @@
 - 예상 난이도: 중. broker 측 IP 등록 정책에 의존.
 - 비용 영향: 중. EC2 24/7 + EIP attach + EBS + 데이터 전송.
 - 운영 리스크: 단일 broker 세션 제약, 토큰 만료, EC2 교체 시 다운타임.
+- 2026-06-10 이월 작업: 2026-06-09에 RDS restore runner 용도로 이미 aws-paper MarketConnector EC2(Amazon Linux 2023, public subnet, EIP attach, IAM Role + SSM managed policy)를 생성했다. 03 spec 진입 시 EC2 신규 생성은 생략하고, Python venv / requirements 설치 / `port-marketconnector` 소스 배치 / KIS paper 계좌 설정 외부화 / RDS 접속 설정 외부화(`marketconnector_app` 사용) / `connector_balance.py` / `connector_order_check.py` 검증부터 진행한다. 검증 결과는 03 spec의 runbook / validation-checklist / operation-notes에 반영한다. 통합 검증과 rollback 절차는 03 spec과 [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook)(예정)에 분담한다.
 
 ### 08-interest-crawler-and-preprocessor-ecs
 

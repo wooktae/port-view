@@ -10,7 +10,7 @@
 
 - [ ] 1. 비용 절감안 vs 안정성 우선안 라인 결정
   - `decision-matrix.md`의 비용 프로파일(low / realistic / stable)을 검토하고 aws-paper와 aws-live 각각의 라인을 결정한다.
-  - 결과를 루트 공통 [`../operator-decisions.md`](../operator-decisions.md)의 해당 Decision ID 옆에 기록한다.
+  - 결과를 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md)의 해당 Decision ID 옆에 기록한다.
   - 본 task는 문서 작업.
   - _Requirements: 1, 11_
 
@@ -22,18 +22,18 @@
 - [ ] 3. aws-paper / aws-live RDS 인스턴스 클래스와 multi-AZ 결정
   - aws-paper: `db.t4g.small` single-AZ 권고.
   - aws-live: 비용 절감안 single-AZ vs 안정성 우선안 multi-AZ 중 선택.
-  - 결과를 루트 공통 [`../operator-decisions.md`](../operator-decisions.md) OD-RDS-002 / OD-RDS-003에 기록.
+  - 결과를 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-RDS-002 / OD-RDS-003에 기록.
   - _Requirements: 5_
 
 - [ ] 4. NAT-free 전략 적용 워크로드 매핑 결정
   - 인터넷 outbound가 필요한 워크로드를 OPT-1 / OPT-2 / OPT-3 / OPT-4 중 어디에 배치할지 결정한다.
   - 권고: marketconnector OPT-2, crawler / preprocessor / research OPT-1, 필요 시 crawler만 OPT-3 승격.
-  - 결과를 루트 공통 [`../operator-decisions.md`](../operator-decisions.md) OD-NET-004에 반영.
+  - 결과를 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-NET-004에 반영.
   - _Requirements: 3_
 
 - [ ] 5. VPC Endpoint 활성 항목 결정
   - 권고 5종(S3, ECR api+dkr, Secrets Manager, SSM, CloudWatch Logs) + 옵션(STS / KMS) 중 활성화 항목을 환경별로 결정.
-  - 결과를 루트 공통 [`../operator-decisions.md`](../operator-decisions.md) OD-NET-005, OD-NET-006에 반영.
+  - 결과를 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-NET-005, OD-NET-006에 반영.
   - _Requirements: 3_
 
 ## Phase 1 — VPC / 네트워크 (AWS Console, aws-paper)
@@ -61,7 +61,7 @@
 
 - [ ] 9. (NAT 미사용 확정 task) NAT Gateway / NAT Instance 생성 안 함
   - 본 spec 결정에 따라 NAT 리소스를 만들지 않는다.
-  - 해당 사실을 루트 공통 [`../operator-decisions.md`](../operator-decisions.md) OD-NET-001 / OD-NET-002에 CONFIRMED 상태로 기록.
+  - 해당 사실을 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-NET-001 / OD-NET-002에 CONFIRMED 상태로 기록.
   - _Requirements: 3_
 
 - [ ] 10. Route Table 3종 생성 및 연결

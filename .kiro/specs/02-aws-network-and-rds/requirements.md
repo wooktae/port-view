@@ -10,7 +10,7 @@
 - `aws-paper`: 1차 AWS 구축 환경. KIS 모의투자 기반 실전 리허설. RDS / ECS / EC2 marketconnector / CloudWatch / Slack / Secrets 구성 포함. 초기 주문 차단, 이후 자동 BUY/SELL E2E 검증.
 - `aws-live`: paper 검증 후 후속 구축. 실제 계좌 연결. 초기 자동주문 금지, 후보 생성 + View 수동 승인 중심 운영. 충분한 검증 후 제한적 자동화 검토.
 
-본 spec(02 폴더) 내부 산출물은 [`requirements.md`](./requirements.md), [`design.md`](./design.md), [`tasks.md`](./tasks.md), [`decision-matrix.md`](./decision-matrix.md) 4개 파일이며, 루트 공통 참조 문서는 [`../aws-resource-glossary.md`](../aws-resource-glossary.md), [`../operator-decisions.md`](../operator-decisions.md), [`../ms-aws-service-decision-matrix.md`](../ms-aws-service-decision-matrix.md), [`../cost-simulation.md`](../cost-simulation.md)이다. 본 spec은 위 문서를 만들거나 참조하는 작업만 다루며, 실제 VPC / RDS / Secrets 리소스 생성, IaC 작성, 8개 MS 코드 / 기존 README / AGENTS.md / docs / CHANGELOG / worklog 수정은 본 spec 범위가 아니다.
+본 spec(02 폴더) 내부 산출물은 [`requirements.md`](./requirements.md), [`design.md`](./design.md), [`tasks.md`](./tasks.md), [`decision-matrix.md`](./decision-matrix.md) 4개 파일이며, 루트 공통 참조 문서는 [`../_common/aws-resource-glossary.md`](../_common/aws-resource-glossary.md), [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/ms-aws-service-decision-matrix.md`](../_common/ms-aws-service-decision-matrix.md), [`../_common/cost-simulation.md`](../_common/cost-simulation.md)이다. 본 spec은 위 문서를 만들거나 참조하는 작업만 다루며, 실제 VPC / RDS / Secrets 리소스 생성, IaC 작성, 8개 MS 코드 / 기존 README / AGENTS.md / docs / CHANGELOG / worklog 수정은 본 spec 범위가 아니다.
 
 선행 spec: `01-aws-migration-foundation`. 본 spec의 결정은 `06-secrets-and-iam`, `03-marketconnector-ec2`, `08-interest-crawler-and-preprocessor-ecs`, `04-strategy-batch-stepfunctions`, `05-port-view-ecs-and-runbook`, `09-strategy-research-batch`, `10-cutover-and-validation-runbook`의 입력으로 사용된다.
 
@@ -168,10 +168,10 @@
 
 #### Acceptance Criteria
 
-1. WHEN 본 spec 산출물을 만드는 경우 THEN 산출물 SHALL 루트 공통 [`../aws-resource-glossary.md`](../aws-resource-glossary.md)를 포함하고 Region / VPC / Subnet / Public Subnet / Private Subnet / Route Table / Internet Gateway / NAT Gateway / NAT Instance / VPC Endpoint / Security Group / Elastic IP / ALB / EC2 / ECS / Fargate / ECR / RDS / RDS Subnet Group / RDS Parameter Group / Secrets Manager / SSM Parameter Store / IAM Role / IAM Policy / Instance Profile / CloudWatch Logs / CloudWatch Metrics / CloudWatch Alarm / EventBridge Scheduler / Step Functions / Lambda / S3 / AWS Batch / KMS / Cloud Map / Service Discovery 항목을 모두 포함해야 한다.
+1. WHEN 본 spec 산출물을 만드는 경우 THEN 산출물 SHALL 루트 공통 [`../_common/aws-resource-glossary.md`](../_common/aws-resource-glossary.md)를 포함하고 Region / VPC / Subnet / Public Subnet / Private Subnet / Route Table / Internet Gateway / NAT Gateway / NAT Instance / VPC Endpoint / Security Group / Elastic IP / ALB / EC2 / ECS / Fargate / ECR / RDS / RDS Subnet Group / RDS Parameter Group / Secrets Manager / SSM Parameter Store / IAM Role / IAM Policy / Instance Profile / CloudWatch Logs / CloudWatch Metrics / CloudWatch Alarm / EventBridge Scheduler / Step Functions / Lambda / S3 / AWS Batch / KMS / Cloud Map / Service Discovery 항목을 모두 포함해야 한다.
 2. WHEN 용어집을 작성하는 경우 THEN 각 항목 SHALL 한 줄 설명, 이 포트폴리오에서의 역할, 비용 발생 여부, 운영자가 조심해야 할 점, 관련 후속 Spec을 포함해야 한다.
-3. WHEN 본 spec 산출물을 만드는 경우 THEN 산출물 SHALL 루트 공통 [`../operator-decisions.md`](../operator-decisions.md)를 포함하고 Decision ID / 결정 항목 / 선택지 / 선택값 / 상태 / 비용 영향 / 운영 리스크 / 후속 Spec 영향 컬럼을 가진 표로 현재 운영자 결정을 기록해야 한다.
-4. WHEN 운영자 결정 상태를 표시하는 경우 THEN 루트 공통 [`../operator-decisions.md`](../operator-decisions.md) SHALL CONFIRMED / TENTATIVE / TBD / DEFERRED 상태 값을 사용해야 한다.
+3. WHEN 본 spec 산출물을 만드는 경우 THEN 산출물 SHALL 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md)를 포함하고 Decision ID / 결정 항목 / 선택지 / 선택값 / 상태 / 비용 영향 / 운영 리스크 / 후속 Spec 영향 컬럼을 가진 표로 현재 운영자 결정을 기록해야 한다.
+4. WHEN 운영자 결정 상태를 표시하는 경우 THEN 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) SHALL CONFIRMED / TENTATIVE / TBD / DEFERRED 상태 값을 사용해야 한다.
 
 ### Requirement 14: 본 spec의 안전 제약
 
@@ -179,7 +179,7 @@
 
 #### Acceptance Criteria
 
-1. WHEN 본 spec이 산출물을 만드는 경우 THEN 산출물 SHALL 본 spec 폴더 안의 [`requirements.md`](./requirements.md), [`design.md`](./design.md), [`tasks.md`](./tasks.md), [`decision-matrix.md`](./decision-matrix.md) 4개 파일과 루트 공통 [`../operator-decisions.md`](../operator-decisions.md), [`../aws-resource-glossary.md`](../aws-resource-glossary.md)를 참조 / 보강 대상으로만 한정해야 한다.
+1. WHEN 본 spec이 산출물을 만드는 경우 THEN 산출물 SHALL 본 spec 폴더 안의 [`requirements.md`](./requirements.md), [`design.md`](./design.md), [`tasks.md`](./tasks.md), [`decision-matrix.md`](./decision-matrix.md) 4개 파일과 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/aws-resource-glossary.md`](../_common/aws-resource-glossary.md)를 참조 / 보강 대상으로만 한정해야 한다.
 2. WHEN 본 spec 작업이 진행되는 동안 THE 작업 SHALL 8개 MS의 README / AGENTS.md / CHANGELOG / docs / worklog와 소스 코드를 수정하지 않아야 한다.
 3. WHEN 본 spec 작업이 진행되는 동안 THE 작업 SHALL 실제 AWS 리소스를 만들거나 변경하지 않아야 한다.
 4. WHEN 본 spec 작업이 진행되는 동안 THE 작업 SHALL 8개 MS entrypoint, broker / KIS / Selenium / KRX / Naver / yfinance / RDS DDL/DML / 주문 / 체결 / Daily Batch / intraday monitor 호출을 실행하지 않아야 한다.

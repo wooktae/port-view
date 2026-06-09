@@ -25,9 +25,9 @@
 
 ### 결정 개수
 
-- 전체: 55건
-- 🟢 확정 (CONFIRMED): 39건
-- 🟡 잠정 (TENTATIVE): 13건
+- 전체: 59건
+- 🟢 확정 (CONFIRMED): 42건
+- 🟡 잠정 (TENTATIVE): 14건
 - 🔴 미정 (TBD): 2건
 - 🔵 보류 (DEFERRED): 1건
 
@@ -132,6 +132,10 @@
 | OD-DB-004 | DB role 분리 | 단일 admin / role 분리 | 7개 role(marketconnector_app, crawler_app, preprocessor_app, decision_app, execution_app, research_app, view_app) | 🟢 확정 | 0 | 권한 매트릭스 운영 부담 | 02, 06 |
 | OD-DB-005 | view_app 권한 | 읽기 전용 / read+ops write / read+ops+execution write | 모든 schema READ + ops WRITE 기본. execution write는 05에서 재검토 | 🟡 잠정 | 0 | port-view에서 execution write가 필요하면 05에서 변경 | 02, 05 |
 | OD-DB-006 | search_path 정책 | 변경 / 유지 | MS별 README 그대로 유지 | 🟢 확정 | 0 | role별 ALTER ROLE SET search_path 적용 | 02 |
+| OD-DB-007 | legacy schema의 app role 권한 | 부여 / 미부여 | 모든 app role에 USAGE / SELECT 미부여(2026-06-09 1차 적용 결과 반영) | 🟢 확정 | 0 | 02 design.md 매트릭스(legacy R 일부 부여) 대비 보안 강화. legacy 데이터 접근 필요한 MS 식별 시 별도 결정으로 grant | 02, 05, 06 |
+| OD-DB-008 | marketconnector_app의 execution 권한 | R/W / R-only / 미부여 | R-only 축소(2026-06-09 1차 적용 반영) | 🟢 확정 | 0 | execution write는 execution_app 단독으로 한정. 02 design.md 매트릭스(R/W) 대비 권한 분리 강화 | 02, 03, 04 |
+| OD-DB-009 | view_app의 execution 권한 | R-only / R+W | R-only 유지(write 필요성은 05 spec에서 재검토) | 🟡 잠정 | 0 | OD-DB-005를 본 결정으로 분리. View에서 execution write가 꼭 필요해지면 05에서 변경 | 02, 05 |
+| OD-DB-010 | 1차 적용 시 기존 객체 owner 일괄 이관 (REASSIGN OWNED) | 즉시 실행 / 미실행 | 미실행(기존 table / sequence / index owner는 `portfolio_admin` 유지) | 🟢 확정 | 0 | schema owner는 `portfolio_owner`로 이관 완료. default privileges는 새 객체에만 자동 적용. 기존 객체 일괄 이관 여부는 후속 결정으로 분리 관리 | 02, 06 |
 
 ### 4. Compute / Service Placement Decisions
 
@@ -228,6 +232,7 @@
 | OD-RDS-002 | aws-live RDS 비용 절감안 | single-AZ 시작 가능 | 🟡 잠정 | 02, 10 |
 | OD-RDS-005 | encryption at rest | aws-paper KMS default, aws-live CMK 권고 | 🟡 잠정 | 02, 06 |
 | OD-DB-005 | view_app 권한 | 모든 schema READ + ops WRITE 기본. execution write는 05에서 재검토 | 🟡 잠정 | 02, 05 |
+| OD-DB-009 | view_app의 execution 권한 | R-only 유지(write 필요성은 05 spec에서 재검토) | 🟡 잠정 | 02, 05 |
 | OD-CUT-004 | local-dev 유지 기간 | 병행 운영(rollback 보험용) | 🟡 잠정 | 10 |
 | OD-OBS-002 | CloudWatch Logs retention (aws-paper) | 7일 시작 | 🟡 잠정 | 02, 05 |
 | OD-OBS-003 | CloudWatch Logs retention (aws-live) | 14일 시작, 운영 안정 후 30일로 상향 가능 | 🟡 잠정 | 05, 10 |
@@ -277,3 +282,4 @@
 | 일자 | 변경 내용 | 비고 |
 |------|-----------|------|
 | 2026-06-05 | 문서 구조 가독성 개선 | 실제 AWS 결정값(Decision ID, 선택지, 선택값, 비용 영향, 운영 리스크, 후속 spec 영향)은 변경하지 않았다. Status 내부 기준값(CONFIRMED / TENTATIVE / TBD / DEFERRED)도 변경하지 않았다. 운영자 표시용으로 한글/색상 라벨(🟢 확정 / 🟡 잠정 / 🔴 미정 / 🔵 보류)을 표 안에 함께 사용하도록 표시 형식만 개선했다. Status Legend, Decision Summary, At a Glance, 카테고리별 상세 결정표 재정리, Open / Tentative / Deferred 결정 모음, Decision Update Rules, Change Log 섹션을 추가했다. |
+| 2026-06-09 | OD-DB-007 ~ OD-DB-010 추가 (DB Role / 권한 1차 적용 결과 반영) | 2026-06-09 운영자가 직접 실행한 [`../02-aws-network-and-rds/db-roles-and-grants.md`](../02-aws-network-and-rds/db-roles-and-grants.md) §4 SQL 결과를 반영했다. 신규 결정: OD-DB-007(legacy schema 모든 app role 미부여, 🟢 확정), OD-DB-008(marketconnector_app execution R-only, 🟢 확정), OD-DB-009(view_app execution R-only, write는 05에서 재검토, 🟡 잠정), OD-DB-010(1차 적용에서 REASSIGN OWNED BY portfolio_admin TO portfolio_owner 미실행, 🟢 확정). OD-DB-005는 OD-DB-009로 분리되었으나 본문은 보존한다(중복 row 미생성). 비밀번호 / endpoint hostname / 계좌번호는 본 문서에 평문 기록 금지(`[REDACTED]`). 결정값 변경 외 본 일자에 추가된 운영 결과 기록은 [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md) 2026-06-09 섹션 참조. |

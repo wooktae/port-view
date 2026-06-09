@@ -9,7 +9,7 @@
 - Design Section: `02-aws-network-and-rds/design.md`의 섹션 제목.
 - Task ID: `02-aws-network-and-rds/tasks.md`의 task 번호.
 - Validation / Evidence: `02-aws-network-and-rds/validation-checklist.md` 섹션 + `02-aws-network-and-rds/runbook.md` Step.
-- Related Decision ID: `../operator-decisions.md`의 Decision ID.
+- Related Decision ID: `../_common/operator-decisions.md`의 Decision ID.
 
 ## 매핑 표
 
@@ -27,7 +27,7 @@
 | Requirement 10 | aws-paper / aws-live 자동 BUY/SELL / 자동 재시도 정책 | `안전장치와 자동 재시도 정책` paper / live / 환경 분리 안전장치 | 29 | validation §7 (자동 재시도 / Secret prefix 분리) | OD-SAFE-001, OD-SAFE-002, OD-SAFE-003, OD-SAFE-004 |
 | Requirement 11 | 비용 프로파일(low / realistic / stable) | `비용 영향 요약` + decision-matrix.md §11, §12, §13 | 1 | validation §1, §8 / runbook Step 2 | OD-NET-001, OD-NET-002, OD-NET-005, OD-NET-007, OD-NET-008, OD-RDS-002, OD-RDS-003, OD-OBS-002, OD-OBS-003 |
 | Requirement 12 | AWS Console 단계별 진행 절차 | `AWS Console 단계별 진행 흐름` 요약 16단계 | 6 ~ 26 | validation §2 ~ §6 / runbook Step 0 ~ 18 | (전반에 걸친 결정) |
-| Requirement 13 | AWS Resource 용어집 + 운영자 결정 기록 | (별도 루트 공통 문서) [`../aws-resource-glossary.md`](../aws-resource-glossary.md), [`../operator-decisions.md`](../operator-decisions.md) | (전 spec 공통) | validation §1, §9 | (글로벌) |
+| Requirement 13 | AWS Resource 용어집 + 운영자 결정 기록 | (별도 루트 공통 문서) [`../_common/aws-resource-glossary.md`](../_common/aws-resource-glossary.md), [`../_common/operator-decisions.md`](../_common/operator-decisions.md) | (전 spec 공통) | validation §1, §9 | (글로벌) |
 | Requirement 14 | 본 spec 안전 제약 | `본 spec의 안전 제약` | 전체 | validation §9 (`[REDACTED]` 일관성, MS 코드 / 문서 무수정) | (안전 제약) |
 
 ## Acceptance Criteria 단위 보강 매핑
@@ -55,12 +55,12 @@
 | 11.1 | aws-paper / aws-live 비용 프로파일 3개 | decision-matrix.md §11, §12 | 1 | validation §1, §8 | (전 결정 합산) |
 | 11.2 | 비용 절감 항목별 영향 정리 | decision-matrix.md §13 | 1 | validation §8 | OD-NET-001, OD-NET-007, OD-NET-008, OD-RDS-002, OD-OBS-002, OD-OBS-003 |
 | 12.1 | tasks.md Console 단계 분해 | `AWS Console 단계별 진행 흐름` 16단계 | 6 ~ 26 | validation §2 ~ §6 / runbook Step 0 ~ 18 | (전반) |
-| 13.1 | aws-resource-glossary 항목 모두 포함 | (루트 공통) [`../aws-resource-glossary.md`](../aws-resource-glossary.md) | (전 spec 공통) | validation §9 | (글로벌) |
+| 13.1 | aws-resource-glossary 항목 모두 포함 | (루트 공통) [`../_common/aws-resource-glossary.md`](../_common/aws-resource-glossary.md) | (전 spec 공통) | validation §9 | (글로벌) |
 | 14.5 | secret 자리 `[REDACTED]` 일관성 | 본문 안전 제약 | 전체 | validation §9 (R-DOCS-001 mitigation) | (안전 제약) |
 
 ## Risk와의 매핑
 
-본 spec의 핵심 리스크는 [`../risk-register.md`](../risk-register.md)에서 관리한다. Requirement → Risk 매핑 보강.
+본 spec의 핵심 리스크는 [`../_common/risk-register.md`](../_common/risk-register.md)에서 관리한다. Requirement → Risk 매핑 보강.
 
 | Requirement ID | Related Risk ID | mitigation 위치 |
 |---|---|---|

@@ -25,14 +25,14 @@
 
 ## 루트 참조 문서
 
-AWS Migration spec을 새로 만들거나 수정하기 전에 `.kiro/specs` 아래의 루트 공통 문서를 먼저 확인한다.
+AWS Migration spec을 새로 만들거나 수정하기 전에 `.kiro/specs/_common` 아래의 루트 공통 문서를 먼저 확인한다.
 
-* `operator-decisions.md`
-* `ms-aws-service-decision-matrix.md`
-* `cost-simulation.md`
-* `followups-overview.md`
-* `aws-resource-glossary.md`
-* `note-aws-landscape-2021-vs-2026.md`
+* `_common/operator-decisions.md`
+* `_common/ms-aws-service-decision-matrix.md`
+* `_common/cost-simulation.md`
+* `_common/followups-overview.md`
+* `_common/aws-resource-glossary.md`
+* `_archive/note-aws-landscape-2021-vs-2026.md` (참고용 아카이브)
 
 위 문서들은 모든 spec에서 공유하는 기준 문서로 사용한다.
 
@@ -126,3 +126,15 @@ AWS Console 작업이나 구현 절차가 필요한 경우에는 실제 실행�
 - 작업공간 목적, 폴더 구조, 주요 문서 목록이 바뀌면 `.kiro/README.md`를 업데이트한다.
 - secret, password, token, app key, app secret, 계좌번호, webhook URL 같은 민감정보는 절대 기록하지 않는다.
 - 민감정보는 필요한 경우 `[REDACTED]`로만 표기한다.
+
+## 문서 최소화 / 운영자 가독성 규칙
+
+- 새 문서를 만들기 전에 기존 문서에 흡수 가능한지 먼저 판단한다.
+- 운영자가 매일 봐야 하는 문서는 각 spec의 README.md / runbook.md / validation-checklist.md / operation-notes.md로 제한한다.
+- requirements.md / design.md / tasks.md / traceability-matrix.md는 Kiro/감사용 문서로 취급하고, 운영자용 요약을 반복해서 길게 쓰지 않는다.
+- 같은 결정값은 operator-decisions.md에만 상세히 기록하고, 다른 문서에서는 Decision ID와 짧은 요약만 참조한다.
+- 작업 완료 후 자동 갱신 대상은 기본적으로 최대 3개 파일로 제한한다.
+  - 현재 spec의 operation-notes.md
+  - 현재 spec의 validation-checklist.md
+  - 필요 시 WORKLOG.md 또는 operator-decisions.md
+- CHANGELOG.md는 구조 변경, 신규 spec 생성, 주요 문서 재구성 때만 갱신한다.

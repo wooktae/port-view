@@ -2,7 +2,7 @@
 
 본 문서는 운영자가 결정해야 하는 핵심 의사결정을 표 단위로 정리한다. 새 환경 모델(local-dev / aws-paper / aws-live)과 NAT-free 기본안을 반영해 갱신했다. 모든 비용은 서울 ap-northeast-2 기준 근사치이고 "AWS Pricing Calculator 확인 필요" 단서가 붙는다. 모든 secret은 `[REDACTED]`로만 표기한다.
 
-세부 단가의 출처는 루트 공통 문서 [`../cost-simulation.md`](../cost-simulation.md).
+세부 단가의 출처는 루트 공통 문서 [`../_common/cost-simulation.md`](../_common/cost-simulation.md).
 
 ## 1. 환경 모델
 
@@ -120,7 +120,7 @@ NAT-free 효과: NAT GW 미사용 절감 ~$43~$86/월 vs Endpoint 비용 ~$40~$8
 
 ## 11. 비용 프로파일 (aws-paper)
 
-aws-paper 환경별 월 합계 추정. 세부 단가는 루트 공통 문서 [`../cost-simulation.md`](../cost-simulation.md).
+aws-paper 환경별 월 합계 추정. 세부 단가는 루트 공통 문서 [`../_common/cost-simulation.md`](../_common/cost-simulation.md).
 
 | 항목 | low | realistic | stable |
 |------|-----|-----------|--------|
@@ -144,7 +144,7 @@ aws-paper 환경별 월 합계 추정. 세부 단가는 루트 공통 문서 [`.
 - realistic: 본 spec 권고 그대로.
 - stable: 운영 회고를 위해 ALB 도입 검토, Logs / Metrics 확장.
 
-기존 [`../cost-simulation.md`](../cost-simulation.md)(이전 결정 기준 paper realistic ~$212)와 비교해 NAT 제거 ~$43~$50, dev AWS 제거 다른 환경 합산에서 추가 절감, ALB 미사용 ~$17 절감 효과로 약 $50~$80 더 낮아진다.
+기존 [`../_common/cost-simulation.md`](../_common/cost-simulation.md)(이전 결정 기준 paper realistic ~$212)와 비교해 NAT 제거 ~$43~$50, dev AWS 제거 다른 환경 합산에서 추가 절감, ALB 미사용 ~$17 절감 효과로 약 $50~$80 더 낮아진다.
 
 ## 12. 비용 프로파일 (aws-live)
 
@@ -174,7 +174,7 @@ aws-live 환경별 월 합계 추정.
 - realistic: single-AZ 유지 + Endpoint multi-AZ로 가용성 일부 보강.
 - stable (안정성 우선안): multi-AZ RDS + Endpoint multi-AZ + internal ALB + 14일 backup. 자동 재시도 금지 정책은 모든 옵션에 동일 적용.
 
-기존 [`../cost-simulation.md`](../cost-simulation.md)(이전 결정 기준 live realistic ~$492)와 비교해 NAT-free 절감 ~$86~$98, ALB 미사용 ~$17, dev AWS 제거 효과(별도 환경 합산)로 합계 약 $130~$170 절감 가능.
+기존 [`../_common/cost-simulation.md`](../_common/cost-simulation.md)(이전 결정 기준 live realistic ~$492)와 비교해 NAT-free 절감 ~$86~$98, ALB 미사용 ~$17, dev AWS 제거 효과(별도 환경 합산)로 합계 약 $130~$170 절감 가능.
 
 ## 13. 비용 절감 vs 운영 리스크 항목별 정리
 
@@ -190,7 +190,7 @@ aws-live 환경별 월 합계 추정.
 
 ## 14. 운영자 결정 체크리스트
 
-본 체크리스트의 결정값은 루트 공통 문서 [`../operator-decisions.md`](../operator-decisions.md)에 기록.
+본 체크리스트의 결정값은 루트 공통 문서 [`../_common/operator-decisions.md`](../_common/operator-decisions.md)에 기록.
 
 - [ ] CIDR / AZ 결정
 - [ ] 인터넷 outbound 워크로드 옵션 매핑(OPT-1 ~ OPT-4)
@@ -207,9 +207,9 @@ aws-live 환경별 월 합계 추정.
 
 ## MS별 AWS 서비스 후보 비교 참조
 
-본 decision-matrix는 NAT / RDS / VPC Endpoint / ALB / backup / cutover 같은 인프라 옵션 결정에 집중한다. 각 MS별 컴퓨트 / orchestration 후보 비교(EC2 / ECS Fargate / ECS on EC2 / AWS Batch / Lambda / EKS / Elastic Beanstalk / App Runner / Step Functions / EventBridge Scheduler 등)와 포트폴리오 어필 관점 보강안은 루트 공통 문서 [ms-aws-service-decision-matrix.md](../ms-aws-service-decision-matrix.md)에 별도로 정리되어 있다.
+본 decision-matrix는 NAT / RDS / VPC Endpoint / ALB / backup / cutover 같은 인프라 옵션 결정에 집중한다. 각 MS별 컴퓨트 / orchestration 후보 비교(EC2 / ECS Fargate / ECS on EC2 / AWS Batch / Lambda / EKS / Elastic Beanstalk / App Runner / Step Functions / EventBridge Scheduler 등)와 포트폴리오 어필 관점 보강안은 루트 공통 문서 [ms-aws-service-decision-matrix.md](../_common/ms-aws-service-decision-matrix.md)에 별도로 정리되어 있다.
 
-8개 MS 컴퓨트 1순위 결정(OD-MS-001 ~ OD-MS-010)은 루트 공통 [`../operator-decisions.md`](../operator-decisions.md) 9장에 락 상태로 기록되어 있다. 본 decision-matrix는 그 결정을 변경하지 않고, 네트워크 / RDS 옵션 선택에만 집중한다.
+8개 MS 컴퓨트 1순위 결정(OD-MS-001 ~ OD-MS-010)은 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 9장에 락 상태로 기록되어 있다. 본 decision-matrix는 그 결정을 변경하지 않고, 네트워크 / RDS 옵션 선택에만 집중한다.
 
 ## 15. 본 spec 작업 안전 제약
 

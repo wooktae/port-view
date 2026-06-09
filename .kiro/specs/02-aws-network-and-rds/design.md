@@ -308,7 +308,7 @@ SHOW search_path;
 
 ## 비용 영향 요약
 
-세부 단가는 루트 공통 문서 [`../cost-simulation.md`](../cost-simulation.md)와 본 spec의 [`decision-matrix.md`](./decision-matrix.md) 참고.
+세부 단가는 루트 공통 문서 [`../_common/cost-simulation.md`](../_common/cost-simulation.md)와 본 spec의 [`decision-matrix.md`](./decision-matrix.md) 참고.
 
 - NAT Gateway 미사용으로 paper / live 모두 ~$43~$86/월 절감. 그러나 VPC Endpoint AZ당 ~$8/월씩 누적.
 - aws-paper RDS single-AZ 시작으로 multi-AZ 대비 약 50% 절감.
@@ -342,13 +342,13 @@ SHOW search_path;
 
 ## MS별 AWS 서비스 후보 비교
 
-8개 MS 각각의 AWS 컴퓨트 / orchestration / 보조 서비스 후보 비교(EC2 / ECS Fargate / ECS on EC2 / AWS Batch / Lambda / EKS / Elastic Beanstalk / App Runner / Step Functions / EventBridge Scheduler 등)와 포트폴리오 어필 관점 보강안은 루트 공통 문서 [ms-aws-service-decision-matrix.md](../ms-aws-service-decision-matrix.md)를 참고한다. 본 design.md는 1차 cutover 운영 안정성 권고만 다루고, 후보 비교 / Lambda 검토 / EKS 검토 / Beanstalk·App Runner 비교는 해당 문서로 분리한다.
+8개 MS 각각의 AWS 컴퓨트 / orchestration / 보조 서비스 후보 비교(EC2 / ECS Fargate / ECS on EC2 / AWS Batch / Lambda / EKS / Elastic Beanstalk / App Runner / Step Functions / EventBridge Scheduler 등)와 포트폴리오 어필 관점 보강안은 루트 공통 문서 [ms-aws-service-decision-matrix.md](../_common/ms-aws-service-decision-matrix.md)를 참고한다. 본 design.md는 1차 cutover 운영 안정성 권고만 다루고, 후보 비교 / Lambda 검토 / EKS 검토 / Beanstalk·App Runner 비교는 해당 문서로 분리한다.
 
-8개 MS 컴퓨트 1순위 결정(OD-MS-001 ~ OD-MS-010)은 루트 공통 [`../operator-decisions.md`](../operator-decisions.md) 9장에 락 상태로 기록되어 있다. Lambda는 모든 핵심 batch 워크로드(decision / execution / research / crawler / preprocessor)에서 비권고이며, 인프라 알람 fan-out / 짧은 후처리 / S3 metadata 같은 보조 용도로만 사용한다. 권고 근거는 Daily Batch 16단계 실측(crawler 약 9분 53초 / preprocessor 약 5분 54초 / research 약 45초 / decision·execution 단발 step 1초 미만)과 live BUY/SELL 자동 재시도 금지 정책이며, 자세한 내용은 `../ms-aws-service-decision-matrix.md` 1.4장과 5장을 참고한다.
+8개 MS 컴퓨트 1순위 결정(OD-MS-001 ~ OD-MS-010)은 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 9장에 락 상태로 기록되어 있다. Lambda는 모든 핵심 batch 워크로드(decision / execution / research / crawler / preprocessor)에서 비권고이며, 인프라 알람 fan-out / 짧은 후처리 / S3 metadata 같은 보조 용도로만 사용한다. 권고 근거는 Daily Batch 16단계 실측(crawler 약 9분 53초 / preprocessor 약 5분 54초 / research 약 45초 / decision·execution 단발 step 1초 미만)과 live BUY/SELL 자동 재시도 금지 정책이며, 자세한 내용은 `../_common/ms-aws-service-decision-matrix.md` 1.4장과 5장을 참고한다.
 
 ## 본 spec의 안전 제약
 
-- 본 spec(02 폴더) 내부 산출물은 [`requirements.md`](./requirements.md), [`design.md`](./design.md), [`tasks.md`](./tasks.md), [`decision-matrix.md`](./decision-matrix.md) 4개 파일. 루트 공통 참조 문서는 [`../operator-decisions.md`](../operator-decisions.md), [`../aws-resource-glossary.md`](../aws-resource-glossary.md), [`../ms-aws-service-decision-matrix.md`](../ms-aws-service-decision-matrix.md), [`../cost-simulation.md`](../cost-simulation.md).
+- 본 spec(02 폴더) 내부 산출물은 [`requirements.md`](./requirements.md), [`design.md`](./design.md), [`tasks.md`](./tasks.md), [`decision-matrix.md`](./decision-matrix.md) 4개 파일. 루트 공통 참조 문서는 [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/aws-resource-glossary.md`](../_common/aws-resource-glossary.md), [`../_common/ms-aws-service-decision-matrix.md`](../_common/ms-aws-service-decision-matrix.md), [`../_common/cost-simulation.md`](../_common/cost-simulation.md).
 - 8개 MS의 README / AGENTS.md / CHANGELOG / docs / worklog와 소스 코드는 수정하지 않는다.
 - 실제 AWS 리소스 생성 / 변경은 본 spec에서 수행하지 않는다. 본 문서는 운영자가 Console / IaC로 진행하기 위한 절차서다.
 - 8개 MS entrypoint, broker / KIS / Selenium / KRX / Naver / yfinance / RDS DDL/DML / 주문 / 체결 / Daily Batch / intraday monitor 호출은 본 작업에 포함되지 않는다.

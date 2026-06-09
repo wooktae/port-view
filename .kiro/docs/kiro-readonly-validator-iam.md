@@ -297,7 +297,7 @@ aws secretsmanager describe-secret --secret-id /portfolio/paper/rds/master `
 
 - 운영자 승인 여부(approval required task)
 - Secret이 본 문서 / 캡처 / 운영자 노트에 평문 노출되지 않았는지(외부 file inspection 필요)
-- [`../specs/operator-decisions.md`](../specs/operator-decisions.md) / [`../specs/risk-register.md`](../specs/risk-register.md) 인지 여부(사람의 판독)
+- [`../specs/_common/operator-decisions.md`](../specs/_common/operator-decisions.md) / [`../specs/_common/risk-register.md`](../specs/_common/risk-register.md) 인지 여부(사람의 판독)
 - AWS Billing Dashboard 실제 청구 금액(읽기는 가능하나 비용 프로파일 라인 결정은 사람 판단)
 - Cost Anomaly Detection alert 등록 여부와 운영자 결정
 - DB / schema / role SQL 실행 여부(03 / 06 spec 진행 시점)

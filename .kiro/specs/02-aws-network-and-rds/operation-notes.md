@@ -85,3 +85,119 @@
 - 본 작업 산출물 갱신 대상: `.kiro/specs/02-aws-network-and-rds/validation-checklist.md`, `.kiro/specs/02-aws-network-and-rds/operation-notes.md`. account-id / RDS endpoint hostname / secret ARN / access key id는 본 작업으로 새로 추가 출력하지 않음.
 
 - 운영 결정: `portfolio-kiro-readonly-validator` IAM User 생성은 우선 보류하고, 기존 AWS CLI 기본 자격증명인 `terraform` IAM User로 Kiro 검증을 진행한다. 단, `terraform`은 AdministratorAccess 권한이므로 Kiro 작업 시 AWS 리소스 생성/수정/삭제 명령은 금지하고 ReadOnly 조회만 허용한다. 향후 보안 정리 단계에서 ReadOnly 전용 IAM 분리를 재검토한다.
+
+
+## 2026-06-09 DB Role / 권한 분리 1차 적용
+
+본 spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 SQL을 운영자가 직접 실행하고, §5 검증 SQL로 결과를 확인했다. SQL 본문 / 실제 password / endpoint / secret value는 본 문서에 기록하지 않는다.
+
+### owner / membership
+
+- `portfolio_owner` 생성 완료(NOLOGIN).
+- `portfolio_admin`에 `portfolio_owner` 멤버십 부여 완료. 이후 `ALTER SCHEMA ... OWNER TO portfolio_owner` 실행 가능 상태로 진입.
+- 9개 도메인 schema(`reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`)의 owner를 `portfolio_owner`로 이관 완료.
+- `public` schema는 변경하지 않음(RDS 정책 / 호환성 유지).
+- 기존 table / sequence / index의 owner는 `portfolio_admin`(restore 실행 계정)으로 그대로 남아 있음. 본 세션에서는 `REASSIGN OWNED BY portfolio_admin TO portfolio_owner`를 실행하지 않음. 기존 객체에 대해서는 §4.5 default privileges가 자동 적용되지 않으므로, 본 세션에서 §4.4 명시 GRANT만으로 권한 매트릭스를 적용한 상태다(이후 새로 만드는 객체는 default privileges 적용 대상). 후속 세션에서 owner 일괄 이관 여부는 운영자 결정으로 분리 관리한다.
+
+### app role 7종
+
+- `marketconnector_app`, `view_app`, `crawler_app`, `preprocessor_app`, `decision_app`, `research_app`, `execution_app` 생성 완료.
+- 7종 role 모두 `LOGIN = true`, `SUPERUSER / CREATEDB / CREATEROLE / REPLICATION / BYPASSRLS = false` 확인.
+- 7종 role 모두 `GRANT CONNECT ON DATABASE portfolio` 부여 + `GRANT USAGE ON SCHEMA public` 부여 완료.
+
+### GRANT 매트릭스 / DEFAULT PRIVILEGES / search_path
+
+- §4.4 schema 단위 GRANT (USAGE / SELECT / INSERT-UPDATE-DELETE / sequence USAGE-SELECT) 적용 완료. legacy schema는 의도적으로 생략.
+- §4.5 `ALTER DEFAULT PRIVILEGES FOR ROLE portfolio_owner IN SCHEMA <9개>` 적용 완료. legacy 제외. 이후 `portfolio_owner` 명의로 새 객체가 만들어질 때 권한 매트릭스가 자동 적용됨.
+- §4.6 `ALTER ROLE ... SET search_path` 7건 적용 완료. 각 MS README 정의와 일치(legacy 항목은 호환성 유지용으로 search_path에는 포함되지만 USAGE 미부여라 실제 접근은 차단).
+
+### 검증 SQL 결과 요약 (§5)
+
+- §5.1 role / 속성: 7개 app role + `portfolio_owner` + `portfolio_admin` 모두 존재 확인. 7개 app role의 superuser / createdb / createrole / replication / bypassrls 모두 false.
+- §5.1 search_path: 7개 role 모두 본 문서 §3 표와 일치.
+- §5.2 schema USAGE / CREATE 매트릭스: §2 표와 불일치 0건. 모든 app role의 `legacy` USAGE = false 확인.
+- §5.3 table 권한 요약 / sequence 권한 요약: §2 표와 불일치 0건.
+- §5.4 실제 connection 검증
+  - `marketconnector_app`: 접속 성공. `connector` 조회 성공, `execution` 조회 성공, `legacy` USAGE = false 확인. `execution` schema에 INSERT / UPDATE / DELETE 시도 → permission denied(기대값 일치).
+  - `execution_app`: 접속 성공. `execution` / `decision` / `connector` 조회 성공, `legacy` USAGE = false 확인. `execution` schema에 INSERT / UPDATE / DELETE 가능(기대값 일치).
+  - `view_app`: 접속 성공. `execution` / `connector` / `decision` 조회 성공, `legacy` USAGE = false 확인. `execution` schema에 INSERT / UPDATE / DELETE 시도 → permission denied(기대값 일치, view write 범위는 현재 `ops` 한정).
+
+### 본 세션 안전 제약 점검
+
+- secret value 조회 없음. 실제 password / endpoint / account-id / 계좌번호 / token / app key / app secret 기록 없음. 모두 `[REDACTED]` 또는 placeholder만 사용.
+- AWS 리소스 생성 / 변경 / 삭제 없음. 본 작업은 RDS 안 SQL 실행과 SQL 결과 기록만 수행.
+- 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 없음.
+- 본 작업 산출물 갱신 대상: 본 파일과 [`./validation-checklist.md`](./validation-checklist.md) 2개 파일.
+
+### 후속 작업 권고
+
+- 7개 app role 비밀번호의 정식 보관(Secrets Manager / SSM SecureString)과 IAM 매트릭스는 후속 spec `06-secrets-and-iam`에서 정리.
+- 기존 객체(`portfolio_admin` 소유) owner 일괄 이관 여부 결정. 결정에 따라 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4.2.1 옵션 A / 옵션 B 중 선택.
+- 매트릭스 변경 사항(legacy 미부여, `marketconnector_app` execution R only 축소)은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-DB 카테고리에 갱신 제안.
+
+
+## 2026-06-09 Local → RDS Migration & RDS 재생성 실행 기록
+
+본 섹션은 운영자가 2026-06-09에 직접 수행한 Local PostgreSQL → aws-paper RDS migration 결과를 기록한다. 본 문서에는 실제 endpoint hostname / password / secret value / account-id / 계좌번호를 적지 않는다(`[REDACTED]` 또는 placeholder만 사용).
+
+### 실행 요약
+
+- 실행 흐름: Local Windows PC → S3 임시 migration bucket → aws-paper MarketConnector EC2 → private RDS PostgreSQL.
+- Restore Runner: aws-paper MarketConnector EC2(Amazon Linux 2023, public subnet, EIP attach). Kiro는 본 작업에서 ReadOnly 검증과 문서화만 수행했다.
+- 결과: schema / table / index / sequence / FK / trigger / table별 row count 모두 로컬 기준선과 일치(diff 0).
+
+### 1. Local 백업 및 기준선 확보
+
+- pg_dump 결과: `portfolio_full_20260609.dump`(format custom + gzip), 크기 422,334,494 bytes.
+- 보관 위치: `C:\Workspaces\db-backup\portfolio_20260609\` (로컬 PC).
+- 기준선: schema별 table count, table별 row count snapshot, 주요 object count(index / trigger / sequence / FK), 총 table 수 81개.
+
+### 2. private RDS 직접 접속 시도와 결정
+
+- 로컬 PC에서 RDS endpoint로 직접 접속 시 timeout. RDS endpoint가 private IP로 resolve되고 RDS Publicly accessible = No 상태이므로 기대 동작으로 판단.
+- 결정: RDS restore runner를 MarketConnector EC2로 한다. 로컬 PC IP를 RDS Security Group에 직접 허용하지 않는다. RDS Public access = No 유지.
+
+### 3. MarketConnector EC2 준비 (restore runner)
+
+- aws-paper용 EC2 1대 신규 생성: Amazon Linux 2023, public subnet 배치, EIP attach.
+- Security Group: RDS PostgreSQL 5432 inbound source를 MarketConnector EC2 SG로 허용. 0.0.0.0/0 5432 허용 없음.
+- 접속: EC2 Instance Connect 성공. 로컬 SSH 직접 접속은 outbound 22 제한 가능성으로 보류.
+- IAM Role: SSM Session Manager 전환을 위한 기본 managed policy 연결 + 임시 migration bucket read 권한 부여. Access Key는 EC2 내부에 저장하지 않음.
+- 패키지: OS 업데이트 완료, AWS CLI 기본 제공 확인. PostgreSQL client는 처음 15.18 설치 후 dump archive header version 불일치 확인 → 15 client 제거 후 18.4 client로 전환(psql 18.4 / pg_restore 18.4). EC2에서 private RDS psql 접속 성공.
+
+### 4. dump 파일 전송과 메타데이터 확인
+
+- 로컬 dump → S3 임시 bucket 업로드 → MarketConnector EC2로 다운로드.
+- 무결성: 로컬 / S3 / EC2 dump 파일 크기 422,334,494 bytes 일치.
+- pg_restore --list 결과: TOC Entries 812, line count 823, dump source PostgreSQL 18.1, dump format CUSTOM + gzip compression 확인.
+
+### 5. Major version mismatch 발견과 RDS 재생성
+
+- 기존 RDS engine PostgreSQL 16.14 확인. dump source 18.1을 16.14에 restore하는 것은 하위 major version restore라 위험으로 판단.
+- 결정: 기존 PostgreSQL 16.14 RDS를 삭제하고 PostgreSQL 18.4 기준으로 재생성한다. RDS Public access = No 유지, initial database name `portfolio` 지정.
+- 결과: 신규 RDS `portfolio` DB 접속 성공, version PostgreSQL 18.4 확인.
+
+### 6. 1차 restore 실패와 옵션 보정
+
+- 1차 시도 결과: `role "postgres" does not exist` 오류. 원인은 로컬 dump의 object owner가 `postgres`인데 RDS에는 `postgres` role이 없기 때문으로 판단.
+- 보정: `portfolio` DB를 drop / recreate 후 `pg_restore --no-owner --no-privileges` 옵션으로 재실행.
+- 결과: 에러 없이 완료. RDS 객체 owner는 restore 실행 계정(`portfolio_admin`) 기준으로 정리됐다.
+
+### 7. 정합성 검증
+
+- schema별 table count 81개 일치. table / index / sequence / FK(33) / trigger(23) / table별 row count clean CSV 82줄 모두 로컬 기준선과 diff 0.
+- CRLF / LF 차이는 `--strip-trailing-cr` 옵션으로 정규화한 뒤 비교했다.
+
+### 8. 본 세션 안전 제약 / 민감정보 점검
+
+- 실제 password / secret value / endpoint hostname / account-id / 계좌번호 / token / app key / app secret / webhook URL 신규 기록 없음. 모두 `[REDACTED]` 또는 placeholder만 사용.
+- AWS 리소스 변경: 운영자가 직접 진행한 EC2 신규 생성과 기존 RDS 삭제 / 재생성. Kiro는 본 작업으로 AWS 리소스를 변경하지 않았다.
+- 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 없음.
+- 본 작업 산출물 갱신 대상: 본 파일 + [`./validation-checklist.md`](./validation-checklist.md). 결정 변경(legacy 미부여 / marketconnector_app execution R-only / view_app execution R-only / REASSIGN OWNED 미실행)은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-DB-007 ~ OD-DB-010에 별도 누적했다.
+
+### 9. 교훈 / 후속 권고
+
+- PostgreSQL major version mismatch는 시작 단계에서 dump의 `pg_restore --list` 출력과 RDS engine version을 비교해 사전 차단한다(R-DATA-003).
+- private RDS는 로컬에서 직접 접속하지 않는다. 항상 EC2 + SSM Session Manager 또는 EIP 기반 restore runner 경유로 접속한다(R-NET-004).
+- dump owner role과 RDS role이 다르면 `--no-owner --no-privileges`로 우회하고, 권한 / owner 정리는 별도 SQL(본 spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md))로 진행한다(R-DATA-004).
+- 1차 적용에서 `REASSIGN OWNED BY portfolio_admin TO portfolio_owner`를 실행하지 않았으므로, 새 객체에는 default privileges가 자동 적용되지만 기존 객체는 적용되지 않는다. 추가 이관 여부는 운영자 결정으로 후속 분리 관리한다.

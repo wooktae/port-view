@@ -18,13 +18,13 @@
 ## 1. Pre-flight Checklist
 
 - <span style="color:red">[O]</span> AWS Region이 `ap-northeast-2`인지 확인 — 본 검증의 모든 AWS API 호출이 `ap-northeast-2` region에서 정상 응답
-- <span style="color:red">[O]</span> aws-paper 대상 작업인지 확인 (OD-ENV-003) — `../operator-decisions.md` At a Glance에 OD-ENV-003 = `aws-paper` 🟢 확정으로 등록되어 있고, 본 spec(02) requirements / design / runbook 모두 aws-paper를 1차 적용 환경으로 일관되게 명시(불일치 0건)
+- <span style="color:red">[O]</span> aws-paper 대상 작업인지 확인 (OD-ENV-003) — `../_common/operator-decisions.md` At a Glance에 OD-ENV-003 = `aws-paper` 🟢 확정으로 등록되어 있고, 본 spec(02) requirements / design / runbook 모두 aws-paper를 1차 적용 환경으로 일관되게 명시(불일치 0건)
 - <span style="color:red">[O]</span> 본 작업이 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog를 수정하지 않는지 확인 — 8개 워크스페이스 `git status --short` 결과 모두 무변경. port-view 내부도 `.kiro/` 외 변경 없음
 - <span style="color:red">[O]</span> 실제 secret 값이 본 spec / 운영자 노트 / 콘솔 캡처에 노출되지 않았는지 확인 — repo 안 grep은 §9에서 다룸. 콘솔 캡처 / 외부 노트 / 개인 PC 파일 등 외부 영역은 운영자만 점검 가능 -> 확인 완료
 - <span style="color:red">[O]</span> 비용 발생 리소스(VPC Endpoint, RDS, EIP) 생성 전 운영자 승인 여부 확인 (R-COST-001) -> 확인 완료
-- <span style="color:red">[O]</span> [`../operator-decisions.md`](../operator-decisions.md) `At a Glance`의 핵심 결정 락 상태 확인 (OD-NET-001 / OD-NET-005 / OD-NET-009 / OD-RDS-001 / OD-CUT-001) — 사람의 인지 자체는 운영자 직접 확인 -> 확인 완료
+- <span style="color:red">[O]</span> [`../_common/operator-decisions.md`](../_common/operator-decisions.md) `At a Glance`의 핵심 결정 락 상태 확인 (OD-NET-001 / OD-NET-005 / OD-NET-009 / OD-RDS-001 / OD-CUT-001) — 사람의 인지 자체는 운영자 직접 확인 -> 확인 완료
 - <span style="color:red">[O]</span> [`./decision-matrix.md`](./decision-matrix.md) 비용 프로파일 라인(low / realistic / stable) 결정 기록 존재 — operation-notes의 `aws-paper low 적용` 라인으로 확인
-- <span style="color:red">[O]</span> [`../risk-register.md`](../risk-register.md)의 R-NET-001 ~ R-COST-002 항목 인지 — 사람 인지 항목 -> 확인 완료
+- <span style="color:red">[O]</span> [`../_common/risk-register.md`](../_common/risk-register.md)의 R-NET-001 ~ R-COST-002 항목 인지 — 사람 인지 항목 -> 확인 완료
 
 ## 2. Network Validation
 
@@ -99,14 +99,14 @@
 
 ## 6. DB / schema / role 준비 Validation
 
-본 spec은 SQL 실행을 운영자에게 위임한다. 본 섹션은 SQL이 실행된 경우(03 / 06 spec과 통합) 점검 항목이다. 현 시점은 SQL 미실행이므로 모두 운영자 합의 / 사람 결정 항목.
+본 spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 SQL을 운영자가 실행했고, §5 검증 SQL로 결과를 확인했다. 상세 실행 기록은 [`./operation-notes.md`](./operation-notes.md) `## 2026-06-09 DB Role / 권한 분리 1차 적용` 섹션 참조.
 
-- <span style="color:black">[운영자 확인 필요]</span> `portfolio` 데이터베이스 생성 (psql `\l`로 확인) — 03 / 06 spec 진행 시점
-- <span style="color:black">[운영자 확인 필요]</span> 10개 schema 생성: `reference, interest, preprocessor, research, decision, execution, connector, ops, legacy, public`
-- <span style="color:black">[운영자 확인 필요]</span> 7개 role 생성: `marketconnector_app, crawler_app, preprocessor_app, decision_app, execution_app, research_app, view_app`
-- <span style="color:black">[운영자 확인 필요]</span> role별 schema 권한 매트릭스가 [`./design.md`](./design.md) 표와 일치
-- <span style="color:black">[운영자 확인 필요]</span> role별 search_path = 8개 MS README 정의대로 적용 (R-DATA-001)
-- <span style="color:black">[운영자 확인 필요]</span> role 비밀번호는 Secrets Manager / SSM SecureString placeholder만 기록 (`[REDACTED]`)
+- <span style="color:red">[O]</span> `portfolio` 데이터베이스 존재 확인 — restore 완료 시점에 존재. 본 세션 SQL 적용 대상
+- <span style="color:red">[O]</span> 10개 schema 존재 확인: `reference, interest, preprocessor, research, decision, execution, connector, ops, legacy, public` — §4.1 사전 점검에서 확인
+- <span style="color:red">[O]</span> 7개 app role 생성 완료: `marketconnector_app, crawler_app, preprocessor_app, decision_app, execution_app, research_app, view_app` — §5.1 결과 7행 모두 존재. 모두 LOGIN = true, SUPERUSER / CREATEDB / CREATEROLE / REPLICATION / BYPASSRLS = false 확인
+- <span style="color:red">[O]</span> role별 schema 권한 매트릭스가 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §2 표와 일치 — §5.2 schema USAGE / CREATE, §5.3 table / sequence 권한 요약 모두 불일치 0건. legacy USAGE는 7개 app role 모두 false 확인
+- <span style="color:red">[O]</span> role별 search_path = 8개 MS README 정의대로 적용 (R-DATA-001) — §5.1 search_path 결과가 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §3 표와 일치
+- <span style="color:black">[운영자 확인 필요]</span> role 비밀번호는 Secrets Manager / SSM SecureString placeholder만 기록 (`[REDACTED]`) — 정식 보관은 `06-secrets-and-iam` 진행 시점에 등록 후 본 항목을 [O]로 갱신
 
 ## 7. Cutover 사전 준비 Validation
 
@@ -130,8 +130,8 @@
 ## 9. Documentation Validation
 
 - <span style="color:red">[O]</span> 본 spec 4개 파일과 본 runbook / validation-checklist / traceability-matrix 모두 작성 완료 — 파일 시스템 직접 확인
-- <span style="color:red">[O]</span> [`../operator-decisions.md`](../operator-decisions.md)의 본 spec 관련 결정 상태 일치 — Kiro가 두 문서를 비교한 결과, OD-ENV-003 aws-paper / OD-ENV-005 단일 VPC / OD-NET-001 paper NAT 미사용 / OD-NET-005 권고 endpoint 5종 / OD-NET-009 SSM only / OD-RDS-001 db.t4g.small single-AZ / OD-RDS-004 PG16 / OD-RDS-006 backup 7일 / OD-RDS-008 PITR on / OD-DB-001~006 portfolio + schema-per-domain + role 7개 / OD-CUT-001 pg_dump+pg_restore / OD-SAFE-001~004 모두 본 spec design / runbook과 일관(불일치 0건)
-- <span style="color:red">[O]</span> [`../risk-register.md`](../risk-register.md)의 R-NET / R-SEC / R-DATA / R-COST 항목 mitigation 점검 완료 — Kiro가 risk row별 mitigation 본문과 본 spec 통제를 비교한 결과 일관(R-NET-001 = sgroup-* inbound 비어 있음, R-NET-002 = OPT-1 매핑, R-NET-003 = endpoint 5종 available, R-SEC-001 = sgroup-rds-postgres SG 참조 inbound + RDS public access No, R-DATA-001 = role search_path 정책 / R-DATA-002 = pg_dump options 합의 항목, R-AUTO-001~002 = OD-SAFE-* state machine 정책, R-DOCS-001 = `[REDACTED]` grep 0건, R-COST-001~002 = NAT / ALB 0건 + Endpoint 권고 세트). R-SEC-002 / R-SEC-003은 02 runbook Step 0 portadmin 흐름과 일관
+- <span style="color:red">[O]</span> [`../_common/operator-decisions.md`](../_common/operator-decisions.md)의 본 spec 관련 결정 상태 일치 — Kiro가 두 문서를 비교한 결과, OD-ENV-003 aws-paper / OD-ENV-005 단일 VPC / OD-NET-001 paper NAT 미사용 / OD-NET-005 권고 endpoint 5종 / OD-NET-009 SSM only / OD-RDS-001 db.t4g.small single-AZ / OD-RDS-004 PG16 / OD-RDS-006 backup 7일 / OD-RDS-008 PITR on / OD-DB-001~006 portfolio + schema-per-domain + role 7개 / OD-CUT-001 pg_dump+pg_restore / OD-SAFE-001~004 모두 본 spec design / runbook과 일관(불일치 0건)
+- <span style="color:red">[O]</span> [`../_common/risk-register.md`](../_common/risk-register.md)의 R-NET / R-SEC / R-DATA / R-COST 항목 mitigation 점검 완료 — Kiro가 risk row별 mitigation 본문과 본 spec 통제를 비교한 결과 일관(R-NET-001 = sgroup-* inbound 비어 있음, R-NET-002 = OPT-1 매핑, R-NET-003 = endpoint 5종 available, R-SEC-001 = sgroup-rds-postgres SG 참조 inbound + RDS public access No, R-DATA-001 = role search_path 정책 / R-DATA-002 = pg_dump options 합의 항목, R-AUTO-001~002 = OD-SAFE-* state machine 정책, R-DOCS-001 = `[REDACTED]` grep 0건, R-COST-001~002 = NAT / ALB 0건 + Endpoint 권고 세트). R-SEC-002 / R-SEC-003은 02 runbook Step 0 portadmin 흐름과 일관
 - <span style="color:red">[O]</span> [`./traceability-matrix.md`](./traceability-matrix.md) Requirement → Design → Task → Decision 매핑 완성 — 직전 세션에서 매핑 완성 + Step 재번호에 맞춰 동기화됨
 - <span style="color:red">[O]</span> 모든 secret 자리에 `[REDACTED]`만 사용. 실제 값 노출 없음 (R-DOCS-001) — `.kiro/**/*.md` 트리에 대한 grep 결과 (AKIA|ASIA)access key id / Slack incoming webhook URL / JWT(eyJ...) / `(PASSWORD|SECRET|TOKEN|APP_KEY|APP_SECRET)=값` / `aws_secret_access_key=값` / `KIS*KEY|SECRET|TOKEN=값` / 계좌번호 평문 패턴 모두 0건. 콘솔 캡처 / 외부 노트 / 개인 PC 파일 / repo 외부 영역은 [운영자 확인 필요](§1)에서 분리 관리
 
@@ -150,11 +150,41 @@
 - <span style="color:red">[O]</span> Rollback 미수행 — AWS Billing 일별 비용은 현재 정상 운영 라인이 유지되는 것이 정상
 - <span style="color:red">[O]</span> Rollback 미수행 — 본 시점에는 rollback 사유 / 일자 / 다음 시도 계획 기록 불필요. 향후 rollback 실행 시 운영자 노트에 기록
 
+## 11. DB Role 권한 매트릭스 Validation
+
+본 섹션은 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 SQL 적용 후 §5 검증 SQL과 §5.4 connection 검증으로 확인한 결과를 라벨로 정리한다. 상세 실행 기록은 [`./operation-notes.md`](./operation-notes.md) `## 2026-06-09 DB Role / 권한 분리 1차 적용` 섹션 참조.
+
+- <span style="color:red">[O]</span> `portfolio_owner` 생성 완료(NOLOGIN). `portfolio_admin`에 `portfolio_owner` 멤버십 부여 완료 — §5.1 query 결과 row 존재 확인
+- <span style="color:red">[O]</span> 9개 도메인 schema(`reference, interest, preprocessor, research, decision, execution, connector, ops, legacy`) owner = `portfolio_owner` 이관 완료 — `public`은 변경하지 않음
+- <span style="color:black">[운영자 확인 필요]</span> 기존 table / sequence / index의 owner는 `portfolio_admin`으로 남아 있음 — `REASSIGN OWNED BY portfolio_admin TO portfolio_owner`는 본 세션 미실행. 후속 운영자 결정으로 일괄 이관 여부 분리 관리(현 시점에는 §4.4 명시 GRANT로 권한 매트릭스 적용 완료, §4.5 default privileges는 이후 새 객체에만 자동 적용)
+- <span style="color:red">[O]</span> 7개 app role 생성 + DB CONNECT + public USAGE 부여 완료 (§4.3 SQL 적용 결과)
+- <span style="color:red">[O]</span> §5.1 7개 app role 모두 LOGIN = true, SUPERUSER / CREATEDB / CREATEROLE / REPLICATION / BYPASSRLS = false
+- <span style="color:red">[O]</span> §5.1 7개 app role의 `search_path`가 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §3 표와 일치
+- <span style="color:red">[O]</span> §5.2 schema USAGE / CREATE 매트릭스 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §2 표와 불일치 0건. 모든 app role의 `legacy` USAGE = false
+- <span style="color:red">[O]</span> §5.3 table 권한 요약 / sequence 권한 요약 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §2 표와 불일치 0건
+- <span style="color:red">[O]</span> §5.4 `marketconnector_app` 접속 검증 — 접속 성공. `connector` 조회 성공, `execution` 조회 성공, `legacy` USAGE = false. `execution` INSERT/UPDATE/DELETE → permission denied 정상(read only 의도와 일치)
+- <span style="color:red">[O]</span> §5.4 `execution_app` 접속 검증 — 접속 성공. `execution` / `decision` / `connector` 조회 성공, `legacy` USAGE = false. `execution` INSERT/UPDATE/DELETE 성공(R/W 의도와 일치)
+- <span style="color:red">[O]</span> §5.4 `view_app` 접속 검증 — 접속 성공. `execution` / `connector` / `decision` 조회 성공, `legacy` USAGE = false. `execution` INSERT/UPDATE/DELETE → permission denied 정상(view write 범위는 현재 `ops` 한정)
+- <span style="color:black">[운영자 확인 필요]</span> 7개 app role 비밀번호의 Secrets Manager / SSM SecureString 정식 등록 — `06-secrets-and-iam` 진행 시점에 등록 후 [O]로 갱신
+- <span style="color:red">[O]</span> 매트릭스 변경(legacy 미부여, `marketconnector_app` execution R only 축소)을 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-DB 카테고리에 갱신 완료 — OD-DB-007 / OD-DB-008 / OD-DB-009 / OD-DB-010 추가
+
+## 12. RDS Restore Validation (Local → aws-paper)
+
+본 섹션은 2026-06-09 운영자가 직접 수행한 Local PostgreSQL → aws-paper RDS migration 결과를 라벨로 정리한다. 상세 실행 기록은 [`./operation-notes.md`](./operation-notes.md) `## 2026-06-09 Local → RDS Migration & RDS 재생성 실행 기록` 섹션 참조.
+
+- <span style="color:red">[O]</span> 로컬 dump 파일 무결성 — `portfolio_full_20260609.dump`(format custom + gzip), 로컬 / S3 임시 bucket / MarketConnector EC2 3 곳 모두 422,334,494 bytes 일치
+- <span style="color:red">[O]</span> dump 메타데이터 — `pg_restore --list` TOC Entries 812, line count 823, dump source PostgreSQL 18.1
+- <span style="color:red">[O]</span> RDS engine version — major version mismatch 회피 결정에 따라 RDS 재생성. 신규 RDS engine = PostgreSQL 18.4, initial DB = `portfolio`, Public access = No 유지
+- <span style="color:red">[O]</span> Restore Runner 경로 — Local Windows PC → S3 임시 bucket → MarketConnector EC2(Amazon Linux 2023, public subnet, EIP attach) → private RDS. 로컬 PC IP는 RDS SG에 직접 허용하지 않음
+- <span style="color:red">[O]</span> 1차 `role "postgres" does not exist` 오류 처리 — DB drop / recreate 후 `pg_restore --no-owner --no-privileges`로 재실행. 에러 없이 완료. RDS 객체 owner는 restore 실행 계정(`portfolio_admin`) 기준
+- <span style="color:red">[O]</span> 정합성 — schema별 table count 81개 일치, table / index / sequence / FK 33개 / trigger 23개 / table별 row count clean CSV 82줄 모두 로컬 기준선과 diff 0(CRLF / LF는 `--strip-trailing-cr` 정규화 후 비교)
+- <span style="color:red">[O]</span> 민감정보 미기록 — 본 검증 결과에 RDS endpoint hostname / password / secret value / account-id / 계좌번호 / token 신규 기록 없음. `[REDACTED]` 또는 placeholder만 사용
+
 ## 본 체크리스트 작업 안전 제약
 
 - 본 점검은 운영자가 직접 확인하거나 ReadOnly IAM([`../../docs/kiro-readonly-validator-iam.md`](../../docs/kiro-readonly-validator-iam.md))으로 자동 검증한다. 콘솔 출력 캡처 시 secret / endpoint 호스트 prefix는 마스킹.
 - 8개 MS 소스 / 문서 수정 없음.
 - 실제 AWS 리소스 변경은 [`./runbook.md`](./runbook.md)으로만 진행. 본 체크리스트는 점검 전용.
-- 결정값 변경 필요 시 본 문서가 아니라 [`../operator-decisions.md`](../operator-decisions.md)에 변경 제안 기록.
+- 결정값 변경 필요 시 본 문서가 아니라 [`../_common/operator-decisions.md`](../_common/operator-decisions.md)에 변경 제안 기록.
 - secret value는 절대 조회하지 않는다(GetSecretValue 금지). DescribeSecret metadata만 사용한다.
 - account-id, RDS endpoint hostname, secret ARN, access key id는 본 문서에 기록하지 않는다. 이미 운영자 노트에 적힌 내부 식별자는 외부 공개 전 운영자가 직접 마스킹한다.

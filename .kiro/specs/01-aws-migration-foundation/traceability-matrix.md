@@ -9,7 +9,7 @@
 - Design Section: `01-aws-migration-foundation/design.md`의 섹션 제목.
 - Task ID: `01-aws-migration-foundation/tasks.md`의 task 번호.
 - Validation / Evidence: 본 spec은 문서 산출물 spec이라 evidence는 문서 작성 / 표 확정 / `git status`. 후속 spec에서 실행되는 검증은 해당 spec의 validation-checklist에 위임.
-- Related Decision ID: `../operator-decisions.md`의 Decision ID.
+- Related Decision ID: `../_common/operator-decisions.md`의 Decision ID.
 
 ## 매핑 표
 

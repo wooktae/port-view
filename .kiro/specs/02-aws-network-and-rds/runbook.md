@@ -7,7 +7,7 @@
 선행 입력
 
 - [`./requirements.md`](./requirements.md), [`./design.md`](./design.md), [`./tasks.md`](./tasks.md), [`./decision-matrix.md`](./decision-matrix.md)
-- [`../operator-decisions.md`](../operator-decisions.md), [`../aws-resource-glossary.md`](../aws-resource-glossary.md), [`../cost-simulation.md`](../cost-simulation.md), [`../risk-register.md`](../risk-register.md)
+- [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/aws-resource-glossary.md`](../_common/aws-resource-glossary.md), [`../_common/cost-simulation.md`](../_common/cost-simulation.md), [`../_common/risk-register.md`](../_common/risk-register.md)
 - [`./validation-checklist.md`](./validation-checklist.md), [`./traceability-matrix.md`](./traceability-matrix.md)
 
 보안 / 안전 원칙
@@ -146,14 +146,14 @@
 
 ### 사전 확인
 
-- [`../operator-decisions.md`](../operator-decisions.md) 핵심 결정 락 상태 확인.
+- [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 핵심 결정 락 상태 확인.
 - 비용 발생 여부: 0 (문서 점검).
 
 ### AWS Console 작업 순서
 
 본 Step은 콘솔 작업이 아닌 문서 검토.
 
-1. [`../operator-decisions.md`](../operator-decisions.md) `At a Glance` 섹션에서 다음 항목 확인:
+1. [`../_common/operator-decisions.md`](../_common/operator-decisions.md) `At a Glance` 섹션에서 다음 항목 확인:
    - OD-ENV-003 1차 환경 = aws-paper 🟢
    - OD-NET-001 paper NAT Gateway = 미사용 🟢
    - OD-NET-005 VPC Endpoint 권고 세트 활성 🟢
@@ -170,7 +170,7 @@
 
 ### 실패 시 조치
 
-- 결정과 본 runbook이 다르면 본 runbook을 진행하지 말고 [`../operator-decisions.md`](../operator-decisions.md) 갱신부터 진행.
+- 결정과 본 runbook이 다르면 본 runbook을 진행하지 말고 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 갱신부터 진행.
 - 결정 변경이 필요해 보이면 본 runbook에서 임의로 진행하지 말고 변경 제안만 기록.
 
 ## Step 3. CIDR / AZ 확정 [확인]
@@ -342,7 +342,7 @@
 ### 실패 시 조치
 
 - 의도치 않은 NAT 리소스 발견 시 운영자 결정으로 즉시 삭제(R-COST-002).
-- NAT가 꼭 필요하다는 결정 변경이 필요하다면 본 runbook 진행을 중단하고 [`../operator-decisions.md`](../operator-decisions.md) OD-NET-001/002 갱신부터.
+- NAT가 꼭 필요하다는 결정 변경이 필요하다면 본 runbook 진행을 중단하고 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-NET-001/002 갱신부터.
 
 ## Step 8. Route Table 생성 및 Subnet 연결 [실행]
 
@@ -876,7 +876,7 @@
 ### 실패 시 조치
 
 - 통과 못 한 항목별로 Step 4 ~ 15 재작업.
-- 비용 / 보안 항목 통과 못 하면 본 runbook 진행을 멈추고 [`../operator-decisions.md`](../operator-decisions.md) 검토부터.
+- 비용 / 보안 항목 통과 못 하면 본 runbook 진행을 멈추고 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 검토부터.
 
 ## Step 19. Rollback 순서 (필요 시) [복구]
 
@@ -928,10 +928,51 @@
 
 본 Step은 IAM `portadmin` 사용자 / 정책 / Root 보안 강화는 되돌리지 않는다. portadmin 사용자 자체를 제거할 필요가 있으면 별도 결정으로만 처리한다.
 
+## 부록 A. RDS Restore Runner & DB Role / 권한 적용 교훈 (2026-06-09 실적 기반)
+
+본 부록은 2026-06-09 운영자가 실제 수행한 Local PostgreSQL → aws-paper RDS migration과 DB Role / 권한 1차 적용 결과를 후속 운영에서 재사용하기 위한 짧은 교훈 모음이다. 결정값 / 기존 Step 번호는 변경하지 않는다. 상세 실행 기록은 [`./operation-notes.md`](./operation-notes.md)와 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) 참조.
+
+### A-1. PostgreSQL major version mismatch 회피
+
+- dump 시작 전에 `pg_dump --version` 그리고 dump 파일에 대해 `pg_restore --list` 첫 줄 또는 `head -c` 메타데이터로 dump source major version을 확인한다.
+- RDS engine major version과 다르면 restore 전에 RDS major version을 dump source 이상으로 맞춘다(R-DATA-003).
+- 2026-06-09 실적: dump source PostgreSQL 18.1 → 기존 RDS PG 16.14 부적합 → RDS를 PG 18.4로 재생성 후 진행.
+
+### A-2. Private RDS는 EC2 / SSM 경유로만 접속
+
+- RDS Public access = No 정책(R-SEC-001) 유지를 위해 로컬 PC IP를 RDS SG에 직접 허용하지 않는다.
+- restore runner는 같은 VPC에 배치된 EC2(예: aws-paper MarketConnector EC2) 또는 임시 EC2를 사용한다. 운영자 접속은 EC2 Instance Connect 또는 SSM Session Manager(OD-NET-009)를 우선한다.
+- 2026-06-09 실적: aws-paper MarketConnector EC2(Amazon Linux 2023, public subnet, EIP attach)를 restore runner로 사용. 로컬 PC → S3 임시 bucket → EC2 → private RDS 경로로 dump 파일 전송.
+
+### A-3. PostgreSQL client / dump archive 호환
+
+- pg_restore archive format의 호환성을 위해 client 버전을 dump source 이상으로 맞춘다.
+- 2026-06-09 실적: 처음 PG 15.18 client에서 archive header version 불일치 확인 → 18.4 client로 전환 후 정상 동작.
+
+### A-4. dump owner role과 RDS role 불일치 처리
+
+- dump의 object owner가 RDS에 존재하지 않는 role이면 `role "X" does not exist` 오류로 restore가 멈춘다(R-DATA-004).
+- 권고 옵션: `pg_restore --no-owner --no-privileges`로 owner / 권한 정보를 무시하고 데이터만 복원한 뒤, [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 SQL로 owner / 권한을 재구성한다.
+- 2026-06-09 실적: 1차 시도 `role "postgres" does not exist` → DB drop / recreate 후 `--no-owner --no-privileges`로 재실행하여 성공.
+
+### A-5. owner 이관은 schema 단위와 객체 단위를 분리해 결정
+
+- 본 spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4.2 절차대로 `portfolio_owner` 생성 → `portfolio_admin`에 멤버십 부여 → 9개 도메인 schema owner를 `portfolio_owner`로 이관한다(public은 변경하지 않음).
+- 기존 table / sequence / index의 owner는 별도 결정(OD-DB-010)으로 1차 적용에서 `REASSIGN OWNED BY portfolio_admin TO portfolio_owner`를 실행하지 않을 수 있다. 그 경우 §4.5 default privileges는 새 객체에만 자동 적용되며, 기존 객체에는 §4.4 명시 GRANT만 적용된 상태로 운영한다.
+- 2026-06-09 실적: schema owner 이관 완료, 기존 객체 owner는 `portfolio_admin` 유지, REASSIGN 미실행. 후속 결정으로 일괄 이관 여부 분리 관리.
+
+### A-6. 정합성 검증 비교 시 줄바꿈 정규화
+
+- 로컬과 RDS의 row count CSV / object count snapshot을 diff할 때 CRLF / LF 차이로 false-positive가 자주 발생한다.
+- `diff --strip-trailing-cr` 또는 `git diff --ignore-cr-at-eol` 같이 줄바꿈을 정규화한 비교를 권장한다.
+- 2026-06-09 실적: schema / table / index / sequence / FK / trigger / row count 모두 정규화 비교 후 diff 0.
+
+본 부록의 운영 실적은 03 / 06 spec과 [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook)(예정) 작성 시 입력으로 활용한다.
+
 ## 본 runbook 작업 안전 제약
 
 - 실제 AWS 리소스 생성 / 변경은 운영자 직접 수행. 본 문서는 절차 안내일 뿐 자동 실행하지 않는다.
 - 8개 MS의 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 금지.
 - broker / KIS / Selenium / KRX / Naver / yfinance / RDS DDL/DML / 주문 / 체결 / Daily Batch / intraday monitor 호출 금지.
 - 모든 secret은 `[REDACTED]` 또는 placeholder만 사용. portadmin 비밀번호 / MFA 시리얼 / 백업 코드는 본 문서 / 노트 어디에도 평문 기록 금지.
-- 결정값을 임의로 바꾸지 않는다. 변경이 필요하면 [`../operator-decisions.md`](../operator-decisions.md)에 변경 제안만 기록.
+- 결정값을 임의로 바꾸지 않는다. 변경이 필요하면 [`../_common/operator-decisions.md`](../_common/operator-decisions.md)에 변경 제안만 기록.

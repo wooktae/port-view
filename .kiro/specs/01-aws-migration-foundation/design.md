@@ -375,7 +375,7 @@
 - CloudWatch Logs / Metrics / Alarms: low ~ medium(retention에 따라).
 - Secrets Manager: secret 수 × 월 단가, low.
 - 본 spec은 실제 가격 대신 low / medium / high 추정만 제시. 정확 추정은 후속 spec.
-- 환경별(dev / paper / live) 월 비용 시뮬레이션과 NAT Gateway 사용 여부 비교, 두 가지 마이그레이션 권고안(최소 비용 paper 검증형 / 운영 안정성 우선형)은 루트 공통 문서 [cost-simulation.md](../cost-simulation.md) 참고.
+- 환경별(dev / paper / live) 월 비용 시뮬레이션과 NAT Gateway 사용 여부 비교, 두 가지 마이그레이션 권고안(최소 비용 paper 검증형 / 운영 안정성 우선형)은 루트 공통 문서 [cost-simulation.md](../_common/cost-simulation.md) 참고.
 
 ### 단계적 cutover 로드맵
 

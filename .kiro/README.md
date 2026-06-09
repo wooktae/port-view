@@ -36,20 +36,24 @@
     │   ├── tasks.md
     │   └── traceability-matrix.md
     ├── 02-aws-network-and-rds/
+    │   ├── README.md
     │   ├── requirements.md
     │   ├── design.md
     │   ├── tasks.md
     │   ├── decision-matrix.md
     │   ├── runbook.md
     │   ├── validation-checklist.md
+    │   ├── operation-notes.md
     │   └── traceability-matrix.md
-    ├── operator-decisions.md
-    ├── ms-aws-service-decision-matrix.md
-    ├── cost-simulation.md
-    ├── followups-overview.md
-    ├── aws-resource-glossary.md
-    ├── risk-register.md
-    └── note-aws-landscape-2021-vs-2026.md
+    ├── _common/
+    │   ├── operator-decisions.md
+    │   ├── ms-aws-service-decision-matrix.md
+    │   ├── cost-simulation.md
+    │   ├── followups-overview.md
+    │   ├── aws-resource-glossary.md
+    │   └── risk-register.md
+    └── _archive/
+        └── note-aws-landscape-2021-vs-2026.md
 ```
 
 ## 주요 파일
@@ -64,13 +68,13 @@
 
 `specs/` 아래의 다음 문서는 모든 spec이 공유하는 단일 기준 문서다. 새 spec을 만들거나 기존 spec을 수정하기 전에 항상 먼저 확인한다.
 
-- `specs/operator-decisions.md` — 운영자 결정사항의 단일 기준 문서. 환경, 네트워크, RDS, DB schema/role, compute/service placement, security, observability, cutover, safety 결정을 누적 관리한다.
-- `specs/ms-aws-service-decision-matrix.md` — 8개 MS별 AWS 서비스 권고와 판단 근거의 단일 기준 문서. 컴퓨트, orchestration 1순위 결정의 비교 표를 담는다.
-- `specs/cost-simulation.md` — 비용 가정, 환경별 월 예상 비용의 단일 기준 문서. RDS 크기, VPC Endpoint 수, ALB/NAT 사용 여부, Fargate 사용량 가정을 정리한다.
-- `specs/followups-overview.md` — 후속 spec(03 ~ 10) 진행 순서와 의존성 맵의 단일 기준 문서.
-- `specs/aws-resource-glossary.md` — AWS 용어 설명의 단일 기준 문서.
-- `specs/risk-register.md` — AWS Migration 운영 / 보안 / 비용 리스크의 단일 누적 기록 문서. 후속 spec(03 ~ 10)에서 새 리스크가 식별되면 동일 형식으로 누적.
-- `specs/note-aws-landscape-2021-vs-2026.md` — 2021년 AWS 구성과 2026년 권고안 비교 노트.
+- `specs/_common/operator-decisions.md` — 운영자 결정사항의 단일 기준 문서. 환경, 네트워크, RDS, DB schema/role, compute/service placement, security, observability, cutover, safety 결정을 누적 관리한다.
+- `specs/_common/ms-aws-service-decision-matrix.md` — 8개 MS별 AWS 서비스 권고와 판단 근거의 단일 기준 문서. 컴퓨트, orchestration 1순위 결정의 비교 표를 담는다.
+- `specs/_common/cost-simulation.md` — 비용 가정, 환경별 월 예상 비용의 단일 기준 문서. RDS 크기, VPC Endpoint 수, ALB/NAT 사용 여부, Fargate 사용량 가정을 정리한다.
+- `specs/_common/followups-overview.md` — 후속 spec(03 ~ 10) 진행 순서와 의존성 맵의 단일 기준 문서.
+- `specs/_common/aws-resource-glossary.md` — AWS 용어 설명의 단일 기준 문서.
+- `specs/_common/risk-register.md` — AWS Migration 운영 / 보안 / 비용 리스크의 단일 누적 기록 문서. 후속 spec(03 ~ 10)에서 새 리스크가 식별되면 동일 형식으로 누적.
+- `specs/_archive/note-aws-landscape-2021-vs-2026.md` — 2021년 AWS 구성과 2026년 권고안 비교 노트.
 
 ## Spec 보조 문서 (runbook / validation / traceability / risk)
 
