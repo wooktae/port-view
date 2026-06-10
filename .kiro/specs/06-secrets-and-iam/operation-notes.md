@@ -1,0 +1,115 @@
+# Operation Notes — 06-secrets-and-iam
+
+본 문서는 06-secrets-and-iam 진행 중 운영자 / Kiro 가 실제 수행한 작업 결과를 일자별로 누적 기록하는 운영 노트다. 1차 적용 환경은 `aws-paper`, region 은 `ap-northeast-2`, 1차 적용 대상은 MarketConnector EC2.
+
+기록 형식
+
+- 일자별 `## YYYY-MM-DD <요약>` 헤더로 누적한다(02 spec operation-notes 와 동일).
+- 항목 끝 `[운영자 기록]` 자리는 운영자가 실제 작업 후 결과(`성공` / `실패` / `보류` / `해당 없음`)를 짧게 채운다.
+- 실패 / 보류 시에는 1줄 사유만 적는다. JSON 본문 / 에러 메시지 전체 인용 금지(보안 / 분량 절감).
+- IAM Role / Policy 변경은 변경 일자 / 변경자 / 변경 사유 / 변경 전·후 항목 요약(JSON 본문 전체 인용 금지) 4줄로 요약한다.
+
+안전 원칙
+
+- 실제 secret value, KIS app key, KIS app secret, 계좌번호, RDS endpoint hostname, RDS password, token, Slack webhook URL, IAM access key id, account-id, 실제 secret ARN, 실제 KMS Key ARN 은 본 문서에 평문 기록 금지. 모두 `[REDACTED]` 또는 placeholder.
+- secret 조회 결과 자체(value)는 기록 금지. `성공 / 실패` 와 마지막 갱신 시각(필요 시 ISO 8601 `YYYY-MM-DDTHH:MM:SS+09:00`)만 기록.
+- 실제 AWS 리소스 생성 / 수정 / 삭제는 운영자가 직접 수행한다. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행한다.
+- 8개 MS(`port-view`, `port-marketconnector`, `port-interest-crawler`, `port-interest-preprocessor`, `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research`) 의 README / AGENTS.md / CHANGELOG / docs / worklog / 소스 코드 미수정.
+- `secretsmanager:GetSecretValue` 실호출은 운영자만. Kiro 자동 검증은 `secretsmanager:DescribeSecret` metadata 만.
+
+## 2026-06-10 06-secrets-and-iam 문서화 진행
+
+- [`./requirements.md`](./requirements.md) 생성 완료
+- [`./README.md`](./README.md) 생성 완료
+- [`./design.md`](./design.md) 생성 완료
+- [`./tasks.md`](./tasks.md) 생성 완료
+- [`./runbook.md`](./runbook.md) 생성 완료
+- [`./validation-checklist.md`](./validation-checklist.md) 생성 완료
+- [`./operation-notes.md`](./operation-notes.md) 생성 완료
+
+본 일자에는 AWS 리소스 생성 / 수정 / 삭제 0건. 8개 MS 코드 / 문서 변경 0건. 외부 API 호출 0건. 본 spec 폴더 안 7개 문서만 신규 생성.
+
+## 2026-06-10 실제 AWS 작업 기록 템플릿
+
+운영자가 [`./runbook.md`](./runbook.md) 단계를 실제 수행한 뒤 본 섹션을 채운다. 각 항목 끝의 `[운영자 기록]` 자리에 결과만 적는다(secret value / 계좌번호 / endpoint hostname / account-id / 실제 ARN 미기록).
+
+### 1. Secrets Manager
+
+- `/portfolio/paper/marketconnector/kis-app-key` 생성 여부: [운영자 기록]
+- `/portfolio/paper/marketconnector/kis-app-secret` 생성 여부: [운영자 기록]
+- `/portfolio/paper/marketconnector/paper-account` 생성 여부 (JSON multi-key `PAPER_ACNT` / `ACNT_PRDT_CD`): [운영자 기록]
+- `/portfolio/paper/rds/marketconnector-app` 생성 여부 (JSON multi-key `host` / `port` / `dbname` / `username` / `password`): [운영자 기록]
+- 기존 `/portfolio/paper/rds/master` 유지 여부 (이름 / KMS / 마지막 수정 시각이 02 spec 시점과 일치): [운영자 기록]
+- 위 5건 외 신규 secret 추가 등록 여부 (있다면 0건이 정상): [운영자 기록]
+- 실제 secret value 본 문서 / 콘솔 캡처 / 운영자 노트 평문 기록 0건 확인: [운영자 기록]
+
+### 2. SSM Parameter Store
+
+- `/portfolio/paper/marketconnector/kis-base-url` 생성 여부: [운영자 기록]
+- `/portfolio/paper/marketconnector/connector-host` 생성 여부: [운영자 기록]
+- `/portfolio/paper/marketconnector/connector-port` 생성 여부: [운영자 기록]
+- `/portfolio/paper/marketconnector/connector-debug` 생성 여부: [운영자 기록]
+- `/portfolio/paper/marketconnector/environment` 생성 여부 (Value=`paper`): [운영자 기록]
+- `/portfolio/paper/marketconnector/broker-name` 생성 여부: [운영자 기록]
+- parameter 이름 자체에 endpoint hostname / 계좌번호 / secret value / password / token 미포함 확인: [운영자 기록]
+
+### 3. IAM Role / Policy / Instance Profile
+
+- IAM Role `portfolio-paper-marketconnector-ec2-role` 생성 또는 확인 여부 (Trust Policy `Service: ec2.amazonaws.com`): [운영자 기록]
+- Instance Profile `portfolio-paper-marketconnector-ec2-profile` 생성 또는 확인 여부 (Role attach 포함): [운영자 기록]
+- 최소 read policy `portfolio-paper-marketconnector-ec2-readonly` 작성 / attach 여부: [운영자 기록]
+- EC2 instance 에 Instance Profile attach 여부 (`describe-iam-instance-profile-associations` 결과 일치): [운영자 기록]
+- Resource wildcard `"*"` 사용 0건 확인: [운영자 기록]
+- Action wildcard (`secretsmanager:*` / `ssm:*` / `*`) 0건 확인: [운영자 기록]
+- 다른 service prefix (`/portfolio/paper/view/*`, `/portfolio/paper/crawler/*` 등) Resource 0건 확인: [운영자 기록]
+- 다른 환경 prefix (`/portfolio/live/...`) Resource 0건 확인: [운영자 기록]
+- KMS Decrypt statement 적용 여부 (CMK 미사용 시 0건이 정상): [운영자 기록]
+
+### 4. EC2 검증
+
+- `aws sts get-caller-identity` 결과 `Arn` 이 `assumed-role/portfolio-paper-marketconnector-ec2-role/<instance-id>` 형태 확인 여부 (실제 account-id / instance-id 본 문서 기록 금지): [운영자 기록]
+- `aws configure list` 결과 access_key Source 가 `iam-role` 또는 `Ec2InstanceMetadata` 확인 여부: [운영자 기록]
+- `~/.aws/credentials` 미존재 확인 여부: [운영자 기록]
+- `~/.aws/config` 안 `aws_access_key_id` / `aws_secret_access_key` 라인 0건 확인 여부: [운영자 기록]
+- 현재 shell 의 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` 환경변수 미설정 확인 여부: [운영자 기록]
+- dotfile (`~/.bashrc` / `~/.profile` / `~/.bash_profile`) 안 access key export 0건 확인 여부: [운영자 기록]
+- Secrets Manager `describe-secret` 4건 metadata 정상 반환 여부 (value 미조회): [운영자 기록]
+- SSM `get-parameters-by-path /portfolio/paper/marketconnector` 6건 정상 반환 여부: [운영자 기록]
+- 다른 service prefix 조회 시 AccessDenied / NotFound (권한 격리 정상) 확인 여부: [운영자 기록]
+- 다른 환경 prefix (`/portfolio/live/...`) 조회 시 AccessDenied 확인 여부: [운영자 기록]
+
+### 5. Connector smoke test (조회성만)
+
+- 임시 export 스크립트 실행 후 `INTEREST_DB_*` / `APP_KEY` / `APP_SECRET` / `BASE_URL` / `PAPER_ACNT` / `ACNT_PRDT_CD` / `PORT_ENVIRONMENT` / `PORT_BROKER_NAME` 환경변수 주입 확인 여부 (값 표시 금지): [운영자 기록]
+- 임시 export 스크립트 / 환경변수 값 파일 / 로그 / 콘솔 캡처 평문 저장 0건 확인 여부: [운영자 기록]
+- RDS `marketconnector_app` 접속 성공 여부 (DDL/DML 미실행, 조회만): [운영자 기록]
+- KIS token 발급 또는 기존 `access_token.txt` 재사용 확인 여부 (token 값 표시 금지): [운영자 기록]
+- `connector_balance.py` 잔고 조회 성공 여부: [운영자 기록]
+- `connector_order_check.py` 주문 / 체결 조회 성공 여부: [운영자 기록]
+- Flask 조회성 endpoint smoke test 통과 여부 (잔고 / 보유 / 주문 내역 등): [운영자 기록]
+- 신규 주문 / 매수 / 매도 / 취소 / 정정 API 호출 0건 확인 여부 (`connector_buy.py`, `connector_sell.py`, `connector_cancel.py`, `connector_modify.py` 미실행): [운영자 기록]
+
+### 6. 미완료 / 이월
+
+- 미완료 항목: [운영자 기록]
+- 이월 항목 (다음 일자로 넘김): [운영자 기록]
+- 03-marketconnector-ec2 spec 으로 넘길 항목 (예: `AmazonSSMManagedInstanceCore` attach, CloudWatch Logs write 권한, systemd 정상 운영 모드 전환): [운영자 기록]
+- `_common` 갱신 후보 (operator-decisions.md OD-SEC-001 / OD-OBS-004 / OD-SEC-005 / OD-SEC-006, risk-register.md R-SEC 후보 4건, followups-overview.md 06 섹션) 진행 여부: [운영자 기록]
+
+## IAM 변경 기록 템플릿 (필요 시 일자별 추가)
+
+본 spec 의 Permission Policy / Trust Policy / Resource ARN 목록이 변경되는 경우 본 섹션에 누적 기록한다. 변경 1건 = 4줄 요약 형식.
+
+```
+## YYYY-MM-DD IAM 변경
+- 변경 일자: YYYY-MM-DDTHH:MM:SS+09:00
+- 변경자: [운영자 식별자(닉네임 / 직무)]  # 실제 IAM user / email 평문 금지
+- 변경 사유: [한 줄 요약]
+- 변경 전 / 후 항목 요약: [Resource 추가 / 삭제 항목 수, Action 추가 / 삭제 항목 수, KMS statement 추가 여부 등 — JSON 본문 전체 인용 금지]
+```
+
+## 후속 인계
+
+- 본 일자에 06 spec 의 7개 문서(`requirements.md`, `README.md`, `design.md`, `tasks.md`, `runbook.md`, `validation-checklist.md`, `operation-notes.md`) 가 모두 생성됨. 본 spec 의 문서상 닫힘 조건([`./tasks.md`](./tasks.md) task 22) 충족 — 단, 실제 AWS 리소스 작업과 검증 통과는 운영자 후속 작업.
+- 03-marketconnector-ec2 spec 진입 시 본 spec 의 §4 Instance Role 매트릭스, §5 Access Key 미사용 원칙, §6 ECS Task Role 골격, §7 OD 후보를 입력으로 받는다([`./tasks.md`](./tasks.md) task 23).
+- [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/risk-register.md`](../_common/risk-register.md), [`../_common/followups-overview.md`](../_common/followups-overview.md) 갱신은 운영자 승인 시 [`./tasks.md`](./tasks.md) task 16 / 17 / 18 에서 별도 진행.

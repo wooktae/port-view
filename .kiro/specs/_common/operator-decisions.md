@@ -25,9 +25,9 @@
 
 ### 결정 개수
 
-- 전체: 59건
+- 전체: 62건
 - 🟢 확정 (CONFIRMED): 42건
-- 🟡 잠정 (TENTATIVE): 14건
+- 🟡 잠정 (TENTATIVE): 17건
 - 🔴 미정 (TBD): 2건
 - 🔵 보류 (DEFERRED): 1건
 
@@ -164,6 +164,9 @@
 | OD-SEC-002 | RDS master password 보관 | Secrets Manager / 직접 입력 | Secrets Manager(권고) | 🟡 잠정 | $0.40/secret/월 | 06 결정에 따라 변경 가능 | 06 |
 | OD-SEC-003 | KIS access_token 보관 | EC2 로컬+S3 backup / EFS / Secrets Manager | EC2 로컬+S3 backup 1순위 | 🟡 잠정 | 매우 작음 | EC2 교체 시 토큰 인계 Runbook 필수 | 03 |
 | OD-SEC-004 | EC2 SSH 22 inbound | 0.0.0.0/0 / 미오픈 | 미오픈. SSM Session Manager만 사용 | 🟢 확정 | 0 | OD-NET-009와 동일 | 02, 03 |
+| OD-SEC-005 | EC2 / 8개 MS Access Key 미사용 원칙 | 허용 / 금지 | EC2 안 access key 파일·환경변수·dotfile·systemd `EnvironmentFile=` 저장 금지. IMDSv2 + Instance Role 또는 ECS Task Role 만 사용 | 🟡 잠정 | 0 | 위반 시 IAM Console 즉시 폐기 + `~/.aws/credentials` 백업 이동 후 IMDSv2 + Role only 모드 복귀 | 03, 04, 05, 06, 08, 09 |
+| OD-SEC-006 | EC2 / ECS IAM Role 기반 secret / parameter read 원칙 | 광범위 / 최소 권한 | 최소 권한. Resource wildcard 금지. Action wildcard 금지(`secretsmanager:*` / `ssm:*` / `*` 모두 금지). service prefix(`/portfolio/{env}/{service}/*`) 분리 | 🟡 잠정 | 0 | 정책 detach + 이전 정책 복구 / 정책 정적 검사로 wildcard 0건 점검 | 03, 04, 05, 06, 08, 09 |
+| OD-SEC-007 | EC2 운영자 접근 = SSM Session Manager 중심 | SSH / SSM / 혼합 | `AmazonSSMManagedInstanceCore` managed policy attach + SSM Session Manager 진입 중심. SSH 22 inbound 최소화(OD-SEC-004 / OD-NET-009 정합). 잔존 SSH 운영은 후속 spec(03 후속 task / 10)에서 정리 | 🟡 잠정 | 0 | SSM Endpoint(VPC Endpoint) 확보 필요. 미사용 시 NAT-free 환경에서 진입 불가 | 03, 04, 05, 08, 09 |
 
 ### 6. Observability / Alerting Decisions
 
@@ -239,6 +242,9 @@
 | OD-SEC-002 | RDS master password 보관 | Secrets Manager(권고) | 🟡 잠정 | 06 |
 | OD-SEC-003 | KIS access_token 보관 | EC2 로컬+S3 backup 1순위 | 🟡 잠정 | 03 |
 | OD-MS-010 | infra alarm 채널 | 도메인 알림은 SlackNotificationService 유지, 인프라 알람은 SNS → Lambda → Slack webhook fan-out | 🟡 잠정 | 05, 10 |
+| OD-SEC-005 | EC2 / 8개 MS Access Key 미사용 원칙 | EC2 안 access key 파일·환경변수·dotfile·systemd `EnvironmentFile=` 저장 금지. IMDSv2 + Instance Role 또는 ECS Task Role 만 사용 | 🟡 잠정 | 03, 06 |
+| OD-SEC-006 | EC2 / ECS IAM Role 기반 secret / parameter read 원칙 | 최소 권한. Resource wildcard 금지. Action wildcard 금지. service prefix 분리 | 🟡 잠정 | 03, 06 |
+| OD-SEC-007 | EC2 운영자 접근 = SSM Session Manager 중심 | `AmazonSSMManagedInstanceCore` attach + SSM Session Manager 진입 중심. SSH 22 inbound 최소화 | 🟡 잠정 | 03, 06, 10 |
 
 ---
 
@@ -283,3 +289,4 @@
 |------|-----------|------|
 | 2026-06-05 | 문서 구조 가독성 개선 | 실제 AWS 결정값(Decision ID, 선택지, 선택값, 비용 영향, 운영 리스크, 후속 spec 영향)은 변경하지 않았다. Status 내부 기준값(CONFIRMED / TENTATIVE / TBD / DEFERRED)도 변경하지 않았다. 운영자 표시용으로 한글/색상 라벨(🟢 확정 / 🟡 잠정 / 🔴 미정 / 🔵 보류)을 표 안에 함께 사용하도록 표시 형식만 개선했다. Status Legend, Decision Summary, At a Glance, 카테고리별 상세 결정표 재정리, Open / Tentative / Deferred 결정 모음, Decision Update Rules, Change Log 섹션을 추가했다. |
 | 2026-06-09 | OD-DB-007 ~ OD-DB-010 추가 (DB Role / 권한 1차 적용 결과 반영) | 2026-06-09 운영자가 직접 실행한 [`../02-aws-network-and-rds/db-roles-and-grants.md`](../02-aws-network-and-rds/db-roles-and-grants.md) §4 SQL 결과를 반영했다. 신규 결정: OD-DB-007(legacy schema 모든 app role 미부여, 🟢 확정), OD-DB-008(marketconnector_app execution R-only, 🟢 확정), OD-DB-009(view_app execution R-only, write는 05에서 재검토, 🟡 잠정), OD-DB-010(1차 적용에서 REASSIGN OWNED BY portfolio_admin TO portfolio_owner 미실행, 🟢 확정). OD-DB-005는 OD-DB-009로 분리되었으나 본문은 보존한다(중복 row 미생성). 비밀번호 / endpoint hostname / 계좌번호는 본 문서에 평문 기록 금지(`[REDACTED]`). 결정값 변경 외 본 일자에 추가된 운영 결과 기록은 [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md) 2026-06-09 섹션 참조. |
+| 2026-06-10 | OD-SEC-005 / OD-SEC-006 / OD-SEC-007 추가 (06 / 03 spec 결정 반영) | 06-secrets-and-iam 1차 락 + 03-marketconnector-ec2 정식 운영 전환 검증 결과를 반영. 신규 결정: OD-SEC-005(EC2 / 8개 MS Access Key 미사용 원칙, 🟡 잠정), OD-SEC-006(EC2 / ECS IAM Role 기반 secret / parameter read 최소 권한 원칙, 🟡 잠정), OD-SEC-007(EC2 운영자 접근 SSM Session Manager 중심 + `AmazonSSMManagedInstanceCore`, 🟡 잠정). 세 결정 모두 06 / 03 spec design 의 입력으로 1차 락 되었으며, 후속 spec(04 / 05 / 08 / 09 / 10)에서 ECS Task Role 패턴 / cutover 검증 통과 후 🟢 확정으로 승격 후보. 실제 secret value / IAM access key id / account-id / 실제 ARN 본 문서 평문 기록 0건. 결정 외 운영 결과 기록은 [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md) 2026-06-10 섹션 참조. |

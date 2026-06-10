@@ -62,6 +62,11 @@
 - 비용 영향: 중. EC2 24/7 + EIP attach + EBS + 데이터 전송.
 - 운영 리스크: 단일 broker 세션 제약, 토큰 만료, EC2 교체 시 다운타임.
 - 2026-06-10 이월 작업: 2026-06-09에 RDS restore runner 용도로 이미 aws-paper MarketConnector EC2(Amazon Linux 2023, public subnet, EIP attach, IAM Role + SSM managed policy)를 생성했다. 03 spec 진입 시 EC2 신규 생성은 생략하고, Python venv / requirements 설치 / `port-marketconnector` 소스 배치 / KIS paper 계좌 설정 외부화 / RDS 접속 설정 외부화(`marketconnector_app` 사용) / `connector_balance.py` / `connector_order_check.py` 검증부터 진행한다. 검증 결과는 03 spec의 runbook / validation-checklist / operation-notes에 반영한다. 통합 검증과 rollback 절차는 03 spec과 [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook)(예정)에 분담한다.
+- 2026-06-10 1차 적용 결과:
+  - 1차 적용 환경: `aws-paper`, `ap-northeast-2`, MarketConnector EC2 1대.
+  - 1차 완료 범위: Python 3.9.25 / venv 구성 + 의존 5종(`requests` / `flask` / `psycopg2-binary` / `psycopg` / `pandas`) 설치 + `marketconnector_app` 기준 RDS 접속 + `connector_balance.py` / `connector_order_check.py` 조회성 실행 + Flask 내부 smoke test + Secrets Manager / SSM Parameter Store env 주입 + Instance Role 기반 Access Key 미사용 — 8건 모두 성공.
+  - 범위 밖: EC2 신규 생성, 신규 주문 / 매수 / 매도 / 취소 / 정정 호출, live rotation 자동화, GitHub Actions OIDC / CI/CD Role(07), systemd 또는 startup script 정상 운영 모드 전환(03 후속 task 또는 별도 phase).
+  - 04 / 05 / 08 / 09 / 10 spec 인계: EC2 Instance Role 패턴을 ECS Task Role 패턴으로 매핑 / service prefix(`/portfolio/{env}/{service}/*`) 분리 유지 / Access Key 미사용 원칙(IMDSv2 + Role only) 유지 / `paper` / `live` env prefix 분리 유지 / Resource·Action wildcard 금지 정책 유지.
 
 ### 08-interest-crawler-and-preprocessor-ecs
 
