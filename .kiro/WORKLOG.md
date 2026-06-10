@@ -9,6 +9,18 @@
 - 상세 구현 로그, 긴 검증 로그, 코드 변경 세부사항은 기록하지 않는다.
 - 실제 AWS 리소스 생성 여부, 애플리케이션 소스 코드 수정 여부, 8개 MS 문서 수정 여부, 민감정보 기록 여부는 짧게 남긴다.
 
+## 2026-06-10 (afternoon ~ evening session)
+
+- 08-interest-crawler-and-preprocessor-ecs 기본 포팅 1차 진행. 운영자가 직접 ECR repository 2개(`portfolio-interest-crawler`, `portfolio-interest-preprocessor`) 생성, port-interest-preprocessor / port-interest-crawler 의 Dockerfile + requirements.txt 신규 생성(preprocessor: `python:3.13-slim` + `pre_daily.py`. crawler: `python:3.13-slim` + Chromium / chromedriver + `interest_crawler_daily.py`), 로컬 빌드(`paper-20260610` / `paper-latest`), ECR push 완료. crawler 의 Selenium 의존성은 빌드 단계에서 1차 해소.
+- 운영자가 ECS Cluster `portfolio-paper-cluster`, Task Execution Role `portfolio-paper-ecs-task-execution-role`(managed `AmazonECSTaskExecutionRolePolicy` + preprocessor DB secret read inline / 단일 secret ARN 한정), Task Role 2종(`portfolio-paper-preprocessor-task-role` / `portfolio-paper-crawler-task-role`), CloudWatch Log Group 2개(`/portfolio/paper/preprocessor` / `/portfolio/paper/crawler`, retention 14일) 준비 완료. preprocessor task SG → RDS PostgreSQL SG 5432 inbound 허용 확인.
+- 운영자가 `/portfolio/paper/rds/preprocessor-app` JSON multi-key secret 신규 생성, preprocessor Task Definition 등록(family `portfolio-paper-interest-preprocessor`, revision 1, awsvpc, cpu 512 / memory 1024, image `paper-20260610`, ECS `secrets` env 주입). preprocessor RunTask 1차 검증 결과 lastStatus `STOPPED` / exitCode `0` / `PREPROCESSOR PIPELINE END` 확인.
+- 검증 도중 1차 실패는 Secrets Manager JSON `host` key 누락(psycopg2 가 Unix socket `/var/run/postgresql/.s.PGSQL.5432` 시도) → secret 재생성으로 해소. 2차 실패는 `public` schema 잔존 sequence 2건(`pre_marketbreadth_daily_feature_id_seq`, `pre_macroeconomic_daily_feature_id_seq`) 의 `preprocessor_app` USAGE / SELECT 권한 부족 → 운영자가 직접 GRANT 후 해소. 두 사례 모두 운영자가 직접 SQL 실행, Kiro 는 결과 / 사유 / 조치를 문서로만 정리.
+- crawler 는 Dockerfile / requirements / 빌드 / push 까지 완료. Task Definition 등록 / RunTask runtime / KRX·Naver·yfinance outbound 도달 검증은 이월. 안정화 100% 는 본 spec 범위 밖.
+- Kiro 작업 산출물: `.kiro/specs/08-interest-crawler-and-preprocessor-ecs/tasks.md` 갱신, `.kiro/specs/08-interest-crawler-and-preprocessor-ecs/operation-notes.md` 신규 생성, `.kiro/specs/_common/risk-register.md` 보강(R-DATA-005 / R-DOCS-001) + 신규(R-DATA-006 / R-AUTO-005), `.kiro/specs/_common/followups-overview.md` 2026-06-10 후속 메모 + 08 spec 1차 적용 결과 보강, `.kiro/specs/_common/operator-decisions.md` Change Log OD-NET-004 메모 추가, `.kiro/CHANGELOG.md` 2026-06-10 섹션 추가, 본 파일.
+- 실제 AWS / ECR / ECS / IAM / Secrets / RDS 작업은 운영자가 직접 수행. Kiro 는 문서 / 절차 / 검증 항목 정리만 수행. 8개 MS 의 README / AGENTS.md / CHANGELOG / docs / worklog 본 spec 작업으로 인한 변경 0건(운영자 직접 작업으로 port-interest-preprocessor / port-interest-crawler Dockerfile · requirements.txt 신규 생성 사실은 운영 노트에만 기록).
+- 민감정보(secret value / password / KIS app key / KIS app secret / 계좌번호 / token / RDS endpoint hostname / account-id / 실제 ARN / image digest / IAM access key id) 신규 기록 없음. 모두 `[REDACTED]` 또는 placeholder. password rotate 는 본 일자 문서 작업 범위에 포함하지 않음.
+- 다음 작업: crawler Task Definition 등록 / RunTask runtime 검증 / KRX·Naver·yfinance outbound runtime 도달 검증, `public` schema 잔존 sequence 추가 점검, 08 spec runbook / validation-checklist 작성 시점 결정.
+
 ## 2026-06-09 (afternoon ~ evening session)
 
 - 2026-06-09 Daily 실행 완료(현황 점검만, 코드 / 자동 매매 변경 없음).

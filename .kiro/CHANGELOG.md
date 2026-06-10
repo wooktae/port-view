@@ -10,6 +10,23 @@
 - 항목 분류는 `Added`, `Changed`, `Removed`, `Security`로 통일한다.
 - 날짜는 한국 기준의 작업 일자를 사용한다.
 
+## 2026-06-10
+
+### Added
+
+- `.kiro/specs/08-interest-crawler-and-preprocessor-ecs/operation-notes.md` — 2026-06-10 운영자 실행 결과 누적 기록 신규 생성. ECR repository 2개 생성, port-interest-preprocessor / port-interest-crawler Dockerfile 및 requirements.txt 신규 생성, 로컬 빌드(`paper-20260610` / `paper-latest`), ECR push, ECS Cluster `portfolio-paper-cluster` / Task Execution Role / Task Role 2종 / CloudWatch Log Group 2종(retention 14일), Secrets Manager `/portfolio/paper/rds/preprocessor-app` JSON multi-key 신규 생성, preprocessor Task Definition(family `portfolio-paper-interest-preprocessor`, awsvpc, cpu 512 / memory 1024, image `paper-20260610`), preprocessor RunTask 1차 검증(lastStatus `STOPPED` / exitCode `0` / `PREPROCESSOR PIPELINE END`) 결과 기록. 1차 실패(Secrets JSON `host` 누락 → Unix socket 시도)와 2차 실패(public schema 잔존 sequence 2건 권한 부족) 사례 / 조치 / 결과를 짧게 기록. crawler runtime 검증 이월 명시. 실제 secret value / endpoint / account-id / 실제 ARN / image digest 평문 기록 0건.
+
+### Changed
+
+- `.kiro/specs/08-interest-crawler-and-preprocessor-ecs/tasks.md` — 2026-06-10 운영자 실행 결과 반영. 43개 task 중 ECR repository 생성 / Dockerfile · requirements 신규 생성 / 로컬 빌드 / ECR push / ECS Cluster · Role · Log Group / Secrets Manager / Task Definition / Preprocessor RunTask / CloudWatch Logs / exit code 0 항목을 체크 완료로 갱신. crawler 항목 중 build / push 는 체크 완료, runtime outbound 검증(task 30) 과 crawler runtime 도달 검증(task 31) 은 이월 표기. 실패 원인 분리 결과(Secrets JSON `host` 누락, public schema 잔존 sequence 권한 부족 2건) 를 task 28 / task 26 에 짧게 반영. 본 spec 안전 제약(35 ~ 40) 은 Kiro 본 spec 작업 기준 0건 유지 + 운영자 직접 작업은 operation-notes 참조 형태로 노트 추가.
+- `.kiro/specs/_common/risk-register.md` — 2026-06-10 08 진행 결과 반영. R-DATA-005 mitigation / detection 보강(public schema 잔존 sequence 권한 누락 사례 + ECS Task event `permission denied for sequence` 패턴 모니터). R-DOCS-001 detection 보강(secret value 작업 채팅 / 명령 출력 / 콘솔 캡처 / CloudWatch Logs 비노출 운영 점검). 신규 R-DATA-006(Secrets Manager JSON multi-key 의 `host` key 누락으로 ECS Task 가 Unix socket `/var/run/postgresql/.s.PGSQL.5432` 시도) 추가. 신규 R-AUTO-005(crawler Selenium / Chromium / chromedriver runtime 또는 KRX / Naver / yfinance outbound 도달 미검증 상태로 운영 진입) 추가. 두 신규 항목 모두 password rotate 를 mitigation 으로 강제하지 않으며 secret value 비노출 / runtime 검증 후속 분리 원칙으로 정리.
+- `.kiro/specs/_common/followups-overview.md` — 2026-06-10 후속 메모 보강. 08 preprocessor ECS Task 1회 실행 성공(lastStatus `STOPPED` / exitCode `0`) 반영. 08 spec 섹션 안에 2026-06-10 1차 적용 결과(완료 범위 / 범위 밖 / 후속 spec 인계) 추가. crawler Task Definition / RunTask runtime 검증, public schema 잔존 sequence 정리는 이월 항목으로 명시.
+- `.kiro/specs/_common/operator-decisions.md` — Change Log 에 OD-NET-004(crawler / preprocessor outbound 방식 = public subnet + assignPublicIp) 가 2026-06-10 preprocessor RunTask 로 1차 검증되었다는 메모 1건 추가. Status 는 🟡 잠정 유지(crawler runtime 검증은 이월). 결정값(선택지 / 선택값 / 비용 영향 / 운영 리스크 / 후속 spec 영향) 변경 없음.
+
+### Security
+
+- 본 변경에서도 secret / token / password / KIS app key / KIS app secret / 계좌번호 / webhook URL / RDS endpoint hostname / account-id / 실제 ARN / image digest / IAM access key id 평문 기록 0건. 모든 placeholder 는 `[REDACTED]` 또는 `<account-id>` / `<region>` / `<rds-endpoint>` / `<image-tag>` / `<image-digest>` / `<task-arn>` 만 사용. password rotate 는 본 일자 문서 작업 범위에 포함하지 않음. secret value 가 작업 채팅 / 명령 출력 / 콘솔 캡처 / CloudWatch Logs 본문에 평문 노출되지 않도록 후속 작업에서도 동일 원칙 유지(R-DOCS-001 정합).
+
 ## 2026-06-09
 
 ### Added

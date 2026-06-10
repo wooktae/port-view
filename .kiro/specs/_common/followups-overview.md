@@ -29,6 +29,8 @@
 - 2026-06-09 작업 결과(`02-aws-network-and-rds`의 RDS 재생성 + DB role 1차 적용)는 [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md), [`../02-aws-network-and-rds/validation-checklist.md`](../02-aws-network-and-rds/validation-checklist.md), [`../02-aws-network-and-rds/db-roles-and-grants.md`](../02-aws-network-and-rds/db-roles-and-grants.md)에 반영 완료. 03 / 06 spec 입력으로 사용한다.
 - `03-marketconnector-ec2` 기본 포팅이 2026-06-09에서 2026-06-10으로 이월. EC2 자체는 RDS restore runner로 이미 생성됐으므로 03 spec은 EC2 재생성보다 Python 실행환경 구성 / 설정 외부화 / connector 검증부터 진행한다.
 - 원래 계획이던 `08-interest-crawler-and-preprocessor-ecs` 기본 포팅도 2026-06-10에 진행 후보이지만, 03 이월 작업이 06 단계 결정(KIS / RDS 비밀 주입)과 맞물리므로 03을 우선한다. 08은 03이 안정된 뒤 / 또는 06과 병렬로 진입한다.
+- `08-interest-crawler-and-preprocessor-ecs` 1차 진행 결과(2026-06-10 오후·저녁): preprocessor ECS Task 1회 실행 성공(lastStatus `STOPPED` / exitCode `0`), 두 MS 의 Dockerfile / requirements.txt 신규 생성, 로컬 빌드 + ECR push 완료, ECS Cluster / Task Execution Role / Task Role 2종 / Log Group 2종 준비 완료. 검증 도중 발견된 1차 이슈(Secrets Manager JSON `host` key 누락)와 2차 이슈(`public` schema 잔존 sequence 권한 부족)는 운영자 직접 조치로 해소. 자세한 결과는 [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-10 섹션 참조.
+- 2026-06-10 이월 항목: (1) crawler Task Definition 등록 / RunTask runtime 검증 / KRX·Naver·yfinance outbound 도달 검증, (2) `public` schema 잔존 sequence 추가 점검(preprocessor 외 도메인 sequence 잔존 여부), (3) crawler 운영 안정화(Selenium / Chromium 런타임)는 본 spec 범위 밖으로 후속 spec / 후속 phase 책임. password rotate 는 본 일자 작업 범위 밖.
 
 ## 각 후속 Spec 요약
 
@@ -77,6 +79,13 @@
 - 예상 난이도: 중. Selenium 컨테이너가 가장 까다롭다.
 - 비용 영향: 작음 ~ 중. NAT-free라 NAT 데이터 처리 비용은 없음. public subnet IPv4 사용 + Endpoint 비용이 핵심.
 - 운영 리스크: KRX 로그인 차단, Selenium 안정성, 외부 API rate limit.
+- 2026-06-10 1차 적용 결과:
+  - 1차 적용 환경: `aws-paper`, `ap-northeast-2`. 1차 검증 대상: Preprocessor MS(`port-interest-preprocessor`).
+  - 1차 완료 범위: ECR repository 2개(`portfolio-interest-crawler`, `portfolio-interest-preprocessor`, paper / live 미분리) 생성 + 두 MS 의 Dockerfile / requirements.txt 운영자 직접 신규 생성 + 로컬 빌드(`paper-20260610` / `paper-latest`) + ECR push + ECS Cluster `portfolio-paper-cluster` + Task Execution Role + Task Role 2종 + CloudWatch Log Group 2종(retention 14일) + Secrets Manager `/portfolio/paper/rds/preprocessor-app` JSON multi-key + preprocessor Task Definition(family `portfolio-paper-interest-preprocessor`, awsvpc, cpu 512 / memory 1024, ECS `secrets` env 주입) + preprocessor RunTask 1회 실행 성공(public subnet + `assignPublicIp=ENABLED`, lastStatus `STOPPED`, exitCode `0`, `PREPROCESSOR PIPELINE END` 확인).
+  - 검증 중 발견·조치: (a) Secrets Manager JSON `host` key 누락 → secret 재생성으로 해소(R-DATA-006). (b) `public` schema 잔존 sequence 2건(`pre_marketbreadth_daily_feature_id_seq`, `pre_macroeconomic_daily_feature_id_seq`)의 `preprocessor_app` USAGE / SELECT 부족 → 운영자 직접 GRANT 로 해소(R-DATA-005 보강).
+  - 범위 밖 / 이월: ECS Service 상시 가동 / EventBridge Scheduler / Step Functions, aws-live 적용(10 spec), CI/CD OIDC(07 spec), crawler Task Definition / RunTask runtime / KRX·Naver·yfinance outbound 도달 검증(R-AUTO-005), Selenium / Chromium 런타임 안정화 100%, 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog 수정.
+  - 04 / 05 / 09 / 10 spec 인계: ECR repository 환경 미분리 정책(image tag / Task Definition / Secrets·SSM path / Task Role / env vars / RDS·broker 설정 6개 항목으로 환경 분리), Task Execution Role(secrets 주입) / Task Role(runtime SDK) 책임 분리, NAT-free public subnet + `assignPublicIp=ENABLED` 패턴, paper / live image tag(`paper-<yyyymmdd>` / `live-<yyyymmdd>`) 전략, Resource·Action wildcard 금지 정책(03 §13 정합) 유지.
+  - 자세한 운영자 실행 결과 / 실패 사례 / 조치는 [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-10 섹션 참조.
 
 ### 04-strategy-batch-stepfunctions
 
