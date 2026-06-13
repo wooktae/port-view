@@ -116,6 +116,7 @@
 2. THE design.md SHALL KRX, Naver, yfinance outbound 접근 경로를 NAT-free 구조에서 public subnet + `assignPublicIp` 로 처리한다는 점을 명시하고, KRX 로그인 / rate limit / Selenium 안정성 미달 가능성을 리스크 후보로 분리해야 한다.
 3. THE design.md SHALL Crawler 운영 안정화 100% 보장은 본 spec 범위 밖이며, 본 spec 시점에는 1차 검토(Dockerfile / 빌드 가능 여부 / outbound 도달 여부) 까지만 수행한다는 점을 명시해야 한다.
 4. WHERE Crawler 1차 검토에서 Selenium / Chrome 의존성 결함이 발견되는 경우, THE design.md SHALL 후속 spec 또는 후속 phase 책임으로 분리하고, Preprocessor 검증 흐름을 차단하지 않는다는 점을 명시해야 한다.
+5. WHERE KRX GUI 의존 수집(예: KRX program / KRX shortsell)이 ECS Fargate Task 의 GUI / Chrome download / OTP 세션 흐름과 호환되지 않는 경우, THE design.md SHALL 해당 KRX GUI 의존 crawler 가 ECS Fargate Task 대신 Windows EC2 worker 위에서 실행될 수 있음을 명시하고, non-GUI crawler 와 KRX GUI 의존 crawler 의 runtime 분리(hybrid execution model) 를 명시해야 한다.
 
 ### Requirement 9: NAT-free 정책 강제
 

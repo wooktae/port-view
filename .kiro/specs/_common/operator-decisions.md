@@ -25,9 +25,9 @@
 
 ### 결정 개수
 
-- 전체: 62건
+- 전체: 65건
 - 🟢 확정 (CONFIRMED): 42건
-- 🟡 잠정 (TENTATIVE): 17건
+- 🟡 잠정 (TENTATIVE): 20건
 - 🔴 미정 (TBD): 2건
 - 🔵 보류 (DEFERRED): 1건
 
@@ -153,6 +153,8 @@
 | OD-MS-008 | port_strategy_research 컴퓨트 | AWS Batch / ECS Fargate Task / Lambda / EC2 | AWS Batch (1순위, Step Functions 보조), ECS Fargate Task (2순위), Lambda 비권고 | 🟢 확정 | 사용량 기반 | 장시간 backtest / RDS connection 누수 점검. report S3 보관 | 09 |
 | OD-MS-009 | Daily Batch orchestration | port-view subprocess / Step Functions + EventBridge + ECS RunTask / EKS CronJob | Step Functions + EventBridge Scheduler + ECS RunTask | 🟢 확정 | Step Functions transitions ≪ ECS Task 비용 | 기존 port-view subprocess는 AWS에서 그대로 쓰지 않음 | 04, 05 |
 | OD-MS-010 | infra alarm 채널 | SlackNotificationService 단독 / SNS+Lambda+Slack 보조 | 도메인 알림은 SlackNotificationService 유지, 인프라 알람은 SNS → Lambda → Slack webhook fan-out | 🟡 잠정 | 무료 한도 안 | webhook URL은 Secrets Manager 또는 SSM SecureString. 06에서 최종 결정 | 05, 10 |
+| OD-MS-011 | port-interest-crawler runtime 분리 (Hybrid execution model) | ECS Fargate Task 단일 / Windows EC2 worker 단일 / Hybrid(GUI=EC2 worker, non-GUI=ECS Fargate Task) | Hybrid(KRX GUI 의존 = Windows EC2 worker, non-GUI = ECS Fargate Task 후보 유지). preprocessor 는 ECS Fargate Task 유지 | 🟡 잠정 | EC2 worker idle 비용 + ECS Fargate per-task. ECS 단일안 대비 EC2 단가 증가 가능 / NAT-free 정책 유지 | KRX OTP / Chrome download / 로그인 session 의존성. EC2 worker stop 절차 / 자동화 미도달 | 08, 04, 05, 09, 10 |
+| OD-MS-012 | KRX GUI 의존 crawler 1차 운영 모드 | wrapper 기반 수동 실행 / SSM RunCommand 기반 무인 실행 / EventBridge + Step Functions hybrid orchestration | wrapper 기반 수동 실행을 1차 운영 모드로 사용(`run_krx_worker_daily.ps1`). 완전 자동화는 후속 분리 | 🟡 잠정 | 0 (wrapper 자체는 비용 없음). 자동화 후속 시 SSM / EventBridge 비용 추가 | wrapper 성공이 실제 DB 적재 성공을 보장하지 않음. wrapper 내 DB 검증 출력 자동 추가는 후속(R-AUTO-007) | 08 |
 
 위 결정은 `ms-aws-service-decision-matrix.md` 5장 최종 권고안과 정합되며, 본 spec(02)와 후속 spec(03 ~ 10)에서 입력으로 사용한다. Lambda는 모든 핵심 batch 워크로드에서 비권고이며, infra alarm fan-out / 짧은 보조 후처리 / S3 metadata 처리 같은 보조 용도로만 사용한다.
 
@@ -167,6 +169,7 @@
 | OD-SEC-005 | EC2 / 8개 MS Access Key 미사용 원칙 | 허용 / 금지 | EC2 안 access key 파일·환경변수·dotfile·systemd `EnvironmentFile=` 저장 금지. IMDSv2 + Instance Role 또는 ECS Task Role 만 사용 | 🟡 잠정 | 0 | 위반 시 IAM Console 즉시 폐기 + `~/.aws/credentials` 백업 이동 후 IMDSv2 + Role only 모드 복귀 | 03, 04, 05, 06, 08, 09 |
 | OD-SEC-006 | EC2 / ECS IAM Role 기반 secret / parameter read 원칙 | 광범위 / 최소 권한 | 최소 권한. Resource wildcard 금지. Action wildcard 금지(`secretsmanager:*` / `ssm:*` / `*` 모두 금지). service prefix(`/portfolio/{env}/{service}/*`) 분리 | 🟡 잠정 | 0 | 정책 detach + 이전 정책 복구 / 정책 정적 검사로 wildcard 0건 점검 | 03, 04, 05, 06, 08, 09 |
 | OD-SEC-007 | EC2 운영자 접근 = SSM Session Manager 중심 | SSH / SSM / 혼합 | `AmazonSSMManagedInstanceCore` managed policy attach + SSM Session Manager 진입 중심. SSH 22 inbound 최소화(OD-SEC-004 / OD-NET-009 정합). 잔존 SSH 운영은 후속 spec(03 후속 task / 10)에서 정리 | 🟡 잠정 | 0 | SSM Endpoint(VPC Endpoint) 확보 필요. 미사용 시 NAT-free 환경에서 진입 불가 | 03, 04, 05, 08, 09 |
+| OD-SEC-008 | KRX 로그인 자격 보관 | 코드 / 설정 파일 / 환경변수 직접 / Secrets Manager / SSM SecureString | Secrets Manager (`/portfolio/{env}/krx/crawler-login`, JSON `username` / `password`). EC2 worker IAM Role inline policy 에 secret 한정 read 허용 | 🟡 잠정 | $0.40/secret/월 + KMS 호출 미미 | secret read 권한 누락 시 worker 기동 실패. 권한 변경 시 운영자 노트에 4줄 요약 기록 | 06, 08 |
 
 ### 6. Observability / Alerting Decisions
 
@@ -245,6 +248,9 @@
 | OD-SEC-005 | EC2 / 8개 MS Access Key 미사용 원칙 | EC2 안 access key 파일·환경변수·dotfile·systemd `EnvironmentFile=` 저장 금지. IMDSv2 + Instance Role 또는 ECS Task Role 만 사용 | 🟡 잠정 | 03, 06 |
 | OD-SEC-006 | EC2 / ECS IAM Role 기반 secret / parameter read 원칙 | 최소 권한. Resource wildcard 금지. Action wildcard 금지. service prefix 분리 | 🟡 잠정 | 03, 06 |
 | OD-SEC-007 | EC2 운영자 접근 = SSM Session Manager 중심 | `AmazonSSMManagedInstanceCore` attach + SSM Session Manager 진입 중심. SSH 22 inbound 최소화 | 🟡 잠정 | 03, 06, 10 |
+| OD-MS-011 | port-interest-crawler runtime 분리 (Hybrid execution model) | Hybrid(KRX GUI 의존 = Windows EC2 worker, non-GUI = ECS Fargate Task 후보 유지) | 🟡 잠정 | 08, 04, 05, 09, 10 |
+| OD-MS-012 | KRX GUI 의존 crawler 1차 운영 모드 | wrapper 기반 수동 실행 1차 운영 모드 | 🟡 잠정 | 08 |
+| OD-SEC-008 | KRX 로그인 자격 보관 | Secrets Manager (`/portfolio/{env}/krx/crawler-login`, JSON `username` / `password`) | 🟡 잠정 | 06, 08 |
 
 ---
 
@@ -291,3 +297,4 @@
 | 2026-06-09 | OD-DB-007 ~ OD-DB-010 추가 (DB Role / 권한 1차 적용 결과 반영) | 2026-06-09 운영자가 직접 실행한 [`../02-aws-network-and-rds/db-roles-and-grants.md`](../02-aws-network-and-rds/db-roles-and-grants.md) §4 SQL 결과를 반영했다. 신규 결정: OD-DB-007(legacy schema 모든 app role 미부여, 🟢 확정), OD-DB-008(marketconnector_app execution R-only, 🟢 확정), OD-DB-009(view_app execution R-only, write는 05에서 재검토, 🟡 잠정), OD-DB-010(1차 적용에서 REASSIGN OWNED BY portfolio_admin TO portfolio_owner 미실행, 🟢 확정). OD-DB-005는 OD-DB-009로 분리되었으나 본문은 보존한다(중복 row 미생성). 비밀번호 / endpoint hostname / 계좌번호는 본 문서에 평문 기록 금지(`[REDACTED]`). 결정값 변경 외 본 일자에 추가된 운영 결과 기록은 [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md) 2026-06-09 섹션 참조. |
 | 2026-06-10 | OD-SEC-005 / OD-SEC-006 / OD-SEC-007 추가 (06 / 03 spec 결정 반영) | 06-secrets-and-iam 1차 락 + 03-marketconnector-ec2 정식 운영 전환 검증 결과를 반영. 신규 결정: OD-SEC-005(EC2 / 8개 MS Access Key 미사용 원칙, 🟡 잠정), OD-SEC-006(EC2 / ECS IAM Role 기반 secret / parameter read 최소 권한 원칙, 🟡 잠정), OD-SEC-007(EC2 운영자 접근 SSM Session Manager 중심 + `AmazonSSMManagedInstanceCore`, 🟡 잠정). 세 결정 모두 06 / 03 spec design 의 입력으로 1차 락 되었으며, 후속 spec(04 / 05 / 08 / 09 / 10)에서 ECS Task Role 패턴 / cutover 검증 통과 후 🟢 확정으로 승격 후보. 실제 secret value / IAM access key id / account-id / 실제 ARN 본 문서 평문 기록 0건. 결정 외 운영 결과 기록은 [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md) 2026-06-10 섹션 참조. |
 | 2026-06-10 | OD-NET-004 1차 검증 메모 추가 (08 spec 결과 반영) | 08-interest-crawler-and-preprocessor-ecs 의 preprocessor ECS RunTask 가 public subnet + `assignPublicIp = ENABLED` 방식으로 실행되어 OD-NET-004(crawler / preprocessor outbound 방식 = public subnet + assignPublicIp 1순위) 가 preprocessor 측에서 1차 검증되었다는 사실을 메모로 반영. Status 는 🟡 잠정 유지(crawler runtime 검증은 이월 — R-AUTO-005). 결정값(선택지 / 선택값 / 비용 영향 / 운영 리스크 / 후속 spec 영향) 변경 없음. 실제 secret value / account-id / 실제 ARN / image digest 본 문서 평문 기록 0건. 결정 외 운영 결과 기록은 [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-10 섹션 참조. |
+| 2026-06-12 | OD-MS-011 / OD-MS-012 / OD-SEC-008 추가 (08 spec Hybrid execution model 반영) | 2026-06-12 Windows EC2 worker 기반 KRX GUI 의존 수집 1차 검증 결과를 반영. 신규 결정: OD-MS-011(port-interest-crawler runtime 분리: KRX GUI 의존 = Windows EC2 worker, non-GUI = ECS Fargate Task 후보 유지, preprocessor = ECS Fargate Task 유지, 🟡 잠정), OD-MS-012(KRX GUI 의존 crawler 1차 운영 모드 = wrapper 기반 수동 실행, 🟡 잠정), OD-SEC-008(KRX 로그인 자격 = Secrets Manager `/portfolio/{env}/krx/crawler-login` JSON `username` / `password`, 🟡 잠정). OD-NET-004 는 KRX GUI 경로가 EC2 worker 로 분리됨에 따라 preprocessor + non-GUI crawler 의 NAT-free public subnet 정책으로 적용 범위가 명확해졌고, 결정값(선택지 / 선택값 / 비용 영향 / 운영 리스크 / 후속 spec 영향) 변경은 없음. R-AUTO-005 는 KRX GUI 경로 1차 운영 가능 상태 도달로 mitigation 보강(R-AUTO-005 row 갱신은 risk-register.md 참조). 실제 secret value / KRX 로그인 password / account-id / 실제 ARN / instance-id 본 문서 평문 기록 0건. KRX 로그인 ID / password 는 "Secrets Manager 에서 주입" 으로만 표기. 결정 외 운영 결과 기록은 [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-12 섹션 참조. |

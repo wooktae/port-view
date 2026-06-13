@@ -32,6 +32,29 @@
 - `08-interest-crawler-and-preprocessor-ecs` 1차 진행 결과(2026-06-10 오후·저녁): preprocessor ECS Task 1회 실행 성공(lastStatus `STOPPED` / exitCode `0`), 두 MS 의 Dockerfile / requirements.txt 신규 생성, 로컬 빌드 + ECR push 완료, ECS Cluster / Task Execution Role / Task Role 2종 / Log Group 2종 준비 완료. 검증 도중 발견된 1차 이슈(Secrets Manager JSON `host` key 누락)와 2차 이슈(`public` schema 잔존 sequence 권한 부족)는 운영자 직접 조치로 해소. 자세한 결과는 [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-10 섹션 참조.
 - 2026-06-10 이월 항목: (1) crawler Task Definition 등록 / RunTask runtime 검증 / KRX·Naver·yfinance outbound 도달 검증, (2) `public` schema 잔존 sequence 추가 점검(preprocessor 외 도메인 sequence 잔존 여부), (3) crawler 운영 안정화(Selenium / Chromium 런타임)는 본 spec 범위 밖으로 후속 spec / 후속 phase 책임. password rotate 는 본 일자 작업 범위 밖.
 
+### 2026-06-12 후속 메모 (08 spec — Hybrid execution model)
+
+- `08-interest-crawler-and-preprocessor-ecs` 가 2026-06-12 Windows EC2 worker 기반 KRX GUI 의존 수집 1차 검증을 마쳤다. 자세한 결과는 [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-12 섹션 참조.
+- 1차 운영 가능 상태(2026-06-12 도달):
+  - KRX program / KRX shortsell EC2 worker 수집 성공(2026-06-09 / 2026-06-10 / 2026-06-11 각 일자 적재 확인 / `interest_program_raw` 543 → 546 / `interest_shortsell_raw` 189158 → 190205)
+  - 다운로드 경로 junction 조치(`C:\Users\USER\Downloads` → `C:\Users\Administrator\Downloads`)
+  - RDS Secret(`/portfolio/paper/rds/crawler-app`) + KRX Secret(`/portfolio/paper/krx/crawler-login`) 기반 환경변수 주입
+  - EC2 worker daily wrapper(`run_krx_worker_daily.ps1`) 1차 실행 / 재실행 시 idempotent no-op 정상 완료
+- runtime 분류 결정(Hybrid execution model):
+  - KRX GUI 의존 crawler(KRX program / KRX shortsell): **Windows EC2 worker** 로 분리 확정
+  - non-GUI crawler(Naver / yfinance / KRX 비-GUI 경로 후보): **ECS Fargate Task 후보 유지**(범위 재정리는 후속)
+  - preprocessor: **ECS Fargate Task 유지**(2026-06-10 1차 검증 결과 그대로)
+- 2026-06-12 이월 / 후속 분리:
+  1. SSM RunCommand 기반 EC2 worker 무인 실행
+  2. EventBridge Scheduler → SSM RunCommand 연계
+  3. Step Functions 에서 ECS Task + EC2 worker 혼합 orchestration
+  4. CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집
+  5. wrapper 내 DB 검증 출력 자동 추가(일자별 row count 출력)
+  6. ECS / Fargate non-GUI crawler 범위 재정리(EC2 worker vs ECS Fargate Task 인벤토리 확정)
+  7. EC2 worker 작업 완료 후 stop 절차 명시(idle 비용 절감)
+  8. KRX GUI 수집 headless 리팩토링은 장기 후보로만 유지(현재 결정은 EC2 worker 사용)
+- 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 04 / 05 / 09 / 10 spec 진입 시 hybrid execution model(EC2 worker + ECS Fargate Task) 전제를 입력으로 사용한다. password rotate 는 본 일자 작업 범위 밖.
+
 ## 각 후속 Spec 요약
 
 ### 02-aws-network-and-rds

@@ -277,6 +277,56 @@ Task Definition `secrets` 필드 주입용 Secrets Manager / SSM read 권한은 
 
 본 호출 단위 정책: 본 호출은 design.md 1개만 갱신하며 requirements.md / tasks.md 는 별도 호출 책임으로 분리한다.
 
+## 12. 2026-06-12 운영자 검증 결과 / Hybrid execution model
+
+본 섹션은 2026-06-12 Windows EC2 worker 기반 KRX GUI 의존 수집 1차 검증 결과를 반영한 보강 섹션이다. 기존 ECS 중심 설계를 전면 재작성하지 않고, 검증 결과로 갱신된 분류 결정과 Secrets Manager 연동 방식만 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-12 섹션 참조.
+
+### 12.1 Hybrid execution model 분류
+
+본 spec 의 crawler / preprocessor runtime 은 단일 ECS Fargate 구조가 아니라 다음과 같이 역할을 분리한다.
+
+| 워크로드 | runtime | 1차 운영 가능 상태 | 비고 |
+|---------|---------|-------------------|------|
+| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task (NAT-free public subnet + `assignPublicIp=ENABLED`) | 2026-06-10 도달 | §7 그대로 유지 |
+| non-GUI crawler (Naver / yfinance / KRX 비-GUI 경로 후보) | ECS Fargate Task 후보 유지 | 미도달 (이월) | runtime 검증 / Selenium 미사용 / outbound 도달 검증 후속 |
+| KRX GUI 의존 crawler (KRX program / KRX shortsell, Selenium / Chrome) | Windows EC2 worker | 2026-06-12 도달 (1차 운영 가능 / 완전 자동화는 후속) | wrapper 기반 수동 실행 |
+
+### 12.2 KRX GUI 의존 수집이 EC2 worker 로 분리된 이유
+
+| 이유 | 설명 |
+|------|------|
+| Chrome GUI / Download 의존 | KRX OTP 후 CSV 다운로드가 Chrome 다운로드 폴더로 떨어지는 흐름. 다운로드 경로가 OS 사용자 / 세션 의존 |
+| 로그인 session 유지 | KRX 로그인 후 OTP / 세션 토큰이 브라우저 컨텍스트에 stateful 하게 결합 |
+| Debug attach / 운영자 점검 용이성 | RDP 진입으로 즉시 GUI 상태 / 다운로드 폴더 / Chrome devtools 점검 가능 |
+| KRX 사이트 특성 | 비정형 JavaScript / 동적 element / OTP 등으로 headless 안정성 미달 가능성 |
+| ECS Fargate Task 의 GUI / Display 미지원 | Fargate 는 GUI / X11 / Display 지원이 사실상 없음. KRX OTP / Chrome download 흐름과 호환 부담 |
+
+### 12.3 Secrets Manager 연동 방식 (2026-06-12 반영)
+
+| Secret path | 용도 | JSON key | 1차 사용 시점 | 비고 |
+|-------------|------|---------|--------------|------|
+| `/portfolio/paper/rds/preprocessor-app` | preprocessor RDS 접속 | `host` / `port` / `dbname` / `username` / `password` | 2026-06-10 | §7.3 |
+| `/portfolio/paper/rds/crawler-app` | EC2 worker 의 RDS 접속(crawler_app role) | `host` / `port` / `dbname` / `username` / `password` | 2026-06-12 | EC2 IAM Role `portfolio-paper-crawler-worker-role` 에서 read |
+| `/portfolio/paper/krx/crawler-login` | KRX 로그인 자격 | `username` / `password` | 2026-06-12 | EC2 IAM Role inline policy 에 `secretsmanager:DescribeSecret` / `secretsmanager:GetSecretValue` 추가 (Resource 한정 / wildcard 0건) |
+
+위 Secret 의 실제 value / RDS endpoint hostname / KRX 로그인 password / 실제 ARN / account-id 는 본 design 어디에도 평문 기록 금지(R10.4 / R-DOCS-001 정합). KRX 로그인 ID / password 는 "Secrets Manager 에서 주입" 으로만 표기한다.
+
+### 12.4 EC2 worker 운영 모드 분리
+
+| 모드 | 설명 | 본 spec 시점 |
+|------|------|-------------|
+| 수동 실행 (wrapper 기반) | 운영자가 RDP 접속 후 `run_krx_worker_daily.ps1` 1회 실행. venv activate / DB Secret / KRX Secret / 다운로드 경로 junction / KRX 로그인 / KRX program / KRX shortsell / 로그 저장을 1회 흐름으로 처리 | **1차 운영 가능 상태(2026-06-12 도달)** |
+| 자동 실행 (SSM RunCommand + EventBridge Scheduler + 옵션상 Step Functions hybrid orchestration) | EC2 worker 무인 실행. 본 spec 범위 밖 / 후속 분리 | 미도달 |
+| Idle 비용 절감 | 작업 종료 후 EC2 stop 절차 명시. 본 spec 범위 밖 / 후속 분리 | 미도달 |
+
+### 12.5 본 섹션 갱신 원칙
+
+- 기존 §1 ~ §11 결정값(ECR repository / Dockerfile 점검 / 로컬 빌드 / ECR push / ECS Cluster·Role·Log Group / Preprocessor 단발 실행 / NAT-free 정책 / 안전 제약) 은 변경하지 않는다.
+- crawler 관련 §3.2 / §4 / §5 의 ECS 단일 전환 가정은 §12.1 hybrid execution model 분류로 보강한다(전면 재작성 아님).
+- non-GUI crawler 가 ECS Fargate Task 로 운영되는 시점에는 §7 의 preprocessor 단발 실행 검증 패턴을 그대로 재사용한다.
+- KRX GUI 의존 수집이 EC2 worker 로 운영되는 동안에도 NAT-free 정책(§9)은 EC2 worker 의 outbound 경로에 동일하게 적용된다(public subnet + EIP 또는 동등 방식 / 운영자 결정).
+- 후속 spec / 후속 phase 책임 분리 원칙은 §11 그대로 유지한다.
+
 ## Testing Strategy (참고)
 
 본 spec 은 ECR / ECS / IAM / 절차서 산출물이며, 코드 / 순수 함수 / 입력 변동에 따라 행위가 달라지는 알고리즘이 없다. 따라서 property-based testing(PBT) 은 적용되지 않으며, 본 design 은 Correctness Properties 섹션을 포함하지 않는다(03 spec Testing Strategy 동일 정책).
