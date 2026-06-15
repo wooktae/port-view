@@ -214,9 +214,11 @@ execution order 생성 / connector 주문 호출 / fill sync / position sync / i
 
 backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리면 길어질 수 있다(수십 분~수 시간).
 
+> [2026-06-15 보강] 본 일자에 운영자가 직접 수행한 (a) AWS Batch Compute Environment / Job Queue / Job Definition revision 1 / 3 + CloudWatch Log Group + Secrets Manager + IAM Execution / Job Role 신규 생성, (b) py_compile smoke + DB smoke SubmitJob 1차 검증, (c) BACKTEST_RESEARCH full + BACKTEST_REPORT 본 phase 단건 SubmitJob `SUCCEEDED` / exitCode 0 검증(`run_id a39b0b0c-...` / `total_return 4.55930879` / `mdd -0.08941942` / `sharpe 2.65561307` / `trade_count 308`), (d) BACKTEST_REPORT 산출물의 S3 prefix 한정 보존 검증으로 본 절의 1순위(AWS Batch + S3) 권고가 1차 실증되었다. View Daily Batch 기준 AWS Batch 포팅 대상은 `BACKTEST_RESEARCH` + `BACKTEST_REPORT` 2종으로 한정되었고(OD-MS-019), `run_extended_analysis.py` 는 `BACKTEST_RESEARCH` 내부에서 이미 수행되어 별도 AWS Batch 포팅 대상에서 제외되었다. `block_watch_*` / `block_exception_buy_*` 4종은 heavy 분류로서 운영자 수동 보조 도구로만 분류된다. 1순위 / 2순위 / 비권고 표 자체의 권고는 변경하지 않는다. 자세한 결과는 [`../09-strategy-research-batch/operation-notes.md`](../09-strategy-research-batch/operation-notes.md) 2026-06-15 3개 섹션 참조.
+
 | AWS Service Option | 가능 여부 | 비용 | 운영 난이도 | 장점 | 단점 | 장애 / 보안 리스크 | 어필도 | 최종 판단 |
 |--------------------|-----------|------|-------------|------|------|-------------------|--------|-----------|
-| [AWS Batch](./aws-resource-glossary.md#aws-batch) ([Fargate](./aws-resource-glossary.md#fargate-ecs-launch-type) compute env) + [S3](./aws-resource-glossary.md#s3-simple-storage-service) (report) | Yes | Low~Medium | Medium | 장시간 / 동시 다수 backtest / vCPU·메모리 설정 자유 / report S3 보관 | Batch state machine 학습 | Batch 큐 / RDS connection 누수 점검 | High | **1순위** |
+| [AWS Batch](./aws-resource-glossary.md#aws-batch) ([Fargate](./aws-resource-glossary.md#fargate-ecs-launch-type) compute env) + [S3](./aws-resource-glossary.md#s3-simple-storage-service) (report) | Yes | Low~Medium | Medium | 장시간 / 동시 다수 backtest / vCPU·메모리 설정 자유 / report S3 보관. [2026-06-15 보강] 1차 실증 통과(BACKTEST_RESEARCH full + BACKTEST_REPORT 4개 리포트 + S3 업로드) | Batch state machine 학습 | Batch 큐 / RDS connection 누수 점검 | High | **1순위** |
 | [ECS](./aws-resource-glossary.md#ecs-elastic-container-service) [Fargate](./aws-resource-glossary.md#fargate-ecs-launch-type) Task | Yes | Low | Low | 단발 backtest에 단순 | 1시간 이상 backtest는 retry 부담 / 동시 실행 제한 직접 관리 | Fargate Task 동시성 / RDS connection | High | 2순위 |
 | [Step Functions](./aws-resource-glossary.md#step-functions) + [ECS](./aws-resource-glossary.md#ecs-elastic-container-service) RunTask 또는 [Batch](./aws-resource-glossary.md#aws-batch) SubmitJob | Yes | Low | Medium | run → analysis → report 단계 묶기 좋음 | 학습 부담 | state machine 진단 | High | 1순위 보조 |
 | [EC2](./aws-resource-glossary.md#ec2-elastic-compute-cloud) cron / 단일 EC2 backtest 머신 | Yes | Medium | Medium | 단순 | 24/7 idle 비용 또는 매번 start/stop 부담 | SPOF | Low | 비권고 |
@@ -234,7 +236,7 @@ backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리�
 | port_strategy_common | 별도 컴퓨트 없음 (git submodule packaging) | wheel + CodeArtifact (성숙기) | ECS / EC2 / Lambda / EKS | 순수 라이브러리. 컴퓨트 대상 아님 |
 | port_strategy_decision | ECS Fargate Task + EventBridge Scheduler (+ Step Functions in 04) | AWS Batch (다수 day 재처리) | Lambda / EC2 / EKS / Beanstalk / App Runner | daily idempotent batch. cron + 컨테이너로 충분 |
 | port_strategy_execution | ECS Fargate Task + EventBridge Scheduler + Step Functions | ECS Fargate Service (intraday 상시) | Lambda / EC2 / EKS / Beanstalk / App Runner | live 자동 재시도 금지 정책을 step별로 인프라 레벨에서 강제하기 위해 Step Functions 1순위 |
-| port_strategy_research | AWS Batch + S3 (Step Functions 보조) | ECS Fargate Task | Lambda / EC2 / EKS / Beanstalk / App Runner | 장시간 backtest + report 산출. Batch가 vCPU/메모리 자유도 + 동시 실행 모두 우수 |
+| port_strategy_research | AWS Batch + S3 (Step Functions 보조) | ECS Fargate Task | Lambda / EC2 / EKS / Beanstalk / App Runner | 장시간 backtest + report 산출. Batch가 vCPU/메모리 자유도 + 동시 실행 모두 우수. [2026-06-15 보강] AWS Batch Compute Environment `portfolio-paper-strategy-research-ce`(MANAGED / FARGATE / maxvCpus 4) + Job Queue `portfolio-paper-strategy-research-queue`(priority 10) + Job Definition revision 1 / 3 등록 후 BACKTEST_RESEARCH full + BACKTEST_REPORT 본 phase 단건 SubmitJob `SUCCEEDED` / exitCode 0 으로 1순위 1차 실증 통과(`run_id a39b0b0c-...` / `total_return 4.55930879` / `mdd -0.08941942` / `sharpe 2.65561307` / `trade_count 308`). report artifact 는 S3 prefix `strategy-research/reports/{YYYYMMDD}/{AWS_BATCH_JOB_ID}/`(OD-MS-019 정합) 한정 보존. AWS Batch 1순위 / ECS Fargate Task 2순위 / Lambda 비권고 권고 변경 없음 |
 
 권고가 ECS Fargate에 집중되는 사유는 다음과 같다.
 
@@ -257,6 +259,8 @@ backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리�
 | Daily Batch orchestration | ECS Fargate Task | + Step Functions + EventBridge Scheduler + ECS RunTask | 04 | Step Functions transitions 무시 가능 | 학습 1회 |
 | infra alarm | CloudWatch Alarm | + SNS + Lambda + Slack webhook fan-out | 05 / 10 | 무료 한도 안 | 낮음 |
 | research artifact | AWS Batch | + S3 (report 보관) + S3 lifecycle | 09 | S3 storage ~$0.025/GB-월 | 낮음 |
+
+> [2026-06-15 보강] research artifact 행은 본 일자에 1차 실증되었다. 기존 S3 bucket `portfolio-paper-migration-yukiever` 재사용 / Job Role 의 `s3:PutObject` Resource 는 `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` 한정 / public read 0건 / wildcard 0건. report wrapper 의 `REPORT_S3_BUCKET` 미설정 시 업로드 skip / 설정 시 `REPORT_S3_PREFIX=strategy-research/reports` 기본값 + `AWS_BATCH_JOB_ID` 기준 하위 경로 분리 / `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` 기본값 유지(Fargate ephemeral 영역 정합). S3 lifecycle 정책은 본 일자 미설정 — 후속 분리(R-COST-003 / 06 후속 phase 책임). KMS encryption 도 후속 spec 결정. 본 매트릭스의 권고(AWS Batch 1순위 + S3 보관 + S3 lifecycle 후속) 자체는 변경하지 않는다.
 | secrets | Secrets Manager | + SSM Parameter Store SecureString(저민감) | 06 | secret 개당 $0.40/월 | 06에서 결정 |
 | container registry | (자동 사용) | ECR + lifecycle policy + image scanning | 07 | storage ~$0.10/GB-월 | 낮음 |
 | optional future | (없음) | EKS optional track / CodePipeline appendix | 7장 + 별도 spec | 추가 시 큼 | 본 spec 범위 밖 |

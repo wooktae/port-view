@@ -407,3 +407,70 @@ revision 6 의 RunTask smoke 결과(2026-06-13)는 다음을 1차 검증한다.
 
 - **정적 점검**: ECR repository 존재 / repository scan 설정 / image tag·digest 존재 / Task Definition `secrets` 매핑 / Task Role·Task Execution Role 권한 골격 / Log Group 존재 / NAT Gateway 부재 / wildcard 부재 / Access Key 부재. validation-checklist.md(후속 phase) 책임.
 - **단발 실행 검증**: Preprocessor ECS Task 1회 `aws ecs run-task` → RDS 접속 성공 / CloudWatch Logs 출력 / exit code 0. runbook.md(후속 phase) 책임. Crawler outbound 검증은 본 spec 범위 밖이며 별도 phase 또는 후속 spec 책임.
+
+## 14. 2026-06-15 운영자 검증 결과 / Interest Crawler 상태 재판정
+
+본 섹션은 2026-06-15 운영자가 직접 수행한 Backend AWS E2E dry-run 1차 점검 결과를 반영한 보강 섹션이다. §12 Hybrid execution model 분류와 §13 1차 자동화 완성 판단 자체는 변경하지 않고, 본 spec 의 crawler runtime 상태 표현을 "전체 완료" 가 아닌 "hybrid 1차 / 부분 완료" 로 보정한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-15 섹션 / 본 일자 결정 락은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-020 / OD-MS-021 참조.
+
+### 14.1 표현 보정 (OD-MS-020 정합)
+
+기존 표현은 KRX GUI worker 의 운영 가능 도달과 ECS / Fargate Selenium Chrome smoke 통과를 묶어 Interest Crawler 전체가 완성된 것으로 해석될 여지가 있어 보정한다.
+
+| 기존 표현 | 보정 표현 |
+|----------|----------|
+| Interest Crawler 완성: 완료 | Interest Crawler hybrid 1차 구현: 부분 완료 |
+| Interest Crawler 는 hybrid execution model 기준으로 1차 완성 | KRX GUI worker 는 운영 가능 상태로 1차 완성 / ECS · Fargate crawler 는 smoke 검증 완료 / non-GUI daily raw 수집 운영 경로와 raw 전체 최신성 검증은 후속 |
+
+본 표현 보정은 다음 원칙을 따른다.
+
+- "완료" 표기는 실제 데이터 적재 / 최신성 검증까지 확인된 경우에만 사용한다.
+- KRX GUI worker 완료와 Interest Crawler 전체 완료를 혼동하지 않는다.
+- smoke 성공과 daily raw 최신성 성공을 분리한다.
+
+### 14.2 워크로드 별 본 일자 상태 (2026-06-15)
+
+§12.1 hybrid execution model 분류 표를 본 일자 상태로 갱신한다(분류 자체는 변경 없음).
+
+| 워크로드 | runtime | 본 일자 상태 | 비고 |
+|---------|---------|-------------|------|
+| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task | 본 일자 단발 RunTask 성공(exitCode 0 / `updated_at` 갱신) — 데이터 최신성 제약 | §7 그대로 유지 |
+| KRX GUI 의존 crawler (KRX program / KRX shortsell, Selenium / Chrome) | Windows EC2 worker | 본 일자 wrapper 재실행 성공 — `[Collected Date] None` idempotent / `interest_program_raw` · `interest_shortsell_raw` 최신일 2026-06-12 | KRX 거래일 정상(2026-06-15 월요일 기준 직전 거래일까지 적재) |
+| non-GUI crawler (Naver / yfinance / KRX 비-GUI 경로 후보) | ECS Fargate Task 후보 유지 | **운영 실행 미도달** — Selenium Chrome smoke(2026-06-13 §13.3 revision 6)는 통과하였으나 실제 daily raw 수집 운영 경로 / Task Definition / command 분리 / outbound 도달 검증은 미완료 | task 58 / task 72 후속 분리 |
+
+### 14.3 non-GUI crawler 인벤토리 분류 (운영 경로 분리 후속)
+
+본 일자 1차 분류는 다음과 같다. 실제 운영용 Task Definition / command 분리는 task 58 / task 72 후속.
+
+- ECS Fargate 후보(non-GUI 가능성 높음): `interest_news.py` / `interest_agency.py` / `interest_foreignindex.py` / `interest_commodity.py` / `interest_macroeconomic.py` / `interest_price.py` / `interest_investorflow.py` / `interest_marketbreadth.py`
+- ECS Fargate 제외(KRX GUI 의존 또는 별도 분리): `interest_krx_login_new.py` / `interest_program.py` / `interest_shortsell.py` / `interest_ticker_value.py`
+
+위 분류는 운영용 Task Definition 분리 시점에 1:1 매핑으로 다시 점검한다. `interest_crawler_daily.py` 자체는 KRX GUI 의존 파일과 non-GUI 파일을 동시에 호출하므로 ECS Fargate 단독 실행 대상에서 제외(2026-06-13 §13.3 정합).
+
+### 14.4 raw 최신성 검증 부족과 downstream 영향
+
+본 일자 SQL 점검 결과(2026-06-15 시점):
+
+- `interest_program_raw` / `interest_shortsell_raw` 최신일 = 2026-06-12 (KRX GUI worker 경로 정상)
+- non-GUI raw 7종(`interest_agency_raw` / `interest_news_raw` / `interest_commodity_raw` / `interest_foreignindex_raw` / `interest_investorflow_raw` / `interest_marketbreadth_raw` / `interest_price_raw`) — 직전 거래일까지 적재되지 않음
+- `interest_ticker_value_raw` 최신일 = 2026-03-09(본 dry-run 핵심 차단 요인에서는 제외 / 별도 후속 분리)
+
+이 상태에서 preprocessor ECS RunTask 가 성공하더라도 신규 feature date 생성이 제한된다(본 일자 §4 정합). Backend AWS E2E dry-run 흐름에서 `BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL` 로 넘어가기 전 raw 최신성 회복이 선결 조건이며, 후속 spec(04 / 09)에서 stale data 입력 위험으로 작용한다(R-DATA-009 / R-DATA-010 정합).
+
+### 14.5 Backend AWS E2E dry-run 진입 정합
+
+§12 / §13 의 hybrid execution model 1차 완성 판단은 그대로 유지하되, View Daily Batch 17단계 순서를 기준으로 본 일자 backend AWS 실행 상태를 정리한 결과는 다음과 같다(자세한 표는 [`./operation-notes.md`](./operation-notes.md) 2026-06-15 §6).
+
+| 분류 | 본 일자 상태 |
+|------|-------------|
+| 완료 | 1번 `CONNECTOR_BALANCE` / 3번 `PREPROCESSOR`(데이터 최신성 제약) |
+| 부분 완료 / follow-up 승격 | 2번 `INTEREST_CRAWLER` |
+| 미진행 | 4 ~ 7번(`BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL`) |
+| 미진행 / dry-run skip 예정 | 8 ~ 17번(`DAILY_BUY_EXECUTION` / `DAILY_SELL_EXECUTION` / `DAILY_AUTO_SELL` / `DAILY_AUTO_BUY` / `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` / `CONNECTOR_ORDER_CHECK` / `SYNC_SELL_FILL` / `SYNC_BUY_FILL` / `SYNC_BUY_POSITION` / `BALANCE_REFRESH`) |
+
+본 표는 OD-MS-021 결정 락의 입력으로 사용된다. 실제 BUY / SELL / `--execute` / fill·position sync 자동 재시도 / aws-live 작업은 모두 0건이다(§11.1 / OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011 정합).
+
+### 14.6 본 섹션 갱신 원칙
+
+- 기존 §1 ~ §13 결정값은 변경하지 않는다.
+- §14 는 §12 의 hybrid execution model 분류와 §13 의 1차 자동화 완성 판단 위에 표현 보정 / 본 일자 상태 갱신 / non-GUI 운영 미도달 명시 / raw 최신성 부족 영향 명시만 추가한다.
+- non-GUI crawler 의 실제 운영용 Task Definition 분리, raw 최신성 회복 작업, preprocessor 재실행, raw / feature 최신성 검증 SQL 자동화는 모두 후속 spec / 후속 phase 책임이다(task 72 / 73 / 74 / 77 / 78 / 58 정합).

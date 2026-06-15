@@ -390,3 +390,79 @@
   9. CI/CD OIDC / GitHub Actions 자동 build / push: 후속(07 spec)
   10. aws-live cutover: 후속(10 spec)
 - 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지 — 단, 09 의 Batch image 준비는 2026-06-13 에 선행 완료된 것으로 기록. 본 일자 결과는 09 / 07 / 10 후속 phase 입력으로 사용한다.
+
+
+### 2026-06-15 후속 메모 (09 spec — Strategy Research AWS Batch 실행 검증 완료)
+
+- `09-strategy-research-batch` 가 2026-06-15 (a) AWS Batch 실행 골격(Compute Environment / Job Queue / Job Definition revision 1 / CloudWatch Log Group / Secrets Manager / Execution Role + Job Role) 신규 생성 + smoke SubmitJob 1차 검증, (b) BACKTEST_RESEARCH full 실행 + BACKTEST_REPORT 4개 리포트 생성 본 phase 검증, (c) BACKTEST_REPORT S3 업로드 보강 + Job Definition revision 3 + S3 4개 객체 존재 확인까지 도달했다. 자세한 결과는 [`../09-strategy-research-batch/operation-notes.md`](../09-strategy-research-batch/operation-notes.md) 2026-06-15 3개 섹션 참조. 같은 일자(2026-06-13 Strategy Research Batch image 1차 준비) 후속이며, Strategy Research 의 최종 컴퓨트 1순위는 AWS Batch 유지(OD-MS-008 본문 변경 없음 / Status 그대로 유지) — 본 일자 결과로 1차 실증 메모 보강.
+- 1차 완료 범위(2026-06-15 도달):
+  - AWS Batch Compute Environment `portfolio-paper-strategy-research-ce`(MANAGED / FARGATE / maxvCpus 4 / state ENABLED / status VALID)
+  - Job Queue `portfolio-paper-strategy-research-queue`(priority 10 / state ENABLED / status VALID)
+  - Job Definition revision 1 `portfolio-paper-strategy-research:1`(image `paper-latest` / vCPU 1 / memory 2048 / timeout 600초 / FARGATE / assignPublicIp ENABLED / 기본 command 안전한 `py_compile` smoke)
+  - CloudWatch Log Group `/portfolio/paper/strategy-research`(retention 14일)
+  - Secrets Manager `/portfolio/paper/rds/research-app`(JSON multi-key `host` / `port` / `dbname` / `username` / `password` / secret value 노출 0건 / key presence 검증 완료)
+  - Execution Role `portfolio-paper-research-batch-execution-role`(`AmazonECSTaskExecutionRolePolicy` + research-app secret read inline policy / secret ARN 한정 / wildcard 0건 / OD-SEC-006 정합)
+  - Job Role `portfolio-paper-research-job-role`(최초 smoke 단계 최소 권한 + 이후 prefix 한정 `s3:PutObject` 추가 / Resource = `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` / public read 0건 / wildcard 0건)
+  - py_compile smoke SubmitJob `smoke-strategy-research-import-20260615`(jobId `81ec3581-0204-43ea-8238-a2a6d22f3f28` / `SUCCEEDED` / exitCode 0)
+  - DB smoke SubmitJob `smoke-strategy-research-db-20260615`(jobId `5399aa10-0fdd-466b-8079-236d3b7e7e37` / `SUCCEEDED` / exitCode 0 / `db smoke ok` / `research_app` / `portfolio` / schema `research` / search_path 정합 / image pull · secret injection · log delivery 오류 0건)
+  - Strategy Common 1차 정합성 확인 완료(별도 컴퓨트 없음 / Decision · Execution · Research image 에 vendoring 유지 / common 주요 모듈 + Research adapter 3개 py_compile 통과 + 각 MS 의 common import smoke 통과 / 표현은 "Strategy Common 1차 정합성 확인 완료 / 정식 package 관리는 후속")
+  - BACKTEST_RESEARCH full 실행 SubmitJob `SUCCEEDED` / exitCode 0 / `run_id a39b0b0c-cfe9-474e-8a4a-4ddb33f09567` / `total_return 4.55930879` / `mdd -0.08941942` / `sharpe 2.65561307` / `trade_count 308` / extended analysis 내부 수행 포함
+  - BACKTEST_REPORT SubmitJob `SUCCEEDED` / exitCode 0 / 4개 리포트 생성 / `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` 적용
+  - BACKTEST_REPORT S3 업로드 보강 — 기존 S3 bucket `portfolio-paper-migration-yukiever` 재사용 / `boto3` requirements.txt 추가 + Docker 내부 import smoke 성공 / report wrapper 옵션 추가(`REPORT_S3_BUCKET` 미설정 시 skip / `REPORT_S3_PREFIX` 기본값 `strategy-research/reports` / `AWS_BATCH_JOB_ID` 기준 하위 경로 분리 / `REPORT_OUTPUT_DIR` 기본값 `/tmp/portfolio-reports` 유지) / Docker rebuild + ECR push(image tag `paper-20260615-report-s3` / image digest sha256 placeholder 사용 / image size 약 106MB / pushedAt 2026-06-15T17:00:10+09:00) / Job Definition revision 3 등록(image `paper-20260615-report-s3` / TaskRole `portfolio-paper-research-job-role`)
+  - S3 업로드 SubmitJob `strategy-research-backtest-report-s3-20260615`(jobId `112f5fe4-02f3-4614-a88c-60a9842e1447` / `SUCCEEDED` / exitCode 0 / logStreamName `strategy-research/default/b18e548d46764cd791028088e1d32a6d`)
+  - S3 객체 4건 존재 확인(prefix `strategy-research/reports/20260615/112f5fe4-.../` / `01_요약 리포트` ~ `04_추천 리포트` / private 유지 / public read 0건)
+- runtime / packaging 결정(2026-06-15 도달):
+  - Strategy Research AWS Batch 1순위 실증 1차 완료(OD-MS-008 본문 변경 없음 — 1차 실증 메모만 보강).
+  - View Daily Batch 기준 AWS Batch 포팅 대상 = `BACKTEST_RESEARCH` + `BACKTEST_REPORT` 2종 확정(OD-MS-019 신규 결정).
+  - `run_extended_analysis.py` 는 `BACKTEST_RESEARCH` 내부에서 이미 수행되므로 별도 AWS Batch 포팅 대상 제외 + 수동 보조 도구로 분류.
+  - `block_watch_*` / `block_exception_buy_*` 4종은 AWS Batch 포팅 대상 제외 + heavy 분류 후속.
+  - Research report artifact 보존 = S3 prefix `strategy-research/reports/{YYYYMMDD}/{AWS_BATCH_JOB_ID}/`(OD-MS-019 정합) / 기존 bucket `portfolio-paper-migration-yukiever` 재사용.
+  - `port_strategy_common` 1차 배포 방식 = vendoring 유지(OD-MS-014 변경 없음 / 정식 package / version 관리는 후속).
+- 결정 락(2026-06-15): OD-MS-019(신규 / 🟡 잠정). OD-MS-008 / OD-MS-018 본문 변경 없이 1차 실증 메모 보강 — Status 모두 기존 값 유지.
+- 보강 / 신규 리스크: R-AUTO-015 mitigation·detection 보강 + Status `Open` → `Mitigated` 승격(View Daily Batch SubmitJob 연동 / Step Functions orchestration 전까지 완전 Closed 가 아닌 Mitigated 유지가 적절). R-DATA-008 detection 보강(Strategy Common 1차 정합성 확인 절차 + smoke / sample 비교 절차 후속 문서화). 신규 R-COST-003(Research S3 report 누적 비용 / lifecycle 미설정 위험, mitigation = OD-MS-019 prefix 한정 + Job Role Resource 한정 + public read 0건 + S3 lifecycle 정책 후속 결정 + 06 spec KMS encryption 결정, Status `Open`).
+- 6/13 후속 항목 중 본 일자 회수(완료):
+  1. AWS Batch Compute Environment / Job Queue / Job Definition revision 1 1차 생성: 완료
+  2. CloudWatch Log Group `/portfolio/paper/strategy-research` 생성 + retention 14일: 완료
+  3. Secrets Manager `/portfolio/paper/rds/research-app` JSON multi-key 신규 생성: 완료
+  4. IAM Execution Role + Job Role 신규 생성(secret ARN 한정 / wildcard 0건) + Job Role 의 prefix 한정 `s3:PutObject` 추가: 완료
+  5. 짧은 no-op / import smoke SubmitJob 검증 — `smoke` job name prefix + light command allowlist 기반(R-AUTO-015 mitigation 정합): 완료
+  6. full backtest / 장시간 research / report 생성 — 별도 비용 / 시간 / timeout / 운영자 승인 기준 확정 후 실행: 완료(BACKTEST_RESEARCH + BACKTEST_REPORT 단건 검증 / vCPU 1 / memory 2048 / timeout 600초 안에서 1차 통과)
+  7. BACKTEST_REPORT S3 업로드 옵션 / `REPORT_OUTPUT_DIR` 분리 / S3 prefix 정합: 완료
+- 2026-06-15 이월 / 후속 분리(남은 항목):
+  1. View Daily Batch 의 `BACKTEST_RESEARCH` / `BACKTEST_REPORT` step 을 ProcessBuilder 직접 실행 → AWS Batch SubmitJob 호출로 매핑 — 05 / 04 spec 후속 phase 책임
+  2. Step Functions state machine 정의 — `BACKTEST_RESEARCH` → `BACKTEST_REPORT` 순서 강제 + 자동 재시도 금지(OD-SAFE-004 / R-AUTO-001 정합) + EventBridge Scheduler 정기 트리거. 04 spec 후속 phase 책임
+  3. `block_watch_*` / `block_exception_buy_*` 수동 보조 도구 운영 절차 명문화(09 후속 phase 책임 / heavy 분류 / R-AUTO-015 mitigation 정합 / OD-MS-019 정합)
+  4. Research 내부 adapter 3개(`research_backtest_market_adapter` / `research_backtest_filter_adapter` / `research_backtest_sizing_adapter`) → `port_strategy_common` 정식 adapter 이동 — R-DATA-008 mitigation 정합 / OD-MS-005 / OD-MS-014 / OD-MS-018 후속 정합
+  5. `port_strategy_common` 정식 package / version 관리(wheel / sdist / CodeArtifact 또는 git submodule) — 07 spec / Strategy Common 단계 책임. 본 일자에는 vendoring 유지(OD-MS-014 변경 없음).
+  6. CI/CD OIDC build / push 자동화 — 07 spec 책임
+  7. aws-live cutover — 10 spec 책임
+  8. S3 lifecycle 정책 결정 + KMS encryption 결정 — R-COST-003 mitigation / 06 후속 phase 책임
+- 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지 — 단, 09 의 BACKTEST_RESEARCH / BACKTEST_REPORT AWS Batch 1차 실행 검증 + S3 업로드 보강은 2026-06-15 에 본 phase 까지 완료된 것으로 기록. 본 일자 결과는 09 / 04 / 05 / 07 / 10 후속 phase 입력으로 사용한다.
+
+
+### 2026-06-15 후속 메모 (08 spec — Backend AWS E2E dry-run 1차 + Interest Crawler 상태 재판정)
+
+- 운영자가 2026-06-15 직접 수행한 (a) AWS 계정 / region / EC2 / ECS / AWS Batch 사전 점검, (b) MarketConnector EC2 기반 `CONNECTOR_BALANCE` 1차 실행, (c) Windows EC2 worker 기반 KRX worker 재실행 + KRX raw 최신일 점검, (d) non-GUI raw 최신일 SQL 점검, (e) preprocessor ECS RunTask 단발 실행 + DB `updated_at` 갱신 확인 결과를 반영. View 진입 전 backend AWS 측 dry-run 을 17단계 순서로 1차 점검해 stale raw data 이슈를 조기 식별. 자세한 결과는 [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-15 §1 ~ §8 참조. 같은 일자 Strategy Research AWS Batch 골격 + full / report + S3 업로드 후속 메모(앞 섹션) 와 별개의 두 번째 세션이며, 진행 순서(08 → 04 → 05 → 09 → 07 → 10) 자체는 변경 없음.
+- 1차 완료 범위(2026-06-15 도달):
+  - 사전 점검 — region `ap-northeast-2` / account 확인 / 로컬 AWS CLI 기본 실행 가능 / MarketConnector EC2 running / Windows crawler worker running / SSM managed instance Online / `portfolio-paper-cluster` ACTIVE / preprocessor·decision buy-signal·decision position-signal task definition / Strategy Research Compute Environment·Job Queue·Job Definition active revision(BACKTEST_REPORT S3 upload 포함 latest revision = `portfolio-paper-strategy-research:3`) ENABLED / VALID / Healthy
+  - `CONNECTOR_BALANCE`(Backend E2E dry-run 1번) 완료 — MarketConnector EC2(`/home/ec2-user/apps/port-marketconnector` / venv python / SSM RunCommand) / KIS Secrets JSON key parsing 정정(`APP_KEY` → `KIS_APP_KEY` / `APP_SECRET` → `KIS_APP_SECRET` / `PAPER_ACNT` → `KIS_PAPER_ACNT` / `ACNT_PRDT_CD` → `KIS_ACNT_PRDT_CD`) / 기존 `access_token.txt` 백업 / 신규 token 발급 / KIS balance API status 200 / 모의투자 잔고 조회 / `connector_balance_snapshot` 저장 / `connector_position_snapshot` 보유종목 0건 처리 / legacy holdings 0건
+  - KRX GUI worker 재실행 idempotent 정상 완료 — `KRX already logged in` / `KRX Login Ready` / `[Collected Date] None` / `interest_program_raw` · `interest_shortsell_raw` 최신일 2026-06-12(직전 거래일까지 적재 정상)
+  - non-GUI raw 7종 최신일자 SQL 점검 — `interest_agency_raw` 2026-06-11 / `interest_news_raw` 2026-06-11 / `interest_commodity_raw` · `interest_foreignindex_raw` · `interest_investorflow_raw` · `interest_marketbreadth_raw` · `interest_price_raw` 모두 2026-06-08 / `interest_ticker_value_raw` 2026-03-09(dry-run 핵심 차단 요인 제외)
+  - preprocessor ECS RunTask 단발 실행 성공 — `portfolio-paper-cluster` / `portfolio-paper-interest-preprocessor:1` / FARGATE / awsvpc / public-a + public-b / `assignPublicIp = ENABLED` / `sgroup-preprocessor-tasks` / lastStatus `STOPPED` / stopCode `EssentialContainerExited` / container `interest-preprocessor` / exitCode 0 / 약 3분 43초 / DB `updated_at` 2026-06-15 11:03:55+00(KST 2026-06-15 20:03:55) 갱신 확인 / 신규 2026-06-15 feature date 0건 — 원인은 raw 최신성 부족
+  - Secret · IAM 권한 분리 1차 실증 — MarketConnector EC2 role(`portfolio-paper-marketconnector-ec2-role`)에서 `/portfolio/paper/rds/preprocessor-app` `GetSecretValue` `AccessDeniedException`. 장애가 아니라 OD-SEC-006 / OD-DB-008 정합으로 정상 동작 / 권한 추가 0건 / preprocessor DB 확인은 preprocessor ECS Task 또는 운영자 로컬 SSM Port Forwarding(OD-NET-010 / OD-NET-011) 으로만 수행
+  - Backend AWS E2E dry-run 17단계 진행 상태 정리 — 1번 완료 / 2번 부분 완료 / 3번 실행 완료(데이터 최신성 제약) / 4 ~ 7번 미진행 / 8 ~ 17번 미진행 또는 dry-run skip 예정. 실제 BUY / SELL / `--execute` 주문 전송 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건
+- 결정 락(2026-06-15 두 번째 세션): OD-MS-020(Interest Crawler 상태 재판정 / hybrid 1차 구현 부분 완료 표현 통일, 🟡 잠정), OD-MS-021(Backend AWS E2E dry-run 17단계 순서 + 안전 기준, 🟡 잠정). OD-SEC-006 본문 변경 없이 1차 실증 메모만 보강 — Status 🟡 잠정 유지. OD-DB-008(marketconnector_app execution R-only) 본문 변경 없음.
+- 보강 / 신규 리스크: R-DATA-009 신규(smoke 검증을 daily 데이터 최신성 완료로 오해할 위험, Status `Open`), R-DATA-010 신규(raw 최신성 부족으로 downstream Research / Decision 결과가 stale data 기반이 될 위험, Status `Open`). 기존 R-DATA-005 / R-DATA-006 / R-DATA-007 / R-DATA-008 / R-COST-003 본문 변경 없음.
+- 표현 보정(OD-MS-020 정합):
+  - 기존 표현 — "Interest Crawler 완성: 완료" / "Interest Crawler 는 hybrid execution model 기준으로 1차 완성"
+  - 보정 표현 — "Interest Crawler hybrid 1차 구현: 부분 완료" / "KRX GUI worker 는 운영 가능 상태로 1차 완성" / "ECS · Fargate crawler 는 smoke 검증 완료" / "non-GUI daily raw 수집 운영 경로와 raw 전체 최신성 검증은 후속"
+  - 원칙 — "완료" 표기는 실제 데이터 적재 / 최신성 검증까지 확인된 경우에만 사용 / KRX worker 완료와 Interest Crawler 전체 완료를 혼동 금지 / smoke 성공과 daily raw 최신성 성공을 분리
+- 2026-06-15 두 번째 세션 이월 / 후속 분리(남은 항목):
+  1. non-GUI Interest Crawler 운영 실행 경로 정리 — `interest_crawler_daily.py` 에서 KRX GUI 단계 제외한 실행 경로 분리 + ECS / Fargate 용 non-GUI crawler command 분리. 대상 후보 = `interest_news.py` / `interest_agency.py` / `interest_foreignindex.py` / `interest_commodity.py` / `interest_macroeconomic.py` / `interest_price.py` / `interest_investorflow.py` / `interest_marketbreadth.py`. 제외 후보 = `interest_krx_login_new.py` / `interest_program.py` / `interest_shortsell.py` / `interest_ticker_value.py`. 08 spec task 58 / task 72 와 합쳐 진행
+  2. interest raw 최신성 검증 자동화 — non-GUI raw 7종 + KRX raw 2종의 `MAX(trade_date)` 와 직전 거래일 비교 SQL 정기 실행. 08 spec task 73 / R-DATA-009 / R-DATA-010 mitigation 정합
+  3. preprocessor 실행 후 raw / feature 최신성 검증 SQL 자동화 — preprocessor `updated_at` 갱신 후 신규 feature date 생성 여부를 자동 비교. 08 spec task 78 / R-DATA-010 mitigation 정합
+  4. raw 최신성 회복 — `interest_price_raw` / `interest_investorflow_raw` / `interest_marketbreadth_raw` / `interest_commodity_raw` / `interest_foreignindex_raw` / `interest_news_raw` / `interest_agency_raw` 직전 거래일 적재. 08 spec task 74
+  5. preprocessor 재실행 — raw 최신성 회복 후 `portfolio-paper-interest-preprocessor` 재실행 → exitCode 0 확인 → feature table max date / `updated_at` 확인 → 신규 feature date 생성 여부 확인. 08 spec task 77
+  6. Backend E2E dry-run 재개 — `BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL` 순서로 진행. Research 가 Decision 보다 먼저 실행. 주문 전송 / execution 계열은 안전 기준에 따라 skip 또는 dry-run 만 수행(OD-MS-021 / OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 / R-AUTO-010 / R-AUTO-011 정합)
+  7. 표현 통일 점검 — 운영 문서 / 보고 / 슬라이드 등에서 "Interest Crawler 완성: 완료" 잔존 grep 정기 점검(R-DATA-009 detection 정합)
+- 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 단, 08 의 hybrid 1차 구현은 본 일자(2026-06-15) 시점에 **부분 완료** 로 정리되었으며, non-GUI daily 운영 경로와 raw 최신성 회복은 후속 spec / 후속 phase 책임으로 명시한다. 본 일자 결과는 04 / 05 / 09 / 10 후속 phase 입력으로 사용한다.

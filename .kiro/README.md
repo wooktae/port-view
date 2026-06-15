@@ -104,3 +104,17 @@
 - spec 구조 변경, 루트 공통 문서 변경, 신규 spec 생성, 주요 문서 재구성이 발생하면 `CHANGELOG.md`를 갱신한다.
 - 의미 있는 Kiro 문서 작업 세션이 끝나면 `WORKLOG.md`에 간단히 누적한다.
 - Kiro 작업 규칙(범위, 단일 기준 문서, 보안/실행 정책)이 바뀌면 `AGENTS.md`를 갱신한다.
+
+## 현재 진행 상태 요약 (2026-06-15 기준)
+
+본 섹션은 운영자가 한눈에 보기 위한 짧은 진행 상태 요약이다. 자세한 일자별 결과 / 후속 인계는 `specs/_common/followups-overview.md` 와 `WORKLOG.md` 에 누적되어 있고, 각 spec 의 운영 결과는 해당 spec 의 `operation-notes.md` 에 누적된다. 본 섹션의 "완료" 표기는 실제 데이터 적재 / 최신성 검증까지 확인된 경우에만 사용한다(OD-MS-020 정합).
+
+- 02 `aws-network-and-rds` — VPC / Subnet / RDS / DB Role 1차 적용 완료. SSM Port Forwarding 표준 경유지 1차 운영(OD-NET-010 / OD-NET-011).
+- 03 `marketconnector-ec2` — EC2 + EIP 정상 운영 모드 1차 검증 완료. 본 일자(2026-06-15) `CONNECTOR_BALANCE` 1차 실행 성공(KIS balance API status 200 / `connector_balance_snapshot` 저장).
+- 06 `secrets-and-iam` — paper 환경 Secrets / IAM 1차 적용 완료. MS 별 Secret 접근 분리(OD-SEC-006) 정책 정합성 1차 실증(MarketConnector EC2 role 의 preprocessor secret `AccessDeniedException` 정상 동작).
+- 08 `interest-crawler-and-preprocessor-ecs` — **Interest Crawler hybrid 1차 구현: 부분 완료**. KRX GUI worker 는 운영 가능 상태로 1차 완성(KRX program / KRX shortsell 직전 거래일까지 적재). ECS / Fargate crawler 는 smoke 검증 완료. **non-GUI daily raw 수집 운영 경로와 raw 전체 최신성 검증은 후속**(non-GUI raw 7종 직전 거래일까지 미적재). preprocessor MS 는 ECS 단발 RunTask 실행 성공(exitCode 0 / `updated_at` 갱신) — **단, 입력 raw 최신성 부족으로 신규 feature date 생성은 제한**(R-DATA-010).
+- 04 `strategy-batch-stepfunctions` — Strategy Decision 2개 Task Definition / Strategy Execution 단일 Task Definition + command override 1차 RunTask 검증 완료(OD-MS-013 / OD-MS-017). Step Functions / EventBridge 정기 트리거는 후속.
+- 09 `strategy-research-batch` — AWS Batch Compute Environment / Job Queue / Job Definition revision 1 ~ 3 + S3 업로드 보강 1차 실증 통과(BACKTEST_RESEARCH full + BACKTEST_REPORT 4개 리포트 + S3 prefix `strategy-research/reports/` 한정). View Daily Batch 기준 AWS Batch 포팅 대상은 `BACKTEST_RESEARCH` + `BACKTEST_REPORT` 2종 한정(OD-MS-019). `block_watch_*` / `block_exception_buy_*` / `run_extended_analysis.py` 는 수동 보조 도구로 분류.
+- 05 / 07 / 10 — 미진행. View Daily Batch 의 ProcessBuilder → AWS Batch · ECS RunTask 매핑(05) / Step Functions state machine + EventBridge Scheduler / CI/CD OIDC(07) / aws-live cutover(10) 모두 후속 분리.
+- aws-live — **미진행** / 본 일자까지 모든 검증은 `aws-paper` 한정.
+- 가장 최근 Backend AWS E2E dry-run 진행 상태(2026-06-15) — 1번 `CONNECTOR_BALANCE` 완료 / 2번 `INTEREST_CRAWLER` 부분 완료 / 3번 `PREPROCESSOR` 실행 완료(데이터 최신성 제약) / 4 ~ 7번(`BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL`) 미진행 / 8 ~ 17번 미진행 또는 dry-run skip 예정. 실제 BUY / SELL / `--execute` 주문 전송 0건 / fill·position sync 자동 재시도 0건(OD-MS-021 / OD-SAFE-001 ~ OD-SAFE-004 정합).

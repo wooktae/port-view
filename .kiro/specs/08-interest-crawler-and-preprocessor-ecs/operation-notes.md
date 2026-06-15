@@ -451,3 +451,199 @@
 5. ECS / Fargate non-GUI crawler 실제 Task Definition 분리(인벤토리 확정 + smoke 용 revision 6 과 운영용 Task Definition 분리): 후속 분리
 6. EC2 worker 작업 완료 후 stop 절차 명시(idle 시간 비용 절감): 후속 분리
 7. 본 spec 산출물(requirements.md / design.md / tasks.md) 갱신은 본 노트 §1 ~ §6 결과 반영분 한정. runbook.md / validation-checklist.md 는 운영자 실행 이후 별도 작성 책임 유지.
+
+## 2026-06-15 Backend AWS E2E dry-run 1차 / Interest Crawler 상태 재판정
+
+운영자가 2026-06-15 직접 수행한 (a) AWS 계정 / region / EC2 / ECS / AWS Batch 사전 점검, (b) MarketConnector EC2 기반 `CONNECTOR_BALANCE` 1차 실행, (c) Windows EC2 worker 기반 KRX worker 재실행 + `interest_program_raw` / `interest_shortsell_raw` 최신일자 확인, (d) non-GUI crawler `interest_*_raw` 최신일자 SQL 점검, (e) preprocessor ECS RunTask 1회 단발 실행 + DB `updated_at` 갱신 확인 결과를 누적 기록한다. 본 일자에 Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행했고, 실제 AWS / SSM / EC2 / ECS / Batch / RDS 작업은 운영자 직접 수행. 본 일자의 핵심은 View 진입 전 backend AWS 측 dry-run 을 17단계 순서로 점검해 stale raw data 이슈를 조기에 발견한 것이며, 실제 BUY / SELL / `--execute` 주문 전송 계열은 0건이다(OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011 정합).
+
+### 1. 사전 점검 (AWS 계정 / region / EC2 / ECS / AWS Batch)
+
+1. AWS 계정 / region 확인: 완료
+   1) region: `ap-northeast-2`
+   2) account 확인 완료 (account-id 평문 기록 0건 — `<account-id>` placeholder 만)
+   3) 로컬 AWS CLI 기본 실행 가능
+2. EC2 상태 확인: 완료
+   1) MarketConnector EC2 running 확인
+   2) Windows crawler worker running 확인
+   3) SSM managed instance Online 확인
+3. ECS 상태 확인: 완료
+   1) `portfolio-paper-cluster` ACTIVE 확인
+   2) preprocessor task definition(family `portfolio-paper-interest-preprocessor`) 확인
+   3) Strategy Decision buy-signal task definition(family `portfolio-paper-strategy-decision-buy-signal`) 확인
+   4) Strategy Decision position-signal task definition(family `portfolio-paper-strategy-decision-position-signal`) 확인
+4. AWS Batch Research 상태 확인: 완료
+   1) Compute Environment `portfolio-paper-strategy-research-ce`: ENABLED / VALID / Healthy 확인
+   2) Job Queue `portfolio-paper-strategy-research-queue`: ENABLED / VALID / Healthy 확인
+   3) Research Job Definition `portfolio-paper-strategy-research` active revision 확인
+   4) Backtest report S3 upload 포함 latest revision(`portfolio-paper-strategy-research:3`) 확인
+
+### 2. CONNECTOR_BALANCE 실행 (Backend E2E dry-run 1번)
+
+1. MarketConnector EC2 에서 실행: 완료
+   1) 작업 디렉터리: `/home/ec2-user/apps/port-marketconnector`
+   2) 실행 환경: venv python 사용
+   3) 진입점: SSM RunCommand
+2. 초기 실패 원인 확인 / 조치: 완료
+   1) 1차 실패 — `KIS_APP_KEY` 등 환경변수 미주입 상태에서 import smoke 실패
+   2) 원인 — KIS Secrets 가 JSON 형태(`/portfolio/paper/kis/marketconnector` JSON multi-key)임을 확인. SecretString 원문을 그대로 export 하면 안 되고 JSON key 를 파싱해야 함
+   3) 조치 — Secret JSON key → 환경변수 mapping 정정
+3. KIS Secret key mapping 확인: 완료
+   1) `APP_KEY` → `KIS_APP_KEY`
+   2) `APP_SECRET` → `KIS_APP_SECRET`
+   3) `PAPER_ACNT` → `KIS_PAPER_ACNT`
+   4) `ACNT_PRDT_CD` → `KIS_ACNT_PRDT_CD`
+4. 실행 성공: 완료
+   1) 기존 `access_token.txt` 백업
+   2) 신규 token 발급 성공 (token 값 평문 기록 0건)
+   3) KIS balance API status 200
+   4) 모의투자 잔고 조회 성공
+   5) `connector.connector_balance_snapshot` 저장 성공
+   6) `connector.connector_position_snapshot` — 현재 보유종목 0건 기준 정상 처리
+   7) legacy holdings 데이터 없음 확인
+5. 문서화 필요 사항(R-DOCS-001 정합):
+   1) KIS Secrets 는 JSON key parsing 필요(raw SecretString export 금지)
+   2) secret value / KIS app key / KIS app secret / 계좌번호 / token 본 노트 평문 기록 0건
+6. 안전 점검: 본 단계는 조회성 호출 + balance / position snapshot 저장 한정. broker BUY / SELL 주문 호출 0건. `--execute` 0건.
+
+### 3. INTEREST_CRAWLER 상태 재판정 (Backend E2E dry-run 2번)
+
+1. KRX GUI worker 상태: 완료(2026-06-12 §1 ~ §9 / 2026-06-13 §1 ~ §6 누적분 그대로 유지)
+   1) Windows EC2 worker 기반 KRX login 성공
+   2) `interest_program.py` 단건 수집 성공
+   3) `interest_shortsell.py` 단건 수집 성공
+   4) `run_krx_worker_daily.ps1` wrapper 생성 / 실행 성공
+   5) DB Secret(`/portfolio/paper/rds/crawler-app`) / KRX Secret(`/portfolio/paper/krx/crawler-login`) 로딩 확인
+   6) 다운로드 경로 junction 처리 완료(`C:\Users\USER\Downloads` → `C:\Users\Administrator\Downloads`)
+   7) program / shortsell 로그 파일 생성 확인(`C:\portfolio\logs\krx_worker_daily_*.log`)
+2. 2026-06-15 KRX worker 재실행 결과: 완료
+   1) `KRX already logged in` 확인
+   2) `KRX Login Ready` 확인
+   3) program 실행 성공
+   4) shortsell 실행 성공
+   5) `[Collected Date] None` 출력 — 신규 수집 대상 0건(2026-06-13 / 14 동안 누적된 거래일 없음 + 2026-06-15 월요일 시점에 직전 거래일 2026-06-12 까지 이미 적재됨)
+   6) `check_program_rows.py` / `check_shortsell_rows.py` 로 DB 상태 재확인
+3. KRX raw 최신일자 (2026-06-15 시점):
+   1) `interest_program_raw` 최신일: 2026-06-12
+   2) `interest_shortsell_raw` 최신일: 2026-06-12
+   3) 2026-06-15 월요일 기준 직전 거래일 2026-06-12 금요일까지 적재된 상태(KRX 거래일 정상)
+4. non-GUI crawler 상태: 미완료 / 후속 승격
+   1) ECS / Fargate Selenium Chrome smoke 검증 완료(2026-06-13 §5)
+   2) 실제 daily raw 전체 수집 완료는 아님 — non-GUI daily 운영 Task Definition / command 분리 필요(task 58 후속)
+   3) raw 전체 최신성 검증 실패 — non-GUI raw 7종이 직전 거래일까지 적재되지 않음
+5. non-GUI raw 최신일자 SQL 점검 결과 (2026-06-15 시점):
+   1) `interest_agency_raw` 최신일: 2026-06-11
+   2) `interest_news_raw` 최신일: 2026-06-11
+   3) `interest_commodity_raw` 최신일: 2026-06-08
+   4) `interest_foreignindex_raw` 최신일: 2026-06-08
+   5) `interest_investorflow_raw` 최신일: 2026-06-08
+   6) `interest_marketbreadth_raw` 최신일: 2026-06-08
+   7) `interest_price_raw` 최신일: 2026-06-08
+   8) `interest_ticker_value_raw` 최신일: 2026-03-09 — 본 dry-run 핵심 차단 요인에서는 제외(별도 후속 분리)
+6. 영향 분석:
+   1) Preprocessor 가 실행되더라도 입력 raw 최신성 부족으로 신규 feature date 생성이 제한됨(아래 §4 정합)
+   2) Research / Decision 으로 넘어가기 전 데이터 최신성 기준이 약함 — Backend E2E dry-run 의 본 phase 통과 보강 필요
+   3) Backend E2E dry-run 기준 2번 `INTEREST_CRAWLER` 는 **완료가 아니라 부분 완료 / follow-up 승격** 으로 재분류
+7. 표현 보정 (R-DOCS-001 / 본 일자 기록 정합):
+   1) 기존 표현 "Interest Crawler 완성: 완료" / "Interest Crawler 는 hybrid execution model 기준으로 1차 완성" 은 과대 표현
+   2) 보정 표현 — "Interest Crawler hybrid 1차 구현: 부분 완료" / "KRX GUI worker 는 운영 가능 상태로 1차 완성" / "ECS / Fargate crawler 는 smoke 검증 완료" / "non-GUI daily raw 수집 운영 경로와 raw 전체 최신성 검증은 후속"
+   3) "완료" 표기는 실제 데이터 적재 / 최신성 검증까지 확인된 경우에만 사용한다는 원칙 1차 실증
+
+### 4. PREPROCESSOR ECS Task 단발 실행 (Backend E2E dry-run 3번)
+
+1. ECS RunTask 실행: 완료
+   1) cluster: `portfolio-paper-cluster`
+   2) task definition: `portfolio-paper-interest-preprocessor:1`
+   3) launch type: `FARGATE`
+   4) networkMode: `awsvpc`
+   5) subnet: public-a / public-b 사용
+   6) `assignPublicIp = ENABLED`
+   7) Security Group: `sgroup-preprocessor-tasks`
+2. 실행 결과: 성공
+   1) lastStatus: `STOPPED`
+   2) desiredStatus: `STOPPED`
+   3) stopCode: `EssentialContainerExited`
+   4) stoppedReason: `Essential container in task exited`
+   5) container: `interest-preprocessor`
+   6) exitCode: 0
+   7) 실행 시간 약 3분 43초
+3. CloudWatch Logs 확인:
+   1) `/portfolio/paper/preprocessor` log stream 생성 확인
+   2) 최신 log stream `storedBytes = 0` — log 본문 기반 검증은 제한적
+   3) exitCode 0 기준으로 Task 성공으로 판단
+   4) log 본문 전체 인용 0건(R-DOCS-001 / 본 노트 안전 원칙 정합)
+4. DB 반영 확인:
+   1) preprocessor 테이블 `updated_at` 이 2026-06-15 11:03:55+00 으로 갱신됨(KST 기준 2026-06-15 20:03:55)
+   2) ECS Task 실행 시간과 일치
+   3) DB write 경로는 동작한 것으로 판단
+5. 신규 feature date 확인:
+   1) 신규 2026-06-15 feature date 는 확인되지 않음
+   2) 기존 feature row update / 재계산 형태로 보임
+   3) 원인은 preprocessor 장애가 아니라 §3 의 raw 최신성 부족(특히 `interest_price_raw` / `interest_marketbreadth_raw` / `interest_investorflow_raw` / `interest_commodity_raw` / `interest_foreignindex_raw` / `interest_news_raw` / `interest_agency_raw` 가 직전 거래일까지 적재되지 않음)
+6. 결론:
+   1) PREPROCESSOR ECS 실행 경로는 성공 — exitCode 0 / DB write 동작
+   2) 단, 입력 raw 최신성 부족으로 데이터 최신화는 제한
+   3) Backend E2E dry-run 기준 PREPROCESSOR 는 **실행 완료** 로 표시하되 **데이터 최신성 제약** 을 함께 기록
+
+### 5. Secret / IAM 권한 분리 1차 실증
+
+1. MarketConnector EC2 에서 preprocessor secret 조회 시도: 실패(예상 동작)
+   1) 호출 — `/portfolio/paper/rds/preprocessor-app` `GetSecretValue`
+   2) 응답 — `AccessDeniedException` 확인
+   3) principal — `portfolio-paper-marketconnector-ec2-role`
+   4) 원인 — MarketConnector EC2 role 에 preprocessor secret read 권한이 없기 때문(OD-SEC-006 정합 — service prefix 분리)
+2. 판단:
+   1) 장애가 아니라 MS 별 Secret 접근 분리(OD-SEC-006 / 03 §13)가 정상 동작한 것으로 판단
+   2) MarketConnector EC2 role 에 preprocessor secret read 권한을 **추가하지 않음**
+   3) preprocessor DB 확인은 (a) preprocessor ECS Task(`portfolio-paper-preprocessor-task-role`) 또는 (b) 운영자 로컬 PC 의 SSM Port Forwarding(OD-NET-010 / OD-NET-011) 으로 수행
+3. 추가 기록 (운영자 로컬 PC 도구 환경):
+   1) RDS port-forwarding 은 SSM `StartPortForwardingSessionToRemoteHost` 로 가능
+   2) PowerShell 프롬프트 `>>` 를 명령에 같이 붙여넣으면 `StreamAlreadyRedirected` 오류 발생 — 실제 command 에는 `>>` 를 포함하지 않아야 함(운영자 로컬 PC tip)
+4. IAM 변경 0건: 본 일자에 MarketConnector EC2 role / preprocessor task role / crawler task role 권한 변경 없음. AccessDenied 발생은 정책 정합성 1차 실증으로만 기록.
+
+### 6. Backend AWS E2E dry-run 17단계 진행 상태 (2026-06-15 시점)
+
+본 표는 로컬 View Daily Batch 17단계 순서를 기준으로 본 일자 backend AWS 측 실행 상태를 정리한 dry-run 점검표다. 실제 BUY / SELL / `--execute` 주문 전송 계열은 모두 0건(OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 / R-AUTO-010 / R-AUTO-011 정합).
+
+| # | Step | 본 일자 상태 | 비고 |
+|---|------|-------------|------|
+| 1 | CONNECTOR_BALANCE | 완료 | §2 / MarketConnector EC2 / KIS balance API 200 / snapshot 저장 |
+| 2 | INTEREST_CRAWLER | 부분 완료 / follow-up 승격 | §3 / KRX GUI worker 완료 / non-GUI raw 최신성 부족 |
+| 3 | PREPROCESSOR | 실행 완료 (데이터 최신성 제약) | §4 / ECS Task exitCode 0 / DB `updated_at` 갱신 / 신규 feature date 0건 |
+| 4 | BACKTEST_RESEARCH | 미진행 | 2026-06-15 §1 ~ §7(09 spec) 와 별개 — 본 dry-run 흐름에서는 raw 최신성 회복 후 재실행 예정 |
+| 5 | BACKTEST_REPORT | 미진행 | 동상 |
+| 6 | DAILY_BUY_SIGNAL | 미진행 | Research 가 Decision 보다 먼저 실행되도록 순서 유지(본 일자 안전 기준) |
+| 7 | DAILY_POSITION_SIGNAL | 미진행 | 동상 |
+| 8 | DAILY_BUY_EXECUTION | 미진행 / dry-run skip 예정 | 안전 기준 — `--execute` 주문 전송 계열 실행 금지 |
+| 9 | DAILY_SELL_EXECUTION | 미진행 / dry-run skip 예정 | 동상 |
+| 10 | DAILY_AUTO_SELL | 미진행 / dry-run skip 예정 | 동상 |
+| 11 | DAILY_AUTO_BUY | 미진행 / dry-run skip 예정 | 동상 |
+| 12 | MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE | 미진행 / dry-run skip 예정 | R-AUTO-009 / R-AUTO-010 / R-AUTO-011 정합 — paper 운영 환경 활성화 보류 |
+| 13 | CONNECTOR_ORDER_CHECK | 미진행 / dry-run skip 예정 | fill / position sync 자동 재시도 금지(OD-SAFE-004) |
+| 14 | SYNC_SELL_FILL | 미진행 / dry-run skip 예정 | 동상 |
+| 15 | SYNC_BUY_FILL | 미진행 / dry-run skip 예정 | 동상 |
+| 16 | SYNC_BUY_POSITION | 미진행 / dry-run skip 예정 | 동상 |
+| 17 | BALANCE_REFRESH | 미진행 | step 17 위치 유지(View Daily Batch 17단계 순서 정합) |
+
+### 7. 본 일자 안전 / 문서 기록 점검
+
+1. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS endpoint hostname / RDS password / IAM access key id / account-id / 실제 ARN / image digest / instance-id / task ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+2. KIS Secret JSON key → 환경변수 mapping(`APP_KEY` → `KIS_APP_KEY` / `APP_SECRET` → `KIS_APP_SECRET` / `PAPER_ACNT` → `KIS_PAPER_ACNT` / `ACNT_PRDT_CD` → `KIS_ACNT_PRDT_CD`) 은 mapping 사실만 기록 / 값 미기록.
+3. Kiro 본 일자 작업으로 인한 AWS / SSM / EC2 / ECS / Batch / IAM / Secrets Manager / RDS / GRANT 변경 0건. 모든 실제 작업은 운영자가 직접 수행했고 Kiro 는 절차 / 결과 / 실패 사유 / 조치를 문서로만 정리.
+4. Kiro 본 일자 작업으로 인한 8개 MS(`port-view`, `port-marketconnector`, `port-interest-crawler`, `port-interest-preprocessor`, `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research`) README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 미수정.
+5. broker / KIS 호출 — `CONNECTOR_BALANCE` 한정 조회성 호출만 발생(KIS balance API status 200 / 모의투자 잔고 조회). 신규 주문 / 매수 / 매도 / 취소 / 정정 / `--execute` 0건. fill / position sync 자동 재시도 0건.
+6. RDS DDL 0건 / DML 은 `connector_balance_snapshot` / `connector_position_snapshot` insert + preprocessor pipeline 의 정상 흐름 한정. 직접 SQL 변경 0건.
+7. aws-live 작업 0건 — 본 일자는 `aws-paper` 한정.
+8. CloudWatch Logs 본문 / Selenium / Chrome 의 stdout / stderr / SSM 응답 본문 / docker build 로그 전문은 본 노트에 인용 0건.
+9. wrapper 로그(`krx_worker_daily_*.log`) 본문 전체는 본 노트에 미기록 — 사실(로그 파일명 / `[Collected Date] None` 출력 / `KRX login` 성공 여부) 만 기록.
+
+### 8. 후속 인계
+
+1. non-GUI Interest Crawler 운영 실행 경로 정리 — `interest_crawler_daily.py` 에서 KRX GUI 단계 제외한 실행 경로 분리 + ECS Fargate 용 non-GUI crawler command 분리(task 58 후속)
+   1) 대상 후보 — `interest_news.py` / `interest_agency.py` / `interest_foreignindex.py` / `interest_commodity.py` / `interest_macroeconomic.py` / `interest_price.py` / `interest_investorflow.py` / `interest_marketbreadth.py`
+   2) 제외 후보 — `interest_krx_login_new.py` / `interest_program.py` / `interest_shortsell.py` / `interest_ticker_value.py`
+2. raw 최신성 회복 — `interest_price_raw` / `interest_investorflow_raw` / `interest_marketbreadth_raw` / `interest_commodity_raw` / `interest_foreignindex_raw` / `interest_news_raw` / `interest_agency_raw` 직전 거래일 적재
+3. preprocessor 재실행 — raw 최신성 회복 후 `portfolio-paper-interest-preprocessor` 재실행 → exitCode 0 확인 → feature table max date / `updated_at` 확인 → 신규 feature date 생성 여부 확인
+4. Backend E2E dry-run 재개 — `BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL` 순서로 진행. Research 는 Decision 보다 먼저 실행. 주문 전송 / execution 계열은 안전 기준에 따라 skip 또는 dry-run 만 수행
+5. 표현 통일 — 기존 문서에서 "Interest Crawler 완성: 완료" / "Interest Crawler 는 hybrid execution model 기준으로 1차 완성" 표현은 본 일자 결정 정합으로 보정(WORKLOG.md / followups-overview.md / operator-decisions.md OD-MS-020 정합)
+6. 본 일자 dry-run 결과는 실패가 아니라 **stale raw data 이슈를 조기에 발견한 검증 성공** 으로 기록 — Connector Balance / Preprocessor ECS 실행 경로 성공 + Interest Crawler 재분류 + non-GUI daily 운영 후속 분리
+

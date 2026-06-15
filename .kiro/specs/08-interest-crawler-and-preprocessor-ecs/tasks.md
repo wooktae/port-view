@@ -112,6 +112,23 @@
 - [x] 68. Hybrid execution model 1차 완성 판단(KRX program / shortsell = EC2 worker / non-GUI crawler = ECS Fargate 후보 / preprocessor = ECS Fargate / Selenium Chrome smoke 통과 / public subnet + `assignPublicIp` outbound 통과 / CloudWatch Logs 확인 가능) → 2026-06-13 판단 완료 ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §6)
 - [x] 69. 본 일자 안전 / 문서 기록 점검(secret value / password / 실제 ARN / image digest / task ARN / instance-id / account-id 평문 기록 0건 / 8개 MS 미수정 / 외부 호출 0건) 재확인 → 2026-06-13 통과 ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §7)
 
+## 14. Backend AWS E2E dry-run 1차 / Interest Crawler 상태 재판정 (2026-06-15 추가)
+
+본 섹션은 2026-06-15 운영자가 직접 수행한 Backend AWS E2E dry-run 1차 점검과 Interest Crawler 상태 재판정 결과를 task 단위로 분해해 기록한다. 본 spec 시점의 hybrid execution model 1차 완성 판단(2026-06-13 §13) 자체는 그대로 유지하고, KRX GUI worker 운영 가능 / non-GUI daily 운영 미완료 / raw 최신성 검증 부족 / preprocessor ECS 실행 성공(데이터 최신성 제약) 을 후속으로 분리해 정리한다. 자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-15 §1 ~ §8 참조. 본 일자 결정 락 OD-MS-020 / OD-MS-021 정합.
+
+- [x] 70. KRX GUI worker 운영 가능 상태 1차 완성 재확인(Windows EC2 worker / Scheduled Task / wrapper / KRX login / program / shortsell 단건 수집 / DB Secret · KRX Secret 로딩 / 다운로드 경로 junction / 로그 파일 생성) → 2026-06-15 KRX worker 재실행 결과 `KRX already logged in` / `KRX Login Ready` / `[Collected Date] None` idempotent 정상 완료 확인 / `interest_program_raw` · `interest_shortsell_raw` 최신일 2026-06-12 확인(2026-06-15 월요일 기준 직전 거래일까지 적재 정상) ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §3)
+- [x] 71. KRX raw 최신일자 SQL 점검 절차 정리 → 2026-06-15 `check_program_rows.py` / `check_shortsell_rows.py` 로 DB 상태 재확인. KRX raw 직전 거래일까지 적재 정상 ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §3)
+- [ ] 72. non-GUI Interest Crawler daily 운영 Task Definition / command 분리 — 미완료 / 후속 분리(task 58 와 합쳐 진행). `interest_crawler_daily.py` 에서 KRX GUI 단계 제외한 실행 경로 분리. 대상 후보 = `interest_news.py` / `interest_agency.py` / `interest_foreignindex.py` / `interest_commodity.py` / `interest_macroeconomic.py` / `interest_price.py` / `interest_investorflow.py` / `interest_marketbreadth.py`. 제외 후보 = `interest_krx_login_new.py` / `interest_program.py` / `interest_shortsell.py` / `interest_ticker_value.py` ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §3, §8)
+- [ ] 73. non-GUI raw 최신일자 SQL 점검 정기 항목 정리 → 2026-06-15 1차 점검 결과 누적: `interest_agency_raw` 2026-06-11 / `interest_news_raw` 2026-06-11 / `interest_commodity_raw` 2026-06-08 / `interest_foreignindex_raw` 2026-06-08 / `interest_investorflow_raw` 2026-06-08 / `interest_marketbreadth_raw` 2026-06-08 / `interest_price_raw` 2026-06-08 / `interest_ticker_value_raw` 2026-03-09. 본 dry-run 핵심 차단 요인은 `interest_ticker_value_raw` 제외 7종. 자동화는 후속 분리(R-DATA-009 / R-DATA-010 정합) ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §3)
+- [ ] 74. raw 최신성 회복 작업 정리 — 미완료 / 후속 분리. 대상: `interest_price_raw` / `interest_investorflow_raw` / `interest_marketbreadth_raw` / `interest_commodity_raw` / `interest_foreignindex_raw` / `interest_news_raw` / `interest_agency_raw` ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §8)
+- [x] 75. preprocessor ECS RunTask 단발 실행(Backend E2E dry-run 3번) 절차 정리 → 2026-06-15 cluster `portfolio-paper-cluster` / task definition `portfolio-paper-interest-preprocessor:1` / FARGATE / awsvpc / public-a + public-b / `assignPublicIp = ENABLED` / `sgroup-preprocessor-tasks` / lastStatus `STOPPED` / desiredStatus `STOPPED` / stopCode `EssentialContainerExited` / container `interest-preprocessor` / exitCode 0 / 실행 시간 약 3분 43초 ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §4)
+- [x] 76. preprocessor `updated_at` 갱신 / 신규 feature date 점검 절차 정리 → 2026-06-15 `updated_at` 2026-06-15 11:03:55+00(KST 2026-06-15 20:03:55) 갱신 확인 / DB write 경로 동작 확인. 신규 2026-06-15 feature date 0건 — 원인은 preprocessor 장애가 아니라 §3 raw 최신성 부족(R-DATA-010 정합) ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §4)
+- [ ] 77. preprocessor 재실행 절차 정리 — 미완료 / 후속 분리. raw 최신성 회복 후 `portfolio-paper-interest-preprocessor` 재실행 → exitCode 0 확인 → feature table max date / `updated_at` 확인 → 신규 feature date 생성 여부 확인 ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §8)
+- [ ] 78. preprocessor 실행 후 raw / feature 최신성 검증 SQL 자동화 — 미완료 / 후속 분리(R-DATA-009 / R-DATA-010 mitigation 정합) ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §8)
+- [x] 79. Interest Crawler 표현 보정 결정 락 — 기존 "Interest Crawler 완성: 완료" / "Interest Crawler 는 hybrid execution model 기준으로 1차 완성" 표현을 "Interest Crawler hybrid 1차 구현: 부분 완료" / "KRX GUI worker 는 운영 가능 상태로 1차 완성" / "ECS / Fargate crawler 는 smoke 검증 완료" / "non-GUI daily raw 수집 운영 경로와 raw 전체 최신성 검증은 후속" 으로 보정 → 2026-06-15 OD-MS-020 결정 락 ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §3)
+- [x] 80. Backend AWS E2E dry-run 17단계 점검표 정리 → 2026-06-15 1번 CONNECTOR_BALANCE 완료 / 2번 INTEREST_CRAWLER 부분 완료 / 3번 PREPROCESSOR 실행 완료(데이터 최신성 제약) / 4 ~ 7번 미진행 / 8 ~ 17번 미진행 또는 dry-run skip 예정. 실제 BUY / SELL / `--execute` 주문 전송 0건. fill / position sync 자동 재시도 0건. aws-live 작업 0건. OD-MS-021 결정 락 ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §6)
+- [x] 81. Secret / IAM 권한 분리 1차 실증 정리 — MarketConnector EC2 role(`portfolio-paper-marketconnector-ec2-role`)에서 `/portfolio/paper/rds/preprocessor-app` `GetSecretValue` 시도 시 `AccessDeniedException`. 장애가 아니라 OD-SEC-006 / OD-DB-008 정합으로 정상 동작. MarketConnector EC2 role 에 preprocessor secret read 권한 추가 0건. preprocessor DB 확인은 preprocessor ECS Task 또는 운영자 로컬 SSM Port Forwarding 으로 수행 ([`./operation-notes.md`](./operation-notes.md) 2026-06-15 §5)
+
 ## Task Dependency Graph (간단)
 
 ```text
@@ -125,6 +142,7 @@
                                 ├─> 33~34 (NAT-free 재확인)
                                 ├─> 44~52 (Windows EC2 worker / KRX GUI 수집 / 2026-06-12)
                                 ├─> 61~69 (SSM 자동화 + ECS crawler smoke / 2026-06-13)
+                                ├─> 70~81 (Backend AWS E2E dry-run 1차 / Interest Crawler 상태 재판정 / 2026-06-15)
                                 └─> 35~40 (안전 제약 / 산출물 한정)
                                       └─> 41~43 (완료 기준)
                                             └─> 53~60 (후속 task / 이월 / 53 부분 완료)
@@ -157,3 +175,13 @@
 5. non-GUI crawler 실제 운영용 Task Definition 분리(smoke 용 revision 과 운영용 Task Definition 분리) (task 58)
 6. EC2 worker 작업 완료 후 stop 절차 명시(idle 비용 절감) (task 59)
 7. KRX GUI 수집 headless 리팩토링은 장기 후보로만 유지(현재 결정은 EC2 worker 사용) (task 60)
+
+## 2026-06-15 이월 항목 요약
+
+1. non-GUI Interest Crawler daily 운영 Task Definition / command 분리(task 72 / task 58 와 합쳐 진행)
+2. raw 최신성 회복 — `interest_price_raw` / `interest_investorflow_raw` / `interest_marketbreadth_raw` / `interest_commodity_raw` / `interest_foreignindex_raw` / `interest_news_raw` / `interest_agency_raw` 직전 거래일 적재(task 74)
+3. preprocessor 재실행 — raw 최신성 회복 후 `portfolio-paper-interest-preprocessor` 재실행 → exitCode 0 확인 → feature table max date / `updated_at` 확인 → 신규 feature date 생성 여부 확인(task 77)
+4. preprocessor 실행 후 raw / feature 최신성 검증 SQL 자동화(task 78 / R-DATA-009 / R-DATA-010 mitigation 정합)
+5. non-GUI raw 최신일자 SQL 점검 자동화(task 73)
+6. Backend AWS E2E dry-run 재개 — `BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL` 순서로 진행. Research 는 Decision 보다 먼저 실행(OD-MS-021 정합). 주문 전송 / execution 계열은 안전 기준에 따라 skip 또는 dry-run 만 수행
+7. Interest Crawler 표현 통일 정책 후속 점검(task 79 / OD-MS-020) — 운영 문서 / 보고 / 슬라이드 등에서 "Interest Crawler 완성: 완료" 표현이 잔존하는지 정기 점검
