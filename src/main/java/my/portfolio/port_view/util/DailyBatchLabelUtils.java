@@ -115,6 +115,7 @@ public final class DailyBatchLabelUtils {
             case "BALANCE_REFRESH", "BALANCE_AFTER" -> "잔고/보유종목 최신화";
             case "DAILY_AUTO_SELL" -> "자동 매도 실행";
             case "SYNC_SELL_FILL" -> "매도 체결/포지션 동기화";
+            case "MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE" -> "Strategy 주문 실행";
             default -> fallbackLabel(stepCode);
         };
     }
@@ -139,6 +140,7 @@ public final class DailyBatchLabelUtils {
             case "BALANCE_REFRESH", "BALANCE_AFTER" -> "잔고최신화";
             case "DAILY_AUTO_SELL" -> "자동매도";
             case "SYNC_SELL_FILL" -> "매도동기화";
+            case "MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE" -> "Strategy 주문 실행";
             default -> fallbackLabel(stepCode);
         };
     }

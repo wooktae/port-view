@@ -327,6 +327,78 @@ Task Definition `secrets` 필드 주입용 Secrets Manager / SSM read 권한은 
 - KRX GUI 의존 수집이 EC2 worker 로 운영되는 동안에도 NAT-free 정책(§9)은 EC2 worker 의 outbound 경로에 동일하게 적용된다(public subnet + EIP 또는 동등 방식 / 운영자 결정).
 - 후속 spec / 후속 phase 책임 분리 원칙은 §11 그대로 유지한다.
 
+## 13. 2026-06-13 운영자 검증 결과 / Hybrid execution model 1차 자동화 완성
+
+본 섹션은 2026-06-13 SSM RunCommand 자동화 + ECS crawler revision 6 의 Selenium / Chrome / outbound smoke 1차 검증 결과를 반영한 보강 섹션이다. §12 hybrid execution model 분류는 그대로 유지하고, KRX GUI 경로의 자동화 1차 구조와 ECS crawler smoke 의 의미만 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-13 섹션 참조.
+
+### 13.1 KRX GUI 경로 1차 자동화 구조
+
+| 단계 | 구성 요소 | 결정값 |
+|------|----------|--------|
+| 트리거 | EventBridge Scheduler | **후속 분리** (현재는 운영자 또는 SSM 수동 트리거) |
+| 진입점 | SSM RunCommand (`AWS-RunPowerShellScript`) | 1차 자동화 진입점으로 사용 |
+| 트리거 명령 | `schtasks /Run /TN Portfolio-KRX-Worker-Daily` | wrapper 직접 실행이 아니라 Scheduled Task 1회 실행 트리거만 수행 |
+| 실행 컨테이너 | Windows Scheduled Task `Portfolio-KRX-Worker-Daily` | Administrator interactive session 으로 실행. SYSTEM Session 0 사용 금지 |
+| 실행 스크립트 | `C:\portfolio\run_krx_worker_daily.ps1` | venv activate / RDS Secret 주입 / KRX Secret 주입 / 다운로드 경로 junction 점검 / `interest_krx_login_new.py` → `interest_program.py` → `interest_shortsell.py` 순차 실행 / 로그 저장 |
+| 로그 위치 | `C:\portfolio\logs\krx_worker_daily_yyyyMMdd_HHmmss.log` | 파일 본문 전체는 본 design / operation-notes 평문 인용 금지 |
+
+본 1차 자동화 구조는 paper 환경에서 1차 검증 완료 상태(2026-06-13 도달)이며, EventBridge Scheduler 정기 트리거 연계는 후속 분리한다.
+
+### 13.2 SYSTEM Session 0 직접 실행 부적합 판단
+
+| 항목 | 결과 |
+|------|------|
+| SSM RunCommand 의 실행 컨텍스트 | SessionId 0 / `nt authority\system` |
+| RDP 사용자 세션 | SessionId 2(Administrator) |
+| Chrome 프로세스 | SessionId 0 직접 실행 시 GUI / Display / Chrome download 폴더 / OTP 세션 컨텍스트 분리로 KRX 로그인 단계 실패 가능 |
+| 결정 | SSM RunCommand 가 wrapper 를 SYSTEM Session 0 에서 직접 실행하는 방식은 **KRX GUI 로그인에 부적합**으로 판단. 직접 실행 방식은 채택하지 않음 |
+| 우회 방식 | SSM RunCommand 는 `schtasks /Run` 트리거만 담당하고, 실제 wrapper 실행은 Administrator interactive session 안의 Scheduled Task 가 담당 |
+
+### 13.3 ECS crawler Task Definition revision 6 의 의미
+
+| 항목 | 결정값 |
+|------|--------|
+| family | `portfolio-paper-interest-crawler` |
+| revision | 1 ~ 6 (최신 revision = 6) |
+| image | `portfolio-interest-crawler:paper-20260611` |
+| cpu / memory | 1024 / 2048 |
+| network mode | `awsvpc` |
+| Task Role | `portfolio-paper-crawler-task-role` |
+| Task Execution Role | `portfolio-paper-ecs-task-execution-role` |
+| Log Group | `/portfolio/paper/crawler` |
+| Log stream prefix | `ecs-selenium-chrome-smoke` |
+| `command` 의 의미 | **실제 daily crawler entrypoint 가 아니라 Selenium / Chrome / outbound smoke 검증용** |
+| 운영용 Task Definition 분리 | **후속 분리** (실제 daily crawler 의 Task Definition / image / command 는 별도 revision 또는 별도 family 로 분리 — task 58) |
+
+revision 6 의 RunTask smoke 결과(2026-06-13)는 다음을 1차 검증한다.
+
+- ECS / Fargate Selenium 4.40.0 / Chromium / chromedriver runtime 동작
+- public-a / public-b subnet + `sgroup-crawler-tasks` SG + `assignPublicIp = ENABLED` 기반 outbound 도달
+- `example.com` HTTPS 도달 / Naver Finance 페이지 로딩(TITLE `Npay 증권` 확인)
+- exitCode 0 / `SELENIUM CHROME SMOKE SUCCESS` / `DRIVER QUIT` / `SELENIUM CHROME SMOKE END`
+
+따라서 revision 6 은 ECS / Fargate / Chromium runtime 가용성에 대한 smoke 보증으로만 해석한다. 실제 daily crawler 의 운영 안정화는 본 spec 범위 밖이며, non-GUI crawler 인벤토리 확정과 운영용 Task Definition 분리(task 58)는 후속 spec / 후속 phase 책임이다.
+
+### 13.4 Hybrid execution model 1차 완성 판단
+
+| 워크로드 | 실행 위치 | 1차 운영 가능 상태 |
+|---------|----------|-------------------|
+| Preprocessor MS | ECS Fargate Task | 2026-06-10 도달 |
+| KRX GUI 의존 crawler (KRX program / KRX shortsell) | Windows EC2 worker (Scheduled Task + wrapper) | 2026-06-12 도달 |
+| KRX GUI 경로 자동화 trigger | SSM RunCommand → `schtasks /Run` | 2026-06-13 도달 |
+| non-GUI crawler runtime 가용성 (Selenium / Chrome / outbound) | ECS Fargate Task (smoke 용 revision 6) | 2026-06-13 1차 통과 |
+| EventBridge Scheduler / Step Functions 정기 trigger | — | 미도달 (후속 분리) |
+| EC2 worker 무인 stop / 비용 절감 | — | 미도달 (후속 분리) |
+
+본 시점의 hybrid execution model 1차 완성 판단은 위 6개 차원의 1차 검증 통과 + 자동화 trigger 1단계 도달을 근거로 한다. EventBridge Scheduler 정기 trigger / Step Functions hybrid orchestration / non-GUI crawler 운영용 Task Definition 분리 / wrapper 내 DB 검증 자동 출력 / EC2 worker stop 절차는 모두 후속 spec / 후속 phase 책임이다.
+
+### 13.5 본 섹션 갱신 원칙
+
+- 기존 §1 ~ §12 결정값은 변경하지 않는다.
+- §13 은 §12.4 EC2 worker 운영 모드 분리 표의 `자동 실행 (SSM RunCommand + EventBridge Scheduler + 옵션상 Step Functions hybrid orchestration)` 행을 1차 자동화 진입점(SSM RunCommand → Scheduled Task trigger)까지 도달한 상태로 갱신하는 보강이다.
+- EventBridge Scheduler 정기 trigger 연계는 본 spec 범위 밖이며 후속 분리 원칙(§11 / §12.5) 그대로 유지한다.
+- non-GUI crawler 의 실제 운영용 Task Definition 분리는 본 §13 의 smoke 결과(revision 6)와는 다른 후속 작업으로 구분한다(task 58).
+
 ## Testing Strategy (참고)
 
 본 spec 은 ECR / ECS / IAM / 절차서 산출물이며, 코드 / 순수 함수 / 입력 변동에 따라 행위가 달라지는 알고리즘이 없다. 따라서 property-based testing(PBT) 은 적용되지 않으며, 본 design 은 Correctness Properties 섹션을 포함하지 않는다(03 spec Testing Strategy 동일 정책).

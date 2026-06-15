@@ -608,6 +608,14 @@ public class DailyBatchService {
 
         steps.add(new BatchStep(
                 12,
+                "MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE",
+                "Strategy 주문 실행",
+                properties.getMarketconnectorDir(),
+                List.of(python, "connector_strategy_order_execute.py", "--execute")
+        ));
+
+        steps.add(new BatchStep(
+                13,
                 "CONNECTOR_ORDER_CHECK",
                 "체결 조회",
                 properties.getMarketconnectorDir(),
@@ -615,7 +623,7 @@ public class DailyBatchService {
         ));
 
         steps.add(new BatchStep(
-                13,
+                14,
                 "SYNC_SELL_FILL",
                 "매도 체결/포지션 동기화",
                 properties.getExecutionDir(),
@@ -623,7 +631,7 @@ public class DailyBatchService {
         ));
 
         steps.add(new BatchStep(
-                14,
+                15,
                 "SYNC_BUY_FILL",
                 "매수 체결 동기화",
                 properties.getExecutionDir(),
@@ -631,7 +639,7 @@ public class DailyBatchService {
         ));
 
         steps.add(new BatchStep(
-                15,
+                16,
                 "SYNC_BUY_POSITION",
                 "매수 포지션 동기화",
                 properties.getExecutionDir(),
@@ -639,7 +647,7 @@ public class DailyBatchService {
         ));
 
         steps.add(new BatchStep(
-                16,
+                17,
                 "BALANCE_REFRESH",
                 "잔고/보유종목 최신화",
                 properties.getMarketconnectorDir(),
@@ -762,6 +770,14 @@ public class DailyBatchService {
                     || text.contains("kr_holiday")
                     || text.contains("no target")
                     || text.contains("no ready");
+        }
+
+        if ("MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE".equals(step.stepCode())) {
+            return text.contains("requested strategy order 없음")
+                    || text.contains("strategy execution requested 주문이 없음")
+                    || text.contains("[no_target] requested strategy order 없음")
+                    || text.contains("no requested")
+                    || text.contains("no target");
         }
 
         if ("DAILY_SELL_EXECUTION".equals(step.stepCode())) {

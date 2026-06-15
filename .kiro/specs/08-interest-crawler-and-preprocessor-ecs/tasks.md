@@ -1,8 +1,8 @@
 # Tasks — 08-interest-crawler-and-preprocessor-ecs
 
-본 tasks 는 [`./design.md`](./design.md) / [`./requirements.md`](./requirements.md) 결정을 진행 단위로 분해한 최소 체크리스트다. 실제 AWS 작업과 docker / ecs / iam 작업은 운영자가 직접 수행하고, Kiro 는 문서 / 절차 / 검증 항목 정리만 담당한다. 2026-06-10 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-10 섹션을, 2026-06-12 Windows EC2 worker 기반 KRX GUI 수집 1차 검증 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-12 섹션을 참조한다.
+본 tasks 는 [`./design.md`](./design.md) / [`./requirements.md`](./requirements.md) 결정을 진행 단위로 분해한 최소 체크리스트다. 실제 AWS 작업과 docker / ecs / iam 작업은 운영자가 직접 수행하고, Kiro 는 문서 / 절차 / 검증 항목 정리만 담당한다. 2026-06-10 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-10 섹션, 2026-06-12 Windows EC2 worker 기반 KRX GUI 수집 1차 검증 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-12 섹션, 2026-06-13 SSM RunCommand 자동화 + ECS crawler smoke 1차 검증 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-13 섹션을 참조한다.
 
-본 spec 의 crawler runtime 은 2026-06-12 결과로 hybrid execution model(non-GUI crawler = ECS Fargate Task 후보 유지, KRX GUI crawler = Windows EC2 worker, preprocessor = ECS Fargate Task) 로 분리되었다. 따라서 기존 ECS Fargate 단일 전환 가정으로 정의된 crawler 항목은 보류 / workload 재분류 / non-GUI 후보 유지 로 갱신한다.
+본 spec 의 crawler runtime 은 2026-06-12 결과로 hybrid execution model(non-GUI crawler = ECS Fargate Task 후보 유지, KRX GUI crawler = Windows EC2 worker, preprocessor = ECS Fargate Task) 로 분리되었다. 2026-06-13 결과로 KRX GUI 경로의 1차 자동화 방식이 SSM RunCommand → `schtasks /Run` → Windows Scheduled Task → Administrator interactive session → `run_krx_worker_daily.ps1` 흐름으로 확정되었고, ECS crawler 의 Selenium / Chrome / outbound smoke(revision 6) 1차 통과로 hybrid execution model 1차 완성 상태에 도달했다. 따라서 기존 ECS Fargate 단일 전환 가정으로 정의된 crawler 항목은 보류 / workload 재분류 / non-GUI 후보 유지 로 갱신한다.
 
 ## 1. ECR Repository 생성 준비 (§2)
 
@@ -53,8 +53,8 @@
 ## 7. Crawler 외부 outbound 리스크 별도 정리 (§8)
 
 - [x] 29. Selenium / Chrome 필요 여부 1차 검토 항목 정리 → 2026-06-10 Crawler Dockerfile 에 Chromium / chromedriver 포함 / 빌드 단계 통과. 2026-06-12 검증 결과 KRX GUI 의존 수집(KRX program / KRX shortsell) 은 Windows EC2 worker 로 분리 확정 (§8.1)
-- [~] 30. KRX / Naver / yfinance outbound 도달 여부 1차 검토 항목 정리 → 부분 완료: 2026-06-12 Windows EC2 worker 에서 KRX program / KRX shortsell outbound 도달·수집 성공(2026-06-09 ~ 2026-06-11 각 일자 적재 확인). Naver / yfinance / KRX 비-GUI 경로 outbound 검증은 ECS Fargate Task 후보 위에서 별도 phase 로 이월 (§8.1)
-- [~] 31. public subnet + `assignPublicIp` 도달 검증 항목 정리 → 부분 완료: 2026-06-10 preprocessor RunTask 로 NAT-free 자체 검증 통과. ECS 기반 crawler RunTask 는 보류 / workload 재분류 / non-GUI 후보 유지(KRX GUI 경로는 EC2 worker 로 분리) (§8.2, §9)
+- [ ] 30. KRX / Naver / yfinance outbound 도달 여부 1차 검토 항목 정리 → 부분 완료: 2026-06-12 Windows EC2 worker 에서 KRX program / KRX shortsell outbound 도달·수집 성공(2026-06-09 ~ 2026-06-11 각 일자 적재 확인). 2026-06-13 ECS / Fargate `portfolio-paper-interest-crawler:6` Selenium Chrome smoke 에서 example.com / Naver Finance 접속 성공(`SELENIUM CHROME SMOKE SUCCESS` 확인). KRX outbound 의 ECS Fargate 경로 검증과 yfinance 의 ECS Fargate 경로 검증, non-GUI crawler 실제 Task Definition 분리는 후속(task 58)으로 이월 (§8.1)
+- [ ] 31. public subnet + `assignPublicIp` 도달 검증 항목 정리 → 부분 완료: 2026-06-10 preprocessor RunTask 로 NAT-free 자체 검증 통과. 2026-06-13 ECS crawler smoke RunTask(public-a / public-b subnet + `sgroup-crawler-tasks` SG + `assignPublicIp = ENABLED`)에서 외부 outbound 도달 1차 통과(exitCode 0 / Naver Finance 접속 성공). non-GUI crawler 실제 Task Definition 분리는 후속(task 58)으로 이월(KRX GUI 경로는 EC2 worker 로 분리) (§8.2, §9)
 - [x] 32. 운영 안정화는 본 spec 범위 밖 / 후속 spec·후속 phase 책임 분리 명시 → 2026-06-10 crawler 안정화 100% 는 오늘 범위 밖으로 유지. 2026-06-12 KRX GUI 의존 수집은 EC2 worker 로 1차 운영 가능 상태 도달 / 완전 자동화는 후속 (§8)
 
 ## 8. NAT-free 정책 재확인 (§9)
@@ -91,14 +91,26 @@
 
 ## 12. 후속 task (이월 / 분리)
 
-- [ ] 53. SSM RunCommand 기반 EC2 worker 무인 실행 절차 정리 (후속 분리)
-- [ ] 54. EventBridge Scheduler → SSM RunCommand 연계 절차 정리 (후속 분리)
+- [x] 53. SSM RunCommand 기반 EC2 worker 무인 실행 절차 정리 → 부분 완료(2026-06-13). SSM RunCommand 가 wrapper 를 SYSTEM Session 0 에서 직접 실행하는 방식은 KRX GUI 로그인에 부적합으로 판단되어 채택하지 않음. 1차 자동화 방식은 SSM RunCommand → `schtasks /Run /TN Portfolio-KRX-Worker-Daily` → Windows Scheduled Task → Administrator interactive session → `run_krx_worker_daily.ps1` 흐름으로 확정 ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §1 ~ §4)
+- [ ] 54. EventBridge Scheduler → SSM RunCommand 연계 절차 정리 (후속 분리 — `schtasks /Run` 트리거 정기 실행)
 - [ ] 55. Step Functions 에서 ECS Task + EC2 worker 혼합 orchestration 골격 정리 (후속 분리)
 - [ ] 56. CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집 절차 정리 (후속 분리)
-- [ ] 57. wrapper 내 DB 검증 출력 자동 추가(`interest_program_raw` / `interest_shortsell_raw` 일자별 row count 출력) 절차 정리 (후속 분리)
-- [ ] 58. ECS / Fargate non-GUI crawler 범위 재정리(EC2 worker vs ECS Fargate Task 인벤토리 확정) (후속 분리)
+- [ ] 57. wrapper 내 DB 검증 출력 자동 추가(`interest_program_raw` / `interest_shortsell_raw` 일자별 row count 출력) 절차 정리 (후속 분리 / R-AUTO-007 정합)
+- [ ] 58. ECS / Fargate non-GUI crawler 실제 Task Definition 분리(인벤토리 확정 + smoke 용 revision 과 운영용 Task Definition 분리) (후속 분리)
 - [ ] 59. EC2 worker 작업 완료 후 stop 절차 명시(idle 비용 절감) (후속 분리)
 - [ ] 60. KRX GUI 수집 headless 리팩토링은 장기 후보로만 유지(현재 결정은 EC2 worker 사용) (장기 후보)
+
+## 13. SSM RunCommand 자동화 + ECS crawler smoke (2026-06-13 추가)
+
+- [x] 61. SSM Managed Node 등록 / `AWS-RunPowerShellScript` 가용성 / `hostname` · `whoami` · PowerShell 5.1 / `C:\portfolio` 접근 점검 항목 정리 → 2026-06-13 점검 통과(`whoami` = `nt authority\system` 확인) ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §1)
+- [x] 62. SSM RunCommand 직접 wrapper 실행 시 SYSTEM Session 0 / SessionId 0 / SessionId 2 분리에 의한 KRX GUI 로그인 부적합 사례 정리 → 2026-06-13 직접 실행 방식 채택 거부 결정 ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §2)
+- [x] 63. Windows Scheduled Task `Portfolio-KRX-Worker-Daily` 등록(Administrator interactive 세션 기준 / `C:\portfolio\run_krx_worker_daily.ps1` 실행 / `Start-ScheduledTask` 1차 검증) 절차 정리 → 2026-06-13 등록·실행 성공 ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §3)
+- [x] 64. RDP closed 상태에서 SSM RunCommand → `schtasks /Run /TN Portfolio-KRX-Worker-Daily` trigger 검증 절차 정리 → 2026-06-13 `SUCCESS: Attempted to run the scheduled task` / Task State `Running` → `Ready` / wrapper 최신 로그 `krx_worker_daily_20260613_021904.log` / `[Collected Date] None` idempotent 정상 완료 확인 ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §4)
+- [x] 65. ECS crawler Task Definition `portfolio-paper-interest-crawler` revision 6 의 Selenium Chrome smoke command 분리(실제 daily crawler entrypoint 와 분리) 명시 → 2026-06-13 확정 / log stream prefix `ecs-selenium-chrome-smoke` ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §5)
+- [x] 66. ECS / Fargate Selenium Chrome smoke RunTask(public-a / public-b + `sgroup-crawler-tasks` + `assignPublicIp = ENABLED`) 절차 정리 → 2026-06-13 exitCode 0 / `SELENIUM CHROME SMOKE SUCCESS` / `DRIVER QUIT` / `SELENIUM CHROME SMOKE END` 확인. example.com 접속 성공 / Naver Finance TITLE `Npay 증권` 확인 ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §5)
+- [x] 67. non-GUI crawler 후보 인벤토리 1차 분류(`requests` / `yfinance` 중심 = ECS Fargate 후보 유지 / `interest_crawler_daily.py` 는 KRX GUI 의존 파일과 non-GUI 파일 동시 호출로 ECS 단독 실행 대상 제외) → 2026-06-13 분류 정리 완료 / 실제 운영용 Task Definition 분리는 task 58 (후속) ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §5)
+- [x] 68. Hybrid execution model 1차 완성 판단(KRX program / shortsell = EC2 worker / non-GUI crawler = ECS Fargate 후보 / preprocessor = ECS Fargate / Selenium Chrome smoke 통과 / public subnet + `assignPublicIp` outbound 통과 / CloudWatch Logs 확인 가능) → 2026-06-13 판단 완료 ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §6)
+- [x] 69. 본 일자 안전 / 문서 기록 점검(secret value / password / 실제 ARN / image digest / task ARN / instance-id / account-id 평문 기록 0건 / 8개 MS 미수정 / 외부 호출 0건) 재확인 → 2026-06-13 통과 ([`./operation-notes.md`](./operation-notes.md) 2026-06-13 §7)
 
 ## Task Dependency Graph (간단)
 
@@ -112,25 +124,36 @@
                                 ├─> 29~32 (Crawler outbound 리스크 / 30·31 부분 완료)
                                 ├─> 33~34 (NAT-free 재확인)
                                 ├─> 44~52 (Windows EC2 worker / KRX GUI 수집 / 2026-06-12)
+                                ├─> 61~69 (SSM 자동화 + ECS crawler smoke / 2026-06-13)
                                 └─> 35~40 (안전 제약 / 산출물 한정)
                                       └─> 41~43 (완료 기준)
-                                            └─> 53~60 (후속 task / 이월)
+                                            └─> 53~60 (후속 task / 이월 / 53 부분 완료)
 ```
 
 ## 2026-06-10 이월 항목 요약
 
-1. crawler Task Definition 등록 / RunTask runtime 검증 (task 30, 31 — 2026-06-12 KRX GUI 경로는 EC2 worker 분리로 종결, non-GUI 경로는 후속)
-2. crawler outbound(KRX / Naver / yfinance) 도달 / Selenium runtime 안정화 (2026-06-12 KRX GUI 의존 경로는 EC2 worker 로 1차 운영 가능 상태 도달, non-GUI 경로는 후속 spec / 후속 phase 책임)
+1. crawler Task Definition 등록 / RunTask runtime 검증 (task 30, 31 — 2026-06-12 KRX GUI 경로는 EC2 worker 분리로 종결, 2026-06-13 ECS smoke 1차 통과 / 실제 daily Task Definition 분리는 task 58 후속)
+2. crawler outbound(KRX / Naver / yfinance) 도달 / Selenium runtime 안정화 (2026-06-12 KRX GUI 의존 경로는 EC2 worker 로 1차 운영 가능 상태 도달, 2026-06-13 Selenium Chrome smoke 1차 통과, KRX outbound 의 ECS Fargate 경로 / yfinance ECS 경로 검증은 후속)
 3. public schema 잔존 sequence 추가 점검 (preprocessor 외 도메인 sequence 잔존 여부)
 4. runbook.md / validation-checklist.md 작성 시점 결정
 
 ## 2026-06-12 이월 항목 요약
 
-1. SSM RunCommand 기반 EC2 worker 무인 실행 (task 53)
-2. EventBridge Scheduler → SSM RunCommand 연계 (task 54)
+1. SSM RunCommand 기반 EC2 worker 무인 실행 (task 53 — 2026-06-13 부분 완료 / Scheduled Task trigger 방식으로 확정)
+2. EventBridge Scheduler → SSM RunCommand 연계 (task 54 — `schtasks /Run` 트리거 정기 실행)
 3. Step Functions 에서 ECS Task + EC2 worker 혼합 orchestration (task 55)
 4. CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집 (task 56)
-5. wrapper 내 DB 검증 출력 자동 추가 (task 57)
+5. wrapper 내 DB 검증 출력 자동 추가 (task 57 / R-AUTO-007 정합)
 6. ECS / Fargate non-GUI crawler 범위 재정리 (task 58)
 7. EC2 worker 작업 완료 후 stop 절차 명시 (task 59)
 8. KRX GUI 수집 headless 리팩토링은 장기 후보로만 유지 (task 60)
+
+## 2026-06-13 이월 항목 요약
+
+1. EventBridge Scheduler → SSM RunCommand → `schtasks /Run` 정기 trigger 연계 (task 54)
+2. Step Functions 에서 ECS Task + EC2 worker hybrid orchestration (task 55)
+3. CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집 (task 56)
+4. wrapper 내 DB 검증 출력 자동 추가(`interest_program_raw` / `interest_shortsell_raw` 일자별 row count 출력 / R-AUTO-007 정합) (task 57)
+5. non-GUI crawler 실제 운영용 Task Definition 분리(smoke 용 revision 과 운영용 Task Definition 분리) (task 58)
+6. EC2 worker 작업 완료 후 stop 절차 명시(idle 비용 절감) (task 59)
+7. KRX GUI 수집 headless 리팩토링은 장기 후보로만 유지(현재 결정은 EC2 worker 사용) (task 60)

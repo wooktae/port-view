@@ -201,3 +201,393 @@
 - private RDS는 로컬에서 직접 접속하지 않는다. 항상 EC2 + SSM Session Manager 또는 EIP 기반 restore runner 경유로 접속한다(R-NET-004).
 - dump owner role과 RDS role이 다르면 `--no-owner --no-privileges`로 우회하고, 권한 / owner 정리는 별도 SQL(본 spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md))로 진행한다(R-DATA-004).
 - 1차 적용에서 `REASSIGN OWNED BY portfolio_admin TO portfolio_owner`를 실행하지 않았으므로, 새 객체에는 default privileges가 자동 적용되지만 기존 객체는 적용되지 않는다. 추가 이관 여부는 운영자 결정으로 후속 분리 관리한다.
+
+
+## 2026-06-13 Local-to-AWS Paper RDS 운영 모드 정리
+
+본 섹션은 2026-06-13 운영자가 결정한 Local 개발 / AWS Paper RDS 운영 원칙을 02 spec 운영 노트에 누적 기록한다. RDS Public access 미허용 정책은 변경 없으며(02 spec 1차 적용 결과 / R-SEC-001 / R-NET-004 정합), 로컬 개발 환경에서 AWS Paper RDS 에 접속할 때의 흐름과 guard 조합을 명문화한다. 동일 원칙은 04 spec 2026-06-13 §5(Local-to-AWS Paper RDS) 와 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-ENV-006 / OD-ENV-007 / OD-ENV-008 에 동기화한다.
+
+### 1. Paper 환경 source of truth
+
+1. Paper 환경의 source of truth: 완료
+   1) AWS Paper RDS 단일 source of truth 로 고정.
+   2) 로컬에서 실행하더라도 `PORT_ENVIRONMENT=paper` 이면 AWS Paper RDS 를 바라본다.
+   3) AWS 에서 실행하더라도 동일한 AWS Paper RDS 를 사용한다.
+   4) 로컬 PostgreSQL 은 `LOCAL_DEV` fixture / 실험 / 백업 참고용으로만 사용한다.
+   5) local DB 와 AWS Paper RDS 간 주문 / 체결 / 포지션 데이터 병합 또는 동기화는 하지 않는다(R-DATA-007 정합 후속 추가).
+
+### 2. 환경 구분 라벨
+
+1. `LOCAL_DEV`: 완료
+   1) local PostgreSQL 사용 가능.
+   2) 개발 / 실험 / fixture 전용.
+   3) 실제 paper 운영 아님.
+   4) 주문 실행 금지.
+2. `PAPER`: 완료
+   1) AWS Paper RDS 사용.
+   2) 로컬 실행도 AWS Paper RDS 사용.
+   3) AWS 실행도 AWS Paper RDS 사용.
+   4) paper 주문 / 체결 / 포지션 source of truth.
+3. `LIVE`: 후속
+   1) 후속 설계 대상(10 spec 통합).
+   2) 실전 운영 source of truth 는 paper 와 분리 필요.
+
+### 3. SSM Port Forwarding 방향
+
+1. RDS 노출 정책: 완료
+   1) RDS 는 Private 유지(02 spec 1차 적용 결과 / OD-NET-009 / R-SEC-001 정합).
+   2) RDS Public 접근 허용 금지.
+2. 로컬에서 AWS Paper RDS 접속 시: 완료
+   1) SSM Port Forwarding 사용.
+   2) 로컬에서는 `localhost:15433` 같은 포트로 접속하지만 실제 대상은 AWS Paper RDS.
+   3) DB host 가 `localhost` 라고 해서 무조건 local DB 로 판단하면 안 된다.
+   4) 실제 paper 주문 실행 guard 는 `PORT_ENVIRONMENT=paper` + `PORT_DB_TARGET=aws-paper` 조합으로 판단(MarketConnector executor `--execute` guard 정합).
+
+### 4. 예시 환경 변수(Local PC + SSM Port Forwarding)
+
+1. 환경 변수 예시: 완료
+   1) `PORT_ENVIRONMENT=paper`
+   2) `PORT_DB_TARGET=aws-paper`
+   3) `INTEREST_DB_HOST=localhost`
+   4) `INTEREST_DB_PORT=15433`
+   5) `INTEREST_DB_NAME=portfolio`
+2. 표기 정책: 완료
+   1) 비밀번호 / 계정 / 실제 RDS endpoint hostname / 실제 SSM Port Forwarding session id 평문 기록 금지(R-DOCS-001 정합).
+   2) 본 노트 / 후속 spec 산출물에는 placeholder 만 사용한다.
+
+### 5. 금지 사항
+
+1. local 환경의 paper 주문 실행 금지: 완료
+   1) local PostgreSQL 에서 paper 주문 실행 금지.
+2. local DB 와 AWS Paper RDS 간 동기화 금지: 완료
+   1) `connector_order_request` 병합 금지.
+   2) `connector_fill` 병합 금지.
+   3) `strategy_execution_order` 병합 금지.
+   4) `strategy_position_state` 병합 금지.
+
+### 6. 후속 인계
+
+1. SSM Port Forwarding runbook 정리: 후속
+   1) 02 spec runbook 또는 별도 운영 노트에 SSM Port Forwarding → AWS Paper RDS 접속 절차 정식 기재.
+2. 모든 MS 의 환경변수 점검: 후속
+   1) 8개 MS 의 환경변수 인벤토리에서 `PORT_ENVIRONMENT` / `PORT_DB_TARGET` 정합 여부 점검.
+3. aws-live 통합 시점: 후속
+   1) `LIVE` 라벨의 source of truth 는 paper 와 별도 RDS 로 분리(10 spec 통합 시점 결정).
+
+
+## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 연결 검증 + Runbook
+
+본 섹션은 같은 일자(2026-06-13)의 Local-to-AWS Paper RDS 운영 모드 정리(앞 섹션) 와 별개로, 운영자가 직접 수행한 SSM Port Forwarding 기반 로컬 → AWS Paper RDS 연결 1차 실증 검증 결과를 누적 기록한다. 본 섹션은 동시에 Local-to-AWS Paper RDS SSM Port Forwarding Runbook 의 1차 본문으로 사용된다. RDS Public access 미허용 정책(R-SEC-001 / R-NET-004) 변경 없음. AWS / RDS / IAM 변경 0건 — 본 일자에는 read-only AWS API 호출과 SSM Port Forwarding 세션 + Python `psycopg2` 접속 검증만 수행했다.
+
+### 1. 사전 도구 확인
+
+1. AWS CLI 확인: 완료
+   1) 명령어: `aws --version`
+   2) 결과: `aws-cli/2.27.50 Python/3.13.4 Windows/11 exe/AMD64`
+2. Session Manager Plugin 확인: 완료
+   1) 1차 실행 시 `session-manager-plugin` PowerShell 인식 실패 → Plugin 설치 후 재확인.
+   2) 명령어: `session-manager-plugin --version`
+   3) 결과: `1.2.814.0`
+   4) 판단: SSM Port Forwarding session 기동 가능 상태.
+
+### 2. SSM Port Forwarding 표준 경유지 결정
+
+1. 실행 중 EC2 점검: 완료
+   1) 명령어: `aws ec2 describe-instances`
+   2) `portfolio-paper-marketconnector-ec2`
+       - instance id: `i-0fce77927b7397b88`
+       - private ip: `10.0.0.181`
+       - state: `running`
+   3) `portfolio-paper-crawler-worker`
+       - instance id: `i-0ff768ea639a91355`
+       - private ip: `10.0.0.169`
+       - state: `running`
+2. 표준 경유지 결정: 완료
+   1) SSM Port Forwarding 경유지 = `portfolio-paper-marketconnector-ec2` (instance id `i-0fce77927b7397b88`).
+   2) 결정 사유:
+       - 본 EC2 는 2026-06-09 RDS restore runner 로 동일 RDS 접근 검증 이력 보유(앞 섹션 §3 정합).
+       - MarketConnector / Strategy Execution / View 가 바라볼 Paper DB 의 운영 경유지 역할이 자연스러움(03 spec 정합).
+       - `portfolio-paper-crawler-worker` 는 KRX GUI / Windows worker 역할로 유지(08 spec 정합 — 본 EC2 는 SSM Port Forwarding 경유지로 사용하지 않는다).
+   3) 결정 락: OD-NET-010 (SSM Port Forwarding 표준 경유지) 으로 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 갱신.
+
+### 3. 대상 EC2 SSM Managed Node 점검
+
+1. SSM Online 상태 확인: 완료
+   1) 명령어: `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=i-0fce77927b7397b88"`
+   2) 결과:
+       - instance id: `i-0fce77927b7397b88`
+       - ping status: `Online`
+       - platform type: `Linux`
+       - agent version: `3.3.4515.0`
+   3) 판단: SSM Port Forwarding target 으로 사용 가능.
+
+### 4. AWS Paper RDS endpoint 확인
+
+1. RDS metadata 조회: 완료
+   1) 명령어: `aws rds describe-db-instances --db-instance-identifier portfolio-paper-rds`
+   2) 결과:
+       - DB name: `portfolio`
+       - endpoint hostname: `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`
+       - port: `5432`
+       - publicly accessible: `False`
+       - status: `available`
+   3) 판단: RDS 는 Private 유지(OD-NET-009 / R-SEC-001 / R-NET-004 정합). Public 노출 없이 SSM Port Forwarding 으로 로컬 접속 가능.
+
+### 5. SSM Port Forwarding 터널 오픈
+
+1. 표준 명령어: 완료
+   1) 명령어: `aws ssm start-session --target i-0fce77927b7397b88 --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com",portNumber="5432",localPortNumber="15433"`
+2. 세션 결과: 완료
+   1) session id: `terraform-vjp3fv3nz73konetcevdzjh9de`
+   2) local port: `15433`
+   3) remote RDS port: `5432`
+   4) message: `Port 15433 opened`
+   5) message: `Waiting for connections...`
+3. 연결 구조: 완료
+   1) Local PC `localhost:15433`
+   2) → SSM Session Manager tunnel
+   3) → `portfolio-paper-marketconnector-ec2` (instance id `i-0fce77927b7397b88`)
+   4) → AWS Paper RDS `portfolio-paper-rds:5432`
+
+### 6. 로컬 psql client 미설치 / PATH 미등록 확인
+
+1. 1차 시도: 실패
+   1) 명령어: `psql -h localhost -p 15433 -U portfolio_admin -d portfolio`
+   2) 결과: PowerShell 에서 `psql` 명령어 인식 실패.
+   3) 판단: AWS / SSM / RDS 정합성 문제 아님. 로컬 PostgreSQL client PATH 미등록 문제(R-AUTO-013 정합 후속 추가).
+2. 보정 방향: 완료(즉시 조치는 보류)
+   1) 즉시 psql 설치 진행하지 않음.
+   2) Python `psycopg2` 로 접속 확인 진행(§7 / §8 / §9).
+   3) psql client 정식 설치 / PATH 등록은 후속(`_common/followups-overview.md` 2026-06-13 §1).
+
+### 7. Python `psycopg2` 사용 가능 확인
+
+1. 모듈 import 점검: 완료
+   1) 명령어: `python -c "import psycopg2; print('psycopg2 OK')"`
+   2) 결과: `psycopg2 OK`
+   3) 판단: Python 기반 DB 접속 테스트 가능.
+
+### 8. `portfolio_admin` 접속 확인
+
+1. 접속 파라미터: 완료
+   1) host: `localhost`
+   2) port: `15433`
+   3) dbname: `portfolio`
+   4) user: `portfolio_admin`
+   5) password: 환경변수 `PGPASSWORD` 사용(평문 노출 0건, R-DOCS-001 정합)
+2. 접속 결과: 완료
+   1) 출력 요약(`current_user`, `current_database`, `inet_server_addr`, `inet_server_port`):
+       - `('portfolio_admin', 'portfolio', '10.0.20.165', 5432)`
+   2) 판단:
+       - 로컬 PC 에서 SSM tunnel 을 경유해 AWS Paper RDS 접속 성공.
+       - 실제 RDS private IP = `10.0.20.165` (RDS endpoint resolve 결과).
+       - 실제 RDS port = `5432`.
+       - `localhost:15433` 의 실제 대상이 AWS Paper RDS 임이 1차 실증됨(OD-ENV-007 정합).
+
+### 9. `execution_app` 접속 확인 (Strategy Execution 포팅 사전 검증)
+
+1. 접속 파라미터: 완료
+   1) host: `localhost`
+   2) port: `15433`
+   3) dbname: `portfolio`
+   4) user: `execution_app`
+   5) password: 환경변수 `PGPASSWORD` 사용(평문 노출 0건)
+2. 접속 결과: 완료
+   1) `current_user`: `execution_app`
+   2) `current_database`: `portfolio`
+   3) `search_path`: `execution, decision, research, connector, preprocessor, interest, reference, legacy, public`
+3. 판단: 완료
+   1) Strategy Execution(`port_strategy_execution`) AWS 포팅 전 단계의 AWS Paper RDS app role 접속 1차 검증 통과.
+   2) `execution_app` 의 search_path 가 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §3 / OD-DB-006 / OD-DB-007 정합(legacy 는 search_path 에 포함되지만 USAGE 미부여로 실제 접근 차단).
+   3) 본 일자 검증은 SELECT 조회 한정(`current_user` / `current_database` / `inet_server_addr` / `inet_server_port` / `search_path`) — INSERT / UPDATE / DELETE / DDL 0건.
+
+### 10. Local-to-AWS Paper RDS SSM Port Forwarding Runbook (1차 본문)
+
+1. 사전 점검 단계: [확인]
+   1) 로컬 AWS CLI 확인 — `aws --version`
+   2) Session Manager Plugin 확인 — `session-manager-plugin --version`
+   3) 대상 EC2 running 상태 확인 — `aws ec2 describe-instances --instance-ids i-0fce77927b7397b88`
+   4) 대상 EC2 SSM Online 상태 확인 — `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=i-0fce77927b7397b88"`
+   5) AWS Paper RDS endpoint / status 확인 — `aws rds describe-db-instances --db-instance-identifier portfolio-paper-rds`
+2. SSM Port Forwarding 터널 오픈 단계: [실행]
+   1) 명령어:
+       - `aws ssm start-session --target i-0fce77927b7397b88 --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com",portNumber="5432",localPortNumber="15433"`
+   2) 성공 출력:
+       - `Port 15433 opened`
+       - `Waiting for connections...`
+   3) tunnel 유지 조건:
+       - 본 PowerShell / 터미널 창을 닫지 않는다(R-AUTO-012 정합).
+       - 추가 작업은 별도 PowerShell 창에서 수행한다.
+3. 로컬 환경변수 표준 export 단계: [준비]
+   1) 본 spec / 다른 산출물 본문에 password / secret 평문 기록 금지(R-DOCS-001 정합).
+   2) 표준 환경변수 키:
+       - `PORT_ENVIRONMENT=paper`
+       - `PORT_DB_TARGET=aws-paper`
+       - `INTEREST_DB_HOST=localhost`
+       - `INTEREST_DB_PORT=15433`
+       - `INTEREST_DB_NAME=portfolio`
+   3) `INTEREST_DB_USER` / `INTEREST_DB_PASSWORD` 는 MS 별 app role 로 분리(§10.5).
+4. 접속 검증 단계: [확인]
+   1) Python `psycopg2` 점검 — `python -c "import psycopg2; print('psycopg2 OK')"`
+   2) `portfolio_admin` 접속 확인:
+       - `current_user` = `portfolio_admin`
+       - `current_database` = `portfolio`
+       - `inet_server_addr` = `10.0.20.165`
+       - `inet_server_port` = `5432`
+   3) MS 별 app role 접속 확인(§10.5 표) — `current_user` / `current_database` / `search_path` 출력 검증.
+   4) psql client 가 PATH 에 있는 경우 한해 `psql -h localhost -p 15433 -U <app_role> -d portfolio` 도 사용 가능. 본 일자 시점에는 PATH 미등록(R-AUTO-013 정합).
+5. MS 별 app role 매핑: [준비]
+   1) Strategy Execution: `execution_app`
+   2) MarketConnector: `marketconnector_app`
+   3) Interest Crawler: `crawler_app`
+   4) Interest Preprocessor: `preprocessor_app`
+   5) View: `view_app`
+   6) password / secret value 본 runbook 본문 / 운영자 노트 / 콘솔 캡처 / 로그 평문 기록 금지(R-DOCS-001 정합).
+6. 성공 기준: [확인]
+   1) SSM tunnel 메시지가 `Port 15433 opened` 상태로 유지됨.
+   2) `portfolio_admin` 으로 AWS Paper RDS 접속 가능.
+   3) `execution_app` 으로 AWS Paper RDS 접속 가능(본 일자 1차 검증 완료).
+   4) `execution_app` search_path = `execution, decision, research, connector, preprocessor, interest, reference, legacy, public` 일치.
+   5) RDS `PubliclyAccessible` 값이 `False` 로 유지됨.
+7. 실패 / 복구: [복구]
+   1) `Port 15433 opened` 메시지가 안 나오면 SSM Plugin 설치 / EC2 SSM Online / IAM Role / VPC Endpoint 5종(`com.amazonaws.<region>.ssm` / `ssmmessages` / `ec2messages`) 점검 후 재시도.
+   2) tunnel 창이 닫혔다면 같은 명령어로 새 session 재기동(R-AUTO-012 정합).
+   3) 접속 단계에서 `password authentication failed` 발생 시 environment 의 `PGPASSWORD` 값 / app role password 정합 점검(평문 출력 금지).
+   4) `relation does not exist` / `permission denied` 발생 시 02 spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 GRANT 매트릭스 / §5 검증 SQL 재확인(R-DATA-005 정합).
+
+### 11. 안전 / 보안 점검 결과
+
+1. AWS 리소스 생성 / 수정 / 삭제 0건. read-only AWS API(`aws ec2 describe-instances` / `aws ssm describe-instance-information` / `aws rds describe-db-instances`) + SSM Port Forwarding 세션(`aws ssm start-session` 한정) + Python `psycopg2` SELECT 조회만 사용.
+2. RDS DDL/DML 0건. INSERT / UPDATE / DELETE / DDL 0건. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 호출 0건.
+3. 실제 password / secret value / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 IAM access key id / 실제 secret ARN / EIP 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+4. 본 노트 / runbook 본문에 평문으로 포함된 운영 식별자: instance id(`i-0fce77927b7397b88` / `i-0ff768ea639a91355`), private IP(`10.0.0.181` / `10.0.0.169` / `10.0.20.165`), local port(`15433`), SSM session id(`terraform-vjp3fv3nz73konetcevdzjh9de`), RDS endpoint hostname(`portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`). 사용자 명시 정책에 따라 운영 식별자는 작업 로그 / runbook 에는 기록 가능, 민감정보(secret value / password / token / account-id / KIS 자격)는 절대 평문 기록 금지.
+5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog 본 일자 작업으로 인한 변경 0건.
+6. session id 는 본 일자 검증 세션의 식별자(임시값)이며, 동일 세션 재기동 시 다른 식별자가 생성된다. 본 노트의 session id 는 재현 / 추적 목적의 사실 기록일 뿐 secret 이 아니다.
+
+### 12. 본 일자 범위 밖 / 후속 인계
+
+1. psql client 정식 설치 / PATH 등록: 후속(R-AUTO-013).
+2. 모든 MS 의 Paper mode DB 환경변수 인벤토리 점검: 후속(`_common/followups-overview.md` 2026-06-13 §2).
+3. Strategy Execution(`port_strategy_execution`) AWS 포팅 본 phase: 후속(04 spec 후속 phase).
+4. MarketConnector 신규 executor(`connector_strategy_order_execute.py`) EC2 배포 후보 zip / tag 산출: 후속(03 spec 후속 phase 또는 07 spec).
+5. 평일 또는 안전한 테스트 데이터로 `READY -> REQUESTED -> SUBMITTED` end-to-end dry / integration 검증: 후속(R-AUTO-009 / R-AUTO-010 / R-AUTO-011 정합).
+6. EventBridge Scheduler 정기 trigger / Step Functions hybrid orchestration: 04 / 08 spec 후속 phase.
+7. SSM Port Forwarding session 자동 keep-alive / reconnect: 운영자 확인(현재는 수동 재기동 정책, R-AUTO-012 정합).
+
+
+## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 보강 (psql 18 client + pgAdmin4 접속 검증)
+
+본 섹션은 같은 일자 앞 섹션(`## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 연결 검증 + Runbook`) §1 ~ §12 의 후속이며, 운영자가 동일 SSM Port Forwarding tunnel 위에서 추가 client 2종(로컬 PostgreSQL 18 `psql.exe` 직접 경로 실행 + pgAdmin4) 으로 AWS Paper RDS 접속을 1차 실증한 결과를 누적 기록한다. SSM tunnel 자체는 재사용(같은 명령 / 같은 local port `15433` / 새 session id 가능). RDS Public access 미허용 정책 / OD-NET-009 / R-SEC-001 / R-NET-004 본문 변경 없음. AWS / RDS / IAM 변경 0건 — read-only AWS API + SSM Port Forwarding 세션 + psql / pgAdmin4 SELECT 조회만 사용.
+
+### 1. 로컬 PostgreSQL 18 psql client 접속 검증
+
+1. 로컬 PostgreSQL 설치 인벤토리: 완료
+   1) 경로: `C:\Program Files\PostgreSQL`
+   2) 버전 폴더: `17`, `18`
+2. 직접 경로 실행 명령어: 완료
+   1) 명령어: `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 15433 -U portfolio_admin -d portfolio`
+   2) 일반 `psql` PATH 등록은 여전히 미완료 — full path 직접 실행으로 작업 진행(R-AUTO-013 mitigation 보강 정합).
+3. 접속 결과: 완료
+   1) psql client: `18.1`
+   2) server: `18.4`
+   3) SSL connection: `TLSv1.3`
+   4) `current_user`: `portfolio_admin`
+   5) `current_database`: `portfolio`
+   6) `inet_server_addr`: `10.0.20.165`
+   7) `inet_server_port`: `5432`
+4. 비밀번호 입력 관련 메모: 운영자 확인
+   1) 접속 시 비밀번호를 묻지 않음 — PowerShell 세션의 `PGPASSWORD` 환경변수를 psql 이 사용했기 때문으로 판단.
+   2) 필요 시 `Remove-Item Env:PGPASSWORD` 로 세션 내 비밀번호 환경변수 제거 가능.
+   3) 본 노트 / 콘솔 캡처 / 로그 평문 기록 0건(R-DOCS-001 정합).
+5. 판단: 완료
+   1) 로컬 PostgreSQL 18 psql client → SSM tunnel → AWS Paper RDS 18.4 접속 1차 실증.
+   2) client major 18 / full 18.4 / server 18.4 정합(R-DATA-003 mitigation 정합 / 03 spec design §5 정합).
+
+### 2. pgAdmin4 접속 검증
+
+1. 서버 등록 파라미터: 완료
+   1) Host name/address: `localhost`
+   2) Port: `15433`
+   3) Maintenance database: `portfolio`
+   4) Username: `portfolio_admin`
+   5) Password: `portfolio_admin` 비밀번호 — 본 노트 / 콘솔 캡처 / 로그 평문 기록 0건(R-DOCS-001 정합).
+   6) SSL mode: `Prefer` 또는 기본 TLS 자동 연결.
+2. SSM tunnel 측 확인: 완료
+   1) 같은 일자 앞 섹션 §5 의 tunnel 창에서 pgAdmin4 접속 시 `Connection accepted for session [...]` 메시지 출력 확인.
+   2) tunnel 창 종료 시 pgAdmin4 연결도 즉시 단절(R-AUTO-012 정합).
+3. 확인 SQL: 완료
+   1) `select current_user, current_database(), inet_server_addr(), inet_server_port(), current_setting('search_path');`
+4. 확인 결과: 완료
+   1) `current_user`: `portfolio_admin`
+   2) `current_database`: `portfolio`
+   3) `inet_server_addr`: `10.0.20.165`
+   4) `inet_server_port`: `5432`
+   5) `search_path`: `"$user", public`
+       - 비고: `portfolio_admin` 은 본 일자 시점에 `ALTER ROLE ... SET search_path` 적용 대상이 아님 — app role(7종) 만 search_path 적용(OD-DB-006 정합 / [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §3 정합). 따라서 `portfolio_admin` 의 `"$user", public` 출력은 정상.
+5. schema / table 조회 가능 확인: 완료
+   1) `connector.connector_account`
+   2) `connector.connector_order_request`
+   3) `connector.connector_order_event`
+   4) `connector.connector_fill`
+   5) `decision.strategy_daily_position_decision`
+   6) `decision.strategy_daily_run`
+   7) `execution.connector_signal_order_map`
+   8) `execution.strategy_execution_order`
+   9) `execution.strategy_execution_plan`
+   10) `execution.strategy_position_state`
+   11) `interest.interest_pool`
+   12) `ops.strategy_daily_batch_run`
+   13) `ops.strategy_daily_batch_step_log`
+   14) `preprocessor.pre_agency_analysis`
+   15) `preprocessor.pre_news_daily_feature`
+   16) 본 일자 검증은 SELECT 가능 여부 확인까지만 수행 — INSERT / UPDATE / DELETE / DDL 0건.
+6. 판단: 완료
+   1) pgAdmin4 → SSM tunnel → AWS Paper RDS 접속 1차 실증.
+   2) pgAdmin4 는 `localhost:15433` 로 접속하지만 실제 대상은 AWS Private RDS(`10.0.20.165:5432`).
+   3) SSM tunnel 이 유지되는 동안 pgAdmin4 에서 AWS Paper RDS 운영 데이터 조회 가능.
+   4) tunnel 종료 시 pgAdmin4 연결 즉시 단절(R-AUTO-012 detection 보강 정합).
+
+### 3. Runbook §10 보강(앞 섹션 §10 의 보조 절차)
+
+본 섹션은 앞 섹션 §10 의 Runbook 1차 본문 본문을 변경하지 않고, 추가 client 2종에 대한 보조 절차를 보강한다.
+
+1. 접속 검증 단계 (보조): [확인]
+   1) 로컬 PostgreSQL 18 psql client 직접 경로 실행 — `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 15433 -U portfolio_admin -d portfolio`
+   2) 결과 확인 항목:
+       - psql client major / full / server major / full 일치(client `18.1` / server `18.4`)
+       - `SSL connection: TLSv1.3`
+       - `current_user` / `current_database` / `inet_server_addr` / `inet_server_port` 일치
+   3) 일반 `psql` PATH 미등록은 정상 — full path 직접 실행 또는 PATH 등록 후속(R-AUTO-013 정합).
+2. pgAdmin4 서버 등록 단계: [준비]
+   1) Register Server
+       - Name: `AWS Paper RDS - portfolio`
+   2) Connection
+       - Host name/address: `localhost`
+       - Port: `15433`
+       - Maintenance database: `portfolio`
+       - Username: `portfolio_admin` 또는 MS 별 app role
+       - Password: 해당 DB 비밀번호 — 본 runbook 본문 / 운영자 노트 / 콘솔 캡처 / 로그 평문 기록 금지(R-DOCS-001 정합).
+   3) SSL
+       - SSL mode: `Prefer`
+   4) 주의:
+       - SSM Port Forwarding PowerShell 창이 열려 있어야 접속 가능(`Port 15433 opened` 유지).
+       - tunnel 종료 / `Ctrl + C` 시 pgAdmin4 연결도 즉시 단절(R-AUTO-012).
+       - pgAdmin4 서버 등록은 RDS endpoint 가 아니라 `localhost:15433` 으로 설정(OD-NET-011 정합).
+3. 성공 기준 보강: [확인]
+   1) psql / pgAdmin4 출력에서 `inet_server_addr = 10.0.20.165` / `inet_server_port = 5432` 일치(앞 섹션 §10.6 성공 기준 보강).
+   2) RDS `PubliclyAccessible` 값 `False` 유지(앞 섹션 §10.6 그대로).
+
+### 4. 안전 / 보안 점검 결과
+
+1. AWS / RDS / IAM / Secrets Manager / SSM 변경 0건. read-only AWS API + 같은 SSM Port Forwarding tunnel 재사용 + psql / pgAdmin4 SELECT 조회만 사용.
+2. RDS DDL/DML 0건. INSERT / UPDATE / DELETE / DDL 0건. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 호출 0건. `--execute` 실호출 0건.
+3. 실제 password / secret value / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 IAM access key id / 실제 secret ARN / EIP 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+4. 운영 식별자(앞 섹션 §11 의 instance id / private IP / local port / SSM session id / RDS endpoint hostname) 그대로 재사용. 본 섹션 추가 운영 식별자: 로컬 PostgreSQL 설치 경로(`C:\Program Files\PostgreSQL\18\bin\psql.exe`) — 로컬 PC 의 도구 경로이며 secret 가 아님.
+5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog 본 일자 작업으로 인한 변경 0건. pgAdmin4 / psql 18 client 는 운영자 로컬 PC 도구로 별도 spec 산출물 영향 없음.
+
+### 5. 본 일자 범위 밖 / 후속 인계
+
+1. 일반 `psql` 명령어 PATH 등록 — `C:\Program Files\PostgreSQL\18\bin` 을 시스템 / 사용자 PATH 에 등록(R-AUTO-013 정합 / `_common/followups-overview.md` 2026-06-13 SSM Port Forwarding 후속 메모 보강).
+2. pgAdmin4 의 환경별(paper / live) 서버 분리 등록 정책 — paper 환경에서 잘못해서 live RDS 를 등록하지 않도록 서버 이름 prefix 정책(예: `AWS Paper RDS - portfolio`) 표준화. live 환경은 후속 분리(10 spec).
+3. pgAdmin4 / psql 의 app role 별 비밀번호 보관 — 운영자 로컬 PC 환경 책임. Secrets Manager 에서 직접 주입하지 않음. 운영자 실수 시 R-DOCS-001 위반 방지를 위해 화면 캡처 / 채팅 / 노트에 평문 기록 금지 원칙 유지.
+4. Strategy Execution(`port_strategy_execution`) AWS 포팅 본 phase: 후속(04 spec 후속 phase). 본 일자에는 client 3종(Python `psycopg2` / psql 18 / pgAdmin4) 으로 사전 접속 가능성 1차 실증 완료.
