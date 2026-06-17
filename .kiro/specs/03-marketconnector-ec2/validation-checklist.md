@@ -45,11 +45,13 @@
 
 | 항목 | 결과 | 근거 | 비고 |
 |------|------|------|------|
-| `connector_balance.py` 잔고 조회 통과 | [O] | 2026-06-10 운영자 직접 확인 | (§10 (d)) |
-| `connector_order_check.py` 주문 / 체결 조회 통과 | [O] | 2026-06-10 운영자 직접 확인 | (§10 (e)) |
+| `connector_balance.py` 잔고 조회 통과 | [O] | 2026-06-10 운영자 직접 확인 / [2026-06-17 재검증] 통과 | (§10 (d)) |
+| `connector_order_check.py` 주문 / 체결 조회 통과 | [O] | 2026-06-10 운영자 직접 확인 / [2026-06-17 재검증] 통과 | (§10 (e)) |
 | Flask 내부 smoke test (`/api/v1/view/...` 조회성 endpoint) 통과 | [O] | 2026-06-10 운영자 직접 확인 | (§10 (f)) |
 | 운영 가능 후보(`connector_quote_realtime.py` / `connector_quote_closed.py` / `connector_view_service.py`) 검증 | [Kiro 후속 작업 필요] | 후속 phase 책임 | (§7.3, §7.4) |
 | `CONNECTOR_DEBUG=true` 운영 노출 0건 | [운영자 확인 필요] | Flask startup 로그 | 정상 운영 모드 `false` 강제(§8.2) |
+| [2026-06-17] `CONNECTOR_BALANCE` SSM RunCommand 재검증 | [O] | 2026-06-17 운영자 직접 확인(SSM RunCommand) | `connector_balance_snapshot` 최신 `as_of_date 2026-06-17` / `source_api inquire-balance` / `source_version connector-balance-1.0.0` / 보유종목 0건 정상(runbook §4.1) |
+| [2026-06-17] `CONNECTOR_ORDER_CHECK` SSM RunCommand 재검증(MarketConnector 조회계열 선행 검증) | [O] | 2026-06-17 운영자 직접 확인(SSM RunCommand) | KIS `inquire-daily-ccld` `response_status=200` / `response_code=0` / `is_success=true` / `called_at 2026-06-17 00:51:03 UTC` / row count `connector_order_request 33` / `connector_order_event 18` / `connector_fill 13` / 신규 0건은 본 일자 신규 주문·체결 미발생 정상 판단(runbook §4.2) |
 
 ## 5. Secrets Manager / SSM env 주입
 
@@ -58,9 +60,11 @@
 | Secrets Manager 4건 metadata 정상 (`describe-secret`) | [운영자 확인 필요] | 운영자 EC2 shell | KIS app key / secret / paper-account / rds/marketconnector-app |
 | 기존 `/portfolio/paper/rds/master` 유지 | [운영자 확인 필요] | 02 spec 정합 | 이름 변경 / 삭제 0건 |
 | SSM Parameter 6건 정상 (`get-parameters-by-path /portfolio/paper/marketconnector`) | [운영자 확인 필요] | 운영자 EC2 shell | base-url / connector-host·port·debug / environment / broker-name |
-| 환경변수 매핑(`APP_KEY` / `APP_SECRET` / `PAPER_ACNT` / `ACNT_PRDT_CD` / `INTEREST_DB_*` / `BASE_URL` / `PORT_*` / `CONNECTOR_*`) 주입 통과 | [O] | 2026-06-10 운영자 직접 확인 | (§10 (g), §8.2) |
+| 환경변수 매핑(`APP_KEY` / `APP_SECRET` / `PAPER_ACNT` / `ACNT_PRDT_CD` / `INTEREST_DB_*` / `BASE_URL` / `PORT_*` / `CONNECTOR_*`) 주입 통과 | [O] | 2026-06-10 운영자 직접 확인 / [2026-06-17 재검증] 통과(v5 패턴) | (§10 (g), §8.2) |
 | 임시 export 스크립트 secret 평문 저장 0건 | [운영자 확인 필요] | EC2 shell file 점검 | 권한 700 권고 |
 | `GetSecretValue` 자동 호출 0건 (Kiro 측) | [O] | 본 spec 안전 제약 | 운영자만 수행 |
+| [2026-06-17] JSON SecretString 내부 key 추출 + `KIS_*` alias 동시 export 검증(v5 패턴) | [O] | 2026-06-17 운영자 직접 확인 | `kis-app-key` / `kis-app-secret` / `paper-account` JSON SecretString 내부 key(`APP_KEY` / `APP_SECRET` / `PAPER_ACNT` / `ACNT_PRDT_CD`) 추출 후 `APP_*` 호환 key + `KIS_*` alias 동시 export. JSON dict 전체를 환경변수 값으로 export 한 1차 실패는 v5 패턴 보정으로 해소(design.md §8.2.1 / §8.2.2 / runbook.md §2 정합) |
+| [2026-06-17] secret value / 계좌번호 / token 평문 기록 0건 | [O] | 2026-06-17 운영자 직접 확인 | secret name path / JSON shape / value length / key presence 만 기록(R-DOCS-001 정합 / 보안 정책) |
 
 ## 6. Instance Role / Access Key 미사용
 
@@ -83,6 +87,10 @@
 | `connector_modify.py` 미실행 | [O] | 동상 | |
 | Flask 신규 주문 endpoint(`/api/v1/buy|sell|cancel|modify/...`) 호출 0건 | [O] | 본 spec 안전 제약 | runbook §5 정합 |
 | RDS DDL/DML 0건 | [O] | 본 spec 안전 제약 | (§6.5) |
+| [2026-06-17] 신규 주문 / `--execute` / aws-live 작업 0건 재검증 | [O] | 2026-06-17 운영자 직접 확인 | 본 일자 실행은 `connector_balance.py` / `connector_order_check.py` 조회성 단건만. `connector_buy.py` / `connector_sell.py` / `connector_cancel.py` / `connector_modify.py` 미실행 / `--execute` 0건 / aws-live 작업 0건 / `connector_order_event` / `connector_fill` 신규 row 0건 = 정상(runbook §4.2 / OD-MS-021 / OD-SAFE-001 ~ OD-SAFE-004 정합) |
+| [2026-06-17] (Daily AWS 17-step E2E) Step 12 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` 본 실행 — KIS paper BUY 4건 제출 성공 | [O] | 2026-06-17 운영자 직접 확인 / operation-notes 2026-06-17 (Daily AWS 17-step E2E 완료) §2 정합 | `execution_order` id `26 ~ 29` SUBMITTED / `connector_order_request` id `34 ~ 37` 생성 / `broker_order_no 0000035906` / `0000035912` / `0000035918` / `0000035932` / SELL · 취소 · 정정 호출 0건 / aws-live 작업 0건. `connector_strategy_order_execute.py` MarketConnector EC2 정식 배포 + venv python 사용 + `execution` table UPDATE 권한 보정 + `source_run_id` fallback 패치 후 통과(R-AUTO-009 / R-AUTO-010 [2026-06-17 보강] 정합) |
+| [2026-06-17] (Daily AWS 17-step E2E) Step 13 `CONNECTOR_ORDER_CHECK` 본 실행 — `output1 empty` + `output2 aggregate summary` 응답 형태 식별 + summary fallback guard 패치 후 broker_order_no 별 단건 조회 통과 | [O] | 2026-06-17 운영자 직접 확인 / operation-notes 2026-06-17 (Daily AWS 17-step E2E 완료) §3 정합 | 1차 응답이 `output1 empty` + `output2 summary` 로 마지막 주문 row 에 잘못 매핑된 사례 즉시 식별 + 잘못 생성된 `connector_order_event` / `connector_fill` 삭제 + `connector_order_request` 상태 복구 + `connector_order_check.py` summary fallback guard 패치 적용(active 후보 정확히 1건일 때만 fallback 허용 / 다건이면 event · fill · status 변경 금지) + `broker_order_no` 별 단건 조회로 4건 모두 정상 동기화(`connector_order_request 34 ~ 37` FILLED / `connector_fill 26 ~ 29` 생성). R-AUTO-018 신규 mitigation 1차 실증 |
+| [2026-06-17] (Daily AWS 17-step E2E) Step 17 `BALANCE_REFRESH` 본 실행 — `marketconnector_app` legacy 권한 / search_path 보정 후 재실행 통과 | [O] | 2026-06-17 운영자 직접 확인 / operation-notes 2026-06-17 (Daily AWS 17-step E2E 완료) §4 정합 | 1차 실패 = bare `holdings` `relation does not exist`(legacy schema USAGE / `legacy.holdings` DML / sequence / database search_path 누락) → 운영자가 search_path 를 `connector, execution, legacy, reference, public` 로 보정 + USAGE / DML / sequence GRANT + default privileges 보정 후 SSM 재실행 `Status Success` / `ResponseCode 0` / `connector_position_snapshot` 4종목 최신 생성(`position_snapshot_id 120 ~ 123` / quantity `52 / 65 / 244 / 17` / avg_buy_price `28980.77 / 27043.08 / 5744.41 / 120182.35`). R-DATA-011 신규 mitigation 1차 실증 |
 
 ## 8. 후속 인계
 

@@ -113,3 +113,49 @@
 - 본 일자에 06 spec 의 7개 문서(`requirements.md`, `README.md`, `design.md`, `tasks.md`, `runbook.md`, `validation-checklist.md`, `operation-notes.md`) 가 모두 생성됨. 본 spec 의 문서상 닫힘 조건([`./tasks.md`](./tasks.md) task 22) 충족 — 단, 실제 AWS 리소스 작업과 검증 통과는 운영자 후속 작업.
 - 03-marketconnector-ec2 spec 진입 시 본 spec 의 §4 Instance Role 매트릭스, §5 Access Key 미사용 원칙, §6 ECS Task Role 골격, §7 OD 후보를 입력으로 받는다([`./tasks.md`](./tasks.md) task 23).
 - [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/risk-register.md`](../_common/risk-register.md), [`../_common/followups-overview.md`](../_common/followups-overview.md) 갱신은 운영자 승인 시 [`./tasks.md`](./tasks.md) task 16 / 17 / 18 에서 별도 진행.
+
+
+## 2026-06-17 Daily AWS 17-step E2E 흐름 중 Secrets / IAM / DB Role 권한 사실 기록
+
+운영자가 같은 일자 두 번째 세션(Daily AWS 17-step E2E 완료) 진행 중 본 spec 범위(MarketConnector EC2 Instance Role + Secrets Manager + SSM Parameter Store + DB role 보정 연결)의 사실을 누적 기록한다. 본 spec 자체의 추가 결정 0건 / 본문 변경 0건. 결정 정합 검증과 02 spec 의 DB role / grants 보정 결과 연결만 사실 기록. 자세한 17 step 전체 진행 상태는 03 / 04 / 02 / 08 / 09 spec operation-notes 의 2026-06-17 섹션 참조. Kiro 는 문서 작성 / 절차 정리만 수행. 실제 IAM / Secrets Manager / SSM Parameter Store / GRANT 작업은 운영자 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 ARN / IAM access key id 본 노트 평문 기록 0건.
+
+### 1. MarketConnector EC2 Instance Role 기반 Secrets Manager / SSM Parameter Store 1차 실증
+
+1. EC2 Instance Role read 결과: 성공
+   1) MarketConnector EC2 Instance Role 기반 `secretsmanager:GetSecretValue` 호출 성공(Step 1 `CONNECTOR_BALANCE` / Step 12 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` / Step 13 `CONNECTOR_ORDER_CHECK` / Step 17 `BALANCE_REFRESH` 흐름에서 재사용).
+   2) JSON SecretString 내부 key 추출 정책 정합(03 spec design.md §8.2.2 정합) — `kis-app-key` / `kis-app-secret` / `paper-account` 등의 SecretString 은 plain string 이 아닌 JSON / 내부 key `APP_KEY` / `APP_SECRET` / `PAPER_ACNT` / `ACNT_PRDT_CD` 추출 후 export.
+   3) Access Key 미사용 원칙(OD-SEC-005) 정합 — IMDSv2 + Instance Role only / static credential 0건.
+2. value 평문 출력 0건 / key presence 검증: 완료
+   1) 운영자가 환경변수 export 시 `length` / `key presence` / `alias presence` 만 확인.
+   2) value 평문 stdout / 로그 / 콘솔 캡처 / 운영자 노트 0건(R-DOCS-001 [2026-06-17 보강] / [2026-06-17 보강(17-step E2E)] 정합).
+   3) `KIS_*` alias 동시 export 정책(03 spec runbook §2 정합) — `KIS_APP_KEY` / `KIS_APP_SECRET` / `KIS_PAPER_ACNT` / `KIS_ACNT_PRDT_CD` / `KIS_BASE_URL` 5종.
+3. OD-SEC-006 1차 실증 메모 보강: 완료
+   1) MarketConnector EC2 Instance Role 의 secret read 권한이 KIS Secrets / DB Secrets 한정으로 적용되어 있고 본 일자 17-step 전 구간에서 정상 동작.
+   2) MS 별 Secret 접근 분리 정책 정합(2026-06-15 §6 정합 — preprocessor secret 접근은 여전히 `AccessDeniedException` / 정상 동작).
+   3) JSON SecretString 내부 key parsing 정책은 OD-SEC-006 본문 변경 없이 1차 실증 메모만 보강(2026-06-17 첫 세션 결정 정합).
+
+### 2. 02 spec DB Role 권한 보정과 본 spec 연결
+
+본 일자 17-step 흐름에서 발견된 DB role 권한 보정 2건은 02 spec 책임 영역이지만 본 spec 의 IAM / Secrets / Role 정책과 연관된다. 사실 정합 검증과 후속 정식 매트릭스 갱신만 사실 기록.
+
+1. `execution_app` 의 `interest` schema 권한 보정(Step 8 영향): 사실 기록
+   1) 02 spec operation-notes 2026-06-17 §1 정합 — 운영자 직접 GRANT 보정으로 `DAILY_BUY_EXECUTION` 통과.
+   2) 본 spec 의 `decision-app` / `execution-app` Secrets Manager 정책 정합 검증 — Secret 접근 권한은 본 일자 정합 / DB role 의 schema · table · sequence GRANT 부족이 1차 실패 원인이었음.
+   3) 02 spec db-roles-and-grants 정식 매트릭스 갱신은 후속 phase.
+2. `marketconnector_app` 의 `legacy` schema · `legacy.holdings` · search_path 보정(Step 17 영향): 사실 기록
+   1) 02 spec operation-notes 2026-06-17 §2 정합 — 운영자 직접 search_path 보정 + USAGE / DML / sequence GRANT + default privileges 보정으로 `BALANCE_REFRESH` 통과.
+   2) 본 spec 의 `marketconnector-ec2-role` Secrets Manager 정책 정합 검증 — Secret 접근 권한은 본 일자 정합 / DB role 의 legacy schema USAGE / DML / sequence / database search_path 부족이 1차 실패 원인이었음.
+   3) OD-DB-007(legacy schema 모든 app role 미부여) 의 marketconnector_app 한정 1건 예외 사실은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) Change Log 2026-06-17 두 번째 항목 / [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md) 2026-06-17 §2 / [`../_common/risk-register.md`](../_common/risk-register.md) R-DATA-011 신규 정합. 02 spec 본문 결정값 변경은 후속 분리.
+3. 후속 정식 매트릭스 / default privileges / sequence 권한 검증 후보:
+   1) 02 spec [`../02-aws-network-and-rds/db-roles-and-grants.md`](../02-aws-network-and-rds/db-roles-and-grants.md) §4 GRANT / §5 검증 SQL 의 `execution_app` / `marketconnector_app` 행 정식 갱신.
+   2) future default privileges(`ALTER DEFAULT PRIVILEGES IN SCHEMA <name> GRANT ...`) 정식 정리.
+   3) sequence 권한 정식 정리.
+
+### 3. 안전 / 보안 점검 결과
+
+1. 본 일자 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 변경 0건. 06 spec 본문 결정값 변경 0건 / 운영자 직접 IAM / Secrets / GRANT 변경분은 본 노트에 사실로만 기록.
+2. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder. 운영 식별자(secret name path `/portfolio/paper/kis/marketconnector` / `/portfolio/paper/rds/marketconnector-app` / `/portfolio/paper/rds/execution-app` / SSM Parameter name path `/portfolio/paper/kis/...` / 환경변수 key 이름 `APP_KEY` / `KIS_APP_KEY` / `PORT_ENVIRONMENT` / `PORT_DB_TARGET` / role 이름 `execution_app` / `marketconnector_app` / schema 이름 `interest` / `legacy`) 만 사실 기록.
+3. AWS / IAM / Secrets Manager / SSM Parameter Store / RDS / GRANT 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. AWS CLI / boto3 실행 0건(Kiro 측). `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / 운영자 PowerShell stdout 전문 본 노트 평문 인용 0건.
+4. JSON SecretString 내부 key parsing 사실은 mapping 사실로만 기록(value 평문 0건). raw SecretString export 금지 정책 1차 실증(R-DOCS-001 [2026-06-17 보강] / [2026-06-17 보강(17-step E2E)] 정합).
+5. broker / KIS 호출은 KIS paper BUY 4건(03 spec Step 12) + balance / order check 조회성 한정. SELL / 취소 / 정정 / 추가 `--execute` 호출 0건. live 자동 BUY / SELL E2E 검증은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건.
+6. Daily AWS 17-step E2E paper 1차 통과로 본 spec 의 IAM / Secrets / SSM Parameter / DB role 보정 정책이 backend AWS E2E 흐름에서 정상 동작함이 1차 실증 — OD-SEC-005 / OD-SEC-006 / OD-SEC-007 mitigation 정합 / Status 기존 값 그대로 유지(🟡 잠정).

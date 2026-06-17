@@ -466,3 +466,142 @@
   6. Backend E2E dry-run 재개 — `BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL` 순서로 진행. Research 가 Decision 보다 먼저 실행. 주문 전송 / execution 계열은 안전 기준에 따라 skip 또는 dry-run 만 수행(OD-MS-021 / OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 / R-AUTO-010 / R-AUTO-011 정합)
   7. 표현 통일 점검 — 운영 문서 / 보고 / 슬라이드 등에서 "Interest Crawler 완성: 완료" 잔존 grep 정기 점검(R-DATA-009 detection 정합)
 - 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 단, 08 의 hybrid 1차 구현은 본 일자(2026-06-15) 시점에 **부분 완료** 로 정리되었으며, non-GUI daily 운영 경로와 raw 최신성 회복은 후속 spec / 후속 phase 책임으로 명시한다. 본 일자 결과는 04 / 05 / 09 / 10 후속 phase 입력으로 사용한다.
+
+
+### 2026-06-16 후속 메모 (08 spec — Crawler 데이터 미수집 해결 + KRX EC2 자동화 성공)
+
+- 운영자가 2026-06-16 직접 수행한 (a) Crawler 데이터 미수집 원인 진단(rev6 = Selenium / Chrome smoke command / 원본 `interest_crawler_daily.py` KRX GUI 단계 포함 / non-GUI orchestration 부재), (b) `interest_crawler_daily_nongui.py` 신규 생성 + Docker rebuild + ECR push + ECS Task Definition `portfolio-paper-interest-crawler:7` 등록 + RunTask exitCode 0 / 약 9분 51초 / 전체 step SUCCESS, (c) raw 최신성 회복(non-GUI 6종 + KRX 2종 + news / agency), (d) Windows EC2 worker Autologon + Administrator console session Active + SSM RunCommand → `schtasks /Run` → Scheduled Task → Administrator interactive session 흐름으로 KRX login / program / shortsell 2026-06-15 적재 성공 결과를 반영. 자세한 결과는 [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-16 §1 ~ §5 참조. 본 일자로 Interest Crawler hybrid 구조 완료 / Crawler 데이터 미수집 해결 완료 / Preprocessor ECS 재실행 가능 상태 도달.
+- 1차 완료 범위:
+  1. non-GUI crawler 실제 운영용 ECS Task Definition revision 7 분리(image `paper-20260616-nongui` / command `["python", "interest_crawler_daily_nongui.py"]` / log stream prefix `ecs-crawler-nongui-daily` / FARGATE / awsvpc / cpu 1024 / memory 2048 / crawler-app DB secret 주입 유지)
+  2. RunTask exitCode 0 / failures 0 / lastStatus `STOPPED` / stopCode `EssentialContainerExited` / 실행 시간 약 9분 51초 / CloudWatch log stream 생성 / 전체 step SUCCESS(`interest_news` / `interest_agency` / `interest_foreignindex` / `interest_commodity` / `interest_macroeconomic` / `interest_price` / `interest_investorflow` / `interest_marketbreadth`)
+  3. raw 최신성 회복 — `interest_price_raw`(2026-06-08 → 2026-06-15 / 1,207,904 → 1,209,624) / `interest_investorflow_raw`(2026-06-08 → 2026-06-15 / 274,204 → 275,949) / `interest_marketbreadth_raw`(2026-06-08 → 2026-06-15 / 4,788 → 4,793) / `interest_commodity_raw`(2026-06-08 → 2026-06-15 / 29,132 → 29,162) / `interest_foreignindex_raw`(2026-06-08 → 2026-06-15 / 33,738 → 33,766 / HANGSENG · NIKKEI225 · SHANGHAI 일부 NULL Data 는 non-blocker 분리) / `interest_news_raw`(2026-06-11 → 2026-06-16 / 68,881 → 71,614) / `interest_agency_raw`(2026-06-11 → 2026-06-16 / 49,018 → 49,044) / `interest_macroeconomic_raw`(2026-06-08 → 2026-06-15 / 75,742 → 75,777). KRX `interest_program_raw` 547 → 548 / `interest_shortsell_raw` 190,554 → 190,903.
+  4. KRX EC2 worker 자동화 재검증 — Microsoft Sysinternals Autologon 적용 / EC2 재부팅 후 SSM Online + `query user` Administrator console session Active(USERNAME `administrator` / SESSIONNAME `console` / ID `1` / STATE `Active`) / SSM RunCommand → `schtasks /Run /TN "Portfolio-KRX-Worker-Daily"` SUCCESS / Status `Running` → `Ready` / Last Result `267009` → `0` / Last Run Time 2026-06-16 04:55:49 / wrapper 로그 `C:\portfolio\logs\krx_worker_daily_20260616_045550.log` / KRX login 성공(elapsed 92.83s) / `interest_program` 2026-06-15 Collected / `interest_shortsell` 2026-06-15 349 Company / wrapper `DONE :: KRX worker daily`.
+- 결정 락(2026-06-16):
+  1. OD-MS-022(KRX GUI crawler 자동 로그인 기반 운영 방식 = Windows Autologon + Administrator interactive session + Scheduled Task + SSM trigger / SSM direct Python · wrapper 실행은 SYSTEM Session 0 / 비대화형 GUI 한계로 운영 방식에서 제외 / Headless · 비대화형 KRX 수집은 로컬 검증상 운영 방식에서 제외 / Autologon 은 paper 전용 Windows worker 보안 예외, 🟡 잠정).
+  2. OD-MS-011(port-interest-crawler runtime 분리 Hybrid execution model) / OD-MS-015(KRX GUI 의존 crawler 1차 자동화 방식 = SSM RunCommand → `schtasks /Run` → Scheduled Task) / OD-MS-020(Interest Crawler 상태 표현 / 완료 정의) 본문 변경 없이 1차 실증 메모만 보강 — Status 모두 🟡 잠정 유지. 표현 보정(OD-MS-020 정합) — 이전 "hybrid 1차 구현 부분 완료" → "hybrid 구조 완료(non-GUI rev7 운영 경로 생성 + RunTask 성공 + raw 최신성 회복 + KRX GUI = Windows EC2 worker + Autologon + Scheduled Task + SSM trigger)". Preprocessor 는 "raw 입력 데이터 회복 후 ECS 재실행 가능 상태 도달" 까지만 기록("완료" 표기는 사용하지 않음).
+- 보강·신규 리스크:
+  1. R-SEC-009 신규(Windows Autologon 보안 예외 — paper 전용 worker 한정 / RDP inbound 제한 / 자동 로그인 자격 증명 문서화 금지 / Administrator password 미기록 / EC2 stop 절차 / 추후 전용 local user 검토, Status `Open`).
+  2. R-AUTO-016 신규(Administrator interactive session 부재 시 KRX GUI 수집 실패, Status `Open`).
+  3. R-AUTO-017 신규(Chrome process 잔존 — wrapper 종료 시 Chrome 정리 옵션 검토 / 다음 실행 전 정리, Status `Open`).
+  4. R-AUTO-008 detection·mitigation 보강(2026-06-16 Autologon bootstrap + Administrator console session Active 확인 + Scheduled Task trigger 흐름이 본 일자 1차 실증 통과).
+  5. R-DATA-009 / R-DATA-010 mitigation 보강(2026-06-16 raw 최신성 회복으로 1차 실증 / `interest_foreignindex_raw` HANGSENG · NIKKEI225 · SHANGHAI NULL Data 는 본 일자 Preprocessor blocker 가 아닌 non-blocker 후보로 분리).
+- 2026-06-15 이월 항목 중 본 일자 회수(완료):
+  1. non-GUI crawler 실제 운영용 Task Definition 분리(task 58 / task 72) — 완료
+  2. raw 최신성 회복(task 74) — 완료
+  3. non-GUI raw 최신일자 SQL 점검(task 73) — 1차 회복 적재 결과 확인 / 정기 자동화는 task 78 후속
+  4. KRX EC2 worker Autologon bootstrap(task 86) — 완료
+  5. KRX EC2 worker Scheduled Task trigger 재검증(task 88) — 완료
+  6. KRX program / shortsell 2026-06-15 DB 최신성 확인(task 89) — 완료
+  7. Preprocessor 재실행 가능 상태 판단(task 91) — 완료
+- 남은 후속(본 일자 이월):
+  1. Preprocessor ECS 재실행(task 77) — `portfolio-paper-interest-preprocessor` 재실행 → exitCode 0 확인 → feature table max date / `updated_at` 확인 → 신규 feature date 생성 여부 확인
+  2. Backend AWS E2E dry-run 재개 — `BACKTEST_RESEARCH` → `BACKTEST_REPORT` → `DAILY_BUY_SIGNAL` → `DAILY_POSITION_SIGNAL` 순서. Research 가 Decision 보다 먼저 실행. 주문 전송 / execution 계열은 안전 기준에 따라 skip 또는 dry-run 만 수행(OD-MS-021 정합)
+  3. EventBridge Scheduler → SSM RunCommand → `schtasks /Run` 정기 trigger 연계(task 54)
+  4. Step Functions 에서 ECS Task + EC2 worker hybrid orchestration(task 55)
+  5. CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집(task 56)
+  6. wrapper 내 DB 검증 출력 자동 추가(task 57 / R-AUTO-007 정합)
+  7. EC2 worker 작업 완료 후 stop 절차 명시(task 59 / 비용 절감 / R-COST 후보)
+  8. Chrome process 정리 옵션 검토(task 92 / R-AUTO-017 신규)
+  9. preprocessor 실행 후 raw / feature 최신성 검증 SQL 자동화(task 78 / R-DATA-009 / R-DATA-010 mitigation 정합)
+  10. `interest_foreignindex_raw` HANGSENG / NIKKEI225 / SHANGHAI NULL Data 후속 점검(non-blocker)
+  11. `interest_ticker_value_raw` 최신성 회복(2026-03-09 → 직전 거래일 / 별도 후속)
+  12. View 구현 — 후속 예정
+- 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 04 / 05 / 09 / 10 spec 후속 phase 진입 시 본 일자 hybrid 구조 완료 + Preprocessor 재실행 가능 상태 + KRX GUI 자동 로그인 운영 방식 결과를 입력으로 사용한다. password rotate 는 본 일자 작업 범위 밖.
+
+
+### 2026-06-16 후속 메모 (Backend AWS E2E dry-run safe subset 재개 — 09 / 04 spec)
+
+- 운영자가 2026-06-16 같은 일자 첫 번째 세션(Crawler 데이터 미수집 해결 + KRX EC2 자동화 성공) 후속으로 직접 수행한 (a) BACKTEST_RESEARCH AWS Batch 단건 재실행(`portfolio-paper-strategy-research:5` `SUCCEEDED` / run_id `439d78e7-41fd-4bb7-b455-18564ddff758` / backtest_end_date `2026-06-15` / total_return `4.66534417` / mdd `-0.08941942` / sharpe `2.68071466` / trade_count `310`), (b) BACKTEST_REPORT 정식 Job Definition rev1 ~ rev3 교정 진행 + 최종 `portfolio-paper-strategy-report:3` SubmitJob `SUCCEEDED` + S3 prefix `strategy-research/reports/20260616/67522706-9b5f-4770-a312-ceb1987c4655/` 안 4개 객체 존재 확인, (c) DAILY_BUY_SIGNAL 단건 ECS / Fargate 재실행(exitCode 0 / `decision.strategy_daily_signal` row 4건 `READY` / signal_date `2026-06-16`), (d) DAILY_POSITION_SIGNAL 단건 ECS / Fargate 재실행(exitCode 0 / positions 0 정상 skip — 보유 포지션 0건 정상 케이스) 결과를 반영. 자세한 결과는 [`../09-strategy-research-batch/operation-notes.md`](../09-strategy-research-batch/operation-notes.md) 2026-06-16 §1 ~ §8 / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-16 §1 ~ §7 참조.
+- 1차 완료 범위 (Backend AWS E2E dry-run safe subset, OD-MS-021 17단계 정합):
+  1. 1번 `CONNECTOR_BALANCE`: 완료(2026-06-15 / 03 spec)
+  2. 2번 `INTEREST_CRAWLER`: 완료(2026-06-16 첫 번째 세션 / 08 spec — non-GUI rev7 + KRX EC2 worker hybrid 구조 완료 + raw 최신성 회복)
+  3. 3번 `PREPROCESSOR`: 실행 완료(2026-06-15 / 08 spec — raw 입력 데이터 회복 후 재실행 가능 상태 도달까지 1차 / 신규 raw 입력 기반 재실행은 후속 task 77)
+  4. 4번 `BACKTEST_RESEARCH`: 완료(2026-06-16 / 09 spec)
+  5. 5번 `BACKTEST_REPORT`: 완료(2026-06-16 / 09 spec — `portfolio-paper-strategy-report:3` 최종 확정 + S3 4개 객체)
+  6. 6번 `DAILY_BUY_SIGNAL`: 완료(2026-06-16 / 04 spec — row 4건 `READY`)
+  7. 7번 `DAILY_POSITION_SIGNAL`: 완료(2026-06-16 / 04 spec — positions 0 정상 skip)
+- BACKTEST_REPORT 운영 경로 교정(closed 성격): rev1(`python -m port_strategy_research.backtest_report_run` / local-only) / rev2(`python aws_batch_backtest_report_wrapper.py` / 컨테이너 내 파일 경로 부재로 실패) → rev3(`python -m port_strategy_research.aws_batch_backtest_report_wrapper` / 최종 운영 경로 / image `paper-20260615-report-s3` / env `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` / `REPORT_S3_BUCKET=portfolio-paper-migration-yukiever` / `REPORT_S3_PREFIX=strategy-research/reports`). Job Role 의 S3 PutObject Resource 는 prefix 한정 / public read 0건 / wildcard 0건 유지(OD-MS-019 / R-COST-003 정합).
+- DAILY_POSITION_SIGNAL positions 0 정상 skip 정리: `decision.strategy_daily_position_decision` 신규 row 미생성은 보유 포지션 0건(`connector_order_request` 0건 / `strategy_position_state` OPEN 0건)으로 인한 정상 운영 케이스 — 오류 / R-AUTO-001 / R-AUTO-002 위반 아님. 04 spec operation-notes 2026-06-16 §2 / §4 에만 사실 기록(리스크 register 변경 0건).
+- 결정 락(2026-06-16 두 번째 세션): 신규 OD 0건. OD-MS-008(Strategy Research 컴퓨트 1순위 = AWS Batch) / OD-MS-013(Strategy Decision Task Definition 2개 분리) / OD-MS-019(BACKTEST_RESEARCH + BACKTEST_REPORT 2종 한정 + report artifact S3 prefix) / OD-MS-021(Backend AWS E2E dry-run 17단계 순서 + 안전 기준) 본문 변경 없이 1차 실증 메모만 보강 — Status 모두 🟡 잠정 유지.
+- 보강·신규 리스크: 신규 R 0건. R-AUTO-015(Strategy Research heavy backtest / report job 실수 full 실행 위험) detection 에 BACKTEST_REPORT command 경로 불일치(rev1 / rev2 사례) 보강 — rev3 module 호출 방식 확정으로 Status `Mitigated` 유지. R-COST-003(Research S3 report 누적 비용 / lifecycle 미설정) 본문 변경 없음 — S3 lifecycle 정책 + KMS encryption 결정은 후속 분리.
+- 남은 후속 (본 일자 두 번째 세션 이월):
+  1. View AWS 실행 매핑표 작성 — 05 spec 후속 phase 책임. View Daily Batch 의 `BACKTEST_RESEARCH` / `BACKTEST_REPORT` step → AWS Batch SubmitJob 매핑 / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL` step → ECS RunTask 매핑.
+  2. safe step 우선 연결 — Step Functions state machine 정의(BACKTEST_RESEARCH → BACKTEST_REPORT → DAILY_BUY_SIGNAL → DAILY_POSITION_SIGNAL 순서 강제 + 자동 재시도 금지 OD-SAFE-004 반영) + EventBridge Scheduler 정기 트리거. 04 spec / 05 spec 후속 phase 책임.
+  3. 주문 / 체결 / sync 계열(`DAILY_BUY_EXECUTION` ~ `BALANCE_REFRESH`) 의 paper 운영 환경 활성화: 별도 운영자 승인 + 평일 / 안전 테스트 데이터 환경에서 검증 후 진행(R-AUTO-009 / R-AUTO-010 / R-AUTO-011 / OD-SAFE-002 / OD-SAFE-003 정합). 본 일자 두 번째 세션까지는 safe subset 한정으로 미진행 / dry-run skip 유지.
+  4. Execution 계열 dry-run 가능 여부 별도 판단 — `READY -> REQUESTED -> SUBMITTED` end-to-end 검증 진입 전 안전 가드 점검(R-AUTO-009 / R-AUTO-010 정합). 04 spec 후속 phase.
+  5. Preprocessor 재실행(task 77) — 첫 번째 세션의 raw 최신성 회복 입력 기반으로 재실행 후 feature table max date / `updated_at` / 신규 feature date 생성 여부 확인. 08 spec 후속 phase.
+  6. S3 lifecycle 정책 + KMS encryption 결정 — R-COST-003 정합 / 06 spec 후속 phase.
+  7. `portfolio-paper-strategy-report:1` / `portfolio-paper-strategy-report:2` 정리(Inactive 처리 또는 deregister) — 운영자 후속 결정으로 분리.
+  8. heavy 분류(`run_extended_analysis` / `block_watch_*` / `block_exception_buy_*`) 수동 보조 도구 운영 절차 명문화 — R-AUTO-015 mitigation / 09 spec 후속 phase.
+  9. aws-live cutover — 10 spec 책임.
+- 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 04 / 05 / 09 / 10 spec 후속 phase 진입 시 본 일자 safe subset 1차 실증 결과 + BACKTEST_REPORT rev3 운영 경로 + DAILY_POSITION_SIGNAL positions 0 정상 skip 케이스를 입력으로 사용한다.
+
+### 2026-06-17 후속 메모 (03 spec — MarketConnector 조회성 dry-run 재검증)
+
+- 운영자가 2026-06-17 직접 수행한 (a) `CONNECTOR_BALANCE` SSM RunCommand 재검증(1차 실패 = JSON SecretString 전체를 환경변수 값으로 export 한 mapping 오류 / v5 패턴 = JSON 내부 key value 추출 + `APP_*` 호환 key + `KIS_*` alias 동시 export 로 보정 후 성공 / `connector_balance_snapshot` 최신 row `as_of_date 2026-06-17` / `as_of_ts 2026-06-17 00:46:17 UTC` / `source_api inquire-balance` / `source_version connector-balance-1.0.0` / 보유종목 0건 정상), (b) `CONNECTOR_ORDER_CHECK` SSM RunCommand 재검증(MarketConnector 조회계열 선행 검증 — Daily 17단계 후반 step 13 을 단건 선행 실행 / v5 패턴 재사용 / KIS `inquire-daily-ccld` `response_status=200` / `response_code=0` / `is_success=true` / `called_at 2026-06-17 00:51:03 UTC` / row count `connector_order_request 33` / `connector_order_event 18` / `connector_fill 13` / 신규 0건은 본 일자 신규 주문·체결 미발생 정상 판단) 결과를 반영. 자세한 결과는 [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md) 2026-06-17 §1 ~ §3 참조.
+- 1차 완료 범위 (MarketConnector 조회계열 선행 검증):
+  1. `CONNECTOR_BALANCE` 조회성 경로: 완료(SSM RunCommand / Secrets Manager + SSM Parameter Store + Instance Role / v5 env injection / `connector_balance_snapshot` 최신 row 검증 / 보유종목 0건 정상)
+  2. `CONNECTOR_ORDER_CHECK` 조회성 경로: 완료(SSM RunCommand / v5 env injection 재사용 / `inquire-daily-ccld` 정상 응답 / row count 인벤토리 / 신규 0건 정상 판단)
+  3. JSON SecretString 내부 key 추출 정책 1차 실증 — 03 spec design.md §8.2.1 / §8.2.2 / §8.2.3 / runbook.md §2 보강 / runbook.md §4.1 / §4.2 검증 SQL 후보 추가 / validation-checklist 2026-06-17 [O] 행 추가.
+- 결정 락(2026-06-17): 신규 OD 0건. OD-SEC-006(EC2 / ECS IAM Role 기반 secret / parameter read 최소 권한) 본문 변경 없이 1차 실증 메모만 보강(MarketConnector EC2 Instance Role 기반 secret read 성공 / secret 평문 0건 / JSON SecretString 내부 key parsing 필요성 1차 실증). OD-MS-001(MarketConnector 컴퓨트 = EC2+EIP) / OD-MS-009(Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) 본문 변경 없이 1차 실증 메모만 보강(MarketConnector EC2 조회성 경로 재검증 통과). OD-SAFE-001 ~ OD-SAFE-004 / OD-MS-021 정합 — 신규 주문 / `--execute` / fill·position sync 자동 재시도 / aws-live 작업 0건. CONNECTOR_ORDER_CHECK 는 Daily 17단계 후반 step 이지만 본 실행은 선행 단건 검증으로 표현 통일.
+- 보강·신규 리스크: 신규 R 0건. R-DOCS-001(secret 평문 기록 위험) detection / mitigation 에 [2026-06-17 보강] 메모 추가 — JSON SecretString 내부 value 추출 후 환경변수 export / value 평문 출력 0건 / runbook §4.1 / §4.2 검증 SQL 기반 점검 / `connector_api_call_log` BALANCE / ORDER 의 `response_status` / `response_code` / `is_success` / `connector_balance_snapshot` 최신 row / `CONNECTOR_ORDER_CHECK` 신규 row 0건도 정상 판단.
+- 남은 후속 (본 일자 이월):
+  1. systemd / startup script 정상 운영 모드 전환 시 v5 env mapping 패턴(JSON SecretString 내부 key 추출 + `APP_*` 호환 key + `KIS_*` alias 동시 export) 반영 — 03 spec task 26 후속 phase.
+  2. `/tmp/inject-env.sh` 운영 스크립트 승격 여부 판단(권한 700 / 메모리 export 만 / secret 평문 미저장 정책 유지) — 03 spec task 27 후속 phase.
+  3. `APP_*` 호환 key vs `KIS_*` alias 단일화 / 양쪽 유지 결정(현재 동시 export 로 안전 / 후속 코드 정리 시점에 단일화 후보) — 03 spec task 28 후속 phase.
+  4. View / Step Functions 연동 전 safe command wrapper 정리(SSM RunCommand 가 신규 주문 entrypoint 를 trigger 하지 못하도록 allowlist 운영) — 04 spec / 05 spec 후속 phase.
+  5. 주문 / 체결 / sync 계열(`DAILY_BUY_EXECUTION` ~ `BALANCE_REFRESH`) 의 paper 운영 환경 활성화: 별도 운영자 승인 + 평일 / 안전 테스트 데이터 환경에서 검증 후 진행(R-AUTO-009 / R-AUTO-010 / R-AUTO-011 / OD-SAFE-002 / OD-SAFE-003 정합). 2026-06-16 두 번째 세션 후속 메모와 동일 정책 유지.
+  6. aws-live cutover — 10 spec 책임.
+- 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 03 spec 후속 phase / 04 / 05 spec 진입 시 본 일자 v5 env injection + JSON SecretString 내부 key 추출 + `KIS_*` alias 정책 + runbook §4.1 / §4.2 검증 SQL 후보를 입력으로 사용한다.
+### 2026-06-17 후속 메모 (Daily AWS 17-step E2E 완료 — 03 / 04 / 06 / 08 / 09 / 02 spec)
+
+- 같은 일자 첫 번째 세션(MarketConnector 조회성 dry-run 재검증) 후속으로 운영자가 직접 수행한 Daily AWS 17-step E2E 흐름이 본 일자에 끝까지 연결됐다. 17 step 결과 — 1번 `CONNECTOR_BALANCE` 완료 / 2번 `INTEREST_CRAWLER` 완료(non-GUI ECS Fargate `portfolio-paper-interest-crawler:7` + KRX Windows EC2 worker Scheduled Task / `interest_program_raw` / `interest_shortsell_raw` 2026-06-16 / crawler worker stop 요청 완료) / 3번 `PREPROCESSOR` 완료(`pre_total_*` 2026-06-16) / 4번 `BACKTEST_RESEARCH` 완료(Sharpe Ratio `2.68`) / 5번 `BACKTEST_REPORT` 완료(S3 4개) / 6번 `DAILY_BUY_SIGNAL` 완료(BUY READY 4건 / 후보 `282330` / `004990` / `003490` / `088350`) / 7번 `DAILY_POSITION_SIGNAL` 정상 skip / 8번 `DAILY_BUY_EXECUTION` 완료(`execution_plan_id 92`) / 9번 `DAILY_SELL_EXECUTION` 정상 skip / 10번 `DAILY_AUTO_SELL` 정상 skip / 11번 `DAILY_AUTO_BUY` 완료(`READY -> REQUESTED` 4건 / `total_qty 378` / `total_target_amount 6908189.40`) / 12번 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` 완료(KIS paper BUY 4건 제출 성공 / `execution_order` id `26 ~ 29` SUBMITTED / `connector_order_request` id `34 ~ 37` 생성) / 13번 `CONNECTOR_ORDER_CHECK` 완료(`output1 empty` + `output2 aggregate summary` 식별 + summary fallback guard 패치 후 broker_order_no 별 단건 조회로 동기화 / `connector_order_request 34 ~ 37` FILLED / `connector_fill 26 ~ 29` 생성) / 14번 `SYNC_SELL_FILL` 정상 skip / 15번 `SYNC_BUY_FILL` 완료(`execution_order` FILLED 전환) / 16번 `SYNC_BUY_POSITION` 완료(`strategy_position_state` 4건 OPEN / `position_state_id 6 ~ 9`) / 17번 `BALANCE_REFRESH` 완료(legacy.holdings 권한 / search_path 보정 후 재실행 / `connector_position_snapshot` 4종목 최신). 자세한 결과는 [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md) 2026-06-17 (Daily AWS 17-step E2E 완료) §1 ~ §5 / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-17 §1 ~ §6 / [`../09-strategy-research-batch/operation-notes.md`](../09-strategy-research-batch/operation-notes.md) 2026-06-17 §1 ~ §3 / [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-17 §1 ~ §3 / [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md) 2026-06-17 §1 ~ §3 / [`../06-secrets-and-iam/operation-notes.md`](../06-secrets-and-iam/operation-notes.md) 2026-06-17 §1 ~ §3 참조.
+- 1차 완료 범위 (Daily AWS 17-step E2E):
+  1. 조회성 MarketConnector 선행 검증 포함 17 step 전체 실행 흐름 완료
+  2. 수집 / 전처리 / 리서치 / 리포트 / Decision / Execution / MarketConnector 주문 / 체결 조회 / fill sync / position sync / balance refresh 까지 `aws-paper` 기준 backend AWS E2E 연결 1차 통과
+  3. 실제 broker 호출은 KIS paper BUY 4건 한정 / SELL · 취소 · 정정 호출 0건 / aws-live 작업 0건 / OD-MS-021 / OD-SAFE-001 ~ OD-SAFE-004 정합
+  4. `READY -> REQUESTED -> SUBMITTED -> FILLED + position OPEN` end-to-end 상태 전이 1차 통과(R-AUTO-009 / R-AUTO-010 / R-AUTO-011 mitigation 1차 실증 / Status `Mitigated`)
+  5. 03 spec 운영자 직접 패치 / 정식 배포 — `connector_strategy_order_execute.py` patch(MarketConnector EC2 정식 배포 + venv python 사용 + `source_run_id` fallback) / `connector_order_check.py` summary fallback guard patch(active 후보 정확히 1건일 때만 fallback 허용 / 다건이면 event / fill / status 변경 금지 / `broker_order_no` 별 단건 조회 패턴)
+  6. 02 spec / 06 spec — `execution_app` interest schema USAGE / table SELECT / sequence / default privileges 보정(Step 8) + `marketconnector_app` legacy schema USAGE / `legacy.holdings` DML / sequence / database search_path 보정(Step 17) 1차 실증
+  7. 08 spec — Interest Crawler hybrid 구조(non-GUI ECS Fargate + KRX Windows EC2 worker) + Preprocessor ECS / Fargate 본 일자 재가동 1차 실증 / crawler worker stop 요청 완료 / KRX GUI = Windows interactive desktop session 기반 유지
+  8. 09 spec — BACKTEST_RESEARCH + BACKTEST_REPORT 본 일자 정상 실행 / heavy 분류 SubmitJob 0건 유지(R-AUTO-015 정합)
+- 결정 락(2026-06-17 두 번째 세션): 신규 OD 0건. OD-MS-016 / OD-MS-021 / OD-DB-008 / OD-MS-008 / OD-MS-019 본문 변경 없이 1차 실증 메모만 보강 — 자세한 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-17 두 번째 항목 참조.
+- 보강·신규 리스크: 신규 R-AUTO-018(KIS `inquire-daily-ccld` `output1 empty` + `output2 aggregate summary` 응답 형태에서 active 주문 후보 다건일 때 summary fallback 으로 잘못된 fill / status 매핑 위험, Status `Mitigated`). 신규 R-DATA-011(`marketconnector_app` 의 `legacy` schema USAGE / `legacy.holdings` DML / sequence / database search_path 누락으로 BALANCE_REFRESH 실패 위험, Status `Mitigated`). R-DOCS-001 detection / mitigation 에 [2026-06-17 보강(17-step E2E)] 메모 추가(KIS paper BUY 4건 broker 호출 + 17-step 전체 흐름에서도 secret value 평문 0건 재실증). R-DATA-005 detection / mitigation 에 [2026-06-17 보강] 메모 추가(`execution_app` interest 권한 누락 + `marketconnector_app` legacy.holdings 권한 누락 사례). R-AUTO-009 / R-AUTO-010 / R-AUTO-011 detection / mitigation Status 보강(KIS paper BUY 4건 한정 1차 end-to-end 통과 / Status `Mitigated`). R-AUTO-015 Status `Mitigated` 유지.
+- 남은 후속 (본 일자 이월):
+  1. `connector_order_check.py` summary fallback guard 테스트 케이스 추가(active 후보 0 / 1 / 2 / 다건 시 동작 / output1 / output2 형태별 입력값 / event · fill · status 변경 0건 검증 / KIS API 응답 fixture) — 03 spec task 29 후속 phase.
+  2. `connector_strategy_order_execute.py` 의 `result_payload` 내 `source_daily_signal_id null` 보정 검토(OPTIONAL_COLUMNS 또는 fallback 패턴) — 03 spec task 30 후속 phase.
+  3. `legacy.holdings` 권한 / search_path 보정 정식 문서화(02 spec db-roles-and-grants §4 GRANT / §5 검증 SQL / `marketconnector_app` 의 `legacy` USAGE / `legacy.holdings` DML / sequence / database search_path 정식 매트릭스) — 02 / 06 spec 후속 phase.
+  4. `connector_balance_snapshot` 최신성 검증 SQL 정리(`as_of_ts` / `max(created_at)` 의미 구분 / `connector_balance_snapshot` / `connector_position_snapshot` / `connector_api_call_log` 분리 점검) — 03 spec task 31 후속 phase.
+  5. Windows cp949 콘솔에서 CloudWatch / SSM stdout 이모지 출력 실패 회피 패턴 문서화(SSM 응답 본문 전체 인용 0건 정책 정합 / `chcp 65001` 또는 ASCII fallback) — 03 spec / 운영자 로컬 PC 도구 후속 phase.
+  6. AWS paper 자동화 orchestrator 후보 정리(View 또는 Step Functions 기반) — 04 / 05 spec 후속 phase.
+  7. View AWS 실행 매핑표 작성 / safe step 우선 연결 / Step Functions state machine 정의 + EventBridge Scheduler 정기 트리거 — 04 spec 후속 phase.
+  8. 주문 / 체결 / sync 계열의 paper 운영 환경 정기 트리거 활성화: 별도 운영자 승인 + 평일 / 안전 테스트 데이터 환경에서 검증 후 진행(OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 / R-AUTO-010 / R-AUTO-011 정합) — 04 / 10 spec 후속 phase.
+  9. CI/CD OIDC / GitHub Actions 자동 build / push / 배포 체크리스트(MarketConnector EC2 단일 파일 수동 배포 재발 방지) — 07 spec 후속 phase.
+  10. aws-live cutover — 10 spec 책임.
+- 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 본 일자 17-step E2E paper 1차 통과 결과는 04 / 05 / 06 / 09 / 02 spec 후속 phase 진입 시 입력으로 사용한다. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건. password rotate 는 본 일자 작업 범위 밖.
+
+
+### 2026-06-17 후속 메모 (Daily AWS PowerShell wrapper 구현 — 03 spec + 운영자 로컬 도구)
+
+- 같은 일자 두 번째 세션(Daily AWS 17-step E2E 완료) 후속으로 운영자가 직접 수행한 Daily AWS 17-step 운영자용 Windows PowerShell wrapper 구현 결과를 반영. 본 작업의 산출물은 `.kiro/scripts/` 신규 폴더 / 운영자 로컬 PC 도구 / Kiro spec 산출물 외부 / 8개 MS 소스와 별개. 본 wrapper 작업 중 실제 broker / KIS / 신규 BUY · SELL · 취소 · 정정 / `--execute` 주문 제출 0건 / aws-live 작업 0건 / wrapper 기반 전체 1~17 실제 재실행 0건 / Step 12 `-AllowPaperOrderExecute` 사용 0건 / bundled wrapper 미생성. 자세한 결과는 [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md) 2026-06-17 (Daily AWS PowerShell wrapper 구현) §1 ~ §6 / [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-17 세 번째 항목(OD-MS-023 추가) 참조.
+- 1차 완료 범위 (Daily AWS PowerShell wrapper 기준선 수립):
+  1. main wrapper `run-daily-aws-paper.ps1` + config `daily-aws-paper.config.ps1` + functions `daily-aws-paper.functions.ps1` + step 파일 17개 분리 파일 구조 1차 수립
+  2. SSM RunCommand 공통 함수(`AWS-RunShellScript` Linux + `AWS-RunPowerShellScript` Windows) / ECS RunTask 공통 함수(UTF-8 no BOM JSON `--overrides file://...`) / AWS Batch SubmitJob 공통 함수 작성 + CloudWatch log 수집 / SSM stdout · stderr 저장 / summary 기록 / 성공·실패·blocker 판정 / PowerShell UTF-8 보정
+  3. 전체 1~17 DryRun FOUND 17건 통과 / 실제 ECS RunTask · Batch SubmitJob · SSM command 제출 0건
+  4. Step 1 단독 SSM 1차 검증 통과(MarketConnector EC2 / `connector_balance.py` / Success / ResponseCode 0 / `connector_balance_snapshot` 저장 / 보유종목 0건)
+  5. Step 12 PAPER_ORDER_GATE 안전 차단 검증 통과(중앙 wrapper gate + 내부 이중 gate / `-AllowPaperOrderExecute` 없으면 SSM command 제출 0건 / 실제 KIS 주문 제출 0건)
+  6. PowerShell parser validation 20개 파일 모두 OK / parser error 0건
+  7. 위험 키워드 safety grep 통과(Step 10 / Step 11 의 `--execute` 는 strategy execution 내부 상태 갱신 / Step 12 의 `--execute` 만 KIS paper 주문 제출 가능 step / 의도하지 않은 broker · KIS 주문 제출 command 추가 0건)
+- 결정 락(2026-06-17 세 번째 세션): 신규 OD-MS-023(Daily AWS wrapper 운영 정책 = 운영자 로컬 Windows PowerShell wrapper 분리 파일 구조 / 환경 입력 = `aws-paper` 만 허용 / wrapper 자체는 EC2 · ECS · Batch 내부 실행 대상 아님 / 17 step 매핑 · 진행 순서 · 안전 기준은 OD-MS-021 그대로 유지 / Step 12 는 wrapper 중앙 PAPER_ORDER_GATE + 내부 이중 gate 로 기본 차단 / `-AllowPaperOrderExecute` 명시 시에만 허용 / Step 10 / Step 11 의 `--execute` 는 strategy execution 내부 상태 생성·갱신 의미 / broker 직접 제출 아님 / bundled wrapper 는 필요 시에만 생성 / 완전 자동화 이전 단계의 단계별 확인 가능한 CLI 기준선, 🟡 잠정). OD-MS-009 / OD-MS-021 / OD-MS-016 / OD-SAFE-002 / OD-SAFE-003 / OD-SAFE-004 본문 변경 없이 1차 실증 메모만 보강.
+- 보강·신규 리스크: 신규 R-AUTO-019(wrapper 기반 Step 12 의도하지 않은 `-AllowPaperOrderExecute` 사용 위험, Status `Mitigated`). R-AUTO-016(Administrator interactive session 부재 시 KRX GUI 수집 실패) detection / mitigation 에 [2026-06-17 wrapper 보강] 메모 추가 — Step 2 의 KRX GUI Scheduled Task trigger 는 Windows KRX crawler worker 가 `running` 이 아니면 wrapper 안에서 자동 skip(EC2 instance state / SSM Online 사전 점검) / Status 기존 값 그대로 유지. R-AUTO-002(live 자동매매 조기 활성화) mitigation 에 [2026-06-17 wrapper 보강] 메모 추가 — wrapper 의 환경 입력은 `aws-paper` 만 허용 / aws-live 분기 코드 레벨 미존재. R-DOCS-001(secret 평문 기록 위험) detection / mitigation 에 [2026-06-17 wrapper 보강] 메모 추가 — wrapper summary / overrides JSON / SSM stdout · stderr 파일에 secret 평문 출력 0건 / `/tmp/inject-env.sh` v5 env injection 만 사용.
+- 남은 후속 (본 일자 이월):
+  1. bundled wrapper(`run-daily-aws-paper-bundled.ps1`) 생성 여부 결정 — 17개 step 별 파일 검증이 충분히 안정화된 시점에 단일 파일 실행이 필요하면 생성 / 기본 개발 · 검증 · 운영 기준은 분리 파일 구조 유지(OD-MS-023 정합).
+  2. wrapper 기반 Step 1~7 safe subset 실제 실행 검증 — `-StartStep 1 -EndStep 7` / paper 환경 한정 / broker · KIS 주문 제출 없음 검증.
+  3. wrapper 기반 Step 8~11 execution-side 상태 생성·갱신 구간 별도 검증 — Step 8 / Step 9 / Step 10 / Step 11 의 `--execute` 는 strategy execution 내부 상태 갱신만 / broker · KIS 직접 제출 아님(OD-MS-016 책임 분리 정합) / `strategy_execution_order` row 생성·전이 검증.
+  4. Step 12 실제 KIS paper 주문 제출은 운영자 확인 후 `-AllowPaperOrderExecute` 명시로만 진행 — 별도 운영자 승인 + 평일 / 안전 테스트 데이터 환경에서 진행(R-AUTO-019 mitigation 정합).
+  5. wrapper 기반 Step 13~17 주문 / 체결 / sync / balance 결과 확인 후 연계 실행 — Step 13 = 주문 상태 조회 · DB 갱신 / Step 14~16 = fill · position sync DB 갱신 / Step 17 = balance · position snapshot refresh / 신규 broker · KIS 주문 제출 없음.
+  6. Windows KRX crawler worker stopped 상태일 때 Step 2 실제 실행 검증(skip 동작) — wrapper 안 EC2 instance state pre-check 흐름의 실제 시나리오 검증(R-AUTO-016 [2026-06-17 wrapper 보강] mitigation 정합).
+  7. View backend orchestration 또는 Step Functions 이전 검토 — wrapper 의 17 step 매핑 / 진행 순서 / 안전 기준을 그대로 Step Functions state machine 으로 옮길 수 있는지 검토(05 / 04 spec 후속 phase 책임).
+  8. EventBridge Scheduler 정기 트리거 도입 — wrapper 검증이 안정화된 후 정기 실행으로 전환(04 spec 후속 phase 책임).
+  9. aws-live cutover — 10 spec 책임. wrapper 의 환경 입력에 `aws-live` 분기 추가는 10 spec 진입 시점에 별도 결정.
+- 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 본 일자 wrapper 기준선 수립은 04 / 05 spec 후속 phase 의 Step Functions / View orchestration 진입 시점에 입력으로 사용한다. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 wrapper 작업으로 인한 변경 0건. `.kiro/scripts/` 신규 폴더 / 파일은 운영자 로컬 PC 도구 영역 / Kiro spec 산출물 외부.

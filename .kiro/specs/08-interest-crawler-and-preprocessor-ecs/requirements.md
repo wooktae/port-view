@@ -117,6 +117,8 @@
 3. THE design.md SHALL Crawler 운영 안정화 100% 보장은 본 spec 범위 밖이며, 본 spec 시점에는 1차 검토(Dockerfile / 빌드 가능 여부 / outbound 도달 여부) 까지만 수행한다는 점을 명시해야 한다.
 4. WHERE Crawler 1차 검토에서 Selenium / Chrome 의존성 결함이 발견되는 경우, THE design.md SHALL 후속 spec 또는 후속 phase 책임으로 분리하고, Preprocessor 검증 흐름을 차단하지 않는다는 점을 명시해야 한다.
 5. WHERE KRX GUI 의존 수집(예: KRX program / KRX shortsell)이 ECS Fargate Task 의 GUI / Chrome download / OTP 세션 흐름과 호환되지 않는 경우, THE design.md SHALL 해당 KRX GUI 의존 crawler 가 ECS Fargate Task 대신 Windows EC2 worker 위에서 실행될 수 있음을 명시하고, non-GUI crawler 와 KRX GUI 의존 crawler 의 runtime 분리(hybrid execution model) 를 명시해야 한다.
+6. WHEN KRX GUI 수집 자동화가 운영 단계로 진입하는 경우, THE design.md SHALL 다음 4개 조건을 명시해야 한다(2026-06-16 결과 정합 / OD-MS-022 정합): (a) KRX GUI 수집은 Windows interactive session 이 필수다 / (b) SSM 은 직접 Python 실행이 아니라 Scheduled Task trigger 역할로만 사용한다 / (c) Autologon 은 paper 전용 운영 예외(보안 예외)다 / (d) KRX program · shortsell 완료 기준은 DB max date 와 row count 증가로 검증한다.
+7. WHEN non-GUI crawler 의 ECS Fargate 운영 경로가 분리되는 경우, THE design.md SHALL 다음 4개 조건을 명시해야 한다(2026-06-16 결과 정합 / OD-MS-011 / OD-MS-022 정합): (a) ECS / Fargate Task 의 entrypoint / Python 모듈 import 에서 KRX GUI 의존 모듈을 제외한다 / (b) non-GUI step 별 SUCCESS 로그를 CloudWatch Logs 로 확인한다 / (c) raw table 별 최신성을 SQL 로 검증한다 / (d) 회복된 raw 입력으로 Preprocessor 가 재실행 가능한지 판단한다.
 
 ### Requirement 9: NAT-free 정책 강제
 
@@ -150,3 +152,82 @@
 2. WHEN 본 08 초기 문서 phase 가 진행되는 동안, THE 작업 SHALL runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md(또는 `docs/worklog/YYYY-MM-DD.md`) 를 본 phase 에서 작성하지 않고 운영자 실행 이후 별도 작성으로 분리해야 한다.
 3. WHEN 각 phase 호출이 진행되는 동안, THE 작업 SHALL 해당 호출의 단일 phase 문서(requirements 호출 → requirements.md, design 호출 → design.md, tasks 호출 → tasks.md) 만 갱신하고 나머지 phase 문서는 후속 호출 책임으로 분리해야 한다.
 4. WHEN 본 phase 가 진행되는 동안, THE 작업 SHALL [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/risk-register.md`](../_common/risk-register.md), [`../_common/followups-overview.md`](../_common/followups-overview.md) 의 실제 갱신을 수행하지 않고, 갱신 후보만 후속 phase(design / tasks) 에서 식별하도록 분리해야 한다.
+
+
+## 2026-06-16 보강 — KRX GUI 수집 / non-GUI crawler 요구사항 강화
+
+본 절은 2026-06-16 운영자 검증 결과(`./operation-notes.md` 2026-06-16 §1 ~ §6)를 입력으로 R8(Crawler Selenium / Chrome / 외부 outbound 리스크 별도 관리)과 R6 / R7(ECS Cluster / Role / Log Group / Preprocessor 단발 실행)에 대한 추가 acceptance criteria 를 보강 메모로 명시한다. 기존 R1 ~ R11 결정값(SHALL / SHALL NOT) 은 변경하지 않으며, 본 절은 hybrid execution model 1차 자동화 진입점과 non-GUI 운영 경로 신규 생성에 따른 검증 기준만 보강한다. 결정 락은 OD-MS-022(신규) + OD-MS-011 / OD-MS-015 / OD-MS-020 1차 실증 메모 보강 정합.
+
+### Requirement 12: KRX GUI 수집 운영 방식 (R8 보강)
+
+**User Story:** As 운영자, I want KRX GUI 의존 수집의 운영 방식 기준을 받기, so that SSM direct 실행 / Headless 수집 같은 부적합 방식이 운영에 잘못 들어가지 않는다.
+
+#### Acceptance Criteria
+
+1. WHEN KRX GUI 의존 수집(KRX program / KRX shortsell)이 운영 방식으로 진입하는 경우, THE design.md SHALL Windows EC2 worker 위의 **Administrator console interactive session** 이 필수 조건임을 명시해야 한다.
+2. THE design.md SHALL SSM RunCommand 가 KRX GUI 경로에서 사용되는 방식을 **`schtasks /Run` 트리거 역할** 로만 제한하고, SSM RunCommand 가 wrapper / Python 을 SYSTEM Session 0 / 비대화형 세션에서 직접 실행하는 방식은 **운영 방식에서 제외** 한다는 점을 명시해야 한다(2026-06-13 §13.2 / 2026-06-16 §15.3 정합).
+3. WHERE Administrator console interactive session 이 부재한 경우, THE 운영 방식 SHALL Autologon bootstrap 으로 EC2 부팅 후 자동 생성된 Administrator console session 을 사용한다는 점을 명시하고, Autologon 사용은 paper 전용 Windows worker 한정 보안 예외(R-SEC-009 정합)임을 명시해야 한다.
+4. WHEN KRX GUI 수집 결과의 완료 기준을 다루는 경우, THE 검증 SHALL DB max date 와 row count 증가를 함께 점검(예: `interest_program_raw` 의 max date = 직전 거래일 / row count 증가량 = 영업일 수, `interest_shortsell_raw` 의 max date = 직전 거래일 / row count 증가량 = 영업일 수 × 종목 수) 하는 SQL 점검을 통과해야 한다.
+5. THE design.md SHALL Headless / 비대화형 KRX 수집은 로컬 검증상 제외 / 운영 방식에서 제외(2026-06-16 §15.3 정합)임을 명시하고, "장기 후보" 표현은 본 일자 보정으로 더 이상 사용하지 않는다는 점을 명시해야 한다.
+
+### Requirement 13: non-GUI Interest Crawler 운영 방식 (R8 보강)
+
+**User Story:** As 운영자, I want non-GUI Interest Crawler 의 ECS / Fargate 운영 방식 기준을 받기, so that smoke 검증과 daily 운영용 Task Definition 이 분리되고 raw 최신성 검증이 빠지지 않는다.
+
+#### Acceptance Criteria
+
+1. WHEN non-GUI crawler 가 ECS / Fargate 위에서 daily 운영으로 실행되는 경우, THE Task Definition SHALL KRX GUI 의존 import(`interest_krx_login_new` / `interest_program` / `interest_shortsell`) 를 **제외** 해야 한다(2026-06-16 §15.2 정합).
+2. THE Task Definition SHALL non-GUI step(`interest_news` / `interest_agency` / `interest_foreignindex` / `interest_commodity` / `interest_macroeconomic` / `interest_price` / `interest_investorflow` / `interest_marketbreadth`)별로 **CloudWatch Logs 안 SUCCESS** 메시지 또는 동등한 step 종료 신호를 확인할 수 있어야 한다.
+3. THE 검증 SHALL ECS / Fargate smoke 전용 revision(예: revision 6 / log stream prefix `ecs-selenium-chrome-smoke`) 과 daily 운영용 revision(예: revision 7 / log stream prefix `ecs-crawler-nongui-daily`) 을 **분리 명시** 하고, smoke 통과만으로 daily 운영 완료를 단정하지 않아야 한다(R-DATA-009 mitigation 정합).
+4. THE 검증 SHALL 각 raw table 의 max date 가 직전 거래일과 일치하는지(또는 거래일 N±1 범위 안인지) SQL 로 확인하고, row count 증가량이 영업일 수 × 종목 수 / 영업일 수 × 지수 수 / 영업일 수 × 카테고리 수 와 부합하는지 함께 점검해야 한다.
+5. WHEN raw 최신성 검증을 통과한 경우, THE 검증 SHALL Preprocessor ECS RunTask 의 입력 가능 여부(직전 거래일까지 적재 + max date 일치 + 신규 row 생성 확인)를 함께 판단해야 한다(R-DATA-010 mitigation 정합).
+
+### Requirement 14: hybrid execution model 자동 로그인 기반 운영 방식 보안 (R10 보강)
+
+**User Story:** As 운영자, I want hybrid execution model 에서 paper 전용 Windows worker 의 자동 로그인 보안 예외 기준을 받기, so that 운영자 노트 / spec 산출물 / 채팅 / CloudWatch Logs 어디에도 자동 로그인 자격 증명이 평문 기록되지 않는다.
+
+#### Acceptance Criteria
+
+1. WHEN Autologon 자격 증명을 다루는 경우, THE 산출물 SHALL DefaultUserName / DefaultPassword / Administrator password 를 평문으로 적지 않고 모두 `[REDACTED]` 또는 placeholder 만 사용해야 한다.
+2. THE design.md SHALL Autologon 사용을 **paper 전용 Windows worker 한정 보안 예외** 로 분류하고, 일반 운영 환경 standard 가 아니라는 점을 명시해야 한다(R-SEC-009 정합).
+3. THE design.md SHALL Autologon 적용 대상 EC2 의 **RDP inbound 제한**(0.0.0.0/0 금지 / 운영자 단일 IP 또는 SSM Session Manager 우선 / OD-NET-009 정합) 을 함께 명시해야 한다.
+4. THE 검증 SHALL `query user` 결과의 Administrator console session Active 여부, SSM managed instance Online 여부, Scheduled Task 의 Last Result 코드를 함께 점검해야 한다.
+5. WHEN EC2 worker 작업이 종료되는 경우, THE 후속 작업 SHALL EC2 stop 절차(idle 비용 절감) / Chrome process 정리 옵션 / 추후 전용 local user 검토 후보를 함께 후속 인계로 명시해야 한다(R-AUTO-017 / R-SEC-009 mitigation 정합).
+
+
+## Addendum (2026-06-16) — KRX GUI 자동 로그인 운영 방식 / non-GUI 운영 경로 검증 보강
+
+본 부록은 2026-06-16 운영자가 직접 수행한 (a) `interest_crawler_daily_nongui.py` 신규 + ECS Task Definition revision 7 등록 + RunTask 성공, (b) Windows EC2 worker Autologon bootstrap + Administrator console session Active 확인 + SSM RunCommand → `schtasks /Run` → Scheduled Task 흐름 재검증, (c) raw 최신성 회복 결과를 반영해 R8(Crawler Selenium / Chrome / 외부 outbound 리스크 별도 관리) 와 R9(NAT-free 정책 강제) 의 acceptance criteria 를 보강 메모로 추가한다. R1 ~ R7 / R10 / R11 본문은 변경하지 않는다. 자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-16 §1 ~ §5 / 본 일자 결정 락은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-022 + OD-MS-011 / OD-MS-015 / OD-MS-020 1차 실증 메모 참조.
+
+### Addendum-A. KRX GUI 수집 요구사항 보강 (R8 보강)
+
+본 부록은 R8(Crawler Selenium / Chrome / 외부 outbound 리스크 별도 관리) 의 KRX GUI 의존 수집 항목을 본 일자 결과 기준으로 보강한다.
+
+#### Acceptance Criteria 보강
+
+1. THE design.md SHALL KRX GUI 수집(예: KRX program / KRX shortsell) 이 Windows interactive session 위에서만 실행되도록 명시해야 한다(SYSTEM Session 0 / 비대화형 GUI 직접 실행은 운영 방식에서 제외).
+2. THE design.md SHALL SSM RunCommand 의 역할을 wrapper / Python 직접 실행이 아니라 Scheduled Task trigger(`schtasks /Run /TN "Portfolio-KRX-Worker-Daily"`) 로 한정한다는 점을 명시해야 한다(OD-MS-022 정합 / 2026-06-13 §13.2 + 2026-06-16 §15.5 정합).
+3. THE design.md SHALL Windows Autologon 사용을 paper 전용 Windows worker 보안 예외로 명시해야 한다(R-SEC-009 / OD-MS-022 정합). aws-live 적용 여부는 본 spec 범위 밖이며 후속 spec(10) 책임으로 분리.
+4. WHEN KRX program / KRX shortsell 의 완료 여부를 판단하는 경우, THE 검증 SHALL 다음 두 항목을 모두 만족해야 한다: (a) 해당 raw 테이블의 `MAX(trade_date)` 가 직전 거래일과 일치, (b) row count 가 정상 범위로 증가(예: 2026-06-15 적재 시 `interest_program_raw` 547 → 548 / `interest_shortsell_raw` 190,554 → 190,903 같은 패턴).
+5. WHERE Headless / 비대화형 KRX 수집이 검토되는 경우, THE design.md SHALL 본 spec 시점의 결정값(로컬 검증상 운영 방식에서 제외)을 그대로 따르고, 임의로 운영 방식에 포함하지 않아야 한다(OD-MS-022 정합).
+
+### Addendum-B. non-GUI crawler 요구사항 보강 (R8 보강)
+
+본 부록은 R8 의 non-GUI crawler 항목을 본 일자 결과 기준으로 보강한다.
+
+#### Acceptance Criteria 보강
+
+1. THE design.md SHALL non-GUI Interest Crawler 의 ECS / Fargate 운영 entrypoint 가 KRX GUI 계열(`interest_krx_login_new` / `interest_program` / `interest_shortsell`) 을 import 하지 않도록 명시해야 한다(`interest_crawler_daily_nongui.py` 정합).
+2. THE design.md SHALL non-GUI step(`interest_news` / `interest_agency` / `interest_foreignindex` / `interest_commodity` / `interest_macroeconomic` / `interest_price` / `interest_investorflow` / `interest_marketbreadth`) 별 SUCCESS 로그를 CloudWatch Logs 에서 확인하는 점검 항목을 명시해야 한다(2026-06-16 §2 정합).
+3. THE design.md SHALL non-GUI raw 테이블별 최신성 검증 점검 항목을 명시해야 한다(`interest_*_raw` 의 `MAX(trade_date)` 가 직전 거래일과 일치 / row count 정상 범위 증가).
+4. WHEN non-GUI crawler RunTask 가 성공한 경우, THE 검증 SHALL Preprocessor 입력 데이터로 사용 가능한 수준 도달 여부를 판단해야 한다(R-DATA-009 / R-DATA-010 mitigation 정합). 단, 일부 지수 NULL Data(예: `interest_foreignindex_raw` HANGSENG / NIKKEI225 / SHANGHAI) 가 발견되더라도 전체 적재 실패가 아니라 non-blocker 후보로 분리한다.
+
+### Addendum-C. NAT-free 정책 보강 (R9 보강)
+
+본 부록은 R9(NAT-free 정책 강제) 의 적용 범위를 본 일자 결과 기준으로 명시한다.
+
+#### Acceptance Criteria 보강
+
+1. THE design.md SHALL non-GUI crawler ECS Task Definition revision 7 이 public subnet + `assignPublicIp = ENABLED` 로 NAT-free outbound 를 처리한다는 점을 명시해야 한다(2026-06-16 §2 RunTask 결과 정합 / NAT Gateway 0건 유지).
+2. THE design.md SHALL Windows EC2 worker(KRX GUI crawler) 의 outbound 도 NAT-free 정책을 따른다는 점을 명시해야 한다(public subnet + EIP 또는 동등 방식 / OD-NET-001 / OD-NET-002 정합).
+3. IF NAT Gateway 가 본 spec 운영 도중 발견되는 경우, THEN THE design.md SHALL 본 spec 임의 결정 대신 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-NET-001 / OD-NET-002 를 재확인 후 운영자 결정으로만 처리한다는 R9.3 정책을 그대로 유지한다.

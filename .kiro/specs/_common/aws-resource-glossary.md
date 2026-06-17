@@ -308,6 +308,27 @@
 - 조심할 점: DNS TTL 짧게 유지. 새 Task 기동 시 IP 변경 반영 시간을 application 측이 견딜 수 있어야 한다.
 - 관련 spec: 05.
 
+## SSM RunCommand
+
+- 한 줄 설명: AWS Systems Manager 의 원격 명령 실행 기능. EC2 / on-prem 에 대해 `AWS-RunPowerShellScript` / `AWS-RunShellScript` 등 document 로 명령 실행.
+- 단가 가정: 사실상 0(API 호출 비용 없음). SSM Endpoint(VPC Endpoint) 비용은 OD-NET-005 권고 세트에 이미 포함.
+- 운영 주의: 본 프로젝트는 (a) MarketConnector EC2 의 `CONNECTOR_BALANCE` 등 단발 명령 진입점, (b) Windows EC2 worker 의 KRX worker Scheduled Task trigger(`schtasks /Run /TN "Portfolio-KRX-Worker-Daily"`) 진입점으로 사용. 직접 wrapper 또는 Python 실행은 SYSTEM Session 0 / 비대화형 GUI 한계로 KRX GUI 로그인에 부적합(OD-MS-022 정합).
+- 관련 spec: 03, 08.
+
+## Windows Scheduled Task
+
+- 한 줄 설명: Windows OS 내장 작업 스케줄러. 등록된 task 를 시간 trigger 또는 외부 trigger(`schtasks /Run`) 로 실행.
+- 단가 가정: 0(Windows EC2 OS 기본 기능).
+- 운영 주의: 본 프로젝트는 Windows EC2 worker 에서 KRX GUI worker 의 Administrator interactive session 실행 트리거로 사용. SSM RunCommand 가 SYSTEM Session 0 에서 실행되더라도 Scheduled Task 가 Administrator console interactive session 위에서 wrapper 를 실행하므로 Chrome GUI / Display 컨텍스트 확보 가능(OD-MS-015 / OD-MS-022 정합). Logon Mode `Interactive only`, Run As User `Administrator` 기준.
+- 관련 spec: 08.
+
+## Windows Autologon (Sysinternals)
+
+- 한 줄 설명: Microsoft Sysinternals 도구. Windows 부팅 직후 지정 사용자(보통 Administrator)로 자동 로그인을 활성화해 console interactive session 을 자동 생성.
+- 단가 가정: 0(도구 자체 비용 없음 / Windows EC2 OS 안에서만 동작).
+- 운영 주의: **paper 전용 Windows worker 보안 예외**(OD-MS-022 / R-SEC-009 정합). 자동 로그인 자격 증명이 Windows registry / LSA secret 영역에 저장되어 관리자 권한 보유자에 의해 복호화될 가능성 존재 — Administrator password 는 본 spec 산출물 / 콘솔 캡처 / 로그 평문 기록 금지(`[REDACTED]` 만). RDP inbound 는 운영자 IP 한정 또는 SSM Session Manager 우선 사용. EC2 worker 작업 완료 후 stop 절차로 idle 노출 시간 최소화. 추후 전용 local user(예: `krxworker`) 로 전환 검토 / aws-live 적용은 별도 결정.
+- 관련 spec: 08.
+
 ---
 
 ## 본 spec 작업 안전 제약

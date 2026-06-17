@@ -246,12 +246,40 @@ VPC 밖(운영자 로컬 PC) 에서 RDS 접속이 필요한 경우, 본 EC2 + SS
 | SSM Parameter | `/portfolio/paper/marketconnector/connector-port` | `CONNECTOR_PORT` | Flask port. 코드 기본값 `5000` |
 | SSM Parameter | `/portfolio/paper/marketconnector/connector-debug` | `CONNECTOR_DEBUG` | Flask debug flag. 코드 기본값 `False`. 정상 운영 모드에서는 반드시 `false` 강제 |
 
+#### 8.2.1 KIS_* alias 동시 export 정책 (2026-06-17 보강)
+
+본 design 의 환경변수 키(`APP_KEY` / `APP_SECRET` / `PAPER_ACNT` / `ACNT_PRDT_CD` / `BASE_URL`) 는 8개 MS 호환을 위해 그대로 유지한다. 단, 실제 `port-marketconnector` 코드 실행 시점에는 본 design 시점의 호환 key 외에 `KIS_*` prefix alias 가 함께 필요하다는 사실이 2026-06-17 운영자 검증으로 1차 실증되었다(자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-17 섹션 참조).
+
+| 호환 key (8개 MS 정합) | 실제 코드 실행에 필요한 alias | 출처 |
+|-----------------------|------------------------------|------|
+| `APP_KEY` | `KIS_APP_KEY` | Secrets Manager `/portfolio/paper/marketconnector/kis-app-key` JSON 내부 key `APP_KEY` 의 값 |
+| `APP_SECRET` | `KIS_APP_SECRET` | Secrets Manager `/portfolio/paper/marketconnector/kis-app-secret` JSON 내부 key `APP_SECRET` 의 값 |
+| `PAPER_ACNT` | `KIS_PAPER_ACNT` | Secrets Manager `/portfolio/paper/marketconnector/paper-account` JSON 내부 key `PAPER_ACNT` 의 값 |
+| `ACNT_PRDT_CD` | `KIS_ACNT_PRDT_CD` | Secrets Manager `/portfolio/paper/marketconnector/paper-account` JSON 내부 key `ACNT_PRDT_CD` 의 값 |
+| `BASE_URL` | `KIS_BASE_URL` | SSM Parameter `/portfolio/paper/marketconnector/kis-base-url` 의 값 |
+
+임시 검증 단계에서는 호환 key 와 alias 를 **동시 export** 한다(예: 같은 secret 내부 value 를 `APP_KEY` 와 `KIS_APP_KEY` 두 환경변수로 동시 export). 동시 export 정책은 정상 운영 모드(systemd / startup script) 전환 시점까지 유지하며, 그 이후의 정합 — 호환 key / alias 중 어느 한 쪽으로 단일화할지, 또는 양쪽 동시 export 를 운영 표준으로 유지할지 — 는 본 spec 후속 task 또는 별도 phase 책임으로 분리한다(§8.5 그대로 후속 인계).
+
+#### 8.2.2 JSON SecretString 내부 key 추출 정책 (2026-06-17 보강)
+
+`/portfolio/paper/marketconnector/kis-app-key` 와 `/portfolio/paper/marketconnector/kis-app-secret` 은 plain string SecretString 이 아니라 **JSON SecretString** 이며, 내부 key 는 각각 `APP_KEY` / `APP_SECRET` 이다. `/portfolio/paper/marketconnector/paper-account` 도 JSON SecretString 이며 내부 key 는 `PAPER_ACNT` / `ACNT_PRDT_CD` 이다. 따라서 임시 export 스크립트(§8.3) 는 다음 절차를 따른다.
+
+1. Secrets Manager `GetSecretValue` 결과의 `SecretString` 을 JSON 으로 parse.
+2. 내부 key 의 value 만 환경변수로 export. JSON dict 전체를 환경변수 값으로 export 하지 않는다.
+3. 동일 value 를 호환 key / `KIS_*` alias 양쪽에 동시 export.
+
+`/portfolio/paper/rds/marketconnector-app` 도 JSON multi-key SecretString 이며, 내부 key(`host` / `port` / `dbname` / `username` / `password`) 의 value 를 `INTEREST_DB_HOST` / `INTEREST_DB_PORT` / `INTEREST_DB_NAME` / `INTEREST_DB_USER` / `INTEREST_DB_PASSWORD` 에 그대로 export 하는 정책은 그대로 유지한다(02 / 06 spec 정합 / 변경 0건).
+
+#### 8.2.3 1차 실패 → 보정 사례 (2026-06-17 보강)
+
+2026-06-17 `CONNECTOR_BALANCE` 1차 실행에서 KIS balance API 호출이 도달했음에도 `response_status=500` / `response_code=1` / `is_success=false` 가 반환된 사례는 KIS credential 자체 폐기가 아니라 JSON SecretString 전체를 env 값으로 그대로 export 한 mapping 오류로 1차 진단되었다. JSON 내부 `APP_KEY` / `APP_SECRET` 의 value 만 추출해 호환 key + `KIS_*` alias 양쪽에 동시 export 한 v5 패턴에서 KIS balance API 가 `response_status=200` / `response_code=0` / `is_success=true` 로 정상 응답하고 `connector_balance_snapshot` 신규 row 가 저장되었다. 본 사례는 secret value / KIS app key / KIS app secret 평문 기록 0건으로 누적되며, secret value 는 절대 기록하지 않고 secret name path / shape(JSON SecretString) / 내부 key 이름 / value length 수준까지만 산출물에 기록 가능하다. 자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-17 섹션 참조.
+
 ### 8.3 임시 → 정상 전환 (R8.3 / R8.4 근거)
 
 | 단계 | 형태 | 보안 정책 | 책임 시점 |
 |------|------|-----------|-----------|
-| 임시 검증 단계 | `/tmp/inject-env.sh` source + 메모리 export | 스크립트 본문에 secret 평문 미저장. 권한 700 권고 | 본 spec |
-| 정상 운영 모드 | systemd `EnvironmentFile=` 또는 startup script 메모리 export | `EnvironmentFile=` 본문에 secret 평문 미저장. 권한 600 권고 | 본 spec 후속 task 또는 별도 phase |
+| 임시 검증 단계 | `/tmp/inject-env.sh` source + 메모리 export | 스크립트 본문에 secret 평문 미저장 / 권한 700 권고 / JSON SecretString 은 내부 key value 만 추출(§8.2.2) / 호환 key + `KIS_*` alias 동시 export(§8.2.1) | 본 spec |
+| 정상 운영 모드 | systemd `EnvironmentFile=` 또는 startup script 메모리 export | `EnvironmentFile=` 본문에 secret 평문 미저장. 권한 600 권고. v5 mapping 패턴(§8.2.1 / §8.2.2) 반영 후 운영자 결정으로 호환 key / alias 단일화 또는 양쪽 유지 결정 | 본 spec 후속 task 또는 별도 phase |
 
 ### 8.4 호환 정책 (R8.5 근거)
 

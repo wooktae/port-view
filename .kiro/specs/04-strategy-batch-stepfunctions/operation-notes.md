@@ -760,3 +760,288 @@
 7. `--execute` 포함 entrypoint 2종(`daily_auto_sell_execute_run.py --execute` / `daily_auto_buy_execute_run.py --execute`) 도 주말 가드로 차단 — `READY -> REQUESTED` 실제 전환 0건 / `connector_order_request` 생성 0건.
 8. live 자동 주문은 후속 검증 / 승인 전까지 여전히 금지 (OD-SAFE-002 / OD-SAFE-003 / OD-SAFE-004 정합). 본 일자는 paper 1차 검증.
 9. 운영 식별자(앞 섹션의 instance id / private IP / SSM session id / RDS endpoint hostname) 그대로 재사용. 추가 운영 식별자: image tag(`paper-20260613` / `paper-latest`), Task Definition family(`portfolio-paper-strategy-execution`) / revision(1) / container name(`strategy-execution`), security group 이름(`sgroup-strategy-tasks`), Log Group 이름(`/portfolio/paper/strategy-execution`), Secret 이름(`/portfolio/paper/rds/execution-app`), Task Role 이름(`portfolio-paper-execution-task-role`), Execution Role 이름(`portfolio-paper-ecs-task-execution-role`) — 모두 운영 식별자로서 사실 기록 / secret 가 아님.
+
+
+## 2026-06-16 Strategy Decision safe step ECS dry-run 재검증
+
+운영자가 2026-06-16 직접 수행한 Strategy Decision safe step(`DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL`) ECS / Fargate 단건 재실행 결과를 누적 기록한다. 본 섹션은 같은 spec 의 2026-06-13 Strategy Decision ECS / Fargate 1차 포팅 검증(§1 ~ §10) 의 후속이며, 08 spec 의 2026-06-16 Crawler 데이터 미수집 해결 + KRX EC2 자동화 성공으로 raw 최신성이 회복된 입력 데이터 + 09 spec 의 2026-06-16 Strategy Research AWS Batch Backend dry-run 재검증으로 backtest run row 가 갱신된 상태(run_id `439d78e7-...` / backtest_end_date `2026-06-15`) 위에서 backend AWS E2E dry-run safe subset(Research → Decision)을 재가동하기 위한 1차 검증이다. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행했고, 실제 ECS RunTask / IAM / RDS 작업은 운영자가 직접 수행했다. 실제 BUY / SELL 주문 / `--execute` 주문 전송 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건(OD-SAFE-001 ~ OD-SAFE-004 / OD-MS-021 / OD-MS-013 정합).
+
+### 1. DAILY_BUY_SIGNAL 단건 ECS / Fargate 재실행
+
+1. RunTask 실행: 완료
+   1) Task Definition: `portfolio-paper-strategy-decision-buy-signal:1`
+   2) launch type: FARGATE / awsvpc
+   3) command override: `python -m port_strategy_decision.daily_buy_signal_run`
+   4) image tag: `paper-20260613`(2026-06-13 §3 / §4 그대로 재사용)
+   5) decision-app DB secret 환경변수 주입(`/portfolio/paper/rds/decision-app` JSON multi-key 5종 / `INTEREST_DB_*` 환경변수 호환 정책 / OD-DB-003 정합)
+   6) log group: `/portfolio/paper/strategy-decision`
+   7) log stream prefix: `buy-signal`
+2. 실행 결과: 성공
+   1) lastStatus: `STOPPED`
+   2) stopCode: `EssentialContainerExited`
+   3) container exitCode: `0`
+   4) Batch / 자동 재시도 0건(OD-SAFE-004 / R-AUTO-001 정합 — Strategy Decision 은 ECS RunTask 단건 / Step Functions 자동 재시도 정책 도입 전)
+   5) 실제 주문 전송 옵션 없음 — broker / KIS 호출 0건 / `connector_order_request` 생성 0건
+3. `decision.strategy_daily_signal` 결과 확인: 완료
+   1) run_date: `2026-06-16`
+   2) data_date: `2026-06-15`(2026-06-16 §3 정합 — 09 spec backtest run 의 backtest_end_date 와 동일 일자)
+   3) signal_date: `2026-06-16`
+   4) signal_type: `BUY`
+   5) signal_status: `READY`
+   6) row_count: `4`
+   7) rank range: `1 ~ 4`
+   8) created_at / updated_at: `2026-06-16 07:28:56 UTC`
+4. 안전 점검: 완료
+   1) BUY signal `READY` 상태 row 만 생성 — 실제 주문 전송은 후속 step(`DAILY_AUTO_BUY` / `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE`) 책임이며 본 일자 미실행
+   2) `connector_order_request` / `connector_fill` row 변경 0건
+   3) image digest / task ARN / account-id 본 노트 평문 기록 0건(`<image-digest>` / `<task-arn>` / `<account-id>` placeholder)
+
+### 2. DAILY_POSITION_SIGNAL 단건 ECS / Fargate 재실행
+
+1. RunTask 실행: 완료
+   1) Task Definition: `portfolio-paper-strategy-decision-position-signal:1`
+   2) launch type: FARGATE / awsvpc
+   3) command override: `python -m port_strategy_decision.daily_position_signal_run`
+   4) image tag: `paper-20260613`
+   5) decision-app DB secret 환경변수 주입
+   6) log group: `/portfolio/paper/strategy-decision`
+   7) log stream prefix: `position-signal`
+2. 실행 결과: 성공
+   1) lastStatus: `STOPPED`
+   2) stopCode: `EssentialContainerExited`
+   3) container exitCode: `0`
+   4) Batch / 자동 재시도 0건
+   5) 실제 주문 전송 옵션 없음 — broker / KIS 호출 0건
+3. position signal 실행 결과 확인: 완료
+   1) daily_run_id: `45`
+   2) run_date: `2026-06-16`
+   3) data_date: `2026-06-15`
+   4) market_signal: `AGGRESSIVE`
+   5) positions: `0`
+   6) decision_count: `0`
+   7) sell_count: `0`
+   8) hold_count: `0`
+   9) skip_count: `0`
+   10) decision_ids: `[]`
+4. `decision.strategy_daily_position_decision` 상태: 정상 skip
+   1) max_decision_date: `2026-05-29` 유지(신규 row 미생성)
+   2) 원인: 현재 보유 포지션 0건 — position decision 대상 자체가 없음(BUY signal `READY` 상태 row 가 실제 매수로 전환된 적 없음 / `connector_order_request` 0건 / `strategy_position_state` OPEN 0건)
+   3) 판단: 오류가 아닌 정상 skip — Strategy Decision position-signal 의 정상 운영 케이스이며 본 일자 결과는 R-AUTO-001 / R-AUTO-002 위반 아님
+5. 안전 점검: 완료
+   1) `connector_order_request` / `connector_fill` / `strategy_position_state` row 변경 0건
+   2) SELL position `mark_position_sell_ordered()` 호출 0건(OD-MS-016 정합 — MarketConnector executor 측 책임)
+   3) intraday stop SELL 생성 0건
+
+### 3. Backend AWS E2E dry-run safe subset 진행 상태
+
+1. safe subset 완료 항목(2026-06-16 시점, OD-MS-021 정합 — 17단계 순서 그대로):
+   1) 1번 `CONNECTOR_BALANCE`: 완료(2026-06-15 §2 / 03 spec / `connector_balance_snapshot` 저장)
+   2) 2번 `INTEREST_CRAWLER`: 완료(2026-06-16 / 08 spec — non-GUI rev7 + KRX EC2 worker hybrid 구조 완료 / raw 최신성 회복)
+   3) 3번 `PREPROCESSOR`: 실행 완료(2026-06-15 §4 / 08 spec — raw 입력 데이터 회복 후 재실행 가능 상태 도달까지 1차 / 신규 raw 입력 기반 재실행은 후속 task 77)
+   4) 4번 `BACKTEST_RESEARCH`: 완료(2026-06-16 / 09 spec §1 — `portfolio-paper-strategy-research:5` / run_id `439d78e7-...`)
+   5) 5번 `BACKTEST_REPORT`: 완료(2026-06-16 / 09 spec §2 / §3 / §4 — `portfolio-paper-strategy-report:3` / S3 객체 4건)
+   6) 6번 `DAILY_BUY_SIGNAL`: 완료(본 섹션 §1 — row_count `4` / `READY`)
+   7) 7번 `DAILY_POSITION_SIGNAL`: 완료(본 섹션 §2 — positions 0 정상 skip)
+2. safe subset 보류 / 후속 항목(주문 / 체결 / sync / execution 계열):
+   1) 8번 `DAILY_BUY_EXECUTION` ~ 11번 `DAILY_AUTO_BUY`: 미진행 / dry-run skip 예정 — `--execute` 주문 전송 계열 실행 금지(R-AUTO-009 / R-AUTO-010 / OD-SAFE-002 정합)
+   2) 12번 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE`: 미진행 / dry-run skip 예정 — paper 운영 환경 활성화 보류(R-AUTO-011 정합)
+   3) 13번 `CONNECTOR_ORDER_CHECK` ~ 16번 `SYNC_BUY_POSITION`: 미진행 / dry-run skip 예정 — fill · position sync 자동 재시도 금지(OD-SAFE-004 정합)
+   4) 17번 `BALANCE_REFRESH`: 미진행
+3. View AWS 실행 매핑표 작성 / safe step 우선 연결 / Execution 계열 dry-run 가능 여부 별도 판단: 후속 분리(05 spec / 04 spec 후속 phase 책임).
+
+### 4. 1차 검증 완료 기준
+
+1. DAILY_BUY_SIGNAL ECS / Fargate 단건 실행: 완료(§1 — exitCode 0 / `decision.strategy_daily_signal` row 4건 생성 / signal_date `2026-06-16`)
+2. DAILY_POSITION_SIGNAL ECS / Fargate 단건 실행: 완료(§2 — exitCode 0 / positions 0 정상 skip / `decision.strategy_daily_position_decision` 신규 row 미생성)
+3. data_date `2026-06-15` 기반 입력으로 stale data 위험 해소(R-DATA-009 / R-DATA-010 mitigation 1차 실증)
+4. 실제 주문 전송 / `--execute` / fill · position sync 자동 재시도 / SELL position 변경 0건 — OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011 정합
+5. aws-live 작업 0건 — 본 일자는 `aws-paper` 한정
+6. 판단: Strategy Decision safe step ECS dry-run 재검증 완료. 후속은 주문 / 체결 / sync 계열의 안전 기준에 따른 별도 승인 + 평일 또는 안전 테스트 데이터 환경에서 진행.
+
+### 5. 후속 인계
+
+1. View Daily Batch 의 `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL` step ProcessBuilder → ECS RunTask 호출 매핑 — 05 spec 후속 phase 책임
+2. Step Functions state machine 정의(buy-signal → position-signal 순서 강제 + 자동 재시도 금지 정책 OD-SAFE-004 반영) + EventBridge Scheduler 정기 트리거 — 04 spec 후속 phase 책임
+3. 주문 / 체결 / sync 계열(`DAILY_BUY_EXECUTION` ~ `BALANCE_REFRESH`) 의 paper 운영 환경 활성화: 별도 운영자 승인 + 평일 / 안전 테스트 데이터 환경에서 검증 후 진행(R-AUTO-009 / R-AUTO-010 / R-AUTO-011 / OD-SAFE-002 / OD-SAFE-003 정합)
+4. Execution 계열 dry-run 가능 여부 별도 판단(`READY -> REQUESTED -> SUBMITTED` end-to-end 검증 진입 전 안전 가드 점검) — 04 spec 후속 phase
+5. aws-live cutover — 10 spec 책임
+
+### 6. Task 완료 처리 (본 spec)
+
+본 spec 은 별도 tasks.md 가 없으므로 task 단위 완료 처리는 본 섹션에서 직접 기록한다.
+
+1. DAILY_BUY_SIGNAL 단건 ECS / Fargate 실행 검증: 완료(§1 정합 / 2026-06-13 §7 후속으로 본 일자 재실행 통과)
+2. DAILY_POSITION_SIGNAL 단건 ECS / Fargate 실행 검증: 완료(§2 정합 / positions 0 정상 skip 으로 정상 운영 케이스 1차 실증)
+3. Strategy Decision safe step Backend dry-run 재검증: 완료(§3 / safe subset 1 ~ 7번 모두 완료)
+4. 주문 / 체결 / sync / execution 단계: 미실행 또는 후속 보류(§3 / §5)
+5. View Daily Batch 의 `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL` 매핑: 후속(§5 / 05 spec)
+6. Step Functions + EventBridge Scheduler 정기 트리거: 후속(§5 / 04 spec 후속 phase)
+
+### 7. 안전 / 보안 점검 결과
+
+1. 본 일자 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 변경 0건. 운영자가 직접 수정한 파일 0건(본 일자 작업은 ECS RunTask 단건 실행 검증 + DB 결과 조회만 수행).
+2. 실제 secret value / RDS password / RDS endpoint hostname / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 secret ARN / 실제 IAM Role ARN / image digest full sha256 / IAM access key id / task ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+3. ECS / IAM / Secrets Manager / RDS 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건.
+4. CloudWatch Logs 본문 / ECS Task event / SSM 응답 본문 본 노트 평문 인용 0건. 사실(Task Definition family·revision / image tag / lastStatus / exitCode / row count / data_date / signal_date / signal_status) 만 기록.
+5. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 직접 호출 0건. 신규 BUY / SELL / 취소 / 정정 / `--execute` 0건. fill / position sync 자동 재시도 0건. SELL position `mark_position_sell_ordered()` 호출 0건.
+6. RDS DDL 0건. DML 은 `decision.strategy_daily_run` / `decision.strategy_daily_signal` insert(BUY signal `READY` row 4건) 한정. `decision.strategy_daily_position_decision` 신규 row 0건(positions 0 정상 skip).
+7. live 자동 BUY / SELL E2E 검증은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 paper 환경 한정.
+
+
+## 2026-06-17 Daily AWS 17-step E2E 완료 (Strategy Decision · Strategy Execution)
+
+운영자가 같은 일자 첫 번째 세션(MarketConnector 조회성 dry-run 재검증) 후속으로 직접 수행한 Daily AWS 17-step E2E 흐름이 본 일자에 끝까지 연결됐다. 본 spec 범위에 해당하는 step 은 6번 `DAILY_BUY_SIGNAL` / 7번 `DAILY_POSITION_SIGNAL` / 8번 `DAILY_BUY_EXECUTION` / 9번 `DAILY_SELL_EXECUTION` / 10번 `DAILY_AUTO_SELL` / 11번 `DAILY_AUTO_BUY` / 14번 `SYNC_SELL_FILL` / 15번 `SYNC_BUY_FILL` / 16번 `SYNC_BUY_POSITION` 총 9개 step. 1번 `CONNECTOR_BALANCE` / 12번 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` / 13번 `CONNECTOR_ORDER_CHECK` / 17번 `BALANCE_REFRESH` 4개 step 은 03 spec operation-notes 2026-06-17 §1 ~ §5 정합. 2번 `INTEREST_CRAWLER` / 3번 `PREPROCESSOR` 2개 step 은 08 spec / 4번 `BACKTEST_RESEARCH` / 5번 `BACKTEST_REPORT` 2개 step 은 09 spec operation-notes 2026-06-17 정합. Kiro 는 문서 작성 / 절차 정리만 수행. 실제 ECS RunTask / IAM / RDS / GRANT 작업은 운영자 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. 실제 broker / KIS 호출은 본 spec 범위에서 0건(주문 제출 책임은 03 spec Step 12) — Strategy Execution `--execute` 는 `READY -> REQUESTED` 상태 전환만 담당(OD-MS-016 정합).
+
+### 1. Step 6 `DAILY_BUY_SIGNAL`
+
+1. RunTask 실행: 완료
+   1) Task Definition: `portfolio-paper-strategy-decision-buy-signal:1`
+   2) launch type: FARGATE / awsvpc / image tag `paper-20260613`
+   3) command override: `python -m port_strategy_decision.daily_buy_signal_run`
+2. 실행 결과: 성공
+   1) lastStatus: `STOPPED` / stopCode: `EssentialContainerExited` / exitCode: `0`
+   2) `decision.strategy_daily_run` 신규 row 생성 / run_date `2026-06-17` / data_date `2026-06-16`
+3. `decision.strategy_daily_signal` BUY READY 결과: 확인
+   1) row_count: 4건
+   2) signal_type: BUY / signal_status: READY
+   3) 후보 4종:
+      - `282330` BGF리테일
+      - `004990` 롯데지주
+      - `003490` 대한항공
+      - `088350` 한화생명
+   4) rank range: `1 ~ 4`
+4. 안전 점검: 완료
+   1) BUY signal `READY` 상태 row 만 생성 — 실제 주문 전송은 후속 step(`DAILY_AUTO_BUY` / `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE`) 책임
+   2) `connector_order_request` / `connector_fill` row 변경 0건 / broker · KIS 호출 0건
+
+### 2. Step 7 `DAILY_POSITION_SIGNAL`
+
+1. RunTask 실행: 완료
+   1) Task Definition: `portfolio-paper-strategy-decision-position-signal:1`
+   2) command override: `python -m port_strategy_decision.daily_position_signal_run`
+2. 실행 결과: 성공
+   1) lastStatus: `STOPPED` / exitCode: `0`
+3. position signal 결과: 정상 skip
+   1) positions: 0
+   2) decision_count: 0
+   3) `decision.strategy_daily_position_decision` 신규 row 미생성 — 정상 skip(보유 포지션 0건 / `strategy_position_state` OPEN 0건 시점 / `connector_order_request` 0건 시점)
+4. 판단: 정상 운영 케이스(R-AUTO-001 / R-AUTO-002 위반 0건 / 2026-06-16 §2 / §4 정합)
+
+### 3. Step 8 `DAILY_BUY_EXECUTION`
+
+1. 1차 blocker / 운영자 조치: 완료
+   1) 1차 실패 원인 = `execution_app` 의 `interest` schema USAGE / table SELECT / sequence / default privileges 누락(R-DATA-005 [2026-06-17 보강] 정합)
+   2) 운영자가 직접 GRANT 보정 — `interest` schema USAGE + `interest.*` table SELECT + sequence + default privileges(추후 객체 자동 적용) — 02 spec / 06 spec operation-notes 2026-06-17 사실 기록 정합
+   3) 02 spec db-roles-and-grants 정식 매트릭스 갱신은 후속 phase
+2. 재실행 결과: 완료
+   1) RunTask exitCode 0 / lastStatus STOPPED
+   2) `execution.strategy_execution_plan` 신규 row 생성 — `execution_plan_id 92`
+   3) BUY READY 4건 생성(execution_order)
+   4) `connector_order_request_id` 4건 모두 NULL — Strategy Execution 은 `READY -> REQUESTED` 까지만 담당 / `connector_order_request_id` 매핑은 MarketConnector executor `--execute` 책임(OD-MS-016 정합)
+   5) 실제 broker / KIS 주문 호출 0건
+
+### 4. Step 9 `DAILY_SELL_EXECUTION`
+
+1. RunTask 실행: 완료
+2. 실행 결과: 정상 skip
+   1) sell_decisions: 0
+   2) orders_to_upsert: 0
+   3) 실제 broker / KIS 주문 호출 0건
+
+### 5. Step 10 `DAILY_AUTO_SELL`
+
+1. RunTask 실행: 완료
+2. 실행 결과: 정상 skip
+   1) READY SELL 주문: 0건
+   2) 실제 broker / KIS 주문 호출 0건
+   3) SELL position `mark_position_sell_ordered()` 호출 0건(OD-MS-016 정합 — MarketConnector 측 책임)
+
+### 6. Step 11 `DAILY_AUTO_BUY`
+
+1. RunTask 실행: 완료
+   1) command override: `python -m daily_auto_buy_execute_run --execute`
+   2) `--execute` guard(영업일 / 환경) 통과
+2. 실행 결과: 성공
+   1) BUY execution_order 4건 `READY -> REQUESTED` 전환 완료
+   2) `execution_plan_id 92`
+   3) BUY REQUESTED 4건
+   4) total_qty: `378`
+   5) total_target_amount: `6908189.40`
+   6) `connector_order_request_id` 4건 모두 NULL — `REQUESTED -> SUBMITTED` 전환과 `connector_order_request_id` 매핑은 MarketConnector executor 책임(OD-MS-016 정합 / 03 spec Step 12 책임 경계)
+   7) 실제 broker / KIS 주문 호출 0건 — Strategy Execution `--execute` 는 상태 전환만
+3. 책임 경계 1차 실증: 완료
+   1) Strategy Execution = `READY -> REQUESTED` 상태 전환만 담당
+   2) MarketConnector = 실제 KIS paper 주문 제출 + `REQUESTED -> SUBMITTED` 전환(03 spec Step 12)
+   3) View Daily Batch 17단계의 11번(`DAILY_AUTO_BUY`) → 12번(`MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE`) 흐름 1차 실증(R-AUTO-009 / R-AUTO-010 / R-AUTO-011 [2026-06-17 보강] 정합)
+
+### 7. Step 14 `SYNC_SELL_FILL`
+
+1. RunTask 실행: 완료
+   1) command override: `python -m execution_sync_sell_fill`
+2. 실행 결과: 정상 skip
+   1) SELL fill 0건 — 본 일자 SELL 주문 미발생
+   2) `execution.strategy_execution_order` SELL row 변경 0건
+
+### 8. Step 15 `SYNC_BUY_FILL`
+
+1. RunTask 실행: 완료
+   1) command override: `python -m execution_sync_buy_fill`
+2. 실행 결과: 성공
+   1) `connector.connector_fill 26 ~ 29` 기준 BUY fill sync 완료(03 spec Step 13 결과 정합)
+   2) `execution.strategy_execution_order 26 ~ 29` SUBMITTED → FILLED 전환 완료
+   3) sync_result 반영(`filled_qty` / `filled_avg_price` 등) — `connector_fill` 의 broker 응답값 매핑
+
+### 9. Step 16 `SYNC_BUY_POSITION`
+
+1. RunTask 실행: 완료
+   1) command override: `python -m execution_sync_buy_position`
+2. 실행 결과: 성공
+   1) `execution.strategy_position_state` 4건 OPEN 신규 생성
+   2) position_state_id 매핑:
+      - `282330` BGF리테일: `position_state_id 6`
+      - `004990` 롯데지주: `position_state_id 7`
+      - `003490` 대한항공: `position_state_id 8`
+      - `088350` 한화생명: `position_state_id 9`
+   3) BUY fill 기준 OPEN row 생성 — Strategy Execution position 상태 1차 OPEN 전이 완료
+
+### 10. Backend AWS E2E 17-step 본 일자 진행 상태
+
+1. 17 step 모두 완료 또는 정상 skip(OD-MS-021 / OD-SAFE-001 ~ OD-SAFE-004 정합):
+   1) 1번 `CONNECTOR_BALANCE`: 완료(03 spec §1)
+   2) 2번 `INTEREST_CRAWLER`: 완료(08 spec §1)
+   3) 3번 `PREPROCESSOR`: 완료(08 spec §2)
+   4) 4번 `BACKTEST_RESEARCH`: 완료(09 spec §1)
+   5) 5번 `BACKTEST_REPORT`: 완료(09 spec §2)
+   6) 6번 `DAILY_BUY_SIGNAL`: 완료(본 섹션 §1)
+   7) 7번 `DAILY_POSITION_SIGNAL`: 완료 정상 skip(본 섹션 §2)
+   8) 8번 `DAILY_BUY_EXECUTION`: 완료(본 섹션 §3)
+   9) 9번 `DAILY_SELL_EXECUTION`: 완료 정상 skip(본 섹션 §4)
+   10) 10번 `DAILY_AUTO_SELL`: 완료 정상 skip(본 섹션 §5)
+   11) 11번 `DAILY_AUTO_BUY`: 완료(본 섹션 §6)
+   12) 12번 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE`: 완료(03 spec §2)
+   13) 13번 `CONNECTOR_ORDER_CHECK`: 완료(03 spec §3)
+   14) 14번 `SYNC_SELL_FILL`: 완료 정상 skip(본 섹션 §7)
+   15) 15번 `SYNC_BUY_FILL`: 완료(본 섹션 §8)
+   16) 16번 `SYNC_BUY_POSITION`: 완료(본 섹션 §9)
+   17) 17번 `BALANCE_REFRESH`: 완료(03 spec §4)
+2. ECS RunTask + command override 패턴 1차 검증 완료(OD-MS-013 / OD-MS-017 정합) — 본 일자 검증으로 mitigation 1차 실증.
+3. PowerShell AWS CLI `--overrides` 인라인 JSON quoting 문제로 UTF-8 no BOM JSON 파일 + `--overrides file://...` 패턴 사용 필요 — 본 일자에도 재실증(R-AUTO-014 mitigation 정합 / 자세한 내용은 2026-06-13 §3.1 / §4.5 정합).
+4. Strategy Execution = 실제 broker 주문 제출이 아닌 execution 후보 / 상태 전이 책임 / 실제 KIS 주문 제출은 MarketConnector Step 12 책임 — 본 일자 17-step E2E 1차 실증으로 책임 경계 명확화(OD-MS-016 / R-AUTO-009 / R-AUTO-010 / R-AUTO-011 [2026-06-17 보강] 정합).
+
+### 11. 후속 인계
+
+1. View Daily Batch 의 9개 step ProcessBuilder → ECS RunTask 호출 매핑 — 05 spec 후속 phase 책임
+2. Step Functions state machine 정의(buy-signal → position-signal 순서 강제 + sell-execution / auto-buy / sync 계열의 자동 재시도 금지 정책 OD-SAFE-004 반영) + EventBridge Scheduler 정기 트리거 — 04 spec 후속 phase 책임
+3. `execution_app` interest 권한 정식 매트릭스 갱신 — 02 spec db-roles-and-grants 후속 phase
+4. heavy 분류(`run_extended_analysis` / `block_watch_*` / `block_exception_buy_*`) SubmitJob 0건 정책 유지(R-AUTO-015 정합) — 09 spec 후속 phase
+5. AWS paper 자동화 orchestrator 후보 정리(View 또는 Step Functions 기반) — 04 / 05 spec 후속 phase
+6. aws-live cutover — 10 spec 책임
+
+### 12. 안전 / 보안 점검 결과
+
+1. 본 일자 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 변경 0건. 운영자가 직접 GRANT 보정한 `execution_app` interest 권한 변경분은 02 spec / 06 spec operation-notes 에 사실로만 기록(본문 전체 인용 0건).
+2. 실제 secret value / RDS password / RDS endpoint hostname / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 secret ARN / 실제 IAM Role ARN / image digest full sha256 / IAM access key id / task ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+3. ECS / IAM / Secrets Manager / RDS / GRANT 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / ECS Task event / SSM 응답 본문 본 노트 평문 인용 0건. 운영 식별자(execution_plan_id `92` / execution_order id `26 ~ 29` / connector_order_request id `34 ~ 37` / position_state_id `6 ~ 9` / 종목 코드 / 종목명 / 수량 / total_qty `378` / total_target_amount `6908189.40` / data_date `2026-06-16` / signal_date · run_date `2026-06-17`) 만 사실 기록.
+4. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 본 spec 범위 직접 호출 0건(주문 제출은 03 spec Step 12 책임). Strategy Execution `--execute` 는 11번(`DAILY_AUTO_BUY`) 한정 / `READY -> REQUESTED` 상태 전환만 / broker / KIS 호출 0건. SELL position `mark_position_sell_ordered()` 호출 0건. fill / position sync 자동 재시도 0건.
+5. RDS DDL 0건. DML 은 본 spec 범위에서 `decision.strategy_daily_run` / `decision.strategy_daily_signal` insert / `execution.strategy_execution_plan` insert(`id 92`) / `execution.strategy_execution_order` insert(BUY READY 4건) + update(REQUESTED → SUBMITTED 4건 → FILLED 4건) / `execution.strategy_position_state` insert(OPEN 4건 / `id 6 ~ 9`) 한정. `decision.strategy_daily_position_decision` 신규 row 0건(positions 0 정상 skip).
+6. live 자동 BUY / SELL E2E 검증은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. paper 환경에서의 17-step end-to-end 1차 통과로 R-AUTO-009 / R-AUTO-010 / R-AUTO-011 mitigation 1차 실증 / Status `Mitigated` 갱신 정합.

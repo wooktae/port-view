@@ -642,3 +642,179 @@
 3. heavy 분류 후보(`backtest_research_run` / `backtest_report_run` / `run_extended_analysis` / `block_watch_*` / `block_exception_buy_*`) 별 timeout / vCPU / memory 정식 결정 — 본 phase 에서 BACKTEST_RESEARCH + BACKTEST_REPORT 만 vCPU 1 / memory 2048 / timeout 600초 1차 확정. 나머지(`run_extended_analysis` / `block_watch_*` / `block_exception_buy_*`)는 OD-MS-019 결정 정합으로 AWS Batch 포팅 대상에서 제외 / 수동 보조 도구로 분류 / 별도 후속 phase 책임 유지.
 
 위 항목 외(View Daily Batch SubmitJob 연동 / Step Functions / EventBridge / adapter 정식 이동 / common packaging / CI/CD / aws-live cutover) 는 본 spec 의 후속 분리 유지.
+
+
+## 2026-06-16 Strategy Research AWS Batch Backend dry-run 재검증
+
+운영자가 2026-06-16 직접 수행한 (a) BACKTEST_RESEARCH AWS Batch 단건 재실행, (b) BACKTEST_REPORT 정식 Job Definition `portfolio-paper-strategy-report` 신규 등록 + rev1 ~ rev3 교정 진행 + 최종 rev3 단건 실행 성공 + S3 업로드 4건 존재 확인 결과를 누적 기록한다. 본 섹션은 같은 spec 의 2026-06-15 BACKTEST_RESEARCH / BACKTEST_REPORT 본 phase 검증 + S3 업로드 보강(§1 ~ §22) 의 후속이며, 08 spec 의 2026-06-16 Crawler 데이터 미수집 해결 + KRX EC2 자동화 성공으로 raw 최신성이 회복된 입력 데이터 위에서 backend AWS E2E dry-run 의 safe subset(Research → Decision)을 재가동하기 위한 1차 검증이다. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행했고, 실제 AWS Batch / IAM / S3 / Docker / ECR 작업은 운영자가 직접 수행했다. 실제 BUY / SELL 주문 / `--execute` 주문 전송 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건(OD-SAFE-001 ~ OD-SAFE-004 / OD-MS-021 정합).
+
+### 1. BACKTEST_RESEARCH AWS Batch 재실행
+
+1. SubmitJob 실행: 완료
+   1) Job Definition: `portfolio-paper-strategy-research:5`
+   2) cluster: `portfolio-paper-strategy-research-ce` 단일 / queue `portfolio-paper-strategy-research-queue`
+   3) 실행 status: `SUCCEEDED`
+   4) container exitCode: `0`
+   5) Batch automatic retry 0건(`attempts = 1` / OD-SAFE-004 / R-AUTO-001 / R-AUTO-015 정합)
+2. 최신 run 결과 확인: 완료
+   1) `research.strategy_backtest_run` 최신 row run_id: `439d78e7-41fd-4bb7-b455-18564ddff758`
+   2) backtest_end_date: `2026-06-15` 확인
+   3) `strategy_trade_log` row_count: `310`
+   4) `strategy_backtest_daily` row_count: `822`
+   5) `strategy_backtest_daily_position` row_count: `2375`
+3. 성과 지표: 완료
+   1) total_return: `4.66534417`
+   2) mdd: `-0.08941942`
+   3) sharpe: `2.68071466`
+   4) trade_count: `310`
+4. 안전 점검: 완료
+   1) RDS DDL 0건 / DML 은 backtest run 의 정상 흐름 한정
+   2) broker / KIS 호출 0건 / Daily Batch entrypoint 직접 호출 0건
+   3) heavy 분류(`run_extended_analysis` / `block_watch_*` / `block_exception_buy_*`) SubmitJob 0건(OD-MS-019 정합)
+   4) image digest / job ARN / account-id 본 노트 평문 기록 0건(`<image-digest>` / `<job-arn>` / `<account-id>` placeholder)
+
+### 2. BACKTEST_REPORT 정식 Job Definition 진행 흐름 (rev1 ~ rev3)
+
+1. rev1 등록: 완료(교정 이력)
+   1) family: `portfolio-paper-strategy-report:1`
+   2) command: `python -m port_strategy_research.backtest_report_run`(직접 실행 구조)
+   3) 결과: local report 4개 생성 성공 / S3 업로드 wrapper 미수행
+   4) 판단: 정식 BACKTEST_REPORT 운영 경로로는 부적합 — wrapper 호출이 누락되어 S3 업로드 단계로 이어지지 않음
+2. rev2 등록: 완료(교정 이력)
+   1) family: `portfolio-paper-strategy-report:2`
+   2) command: `python aws_batch_backtest_report_wrapper.py`(직접 파일 실행 구조)
+   3) 결과: 컨테이너 안 `/app/aws_batch_backtest_report_wrapper.py` 경로 부재로 실패
+   4) 원인: 현재 image 의 module 배치(`port_strategy_research/aws_batch_backtest_report_wrapper.py`) 와 직접 파일 경로 호출 방식이 정합하지 않음
+   5) 조치: rev3 에서 module 호출 방식(`python -m`)으로 교정
+3. rev3 등록: 완료(최종 운영 경로)
+   1) family: `portfolio-paper-strategy-report:3`
+   2) command: `python -m port_strategy_research.aws_batch_backtest_report_wrapper`
+   3) image tag: `paper-20260615-report-s3`(2026-06-15 §15 보강분 그대로 재사용)
+   4) 환경변수
+       - `REPORT_OUTPUT_DIR=/tmp/portfolio-reports`
+       - `REPORT_S3_BUCKET=portfolio-paper-migration-yukiever`
+       - `REPORT_S3_PREFIX=strategy-research/reports`
+   5) Job Role: `portfolio-paper-research-job-role` 의 S3 PutObject Resource = `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` 한정(2026-06-15 §12 보강분 재사용 / public read 0건 / wildcard 0건)
+4. 최종 결정: BACKTEST_REPORT 정식 Job Definition 은 `portfolio-paper-strategy-report:3` 로 확정. rev1 / rev2 는 closed 성격의 교정 이력으로만 기록(R-AUTO-015 mitigation·detection 보강).
+
+### 3. BACKTEST_REPORT rev3 SubmitJob 실행 검증
+
+1. SubmitJob 실행: 완료
+   1) jobName: `portfolio-paper-backtest-report-s3-20260616-rev3`
+   2) Job Definition: `portfolio-paper-strategy-report:3`
+   3) status: `SUCCEEDED`
+   4) container exitCode: `0`
+   5) Batch automatic retry 0건(`attempts = 1`)
+2. 입력 run_id: `439d78e7-41fd-4bb7-b455-18564ddff758`(§1 정합)
+3. local report 4개 생성 확인: 완료
+   1) `01_요약_리포트_20260616_v1.txt`
+   2) `02_일자별_매매_리포트_20260616_v1.txt`
+   3) `03_거래_상세_리포트_20260616_v1.txt`
+   4) `04_추천_리포트_20260616_v1.txt`
+4. wrapper S3 upload completed count: `4` 확인
+
+### 4. S3 업로드 결과 확인
+
+1. S3 prefix: 완료
+   1) `strategy-research/reports/20260616/67522706-9b5f-4770-a312-ceb1987c4655/`
+   2) bucket: `portfolio-paper-migration-yukiever`(기존 재사용 / OD-MS-019 정합)
+2. S3 객체 4건 존재 확인: 완료
+   1) `01_요약_리포트_20260616_v1.txt` — 7,258 bytes
+   2) `02_일자별_매매_리포트_20260616_v1.txt` — 552,540 bytes
+   3) `03_거래_상세_리포트_20260616_v1.txt` — 329,088 bytes
+   4) `04_추천_리포트_20260616_v1.txt` — 11,847 bytes
+3. private 유지 / public read 부여 0건 / KMS encryption 별도 결정은 후속(R-COST-003 정합)
+4. 실제 account-id / 실제 IAM Role ARN / 실제 secret ARN / 실제 S3 object ARN / image digest full sha256 본 노트 평문 기록 0건(`<account-id>` / `<role-arn>` / `<secret-arn>` / `<image-digest>` placeholder)
+
+### 5. 1차 검증 완료 기준
+
+1. BACKTEST_RESEARCH AWS Batch 실행 검증: 완료(2026-06-16 §1 정합 / `portfolio-paper-strategy-research:5` `SUCCEEDED` / run_id `439d78e7-...`)
+2. BACKTEST_REPORT AWS Batch 실행 검증: 완료(2026-06-16 §2 / §3 정합 / 최종 Job Definition `portfolio-paper-strategy-report:3` / `SUCCEEDED` / exitCode 0)
+3. BACKTEST_REPORT S3 업로드 보강 1차 실증: 완료(2026-06-16 §4 정합 / S3 prefix `strategy-research/reports/20260616/67522706-9b5f-4770-a312-ceb1987c4655/` 안 4개 객체 존재)
+4. BACKTEST_REPORT 운영 경로 교정: 완료(rev1 local-only / rev2 경로 부재 / rev3 module 호출 방식으로 최종 확정)
+5. heavy 분류 SubmitJob 0건 / Batch automatic retry 0건 / RDS DDL 0건 / broker · KIS 호출 0건 / aws-live 작업 0건
+6. 판단: Strategy Research AWS Batch 정식 BACKTEST_REPORT Job Definition 확정 + safe subset 재실행 검증 완료
+
+### 6. 후속 인계
+
+1. View Daily Batch 의 `BACKTEST_RESEARCH` / `BACKTEST_REPORT` step 을 ProcessBuilder 직접 실행에서 AWS Batch SubmitJob 호출로 매핑 — 05 spec / 04 spec 후속 phase 책임
+2. Step Functions state machine 정의(BACKTEST_RESEARCH → BACKTEST_REPORT 순서 강제 + 자동 재시도 금지) + EventBridge Scheduler 정기 트리거 — 04 spec 후속 phase 책임
+3. S3 lifecycle 정책 + KMS encryption 결정 — R-COST-003 정합 / 06 spec 후속 phase
+4. `portfolio-paper-strategy-report:1` / `portfolio-paper-strategy-report:2` 정리(운영 사용 금지 / Inactive 처리 또는 deregister)는 후속 운영자 결정으로 분리
+5. heavy 분류 entrypoint(`run_extended_analysis` / `block_watch_*` / `block_exception_buy_*`) 수동 보조 도구 운영 절차 명문화 — 09 spec 후속 phase / R-AUTO-015 mitigation 정합
+6. aws-live cutover — 10 spec 책임
+
+### 7. 안전 / 보안 점검 결과
+
+1. 본 일자 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog 변경 0건. 운영자가 직접 작성 / 수정한 `port_strategy_research/aws_batch_backtest_report_wrapper.py` / Dockerfile / requirements.txt 변경분은 본 노트 §2 / §3 에 사실로만 기록(본문 전체 인용 0건).
+2. 실제 secret value / RDS password / RDS endpoint hostname / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 secret ARN / 실제 IAM Role ARN / image digest full sha256 / IAM access key id / job ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+3. AWS Batch / IAM / S3 / Docker / ECR / RDS 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건.
+4. CloudWatch Logs 본문 / Batch console 응답 본문 / Docker build 로그 / S3 업로드 client 로그 본 노트 평문 인용 0건. 사실(jobName / status / exitCode / row count / 파일명 / 객체 size / S3 prefix) 만 기록.
+5. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 직접 호출 0건. 신규 BUY / SELL / 취소 / 정정 / `--execute` 0건. fill / position sync 자동 재시도 0건.
+6. RDS DDL 0건 / DML 은 BACKTEST_RESEARCH 의 정상 backtest run 흐름 + BACKTEST_REPORT 의 read-only 조회 한정.
+7. live 자동 batch / report 생성은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 paper 환경 한정.
+
+### 8. Task 완료 처리 (본 spec)
+
+본 spec 은 별도 tasks.md 가 없으므로 본 noted task 단위 완료 처리는 본 섹션에서 직접 기록한다.
+
+1. BACKTEST_RESEARCH AWS Batch 실행 검증: 완료(§1 / `portfolio-paper-strategy-research:5` `SUCCEEDED` / run_id `439d78e7-...`)
+2. BACKTEST_REPORT AWS Batch 실행 검증: 완료(§2 / §3 / 최종 `portfolio-paper-strategy-report:3` `SUCCEEDED`)
+3. BACKTEST_REPORT S3 업로드 보강: 완료(§4 / S3 객체 4건 존재 확인)
+4. BACKTEST_REPORT 정식 Job Definition 운영 경로 교정: 완료(§2 / rev1 local-only / rev2 경로 부재 / rev3 module 호출 방식으로 확정)
+5. View Daily Batch 의 `BACKTEST_RESEARCH` / `BACKTEST_REPORT` step → AWS Batch SubmitJob 매핑: 후속(§6 / 05 spec / 04 spec 후속 phase)
+6. Step Functions state machine + EventBridge Scheduler: 후속(§6 / 04 spec 후속 phase)
+7. S3 lifecycle / KMS encryption: 후속(§6 / R-COST-003 / 06 spec)
+8. heavy 분류 운영 절차 명문화: 후속(§6 / R-AUTO-015)
+9. aws-live cutover: 후속(§6 / 10 spec)
+
+
+## 2026-06-17 Daily AWS 17-step E2E 완료 (Strategy Research)
+
+운영자가 같은 일자 첫 번째 세션(MarketConnector 조회성 dry-run 재검증) 후속으로 직접 수행한 Daily AWS 17-step E2E 흐름이 본 일자에 끝까지 연결됐다. 본 spec 범위에 해당하는 step 은 4번 `BACKTEST_RESEARCH` / 5번 `BACKTEST_REPORT` 2개. 자세한 17 step 전체 진행 상태는 03 / 04 / 08 spec operation-notes 의 2026-06-17 섹션 참조. Kiro 는 문서 작성 / 절차 정리만 수행. 실제 AWS Batch SubmitJob / IAM / RDS / S3 작업은 운영자 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. heavy 분류(`run_extended_analysis` / `block_watch_*` / `block_exception_buy_*`) SubmitJob 0건 유지(OD-MS-019 / R-AUTO-015 정합).
+
+### 1. Step 4 `BACKTEST_RESEARCH`
+
+1. AWS Batch SubmitJob 실행: 완료
+   1) Job Definition: `portfolio-paper-strategy-research:5`(2026-06-16 §1 정합 / 본 일자 동일 revision 재사용)
+   2) launch type: FARGATE / awsvpc / image tag `paper-20260616` 또는 그 시점의 최신 paper image(운영자 직접 결정)
+2. 실행 결과: 성공
+   1) job status: `SUCCEEDED`
+   2) container exitCode: `0`
+   3) Batch automatic retry 0건(OD-SAFE-004 / R-AUTO-001 정합)
+3. 결과 확인: 완료
+   1) latest result date: `2026-06-16`
+   2) Sharpe Ratio: `2.68`
+   3) `research.strategy_backtest_daily` 최신성: `2026-06-16` 확인
+   4) `research.strategy_backtest_daily_position` 최신성: `2026-06-16` 확인
+4. 안전 점검: 완료
+   1) extended analysis 는 BACKTEST_RESEARCH 내부에서 이미 수행(OD-MS-019 정합) — 별도 SubmitJob 없음
+   2) heavy 분류 SubmitJob 0건 유지
+   3) RDS DDL 0건 / broker · KIS 호출 0건 / `--execute` 호출 0건
+
+### 2. Step 5 `BACKTEST_REPORT`
+
+1. AWS Batch SubmitJob 실행: 완료
+   1) Job Definition: `portfolio-paper-strategy-report:3`(rev3 module 호출 방식 / 2026-06-16 §2 / §3 정합)
+   2) image tag `paper-20260615-report-s3` 또는 운영자 직접 갱신한 paper image
+   3) env: `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` / `REPORT_S3_BUCKET=portfolio-paper-migration-yukiever` / `REPORT_S3_PREFIX=strategy-research/reports`
+2. 실행 결과: 성공
+   1) job status: `SUCCEEDED`
+   2) container exitCode: `0`
+3. S3 객체 4건 생성 확인: 완료
+   1) prefix: `strategy-research/reports/{YYYYMMDD}/{AWS_BATCH_JOB_ID}/` 정합(OD-MS-019 정합)
+   2) `01_요약_리포트` / `02_일자별_매매_리포트` / `03_거래_상세_리포트` / `04_추천_리포트` 4종 모두 존재 확인
+   3) private 유지 / public read 부여 0건 / wildcard 0건(R-COST-003 mitigation 정합)
+4. report upload prefix / object count 검증: 완료
+   1) Job Role 의 `s3:PutObject` Resource 가 `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` 한정 정책 정합(OD-MS-019 / R-COST-003 정합)
+   2) 다른 prefix / 다른 bucket 으로의 PutObject 패턴 0건
+
+### 3. 안전 / 보안 점검 결과
+
+1. 본 일자 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 변경 0건. 운영자가 직접 갱신한 `port_strategy_research/aws_batch_backtest_report_wrapper.py` / 관련 Dockerfile / requirements.txt 가 있다면 사실로만 기록(본문 전체 인용 0건).
+2. 실제 secret value / RDS password / RDS endpoint hostname / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 secret ARN / 실제 IAM Role ARN / image digest full sha256 / IAM access key id / job ARN / task ARN / S3 bucket ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder. 운영 식별자(Job Definition family `portfolio-paper-strategy-research` / `portfolio-paper-strategy-report` / S3 prefix `strategy-research/reports/` / Sharpe Ratio `2.68` / latest result date `2026-06-16` / 4개 리포트 파일명) 만 사실 기록.
+3. AWS Batch / ECS / IAM / S3 / Docker / ECR / RDS 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / Batch console 응답 / S3 client 로그 본 노트 평문 인용 0건.
+4. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 직접 호출 0건. heavy 분류(`run_extended_analysis` / `block_watch_*` / `block_exception_buy_*`) SubmitJob 0건 유지(R-AUTO-015 정합).
+5. RDS DDL 0건. DML 은 BACKTEST_RESEARCH 정상 backtest run 흐름 한정 — `research.strategy_backtest_run` / `research.strategy_backtest_daily` / `research.strategy_backtest_daily_position` / `research.strategy_trade_log` / `research.strategy_backtest_*_analysis` 정상 insert / upsert.
+6. live 자동 batch / report 생성은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. S3 lifecycle 정책 / KMS encryption 결정은 후속(R-COST-003 정합).
+7. Daily AWS 17-step E2E paper 1차 통과로 backend AWS E2E 의 4번 / 5번 step 정합 — OD-MS-008 / OD-MS-019 mitigation 1차 실증 / Status 기존 값 그대로 유지.

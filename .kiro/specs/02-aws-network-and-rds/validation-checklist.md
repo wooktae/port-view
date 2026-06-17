@@ -180,6 +180,20 @@
 - <span style="color:red">[O]</span> 정합성 — schema별 table count 81개 일치, table / index / sequence / FK 33개 / trigger 23개 / table별 row count clean CSV 82줄 모두 로컬 기준선과 diff 0(CRLF / LF는 `--strip-trailing-cr` 정규화 후 비교)
 - <span style="color:red">[O]</span> 민감정보 미기록 — 본 검증 결과에 RDS endpoint hostname / password / secret value / account-id / 계좌번호 / token 신규 기록 없음. `[REDACTED]` 또는 placeholder만 사용
 
+## 13. DB Role 권한 / search_path 보강 Validation (2026-06-17 17-step E2E)
+
+본 섹션은 2026-06-17 Daily AWS 17-step E2E 흐름 중 운영자가 발견 / 보정한 DB role 권한 / search_path 사실을 라벨로 정리한다. 상세 실행 기록은 [`./operation-notes.md`](./operation-notes.md) `## 2026-06-17 Daily AWS 17-step E2E 흐름 중 발견된 DB Role / 권한 / search_path 보정` §1 ~ §4 / [`../_common/risk-register.md`](../_common/risk-register.md) R-DATA-005 [2026-06-17 보강] / R-DATA-011 신규 정합 참조. 본 spec 본문 결정값(§4 GRANT / §5 검증 SQL) 변경은 후속 phase / 본 일자에는 사실 기록만.
+
+- <span style="color:red">[O]</span> `execution_app` 의 `interest` schema USAGE 권한 보정(Step 8 1차 실패 → 운영자 직접 GRANT 후 통과 / R-DATA-005 [2026-06-17 보강] 정합)
+- <span style="color:red">[O]</span> `execution_app` 의 `interest.*` table SELECT 권한 보정(execution buy 흐름 정합)
+- <span style="color:red">[O]</span> `execution_app` 의 interest sequence 권한 / future default privileges 보정(`ALTER DEFAULT PRIVILEGES IN SCHEMA interest GRANT SELECT ON TABLES TO execution_app` 등)
+- <span style="color:red">[O]</span> `marketconnector_app` 의 `legacy` schema USAGE 권한 보정(Step 17 1차 실패 → 운영자 직접 GRANT 후 통과 / OD-DB-007 의 marketconnector_app 한정 1건 예외 / R-DATA-011 신규 정합)
+- <span style="color:red">[O]</span> `marketconnector_app` 의 `legacy.holdings` DML(SELECT / INSERT / UPDATE / DELETE) 권한 보정(legacy 운영 데이터 갱신 최소 권한)
+- <span style="color:red">[O]</span> `marketconnector_app` 의 legacy sequence 권한 / future default privileges 보정
+- <span style="color:red">[O]</span> `marketconnector_app` 의 database search_path 보정 — `connector, execution, legacy, reference, public`(`ALTER ROLE marketconnector_app IN DATABASE portfolio SET search_path = ...`)
+- <span style="color:red">[O]</span> bare table name 의존 legacy 경로(`holdings`) 가 search_path 안에서 탐색되는지 검증 SQL 후보 추가(`SET ROLE marketconnector_app; SELECT 1 FROM holdings LIMIT 1;`)
+- <span style="color:red">[O]</span> 본 일자 password / RDS endpoint hostname / account-id / 실제 ARN / 계좌번호 평문 기록 0건. R-DOCS-001 [2026-06-17 보강(17-step E2E)] 정합
+
 ## 본 체크리스트 작업 안전 제약
 
 - 본 점검은 운영자가 직접 확인하거나 ReadOnly IAM([`../../docs/kiro-readonly-validator-iam.md`](../../docs/kiro-readonly-validator-iam.md))으로 자동 검증한다. 콘솔 출력 캡처 시 secret / endpoint 호스트 prefix는 마스킹.

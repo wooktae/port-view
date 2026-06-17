@@ -591,3 +591,60 @@
 2. pgAdmin4 의 환경별(paper / live) 서버 분리 등록 정책 — paper 환경에서 잘못해서 live RDS 를 등록하지 않도록 서버 이름 prefix 정책(예: `AWS Paper RDS - portfolio`) 표준화. live 환경은 후속 분리(10 spec).
 3. pgAdmin4 / psql 의 app role 별 비밀번호 보관 — 운영자 로컬 PC 환경 책임. Secrets Manager 에서 직접 주입하지 않음. 운영자 실수 시 R-DOCS-001 위반 방지를 위해 화면 캡처 / 채팅 / 노트에 평문 기록 금지 원칙 유지.
 4. Strategy Execution(`port_strategy_execution`) AWS 포팅 본 phase: 후속(04 spec 후속 phase). 본 일자에는 client 3종(Python `psycopg2` / psql 18 / pgAdmin4) 으로 사전 접속 가능성 1차 실증 완료.
+
+
+## 2026-06-17 Daily AWS 17-step E2E 흐름 중 발견된 DB Role / 권한 / search_path 보정
+
+운영자가 같은 일자 두 번째 세션(Daily AWS 17-step E2E 완료) 진행 중 발견한 본 spec 범위의 DB Role / 권한 / search_path 보정 사실을 누적 기록한다. 본 spec 자체의 추가 결정 0건 / 본문 변경 0건. 결정 정합 검증과 후속 정식 매트릭스 갱신만 사실 기록. 자세한 17 step 전체 진행 상태는 03 / 04 / 06 / 08 / 09 spec operation-notes 의 2026-06-17 섹션 참조. Kiro 는 문서 작성 / 절차 정리만 수행. 실제 GRANT / search_path 변경은 운영자 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. password / endpoint hostname / account-id / 실제 ARN / 계좌번호 본 노트 평문 기록 0건.
+
+### 1. `execution_app` 의 `interest` schema 권한 보정 (Step 8 영향)
+
+1. 1차 실패 사실: 확인
+   1) Daily AWS 17-step 의 8번 `DAILY_BUY_EXECUTION` ECS RunTask 가 1차 실행에서 `execution_app` 의 `interest` schema / table SELECT 권한 누락으로 실패(R-DATA-005 [2026-06-17 보강] 정합).
+   2) 영향 범위: 04 spec operation-notes 2026-06-17 §3 정합. preprocessor 자체(3번 step)는 정상 완료 / 본 권한 누락은 8번 step 영향에 한정.
+2. 운영자 조치 사실: 완료(2026-06-17 §3 운영자 직접 GRANT 보정)
+   1) `execution_app` 에 `interest` schema USAGE 권한 부여.
+   2) `interest.*` table SELECT 권한 부여(execution_app 이 buy execution 흐름에서 interest schema 읽기 필요).
+   3) sequence 권한 부여(필요한 sequence 한정).
+   4) future default privileges 보정(`ALTER DEFAULT PRIVILEGES IN SCHEMA interest GRANT SELECT ON TABLES TO execution_app` 등) — 후속 객체 신규 생성 시 자동 적용.
+3. 02 spec 정식 매트릭스 갱신: 후속
+   1) [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 GRANT / §5 검증 SQL 의 `execution_app` 행에 `interest` schema USAGE / table SELECT / sequence / default privileges 사실 반영은 후속 phase.
+   2) 운영자 직접 GRANT 결과는 본 노트에 사실로만 기록 — 정식 매트릭스 갱신 시점에 02 spec 본문 갱신 / 본 일자에는 본문 변경 없음.
+
+### 2. `marketconnector_app` 의 `legacy` schema / `legacy.holdings` / search_path 보정 (Step 17 영향)
+
+1. 1차 실패 사실: 확인
+   1) Daily AWS 17-step 의 17번 `BALANCE_REFRESH` SSM RunCommand 가 1차 실행에서 bare `holdings` 의 `relation does not exist` 오류로 실패(R-DATA-011 신규 정합).
+   2) 원인: `marketconnector_app` 의 `legacy` schema USAGE 미부여(OD-DB-007 정합 — legacy schema 모든 app role 미부여 정책의 1건 예외 발생) + `legacy.holdings` DML 미부여 + sequence 미부여 + database search_path 누락.
+   3) 영향 범위: 03 spec operation-notes 2026-06-17 §4 정합.
+2. 운영자 조치 사실: 완료(03 spec §4 운영자 직접 작업 정합)
+   1) `marketconnector_app` 의 database search_path 를 `connector, execution, legacy, reference, public` 로 보정(`ALTER ROLE marketconnector_app IN DATABASE portfolio SET search_path = ...`).
+   2) `legacy` schema USAGE 권한 부여(legacy 운영 데이터 접근 필요 — OD-DB-007 의 1건 예외 / 후속 재검토 후보).
+   3) `legacy.holdings` DML(SELECT / INSERT / UPDATE / DELETE) 권한 부여(legacy 운영 데이터 갱신 최소 권한 한정).
+   4) `legacy` schema sequence 권한 부여 + future default privileges 보정.
+3. 02 spec 정식 매트릭스 갱신: 후속
+   1) [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 GRANT / §5 검증 SQL 의 `marketconnector_app` 행에 `legacy` schema USAGE / `legacy.holdings` DML / sequence / database search_path 사실 반영은 후속 phase.
+   2) OD-DB-007(legacy schema 모든 app role 미부여) 정책의 marketconnector_app 한정 1건 예외 사실은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) Change Log 2026-06-17 두 번째 항목에 사실 기록 / 본문 결정값 변경 후속 분리.
+
+### 3. 검증 SQL 보강 후보 / app role 별 search_path / grants 검증 SQL
+
+1. app role 별 search_path 점검 SQL 후보:
+   1) `SELECT rolname, rolconfig FROM pg_roles WHERE rolname IN ('execution_app', 'marketconnector_app', 'decision_app', 'preprocessor_app', 'crawler_app', 'research_app', 'view_app');` — `rolconfig` 에서 `search_path=...` 항목 추출.
+   2) 또는 각 role 로 접속 후 `SHOW search_path;` 직접 실행.
+   3) 본 일자 `marketconnector_app` 의 search_path 가 `connector, execution, legacy, reference, public` 로 보정되었음을 정기 검증 항목으로 추가.
+2. future default privileges 점검 SQL 후보:
+   1) `SELECT * FROM pg_default_acl WHERE defaclnamespace = 'legacy'::regnamespace;` — legacy schema 의 default ACL 확인.
+   2) `SELECT * FROM pg_default_acl WHERE defaclnamespace = 'interest'::regnamespace;` — interest schema 의 default ACL 확인.
+   3) 본 일자 보정 결과로 `execution_app` interest / `marketconnector_app` legacy 에 대한 default privileges 가 적용되었음을 정기 검증.
+3. bare table name 의존 legacy 경로 검증 SQL 후보:
+   1) `SET ROLE marketconnector_app;` `SELECT 1 FROM holdings LIMIT 1;` — bare `holdings` 가 search_path 안에서 탐색되는지 확인.
+   2) BALANCE_REFRESH 진입 전 사전 점검 SQL 로 추가.
+4. R-DATA-011 detection 정합으로 본 검증 SQL 들을 17-step 진입 단계의 정기 항목으로 추가 — 정식 매트릭스 갱신은 후속 phase.
+
+### 4. 안전 / 보안 점검 결과
+
+1. 본 일자 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 변경 0건. 02 spec 본문 결정값 변경 0건 — 정식 매트릭스 갱신은 후속.
+2. 실제 password / RDS endpoint hostname / RDS port / database name / username / account-id / 실제 IAM Role ARN / 실제 secret ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder. 운영 식별자(role 이름 `execution_app` / `marketconnector_app` / schema 이름 `interest` / `legacy` / table 이름 `holdings` / search_path 값 `connector, execution, legacy, reference, public`) 만 사실 기록.
+3. RDS / GRANT / ALTER ROLE 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / SSM 응답 본문 / 운영자 PowerShell stdout 전문 본 노트 평문 인용 0건.
+4. RDS DDL 0건(본 spec 범위 — schema 생성 / drop / table 생성 / drop 0건). DML 0건(본 spec 범위 — `legacy.holdings` 직접 변경은 03 spec Step 17 책임). GRANT / REVOKE / ALTER DEFAULT PRIVILEGES / ALTER ROLE 작업이 본 일자에 발생했고 이는 본 노트에 사실로만 기록.
+5. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 직접 호출 0건. live 자동 GRANT / DDL / DML 은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. R-DATA-005 / R-DATA-011 mitigation 1차 실증 / Status `Mitigated` 갱신 정합.

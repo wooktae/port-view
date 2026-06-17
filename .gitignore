@@ -38,3 +38,6 @@ src/main/resources/application-*.local.properties
 .env
 .env.*
 !.env.example
+
+# Local Kiro cleanup archives
+.kiro/_archive/

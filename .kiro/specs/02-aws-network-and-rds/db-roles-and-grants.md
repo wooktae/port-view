@@ -687,6 +687,35 @@ DROP ROLE IF EXISTS portfolio_owner;
 
 라벨 / 색상 표기는 기존 `validation-checklist.md` 4종 라벨 규칙을 그대로 따른다. SQL 결과에 따라 `[O]` 또는 `[X]`로 적는다.
 
+## 8. 후속 갱신 후보 (2026-06-17 17-step E2E 보강)
+
+본 섹션은 2026-06-17 Daily AWS 17-step E2E 흐름 중 운영자가 발견 / 보정한 DB role 권한 / search_path 사실을 후속 갱신 후보로 누적한다. 운영자 직접 GRANT 보정 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-17 §1 ~ §4 / [`../_common/risk-register.md`](../_common/risk-register.md) R-DATA-005 [2026-06-17 보강] / R-DATA-011 신규 정합으로 사실 기록되어 있고, 본 spec 본문 §4 GRANT / §5 검증 SQL 의 정식 매트릭스 갱신은 후속 phase 책임이다.
+
+### 8.1. `execution_app` 의 `interest` schema 권한 정식 갱신 후보
+
+- §4.4 GRANT 매트릭스의 `execution_app` 행에 `interest` schema USAGE / `interest.*` table SELECT / sequence USAGE+SELECT / future default privileges(`ALTER DEFAULT PRIVILEGES IN SCHEMA interest GRANT SELECT ON TABLES TO execution_app` 등) 추가 후보.
+- §5 검증 SQL 의 `execution_app` 행에 `has_schema_privilege('execution_app', 'interest', 'USAGE')` / `has_table_privilege('execution_app', 'interest.<핵심 table 이름>', 'SELECT')` 점검 SQL 추가 후보.
+- 본 일자 1차 실패 사실은 [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-17 §3 정합 / R-DATA-005 [2026-06-17 보강] 정합.
+
+### 8.2. `marketconnector_app` 의 `legacy` schema · `legacy.holdings` · search_path 정식 갱신 후보
+
+- §4.4 GRANT 매트릭스의 `marketconnector_app` 행에 `legacy` schema USAGE / `legacy.holdings` DML(SELECT / INSERT / UPDATE / DELETE) / sequence USAGE+SELECT+UPDATE / future default privileges 추가 후보.
+- §3 search_path 전략의 `marketconnector_app` 행에 database search_path = `connector, execution, legacy, reference, public` 추가 후보(`ALTER ROLE marketconnector_app IN DATABASE portfolio SET search_path = connector, execution, legacy, reference, public`).
+- §5 검증 SQL 의 `marketconnector_app` 행에 `current_setting('search_path')` / `has_schema_privilege('marketconnector_app', 'legacy', 'USAGE')` / `has_table_privilege('marketconnector_app', 'legacy.holdings', 'SELECT,INSERT,UPDATE,DELETE')` 점검 SQL 추가 후보.
+- bare table name 의존 legacy 경로 검증 SQL 후보(`SET ROLE marketconnector_app; SELECT 1 FROM holdings LIMIT 1;`) 추가 후보.
+- OD-DB-007(legacy schema 모든 app role 미부여) 정책의 marketconnector_app 한정 1건 예외 사실은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) Change Log 2026-06-17 두 번째 항목 / R-DATA-011 신규 정합. 본 spec 본문 결정값 변경은 후속 분리.
+
+### 8.3. `marketconnector_app` 의 execution table UPDATE 권한 (OD-DB-008 R-only 정책 후속 재검토)
+
+- 본 일자 Step 12 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` 1차 실패의 한 원인은 `marketconnector_app` 의 execution table UPDATE 권한 누락(OD-DB-008 R-only 정책 정합). 운영자 직접 GRANT 로 SUBMITTED 전환 가능하도록 1차 보정 — 03 spec operation-notes 2026-06-17 §2 정합.
+- OD-DB-008 R-only 정책의 후속 재검토 후보 — MarketConnector executor 가 `strategy_execution_order` 를 SUBMITTED / FAILED 로 갱신해야 하는 책임을 가지므로 execution-table 의 일부 UPDATE 권한이 marketconnector_app 에 필요한지 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-DB-008 후속 분리.
+
+### 8.4. 후속 갱신 일정
+
+- 본 일자에 운영자가 직접 수행한 GRANT / search_path 보정 결과는 사실 기록만 — 본 spec 본문 §4 / §5 / §3 의 정식 매트릭스 갱신은 후속 phase 책임.
+- 정식 매트릭스 갱신 시점에 본 §8 항목들을 §4 / §5 / §3 본문으로 통합한다.
+- 본 §8 자체는 갱신 후보 누적 섹션이며 본문 결정값 변경 0건.
+
 ## 본 문서 작업 안전 제약
 
 - 본 문서는 SQL 초안 / 검증 / rollback / 반영 문구 산출물이며, 실제 SQL 실행은 운영자가 진행한다.

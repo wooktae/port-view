@@ -293,6 +293,7 @@ paper 환경 합계 추정: 약 $130~$170 / 월 (NAT 제거로 realistic 대비 
 - Fargate Task가 public subnet에서 동작 → 보안 그룹 / IAM 검증을 더 엄격하게 해야 한다.
 - NAT 미사용이므로 인터넷 outbound 필요 워크로드를 명시적으로 식별해야 한다(크롤러, 마켓커넥터).
 - live 안정성과는 별개 권고이므로 권고안 B로 cutover 전 최소 N영업일 검증 필요.
+- KRX Windows worker(paper, 2026-06-12 ~ 2026-06-16 도입) 비용 메모: Autologon / Windows Scheduled Task / SSM RunCommand 자체 비용은 사실상 0이다. 실제 비용 영향은 Windows EC2 running 시간 + EIP(필요 시) + EBS storage + CloudWatch Logs 저장량으로 발생한다. KRX program / shortsell daily 수집은 영업일 단위 짧은 실행이므로 EC2 running 시간을 줄이려면 작업 완료 후 stop 절차(08 spec task 59 후속)로 idle 시간을 최소화한다. EC2 stop 후에도 EIP는 분 단위 과금이 발생할 수 있어 운영자 결정으로 detach 여부 검토 가능. Autologon은 paper 전용 보안 예외(OD-MS-022 / R-SEC-009)로 운영하며, 추후 전용 local user 전환 / 또는 aws-live 단계 도입 시 별도 결정 책임.
 
 적용 대상 stage: design.md 로드맵의 Stage 2~4(파일럿 + 마켓커넥터 + 전략 paper).
 
