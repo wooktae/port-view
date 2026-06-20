@@ -605,3 +605,51 @@
   8. EventBridge Scheduler 정기 트리거 도입 — wrapper 검증이 안정화된 후 정기 실행으로 전환(04 spec 후속 phase 책임).
   9. aws-live cutover — 10 spec 책임. wrapper 의 환경 입력에 `aws-live` 분기 추가는 10 spec 진입 시점에 별도 결정.
 - 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 본 일자 wrapper 기준선 수립은 04 / 05 spec 후속 phase 의 Step Functions / View orchestration 진입 시점에 입력으로 사용한다. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 wrapper 작업으로 인한 변경 0건. `.kiro/scripts/` 신규 폴더 / 파일은 운영자 로컬 PC 도구 영역 / Kiro spec 산출물 외부.
+
+
+### 2026-06-18 후속 메모 (Daily AWS Paper Wrapper 17단계 실운영 검증 완료 — 03 / 04 spec + 운영자 로컬 도구)
+
+- 2026-06-17 wrapper 구조 1차 수립(OD-MS-023) 후속으로 2026-06-18 운영자가 직접 수행한 Daily AWS Paper Wrapper(`.kiro/scripts/run-daily-aws-paper.ps1`) 의 Step 1 ~ Step 17 실 실행 결과를 반영. View 구현 전 CLI 기준 Daily 전체 실행 기준선 1차 완성. 환경 `aws-paper` / RunDate `2026-06-18` / region `ap-northeast-2` / Step 12 `-AllowPaperOrderExecute` 첫 사용. 실제 KIS paper BUY 4건 제출 + 체결 + execution fill sync + position sync + balance refresh E2E 완료. 자세한 결과는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-18(OD-MS-024 신규) / [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md) 2026-06-18 §1 ~ §4 / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-18 §1 ~ §6 참조.
+- 1차 완료 범위 (Daily AWS Paper Wrapper 17단계 실운영 검증):
+  1. wrapper 1~17 실 실행 통과(DryRun 아님 / 실제 ECS RunTask · Batch SubmitJob · SSM command 제출 흐름 / 운영자 로컬 PC 에서 단계별 확인 실행)
+  2. Step 12 `-AllowPaperOrderExecute` 첫 사용 / KIS paper BUY 4건 제출 성공(broker_order_no `0000025576` / `0000025740` / `0000025744` / `0000025747`)
+  3. Step 13 broad 조회 `output1 empty` + `output2 summary-only` 응답 + active candidate 4건 → summary fallback 자동 skip(R-AUTO-018 mitigation 1차 실증) → 단건 `--code` / `--order-no` / `--no-broad` 조회로 4건 체결 반영
+  4. Step 16 추가매수 케이스 `strategy_position_state` unique constraint 충돌 발견(R-DATA-012 신규) → `execution_sync_buy_position.py` merge 패치(`merge_open_position_state()` + `additional_buys` + idempotency) → Docker rebuild + ECR push + ECS 재실행 통과 → OD-MS-024 신규 결정 락
+  5. 운영 예외 3종(KIS paper API read timeout / KIS summary-only 응답 / 추가매수 unique constraint) 모두 운영 중 식별 + 통제된 복구 + end-to-end 통과
+  6. 최종 6종목 OPEN(003490 58주 / 004990 69주 / 023530 8주 / 042660 11주 / 088350 244주 / 282330 17주) 정합 / Step 17 SSM Success / `connector_position_snapshot` row_count 36 / `legacy.holdings` row_count 41
+- 결정 락(2026-06-18): 신규 OD-MS-024(추가매수 허용 정책 + 기존 OPEN row merge / `execution_sync_buy_position.py` patch 적용 / OD-MS-016 책임 분리 / OD-MS-017 단일 Task Definition + command override 정합 유지). OD-MS-016 / OD-MS-021 / OD-MS-023 본문 변경 없이 1차 실증 메모만 보강 — 자세한 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-18 항목 참조.
+- 보강·신규 리스크: 신규 R-BROKER-004(KIS paper API read timeout 시 단순 재실행 broker 중복 주문 위험, mitigation = `connector_order_request` / `connector_api_call_log` / `broker_order_no` 사전 점검 후 통제된 REQUESTED 복구, Status `Mitigated`). 신규 R-DATA-012(추가매수 시 `strategy_position_state` unique constraint 충돌 위험, mitigation = `execution_sync_buy_position.py` merge 패치 + idempotency, Status `Mitigated`). R-AUTO-018(KIS summary-only fallback 오매핑) detection / mitigation 에 [2026-06-18 보강] — wrapper Step 13 자동 skip + 단건 조회로만 fallback 1차 실증. R-AUTO-009 / R-AUTO-010 / R-AUTO-011 / R-AUTO-019 detection / mitigation Status 보강 — Step 12 첫 사용 / 1차 timeout → 통제된 복구 → end-to-end 통과 / Status 기존 `Mitigated` 유지. R-DATA-005 detection / mitigation 에 [2026-06-18 보강] — view_app 의 `legacy.holdings` SELECT 권한 부재로 `portfolio_admin` 우회 / 정식 GRANT 후속 검토(02 spec db-roles-and-grants 후속).
+- 남은 후속 (본 일자 이월):
+  1. Step 13 단건 체결조회(`--code` / `--order-no` / `--no-broad`) wrapper 안 자동화 보완 — 다건 active candidate 상황에서 broad 조회 후 자동으로 단건 조회 loop 호출 / 운영자 수동 실행 단계 제거(R-AUTO-018 mitigation 강화).
+  2. KIS paper API timeout 재시도 정책 명문화 — 03 spec runbook §4.2 또는 후속 phase 산출물에 정식 절차 기재(connector_order_request · api_call_log · broker_order_no 사전 점검 → broker_order_no 부재 시에만 통제된 REQUESTED 복구 → broker_order_no 존재 시 단건 조회로 동기화). R-BROKER-004 mitigation 확정.
+  3. Step 16 추가매수 merge 패치 정식 commit + 07 spec CI/CD 연동 — 운영자가 직접 patch 한 `port_strategy_execution/execution_sync_buy_position.py` 변경분의 정식 commit / image tag 관리 / ECR push 자동화 / R-DATA-012 mitigation 정합 회귀 점검 자동화.
+  4. view_app `legacy.holdings` SELECT 권한 검토 — 02 spec db-roles-and-grants §4 GRANT / §5 검증 SQL 갱신 후보(R-DATA-005 [2026-06-18 보강] 정합 / view_app 의 legacy schema 운영 조회 필요 여부 운영자 결정 후 진행).
+  5. wrapper run summary 출력 보강 — `summary/run-summary.txt` 에 KIS paper API timeout 발생 / 통제된 복구 결과 / Step 13 broad → 단건 조회 전환 / Step 16 patch 재실행 흐름 등 운영 예외 추적 라벨 자동 기록.
+  6. View Daily Batch 화면 연동 전 최종 운영 summary 개선 — 05 spec 진입 시점에 wrapper summary 형식을 그대로 사용할지 / View 측 별도 summary 형식 정할지 결정.
+  7. bundled wrapper 생성 여부 결정 — wrapper 1~17 실 실행 통과 후에도 본 일자 미생성 유지 / OD-MS-023 정합 분리 파일 구조 우선.
+  8. EventBridge Scheduler 정기 트리거 / Step Functions hybrid orchestration 이전 — 04 spec 후속 phase / 05 spec 후속 phase 책임.
+  9. aws-live cutover — 10 spec 책임. wrapper 의 환경 입력에 `aws-live` 분기 추가는 10 spec 진입 시점에 별도 결정.
+  10. SELL closing 흐름 / 부분 청산 / 전량 청산 시 `additional_buys` 처리 방식 검증 — OD-MS-024 정합 / SELL 측 `mark_position_sell_ordered()` 호출 시점에 `additional_buys` 데이터를 어떻게 활용할지 / SELL fill 후 position_state status 전이 시점에 `additional_buys` 보존 여부 / 별도 spec 검증 후속.
+- 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 본 일자 wrapper 17단계 실운영 검증 결과는 04 / 05 spec 후속 phase 의 Step Functions / View orchestration 진입 시점에 입력으로 사용한다. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 wrapper 작업으로 인한 변경 0건(spec 영역) — `port_strategy_execution/execution_sync_buy_position.py` 운영자 직접 patch 결과는 04 spec operation-notes 에 사실로만 기록(본문 전체 인용 0건 / R-DOCS-001 정합).
+
+
+### 2026-06-18 후속 메모 (Step 13 `connector_order_check.py` 단건 순차 조회 기본화 — 03 spec)
+
+- 2026-06-18 같은 일자 첫 번째 세션(Daily AWS Paper Wrapper 17단계 실운영 검증 완료) 후속으로 운영자가 직접 수행한 MarketConnector `connector_order_check.py` 기본 실행 모드 변경 결과를 반영. 운영 실패가 아니라 운영 안전성 강화를 위한 설계 변경 — 첫 번째 세션의 broad 조회 `output1 empty` + `output2 summary-only` + active candidate 4건 응답 패턴(R-AUTO-018 mitigation 1차 실증) 결과를 더 안전한 기본 동작으로 코드 레벨에 반영. 자세한 결과는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-18 두 번째 항목(OD-MS-025 신규) / [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md) 2026-06-18 (Step 13 `connector_order_check.py` 단건 순차 조회 기본화) 섹션 참조.
+- 1차 완료 범위 (Step 13 `connector_order_check.py` 단건 순차 조회 기본화):
+  1. 기본 실행 모드 변경 — 변경 전 = broad 체결조회 중심 → 변경 후 = active 주문 목록 조회 + 주문번호 / 종목코드 기준 단건 direct-only 순차 조회
+  2. 신규 옵션 — `--broad`(legacy broad 조회 모드 / 기본값 미사용) / `--active-limit`(기본 active 주문 단건 순차 조회 최대 처리 건수) / 명시 주문 조회는 `--code {ticker_code} --order-no {broker_order_no} --no-broad` 조합으로 broad fallback 없이 해당 주문만 조회
+  3. 안전 기준 — 다건 active 주문 상태에서 `output2 summary-only` 응답을 DB 반영 근거로 사용하지 않고 `connector_order_request` 후보가 주문번호 / 종목코드 기준으로 1건 확정된 경우에만 summary fallback 허용(R-AUTO-018 [2026-06-18 추가 보강] mitigation 정합)
+  4. 책임 분리 — wrapper ps1(`.kiro/scripts/steps/step-13-connector-order-check.ps1`) = Step 13 orchestration(SSM RunCommand 호출 / 환경 검증 / log 저장) 만 담당 / 체결조회 방식 제어(active 조회 / 단건 direct-only / broad 모드 분리) = `connector_order_check.py` 내부 책임
+  5. 검증 milestone — 로컬 `python -m py_compile connector_order_check.py` 통과 / `python connector_order_check.py --help` 의 `--broad` / `--active-limit` 옵션 표시 확인 / 로컬 commit `75cb804`(`fix(connector): run order checks sequentially per active order` / 현재 repository 에 remote push destination 미설정 → git push 미수행 / 후속 분리)
+  6. EC2 반영 — S3 경유(bucket `portfolio-paper-migration-yukiever` / key `deploy/marketconnector/connector_order_check.py` / size `39159 bytes` / EC2 backup `connector_order_check.py.bak-20260618-step13-per-order` / SSM commandId `b344d404-07a4-4bb6-9d63-34151e648bab`) → wrapper 단독 실행 검증(`-StartStep 13 -EndStep 13`) 통과 — 단건 direct-only 조회 1건(`004990` / `0000025576`) 기준 `connector_order_event` / `connector_fill` 정상 생성
+- 결정 락(2026-06-18 두 번째 세션): 신규 OD-MS-025(MarketConnector `connector_order_check.py` 운영 모드 = active 주문 단건 순차 조회 기본 + broad 옵션 격리 + `connector_order_check.py` 내부 분기). OD-MS-016 / OD-MS-021 / OD-MS-023 본문 변경 없이 1차 실증 메모만 보강 — wrapper ps1 의 책임은 orchestration 만으로 유지 / 체결조회 방식 제어는 `connector_order_check.py` 내부 책임으로 명확화. 자세한 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-18 두 번째 항목 참조.
+- 보강·신규 리스크: 신규 R 0건. R-AUTO-018(KIS `inquire-daily-ccld` summary-only fallback 오매핑) detection / mitigation 에 [2026-06-18 추가 보강] — 본 일자 첫 번째 세션의 wrapper 안 자동 skip 1차 실증에 더해 `connector_order_check.py` 자체의 기본 실행 모드가 active 주문 단건 순차 조회로 변경됨으로써 broad 체결조회 호출 빈도 자체가 줄고 다건 active 상태에서 summary fallback 노출 표면이 감소 / Status `Mitigated` 유지(verified on 2026-06-18 두 번째 세션).
+- 남은 후속 (본 일자 두 번째 세션 이월):
+  1. Git remote push destination 설정 + commit `75cb804` 정식 push — 현재 `port-marketconnector` repository 의 remote push destination 미설정 / 운영자 결정 후 origin 등록 + push / 07 spec CI/CD pipelines 연동 시점에 정식 origin 정책과 함께 정리.
+  2. Step 13 wrapper 단독 실행 summary 출력 보강 — `summary/run-summary.txt` 에 `active_order_count` / `single_check_success_count` / `single_check_failed_count` / `broad_mode_used` 여부 / 실패 시 종목코드 / 주문번호 / 사유 자동 기록(R-AUTO-018 detection 정합 / 운영자 PowerShell summary 만으로 사후 검증 가능).
+  3. View Daily Batch 화면 연동 시 주문별 표시 — 05 spec 진입 시점에 단건 direct-only 조회 결과를 주문별 row 단위로 화면에 표시할지 결정 / wrapper summary 형식과 화면 형식의 정합성 검토.
+  4. Windows PowerShell · AWS CLI SSM 출력 cp949 인코딩 회피 패턴 정리 — wrapper Step 13 stdout / SSM 응답 본문이 한글 라벨 / 파일명 포함 시 cp949 vs UTF-8 인코딩 충돌 가능성 / 운영자 노트 / spec 산출물 본문에 cp949 깨짐 0건 정책 유지(R-DOCS-001 정합).
+  5. KIS paper API timeout 재시도 정책 명문화(2026-06-18 첫 번째 세션 §2 followups §2 와 결합) — 단건 direct-only 조회 패턴이 `--no-broad` + `--code` + `--order-no` 로 통제되는 구조이므로 timeout 재시도 시점에도 broker_order_no 별 단건 조회로만 동기화 / 03 spec runbook §4.2 정식 절차 기재 후속.
+  6. `--active-limit` 기본값 결정 후속 — 본 일자 1차 실증 시점의 default 값 적용 / 운영 환경에서 active 주문 수 누적 시 처리 건수 상한 정책 결정.
+- 진행 순서 자체는 변경하지 않는다. 08 → 04 → 05 → 09 → 07 → 10 흐름 유지. 본 일자 두 번째 세션의 단건 순차 조회 기본화 결과는 03 / 04 / 05 spec 후속 phase 의 Step Functions / View orchestration 진입 시점에 입력으로 사용한다. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 패키징 본 일자 두 번째 세션 작업으로 인한 변경 0건(spec 영역) — 운영자 직접 patch 한 `port-marketconnector/connector_order_check.py` 변경분은 03 spec operation-notes 에 사실로만 기록(본문 전체 인용 0건 / R-DOCS-001 정합).

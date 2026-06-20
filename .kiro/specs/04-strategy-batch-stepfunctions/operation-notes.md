@@ -1045,3 +1045,117 @@
 4. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 본 spec 범위 직접 호출 0건(주문 제출은 03 spec Step 12 책임). Strategy Execution `--execute` 는 11번(`DAILY_AUTO_BUY`) 한정 / `READY -> REQUESTED` 상태 전환만 / broker / KIS 호출 0건. SELL position `mark_position_sell_ordered()` 호출 0건. fill / position sync 자동 재시도 0건.
 5. RDS DDL 0건. DML 은 본 spec 범위에서 `decision.strategy_daily_run` / `decision.strategy_daily_signal` insert / `execution.strategy_execution_plan` insert(`id 92`) / `execution.strategy_execution_order` insert(BUY READY 4건) + update(REQUESTED → SUBMITTED 4건 → FILLED 4건) / `execution.strategy_position_state` insert(OPEN 4건 / `id 6 ~ 9`) 한정. `decision.strategy_daily_position_decision` 신규 row 0건(positions 0 정상 skip).
 6. live 자동 BUY / SELL E2E 검증은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. paper 환경에서의 17-step end-to-end 1차 통과로 R-AUTO-009 / R-AUTO-010 / R-AUTO-011 mitigation 1차 실증 / Status `Mitigated` 갱신 정합.
+
+
+## 2026-06-18 Daily AWS Paper Wrapper 17단계 실운영 검증 (Strategy Decision · Strategy Execution)
+
+운영자가 2026-06-18 직접 수행한 Daily AWS Paper Wrapper(`.kiro/scripts/run-daily-aws-paper.ps1`) 의 Step 1 ~ Step 17 실 실행 결과 중 04 spec(Strategy Decision / Strategy Execution) 책임 step 인 Step 6 / Step 7 / Step 8 / Step 9 / Step 10 / Step 11 / Step 14 / Step 15 / Step 16 결과를 누적 기록한다. Step 1 / Step 12 / Step 13 / Step 17 = 03 spec / Step 2 / Step 3 = 08 spec / Step 4 / Step 5 = 09 spec operation-notes 의 2026-06-18 섹션 정합. 환경 `aws-paper` / RunDate `2026-06-18` / region `ap-northeast-2`. Kiro 는 문서 작성 / 절차 정리만 수행 / 실제 wrapper 실행 / ECS RunTask / 운영자 직접 patch / Docker rebuild / ECR push / ECS 재실행은 모두 운영자가 직접 진행했다. 04 spec 범위에서 broker / KIS 직접 호출 0건(KIS paper BUY 본 실행은 03 spec Step 12 책임 / 본 spec 의 `--execute` 는 strategy execution 내부 상태 생성·갱신 의미 / OD-MS-016 책임 분리 정합). aws-live 작업 0건.
+
+### 1. Step 6 `DAILY_BUY_SIGNAL` / Step 7 `DAILY_POSITION_SIGNAL` / Step 8 `DAILY_BUY_EXECUTION`
+
+1. Step 6: 완료
+   1) wrapper Step 6 호출 → ECS RunTask `portfolio-paper-strategy-decision-buy-signal:1` (image `paper-20260613` / OD-MS-013 정합)
+   2) exitCode 0 / lastStatus STOPPED
+   3) `decision.strategy_daily_signal` BUY READY 4건 / signal_date `2026-06-18` / data_date `2026-06-17`
+   4) 후보 4종 — `004990` 롯데지주 / `023530` 롯데쇼핑 / `003490` 대한항공 / `042660` 한화오션
+2. Step 7: 완료
+   1) wrapper Step 7 호출 → ECS RunTask `portfolio-paper-strategy-decision-position-signal:1` (image `paper-20260613`)
+   2) exitCode 0 / lastStatus STOPPED
+   3) 보유 포지션(2026-06-17 17-step E2E 결과로 4종목 OPEN: `282330` / `004990` / `003490` / `088350`) 기준 HOLD decision 정상 생성
+   4) `decision.strategy_daily_position_decision` 신규 row 생성 정합
+3. Step 8: 완료
+   1) wrapper Step 8 호출 → ECS RunTask `portfolio-paper-strategy-execution:1` + command override `python daily_buy_execution_run.py` (OD-MS-017 정합)
+   2) exitCode 0 / lastStatus STOPPED
+   3) `execution.strategy_execution_plan` 신규 row 생성 / `execution_plan_id 94`
+   4) BUY READY 주문 4건 생성 / blocked_order_count 0 / skipped_order_count 0
+   5) 추가매수 허용 정책에 따라 기존 보유 종목(`004990` / `003490`)도 BUY 후보로 주문 생성 — OD-MS-024 신규 정합
+   6) 주문 수량:
+       - `004990` 롯데지주 4주
+       - `023530` 롯데쇼핑 8주
+       - `003490` 대한항공 6주
+       - `042660` 한화오션 11주
+4. 안전 점검: 완료
+   1) `connector_order_request_id` 4건 모두 NULL — Strategy Execution 은 `READY -> REQUESTED` 까지만 담당 / `connector_order_request_id` 매핑은 MarketConnector executor 책임(OD-MS-016 정합)
+   2) broker / KIS 직접 호출 0건
+
+### 2. Step 9 `DAILY_SELL_EXECUTION` / Step 10 `DAILY_AUTO_SELL`
+
+1. Step 9: 완료 정상 skip
+   1) wrapper Step 9 호출 → ECS RunTask `portfolio-paper-strategy-execution:1` + command override `python daily_sell_execution_run.py`
+   2) exitCode 0 / lastStatus STOPPED
+   3) SELL 대상 없음 / sell_decisions 0 / orders_to_upsert 0
+   4) broker / KIS 직접 호출 0건
+2. Step 10: 완료 정상 skip
+   1) wrapper Step 10 호출 → ECS RunTask `portfolio-paper-strategy-execution:1` + command override `python daily_auto_sell_execute_run.py --execute`
+   2) exitCode 0 / lastStatus STOPPED
+   3) READY SELL 주문 0건 / `--execute` 는 strategy execution 내부 상태 생성·갱신 의미만(OD-MS-016 책임 분리 정합)
+   4) broker / KIS 직접 호출 0건
+
+### 3. Step 11 `DAILY_AUTO_BUY` — `READY -> REQUESTED` 4건
+
+1. wrapper Step 11 호출: 완료
+   1) ECS RunTask `portfolio-paper-strategy-execution:1` + command override `python daily_auto_buy_execute_run.py --execute`
+   2) `--execute` 는 strategy execution 내부 상태 생성·갱신 의미만 / broker · KIS 직접 제출 아님(OD-MS-016 책임 분리 정합)
+2. 실행 결과: 완료
+   1) exitCode 0 / lastStatus STOPPED
+   2) BUY 4건 `READY -> REQUESTED` 전환 — `strategy_execution_order id 30 ~ 33` REQUESTED
+   3) `execution_plan_id 94`
+   4) `connector_order_request_id` 4건 모두 NULL — Step 12 MarketConnector executor 가 `REQUESTED -> SUBMITTED` 전환 + `connector_order_request_id` 매핑 책임(OD-MS-016 정합 / 03 spec 2026-06-18 §2 정합)
+   5) broker / KIS 직접 호출 0건
+
+### 4. Step 14 `SYNC_SELL_FILL` / Step 15 `SYNC_BUY_FILL`
+
+1. Step 14: 완료 정상 skip
+   1) wrapper Step 14 호출 → ECS RunTask `portfolio-paper-strategy-execution:1` + command override `python execution_sync_sell_fill.py`
+   2) exitCode 0 / lastStatus STOPPED
+   3) SELL fill 0건 / SELL 주문 미발생 정합
+2. Step 15: 완료
+   1) wrapper Step 15 호출 → ECS RunTask `portfolio-paper-strategy-execution:1` + command override `python execution_sync_buy_fill.py`
+   2) exitCode 0 / lastStatus STOPPED
+   3) `connector.connector_fill` 기준 BUY fill sync — strategy_execution_order id `30 ~ 33` REQUESTED → FILLED 전환(03 spec 2026-06-18 §3 의 단건 체결 동기화 결과 정합)
+   4) `result_payload.sync_result` 생성 / 4건 모두 FILLED 정합
+
+### 5. Step 16 `SYNC_BUY_POSITION` — 추가매수 unique constraint 충돌 + merge 패치
+
+본 step 은 본 일자 wrapper 실 실행에서 가장 큰 운영 예외다. 추가매수 허용 정책 정합으로 기존 OPEN position(`004990` / `003490`)이 있는 종목에 대해 신규 INSERT 를 시도하면 `strategy_position_state` `unique(account_id, ticker_code, status='OPEN')` 충돌이 발생한다. 운영자가 직접 patch 로 해결한 결과를 OD-MS-024 신규 / R-DATA-012 신규 mitigation 정합으로 누적 기록한다.
+
+1. 1차 시도: 실패(R-DATA-012 신규 정합)
+   1) wrapper Step 16 호출 → ECS RunTask `portfolio-paper-strategy-execution:1` + command override `python execution_sync_buy_position.py`
+   2) ECS task 실패 — `duplicate key value violates unique constraint` (`strategy_position_state` unique constraint on `account_id` / `ticker_code` / OPEN status)
+   3) 영향 종목 — `004990` 롯데지주(기존 `position_state_id 7` OPEN) / `003490` 대한항공(기존 `position_state_id 8` OPEN) — 추가매수 케이스 2건
+   4) 신규 OPEN 2건(`023530` / `042660`)은 기존 OPEN row 부재로 unique 위반 0건
+2. patch 내용: 완료
+   1) `port_strategy_execution/execution_sync_buy_position.py` 운영자 직접 patch
+   2) 동일 `account_id` / `ticker_code` / OPEN status 기준 기존 position 조회 로직 추가
+   3) 기존 OPEN position 존재 시 신규 INSERT 대신 `merge_open_position_state()` 호출 — quantity 단순 합산 / entry_price 가중평균 / status `OPEN` 유지
+   4) `buy_info.additional_buys` 에 추가매수 이력 누적(`execution_order_id` / `connector_order_request_id` / 매수 일자 / 수량 / 단가)
+   5) idempotency 체크 — 같은 `execution_order_id` 또는 `connector_order_request_id` 가 이미 `additional_buys` 에 존재하면 다시 누적하지 않음
+   6) 기존 OPEN position 부재 시에만 신규 INSERT 진행
+   7) patch 변경분은 본 노트 사실 기록만(본문 전체 인용 0건 / R-DOCS-001 정합)
+3. Docker build 및 ECR push: 완료
+   1) `portfolio-strategy-execution:paper-20260613` 재빌드
+   2) Docker build context 주의 — Dockerfile 이 `port_strategy_execution/...` 경로를 COPY 하므로 `C:\Workspaces` 기준으로 build 진행
+   3) ECR push 완료(image digest 운영자 보관 / 본 spec 산출물 평문 기록 금지 / R-DOCS-001 정합)
+   4) PowerShell pipe 기반 `docker login` 시 400 응답 발생 → `cmd /c` pipe 우회 방법으로 해결(운영자 로컬 PC 환경 운영 메모)
+4. 재실행 결과: 성공
+   1) wrapper Step 16 재진입 → ECS task exitCode 0 / Step 16 SUCCESS
+   2) `position_sync_result` 생성 / 모든 4건 정합 처리
+5. 포지션 반영 결과: 확인(OD-MS-024 / R-DATA-012 mitigation 1차 실증)
+   1) `004990` 롯데지주 — 기존 `position_state_id 7` 유지 / 65주 → 69주 / entry_price `27008.6956`(가중평균 갱신) / `additional_buys` 에 `execution_order_id 30` 기록
+   2) `003490` 대한항공 — 기존 `position_state_id 8` 유지 / 52주 → 58주 / entry_price `28979.3103` / `additional_buys` 에 `execution_order_id 32` 기록
+   3) `023530` 롯데쇼핑 — 신규 `position_state_id 11` 생성 / 8주 / entry_price `194225.0000`
+   4) `042660` 한화오션 — 신규 `position_state_id 12` 생성 / 11주 / entry_price `126118.1818`
+   5) 추가매수 merge 2건 + 신규 OPEN 2건 모두 정합 처리
+6. 후속 인계: 후속
+   1) patch 정식 commit + 07 spec CI/CD 연동 — followups-overview 2026-06-18 §3
+   2) idempotency 회귀 점검 자동화 — 같은 `execution_order_id` 가 두 번 누적되지 않는지 정기 SQL 점검
+   3) SELL closing 흐름 / 부분 청산 / 전량 청산 시 `additional_buys` 처리 방식 검증 — followups-overview 2026-06-18 §10
+
+### 6. 안전 / 보안 점검 결과 (Strategy Decision · Strategy Execution)
+
+1. 본 일자 wrapper 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 변경 0건(spec 영역). 운영자가 직접 patch / Docker rebuild / ECR push 한 `port_strategy_execution/execution_sync_buy_position.py` 변경분은 본 노트 §5 에 사실로만 기록(본문 전체 인용 0건 / R-DOCS-001 정합).
+2. 실제 secret value / RDS password / RDS endpoint hostname / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / account-id / 실제 secret ARN / 실제 IAM Role ARN / image digest full sha256 / IAM access key id / task ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+3. ECS / IAM / Secrets Manager / RDS / Docker / ECR / GRANT 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / ECS Task event / SSM 응답 본문 / Docker build · push 로그 본 노트 평문 인용 0건. 운영 식별자(`execution_plan_id 94` / strategy_execution_order id `30 ~ 33` / connector_order_request_id 4건은 03 spec Step 12 책임 / position_state_id `7` · `8` · `11` · `12` / 종목 코드 / 종목명 / 수량 / entry_price / data_date `2026-06-17` / signal_date · run_date `2026-06-18`) 만 사실 기록.
+4. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 본 spec 범위 직접 호출 0건(주문 제출은 03 spec Step 12 책임). Strategy Execution `--execute` 는 Step 10 / Step 11 / Step 14 / Step 15 / Step 16 한정 / 모두 strategy execution 내부 상태 생성·갱신 / broker · KIS 직접 제출 아님(OD-MS-016 책임 분리 정합). SELL position `mark_position_sell_ordered()` 호출 0건. fill / position sync 자동 재시도 0건(운영자 직접 patch 후 재실행 / wrapper 자동 retry 미사용).
+5. RDS DDL 0건. DML 은 본 spec 범위에서 `decision.strategy_daily_run` / `decision.strategy_daily_signal` insert / `decision.strategy_daily_position_decision` insert / `execution.strategy_execution_plan` insert(`id 94`) / `execution.strategy_execution_order` insert · update(BUY READY 4건 → REQUESTED → SUBMITTED → FILLED) / `execution.strategy_position_state` insert · merge(추가매수 merge 2건 + 신규 INSERT 2건) 한정. SELL row 변경 0건 / `mark_position_sell_ordered()` 호출 0건.
+6. live 자동 BUY / SELL E2E 검증은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. paper 환경에서의 wrapper 17-step 실 실행 + 추가매수 merge end-to-end 1차 통과로 OD-MS-024 / R-DATA-012 mitigation 1차 실증 / Status `Mitigated` 갱신 정합.
