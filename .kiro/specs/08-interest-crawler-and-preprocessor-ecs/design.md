@@ -693,3 +693,86 @@ revision 6 은 ECS / Fargate / Chromium runtime 가용성 보증으로만 해석
 - 기존 §1 ~ §14 결정값은 변경하지 않는다.
 - §15 는 §12 의 hybrid execution model 분류와 §13 의 1차 자동화 완성 판단, §14 의 표현 보정 위에 본 일자 결과로 hybrid 구조 완료 / revision 6 / revision 7 의미 분리 / SSM direct 실행 부적합 / Headless · 비대화형 KRX 수집 운영 방식 제외 / Preprocessor 재실행 가능 상태 도달만 추가한다.
 - Preprocessor 재실행 / Backend AWS E2E dry-run 재개 / EventBridge Scheduler 정기 trigger / Step Functions hybrid orchestration / non-GUI crawler 인벤토리 추가 점검 / wrapper 내 DB 검증 출력 자동 추가 / EC2 worker stop 절차 / Chrome process 정리 옵션 / View 구현은 모두 후속 spec / 후속 phase 책임이다.
+
+
+## 16. 2026-06-20 운영자 검증 결과 / Daily AWS Paper Wrapper 최종 점검 + EC2 lifecycle 후속 필요성
+
+본 섹션은 2026-06-20 운영자 직접 수행한 (a) Daily AWS Paper Wrapper 구조 / 안전 기준 / EC2 기동 기준 최종 점검, (b) RunDate `2026-06-18` / Step 1 ~ Step 11 범위 wrapper 재실행 시도 안전 중단, (c) 6/19 KRX raw 최신성 복구 상태 점검 결과를 반영한 보강 섹션이다. §12 ~ §15 결정값은 변경하지 않고, EC2 lifecycle 후속 필요성과 Step 2 wrapper 성공판정 강화 진입 근거만 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-20 §1 ~ §5 참조.
+
+### 16.1 EC2 기동 기준 (Step 별 의존성)
+
+본 spec 의 Step 2 INTEREST_CRAWLER 책임 범위와 인접 step 의 EC2 의존성을 명시한다.
+
+| Step | 의존 EC2 | 본 일자 운영 메모 |
+|------|----------|------------------|
+| Step 1 `CONNECTOR_BALANCE` | MarketConnector EC2 | EC2 stop · start 후 `/tmp/inject-env.sh` 유실 가능 / 본 일자 1차 실증(재생성 후 통과). 03 spec 책임 |
+| Step 2 `INTEREST_CRAWLER` | (a) non-GUI ECS Fargate Task / (b) Crawler Worker EC2(KRX GUI) | non-GUI 는 EC2 의존 없음 / KRX GUI 는 Crawler Worker EC2 가 `running` 상태 + Administrator interactive session 필요 |
+| Step 12 / 13 / 17 | MarketConnector EC2 | broker / KIS 호출 또는 BALANCE_REFRESH / 03 spec 책임 |
+
+### 16.2 EC2 lifecycle 후속 필요성 (08 spec 입력)
+
+- 두 EC2 가 stopped 상태이면 wrapper 실행 전 운영자가 직접 start 필요 / 종료 후 stop 필요(R-AUTO-016 / R-AUTO-017 mitigation 정합).
+- MarketConnector EC2 의 `/tmp/inject-env.sh` 유실 대응 / SSM Online wait / KRX worker EC2 stop 절차의 자동화는 본 spec 범위 밖 / 후속 분리(task 59 정합).
+- 본 일자 6/18 wrapper 중복 실행 시도 결과 — Step 12 미실행 / 신규 broker 주문 0건 / 신규 execution_plan 0건 / Crawler Worker chrome 잔여 프로세스는 EC2 stop 으로 정리 / R-AUTO-002 / R-AUTO-019 mitigation 정합.
+
+### 16.3 본 섹션 갱신 원칙
+
+- §12 ~ §15 결정값은 변경하지 않는다.
+- §16 은 EC2 기동 기준 / EC2 lifecycle 후속 필요성 / 6/18 중복 실행 시도 결과만 보강한다.
+- KRX GUI 경로의 자동 로그인(OD-MS-022) / non-GUI ECS Fargate 운영 경로(OD-MS-011) / 표현 보정(OD-MS-020) 정책은 본 일자에도 그대로 유지된다.
+
+## 17. 2026-06-21 운영자 검증 결과 / Step 2 INTEREST_CRAWLER 성공판정 강화 (OD-MS-026 신규)
+
+본 섹션은 2026-06-21 운영자 직접 수행한 (a) `step-02-interest-crawler.ps1` 성공판정 강화, (b) non-GUI ECS crawler env 보강, (c) `interest_krx_raw_validate_daily.py` 신규 생성 + EC2 배포 + EC2 단독 검증, (d) `step-02-interest-crawler.ps1` DB validation 연동, (e) crawler worker stopped fail-closed 처리, (f) Step 2 단독 실행 검증 결과를 반영한 보강 섹션이다. §12 ~ §16 결정값은 변경하지 않고, Step 2 성공 조건과 worker stopped fail-closed 설계 변경 / KRX raw validation script 의 Step 2 guard 역할만 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-21 §1 ~ §8 참조. 본 일자 결정 락 OD-MS-026 신규 / R-AUTO-020 신규 mitigation 1차 실증 / R-AUTO-007 / R-AUTO-016 / R-AUTO-017 보강.
+
+### 17.1 Step 2 성공 조건 (강화)
+
+Step 2 `INTEREST_CRAWLER` 의 SUCCESS 조건은 다음 6개를 모두 통과해야 한다(OD-MS-026 정합 / R-AUTO-020 mitigation 정합).
+
+1. **non-GUI ECS crawler exitCode 0** — Task Definition `portfolio-paper-interest-crawler:7` RunTask 의 lastStatus `STOPPED` / container exitCode 0 / stoppedReason `Essential container in task exited` / CloudWatch log 저장 확인.
+2. **Crawler Worker EC2 running** — instance state `running` 이 아니면 Step 2 fail-closed(아래 §17.2 참조).
+3. **Windows Scheduled Task `Portfolio-KRX-Worker-Daily` Running → Ready 복귀** — `schtasks /Run` 으로 trigger / `Running` 상태 polling → `Ready` 복귀 wait / `sawRunning` 로그 출력 / timeout 시 Step 2 실패.
+4. **Last Result 0 또는 0x0** — Scheduled Task 종료 후 Last Result 확인 / Scheduled Task trigger 성공만으로 SUCCESS 처리하지 않는다(R-AUTO-020 mitigation 핵심).
+5. **latest worker log path / tail 출력** — `C:\portfolio\logs\krx_worker_daily_*.log` 최신 파일 path / last write time / size / tail 출력. `KRX login SUCCESS` / `KRX program SUCCESS` / `KRX shortsell SUCCESS` / `DONE :: KRX worker daily` 라벨 확인(본문 평문 인용 0건 / R-DOCS-001 정합).
+6. **KRX raw DB validation 통과** — `INTEREST_CRAWLER_KRX_DB_VALIDATE` SSM step → `interest_krx_raw_validate_daily.py --expected-date <ExpectedKrxRawDate>` 실행 → `interest_program_raw` / `interest_shortsell_raw` 의 expected trade_date 기준 row_count + `max(trade_date)` 검증 / non-zero exit 또는 row_count 0 시 Step 2 fail. step result 에 `KrxDbValidationCommandId` 포함.
+
+### 17.2 worker stopped 처리 (skip → fail-closed)
+
+| 시점 | 처리 방식 | 결과 |
+|------|-----------|------|
+| ~ 2026-06-20 (이전) | crawler worker EC2 가 `running` 이 아니면 wrapper 안에서 KRX GUI Scheduled Task trigger 자동 skip | skip 상태에서도 Step 2 SUCCESS 가능성 존재 / KRX raw 미적재가 Step 3 이후로 전파될 위험(R-AUTO-016 / R-AUTO-020 정합) |
+| 2026-06-21 (현재) | crawler worker EC2 가 `running` 이 아니면 즉시 Step 2 실패(fail-closed) / instanceId / state 출력 | KRX GUI worker · DB validation 미수행 상태에서 Step 2 SUCCESS 진입 차단 |
+
+본 변경은 R-AUTO-016 mitigation 갱신과 R-AUTO-020 신규 mitigation 의 핵심 설계 변경이며, 본 일자 단독 실행 검증에서는 worker state `running` 이 1차 실증되어 fail-closed 분기 자체는 진입하지 않았다(`§17.4 정합`).
+
+### 17.3 KRX raw validation script 의 Step 2 guard 역할
+
+- `interest_krx_raw_validate_daily.py` 는 Step 2 guard 로 사용되며, Step 2 가 SUCCESS 처리되기 전 단계의 마지막 체크 포인트다.
+- 검증 대상은 `interest_program_raw` / `interest_shortsell_raw` 두 raw table 이며, expected trade_date 기준 row_count + `max(trade_date)` 가 expected 이상인지 확인한다. 실패 시 exit code 30 반환.
+- DB session 정합 — user `crawler_app` / schema `interest` / search_path `interest, reference, legacy, public`(2026-06-21 EC2 단독 검증 결과 정합).
+- 본 script 가 Step 2 guard 위치에 배치됨으로써 wrapper 가 Scheduled Task trigger 성공만 보고 Step 2 SUCCESS 처리하던 한계(R-AUTO-007 / R-AUTO-020)가 1차 차단된다.
+
+### 17.4 Step 2 단독 실행 검증 결과 (2026-06-21)
+
+| 항목 | 값 / 결과 |
+|------|-----------|
+| RunId | `daily-aws-paper-20260621-204017` |
+| Environment / RunDate / 실행 범위 | `aws-paper` / `2026-06-20` / `-StartStep 2 -EndStep 2` |
+| ExpectedKrxRawDate | `2026-06-19` |
+| StepCode / Status / Runner | `INTEREST_CRAWLER` / `SUCCESS` / `ECS+SSM` |
+| non-GUI ECS taskDefinition / taskId / exitCode | `portfolio-paper-interest-crawler:7` / `78979b5cbb714d0eb94f5946e15a14ce` / `0` |
+| Crawler Worker EC2 state | `running` |
+| KRX worker SSM commandId | `f9d82fcc-1e26-4710-87c3-1d20483b63ef` |
+| Scheduled Task | elapsedSeconds=`111` / sawRunning=True / FinalStatus=`Ready` / FinalLastResult=`0` |
+| latest worker log | `C:\portfolio\logs\krx_worker_daily_20260621_114154.log` |
+| KRX raw DB validation SSM commandId | `2279c6d7-2da6-4317-9c10-7cc77374b317` |
+| `interest_program_raw` 검증 | expected=`2026-06-19` / max_date=`2026-06-19` / expected_count=`1` / OK |
+| `interest_shortsell_raw` 검증 | expected=`2026-06-19` / max_date=`2026-06-19` / expected_count=`349` / OK |
+| validation exit code | `0` (stderr empty) |
+
+### 17.5 본 섹션 갱신 원칙
+
+- §12 ~ §16 결정값은 변경하지 않는다.
+- §17 은 (a) Step 2 성공 조건 강화, (b) worker stopped 처리 변경(skip → fail-closed), (c) KRX raw validation script 의 Step 2 guard 역할, (d) Step 2 단독 실행 검증 결과만 추가로 명시한다.
+- KRX GUI 경로의 자동 로그인(OD-MS-022) / non-GUI ECS Fargate 운영 경로(OD-MS-011) / 표현 보정(OD-MS-020) / wrapper 운영 정책(OD-MS-023) 결정은 그대로 유지된다.
+- Step 3 PREPROCESSOR 이후 단계 진행 / EC2 lifecycle 자동화 / Step Functions 혼합 orchestration / View 표시 연동 / worker log centralized collection 은 모두 후속 spec / 후속 phase 책임으로 유지한다.

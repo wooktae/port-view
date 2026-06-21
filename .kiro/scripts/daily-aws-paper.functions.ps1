@@ -86,7 +86,8 @@ function Invoke-DailyStepFile {
 function New-SsmParameterFile {
     param(
         [string]$StepCode,
-        [string[]]$Commands
+        [string[]]$Commands,
+        [int]$ExecutionTimeoutSeconds = 900
     )
 
     $safeStepCode = $StepCode.ToLower().Replace("_", "-")
@@ -94,7 +95,7 @@ function New-SsmParameterFile {
 
     $payload = @{
         commands = $Commands
-        executionTimeout = @("900")
+        executionTimeout = @([string]$ExecutionTimeoutSeconds)
     }
 
     $json = $payload | ConvertTo-Json -Depth 10
@@ -108,10 +109,14 @@ function Invoke-SsmCommandAndWait {
         [string]$StepCode,
         [string]$InstanceId,
         [string[]]$Commands,
-        [string]$DocumentName = "AWS-RunShellScript"
+        [string]$DocumentName = "AWS-RunShellScript",
+        [int]$ExecutionTimeoutSeconds = 900
     )
 
-    $paramPath = New-SsmParameterFile -StepCode $StepCode -Commands $Commands
+    $paramPath = New-SsmParameterFile `
+        -StepCode $StepCode `
+        -Commands $Commands `
+        -ExecutionTimeoutSeconds $ExecutionTimeoutSeconds
 
     # AWS CLI on Windows expects local param files as file://C:\path\file.json.
     # Do not convert to file:///C:/... because it may be interpreted as /C:/...
@@ -225,6 +230,9 @@ function Invoke-DailyAwsPaperEcsTask {
         [string[]] $Command = @(),
 
         [Parameter(Mandatory = $false)]
+        [hashtable] $EnvironmentVariables = @{},
+
+        [Parameter(Mandatory = $false)]
         [string] $Region = $Global:AwsRegion,
 
         [Parameter(Mandatory = $false)]
@@ -262,6 +270,19 @@ function Invoke-DailyAwsPaperEcsTask {
 
     if ($Command -and $Command.Count -gt 0) {
         $containerOverride.command = $Command
+    }
+
+    if ($EnvironmentVariables -and $EnvironmentVariables.Count -gt 0) {
+        $environment = @()
+
+        foreach ($key in ($EnvironmentVariables.Keys | Sort-Object)) {
+            $environment += @{
+                name = [string]$key
+                value = [string]$EnvironmentVariables[$key]
+            }
+        }
+
+        $containerOverride.environment = $environment
     }
 
     $overrides = @{

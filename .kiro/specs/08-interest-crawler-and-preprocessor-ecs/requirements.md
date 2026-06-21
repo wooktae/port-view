@@ -231,3 +231,26 @@
 1. THE design.md SHALL non-GUI crawler ECS Task Definition revision 7 이 public subnet + `assignPublicIp = ENABLED` 로 NAT-free outbound 를 처리한다는 점을 명시해야 한다(2026-06-16 §2 RunTask 결과 정합 / NAT Gateway 0건 유지).
 2. THE design.md SHALL Windows EC2 worker(KRX GUI crawler) 의 outbound 도 NAT-free 정책을 따른다는 점을 명시해야 한다(public subnet + EIP 또는 동등 방식 / OD-NET-001 / OD-NET-002 정합).
 3. IF NAT Gateway 가 본 spec 운영 도중 발견되는 경우, THEN THE design.md SHALL 본 spec 임의 결정 대신 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-NET-001 / OD-NET-002 를 재확인 후 운영자 결정으로만 처리한다는 R9.3 정책을 그대로 유지한다.
+
+
+
+## 2026-06-21 보강 — Step 2 INTEREST_CRAWLER 성공판정 강화
+
+본 절은 2026-06-21 운영자 검증 결과(`./operation-notes.md` 2026-06-21 §1 ~ §8)를 입력으로 R8 / R12 / R13(KRX GUI 수집 운영 방식 / non-GUI Interest Crawler 운영 방식)에 대한 추가 acceptance criteria 를 보강 메모로 명시한다. 기존 R1 ~ R13 결정값(SHALL / SHALL NOT) 은 변경하지 않으며, 본 절은 wrapper Step 2 의 성공 조건과 worker stopped fail-closed 설계 변경, KRX raw DB validation guard 도입에 따른 검증 기준만 보강한다. 결정 락은 OD-MS-026(신규) + OD-MS-022 / OD-MS-023 정합. 신규 R-AUTO-020 + R-AUTO-007 / R-AUTO-016 / R-AUTO-017 mitigation·detection 보강.
+
+### Requirement 14: wrapper Step 2 성공판정 강화 (R8 / R12 / R13 보강)
+
+**User Story:** As 운영자, I want wrapper Step 2 의 성공 판정 기준을 받기, so that Scheduled Task trigger 성공만으로 Step 2 SUCCESS 처리되어 KRX raw 미적재가 Step 3 이후 흐름으로 전파되는 위험이 차단된다.
+
+#### Acceptance Criteria
+
+1. WHEN wrapper Step 2 (`INTEREST_CRAWLER`) 가 실행되는 경우, THE wrapper SHALL Scheduled Task trigger 성공만으로 Step 2 SUCCESS 로 처리하지 않아야 한다(OD-MS-026 / R-AUTO-020 mitigation 정합).
+2. WHEN wrapper Step 2 가 실행되는 경우, THE wrapper SHALL 다음 6개 조건을 모두 통과시켜야 Step 2 SUCCESS 처리해야 한다 — (a) non-GUI ECS crawler exitCode 0, (b) Crawler Worker EC2 `running`, (c) Windows Scheduled Task `Running` → `Ready` 복귀(`sawRunning` 로그 출력 + timeout 시 Step 2 실패), (d) Last Result 0 또는 0x0, (e) latest worker log path / last write time / size / tail 출력, (f) KRX raw DB validation 통과(`interest_program_raw` / `interest_shortsell_raw` `ExpectedKrxRawDate` 기준 row_count + `max(trade_date)`).
+3. WHEN Crawler Worker EC2 instance state 가 `running` 이 아닌 경우, THE wrapper SHALL Step 2 를 즉시 fail-closed 처리하고 instanceId / state 를 실패 메시지에 출력해야 한다(skip 후 Step 2 SUCCESS 진입 금지 / R-AUTO-016 mitigation 갱신).
+4. WHEN wrapper Step 2 의 KRX raw DB validation step 이 실행되는 경우, THE wrapper SHALL `INTEREST_CRAWLER_KRX_DB_VALIDATE` SSM step 으로 Windows crawler worker EC2 안에서 `load-crawler-db-env.ps1` + `venvs/interest-crawler` venv + `interest_krx_raw_validate_daily.py --expected-date <ExpectedKrxRawDate>` 를 실행해야 한다.
+5. WHEN `interest_krx_raw_validate_daily.py` 가 실행되는 경우, THE script SHALL `interest_program_raw` / `interest_shortsell_raw` 의 expected trade_date 기준 row_count 가 0 이거나 `max(trade_date)` 가 expected date 미만이면 exit code 30 으로 종료해야 한다.
+6. WHEN wrapper Step 2 의 KRX raw DB validation 결과가 non-zero exit 또는 row_count 0 인 경우, THE wrapper SHALL Step 2 를 실패 처리하고 step result 에 `KrxDbValidationCommandId` 를 포함해야 한다.
+7. WHEN wrapper Step 2 가 KRX worker 를 실행하기 직전 단계에서, THE wrapper SHALL Chrome / chromedriver stale process 의 best-effort reset 을 수행하고, reset 실패는 즉시 중단하지 않고 warning 로그만 남기고 진행해야 한다(R-AUTO-017 mitigation 정합).
+8. WHEN wrapper Step 2 의 KRX GUI worker 가 실행되는 경우, THE wrapper SHALL `Portfolio-KRX-Worker-Daily` Scheduled Task 를 `schtasks /Run` 으로 trigger 하는 경로를 유지해야 한다(SSM direct python 실행 채택 거부 / OD-MS-022 / OD-MS-026 정합).
+9. WHEN wrapper Step 2 가 non-GUI ECS RunTask 를 실행하는 경우, THE wrapper SHALL ECS RunTask `containerOverrides.environment` 로 `TEMP=/tmp` / `TMP=/tmp` / `PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8` 를 주입해야 한다(Windows / Linux 인코딩 차이 완화 / 임시 파일 경로 의존성 명시화).
+10. THE wrapper SHALL `Invoke-DailyAwsPaperEcsTask` `EnvironmentVariables` 파라미터 / `New-SsmParameterFile` `ExecutionTimeoutSeconds` 파라미터 / `Invoke-SsmCommandAndWait` `ExecutionTimeoutSeconds` 전달을 지원해 KRX worker · DB validation 장시간 실행 시 SSM timeout 을 제어할 수 있어야 한다.
