@@ -15,7 +15,7 @@ $commands = @(
     'cd /home/ec2-user/apps/port-marketconnector/src',
     'export PORT_ENVIRONMENT=paper',
     'export PORT_DB_TARGET=aws-paper',
-    'if [ -f /tmp/inject-env.sh ]; then source /tmp/inject-env.sh; else echo "[BLOCKER] /tmp/inject-env.sh not found"; exit 20; fi',
+    '__MARKETCONNECTOR_ENV_BOOTSTRAP__',
     'echo "PORT_ENVIRONMENT=${PORT_ENVIRONMENT:-}"',
     'echo "PORT_DB_TARGET=${PORT_DB_TARGET:-}"',
     'test "${PORT_ENVIRONMENT:-}" = "paper"',
@@ -23,6 +23,17 @@ $commands = @(
     'echo "[PAPER_ORDER_GATE] About to execute connector_strategy_order_execute.py --execute"',
     '/home/ec2-user/apps/port-marketconnector/.venv/bin/python connector_strategy_order_execute.py --execute',
     'echo "===== MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE END ====="'
+)
+
+$commands = @(
+    $commands | ForEach-Object {
+        if ($_ -eq "__MARKETCONNECTOR_ENV_BOOTSTRAP__") {
+            Get-DailyAwsPaperMarketConnectorEnvBootstrapCommands
+        }
+        else {
+            $_
+        }
+    }
 )
 
 $result = Invoke-SsmCommandAndWait `
