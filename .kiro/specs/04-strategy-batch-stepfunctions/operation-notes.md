@@ -1159,3 +1159,249 @@
 4. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 본 spec 범위 직접 호출 0건(주문 제출은 03 spec Step 12 책임). Strategy Execution `--execute` 는 Step 10 / Step 11 / Step 14 / Step 15 / Step 16 한정 / 모두 strategy execution 내부 상태 생성·갱신 / broker · KIS 직접 제출 아님(OD-MS-016 책임 분리 정합). SELL position `mark_position_sell_ordered()` 호출 0건. fill / position sync 자동 재시도 0건(운영자 직접 patch 후 재실행 / wrapper 자동 retry 미사용).
 5. RDS DDL 0건. DML 은 본 spec 범위에서 `decision.strategy_daily_run` / `decision.strategy_daily_signal` insert / `decision.strategy_daily_position_decision` insert / `execution.strategy_execution_plan` insert(`id 94`) / `execution.strategy_execution_order` insert · update(BUY READY 4건 → REQUESTED → SUBMITTED → FILLED) / `execution.strategy_position_state` insert · merge(추가매수 merge 2건 + 신규 INSERT 2건) 한정. SELL row 변경 0건 / `mark_position_sell_ordered()` 호출 0건.
 6. live 자동 BUY / SELL E2E 검증은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. paper 환경에서의 wrapper 17-step 실 실행 + 추가매수 merge end-to-end 1차 통과로 OD-MS-024 / R-DATA-012 mitigation 1차 실증 / Status `Mitigated` 갱신 정합.
+
+
+## 2026-06-22 Daily AWS Paper execution steps 6~17 운영 검증
+
+운영자가 2026-06-22 직접 수행한 Daily AWS Paper Wrapper(`.kiro/scripts/run-daily-aws-paper.ps1`) 1 ~ 17 두 번째 실 운영 실행 중 본 spec(Strategy Decision · Strategy Execution) 책임 step 결과를 누적 기록한다. 본 spec 범위에 해당하는 step 은 Step 6 / Step 7 / Step 8 / Step 9 / Step 10 / Step 11 / Step 14 / Step 15 / Step 16 총 9개. Step 1 / Step 12 / Step 13 / Step 17 = 03 spec / Step 2 / Step 3 = 08 spec / Step 4 / Step 5 = 09 spec operation-notes 의 2026-06-22 섹션 정합. 환경 `aws-paper` / RunDate `2026-06-22` / region `ap-northeast-2`. 표현 = "Daily wrapper 기반 수동 orchestration 검증" — Step Functions 자체 구현은 아직 후속 orchestration target 으로 유지. Kiro 는 문서 작성 / 절차 정리만 수행 / 실제 ECS RunTask / IAM / RDS / GRANT 작업은 운영자 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. 실제 broker / KIS 호출은 본 spec 범위에서 0건(주문 제출 책임은 03 spec Step 12 / KIS paper SELL 1건은 03 spec 책임 / 본 spec 의 `--execute` 는 strategy execution 내부 상태 생성·갱신 의미 / OD-MS-016 정합).
+
+### 1. Step 6 ~ Step 8 (Daily Decision · Buy Execution Plan)
+
+1. Step 6 `DAILY_BUY_SIGNAL`: 완료
+   1) ECS RunTask `portfolio-paper-strategy-decision-buy-signal:1` exitCode 0
+   2) `decision.strategy_daily_signal` 신규 row 정합
+2. Step 7 `DAILY_POSITION_SIGNAL`: 완료
+   1) ECS RunTask `portfolio-paper-strategy-decision-position-signal:1` exitCode 0
+   2) 본 일자 보유 6종목(`088350` 포함) 의 position decision 생성 — `088350` 한화생명 SELL_HARD_STOP 결정 포함
+3. Step 8 `DAILY_BUY_EXECUTION`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python daily_buy_execution_run.py`) exitCode 0
+   2) `execution.strategy_execution_plan id 96` 생성 — `plan_date 2026-06-22` / `strategy_name strategy_ai` / `market_signal DEFENSIVE` / `risk_regime DEFENSIVE` / `plan_status PARTIALLY_BLOCKED` / total_candidate 3 / ready 1 / blocked 2 / skipped 0 / total_target_amount `1,237,080` / available_cash `-62,763` / max_order_amount `-31,381.50`
+   3) BUY 2건 BLOCKED — 현금 부족 사유 정합 / 안전 기준 위반 0건(OD-MS-021 / OD-SAFE-001 ~ OD-SAFE-004 정합)
+
+### 2. Step 9 `DAILY_SELL_EXECUTION` — 1차 권한 누락 실패 + GRANT 보정
+
+1. 1차 실패 원인 식별: 확인
+   1) ECS RunTask 실패 — `permission denied for table strategy_daily_position_decision` 패턴(또는 동등 권한 오류)
+   2) `execution_app` 은 기존에 `decision.strategy_daily_position_decision` SELECT 만 보유 / UPDATE 미부여
+   3) Step 9 흐름 — SELL execution_order 생성 후 daily position decision row 의 `execution_order_id` 를 UPDATE 해 SELL 결정과 execution order 를 link 해야 함 → UPDATE 권한 필수(R-DATA-005 [2026-06-22 보강] 정합 / R-DATA-013 신규)
+2. 운영자 직접 GRANT 보정: 완료(02 spec / 06 spec operation-notes 후속 갱신 대상)
+   1) `GRANT USAGE ON SCHEMA decision TO execution_app` 수행
+   2) `GRANT UPDATE ON TABLE decision.strategy_daily_position_decision TO execution_app` 수행
+   3) 권한 확인 — `execution_app` 에 SELECT + UPDATE 두 권한 확인
+3. Step 9 재실행: 완료
+   1) ECS RunTask exitCode 0
+   2) `execution.strategy_execution_order id 37`(SELL `088350` 244주 MARKET) 생성 / `execution_status READY`
+   3) `decision.strategy_daily_position_decision` row 의 `execution_order_id` UPDATE 정합
+
+### 3. Step 10 / Step 11 (Daily Auto SELL / BUY)
+
+1. Step 10 `DAILY_AUTO_SELL`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python daily_auto_sell_execute_run.py --execute`) exitCode 0
+   2) `execution_order id 37` 상태 `READY -> REQUESTED` 전환(OD-MS-016 책임 분리 정합 / broker · KIS 직접 호출 0건)
+2. Step 11 `DAILY_AUTO_BUY`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python daily_auto_buy_execute_run.py --execute`) exitCode 0
+   2) BUY 2건은 Step 8 에서 이미 BLOCKED 상태 / 본 step 에서 신규 `READY -> REQUESTED` 전환 대상 0건
+   3) `connector_order_request_id` 4건 모두 NULL — broker · KIS 직접 호출 0건(03 spec Step 12 책임)
+
+### 4. Step 12 ~ Step 17 (03 spec Step 12·13·17 / 04 spec Step 14·15·16)
+
+1. Step 12 ~ Step 13: 03 spec operation-notes 2026-06-22 §2 / §3 정합. 본 spec 범위 밖.
+2. Step 14 `SYNC_SELL_FILL`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python execution_sync_sell_fill.py`) exitCode 0
+   2) `connector_fill id 34` 기준 SELL fill sync — `execution_order id 37` execution_status `REQUESTED -> SUBMITTED -> FILLED` 전환 정합
+3. Step 15 `SYNC_BUY_FILL`: 완료
+   1) ECS RunTask exitCode 0
+   2) BUY fill 0건(본 일자 BUY 주문 0건) — `[NO_TARGET]` 정상 처리
+4. Step 16 `SYNC_BUY_POSITION`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python execution_sync_buy_position.py`) exitCode 0 — 2026-06-18 추가매수 merge 패치(OD-MS-024 정합) 회귀 0건
+   2) BUY position 변경 0건 / 본 일자 SELL 청산만 발생 / 별도 sync 책임은 `mark_position_sell_ordered()` + Step 17 BALANCE_REFRESH 책임
+5. Step 17 `BALANCE_REFRESH`: 03 spec operation-notes 2026-06-22 §4 정합. `strategy_position_state id 9` 의 remaining_qty 0 / position_status `CLOSED` / latest_sell_reason `SELL_HARD_STOP` 전이는 본 spec 의 SELL fill sync 결과 + MarketConnector executor SELL 성공 시점의 `mark_position_sell_ordered()` 호출 결과의 정합 종착점.
+
+### 5. 결정 / 리스크 변경 요약
+
+1. 신규 결정: 완료
+   1) OD-DB-011(`execution_app` 의 `decision.strategy_daily_position_decision` 제한적 UPDATE 권한, 🟢 확정 / 02 spec db-roles-and-grants 정식 매트릭스 갱신 후속 책임)
+2. 본문 변경 없는 결정: 1차 실증 메모 보강
+   1) OD-MS-016 — Strategy Execution `READY -> REQUESTED`(Step 10) / MarketConnector `REQUESTED -> SUBMITTED`(03 spec Step 12) 책임 분리가 SELL 흐름에서도 1차 실증
+   2) OD-MS-021 — 17단계 안전 기준 정합 / Step 9 권한 보정 외 안전 기준 위반 0건
+   3) OD-MS-017 — 단일 Task Definition + command override 패턴 회귀 0건(7개 entrypoint 모두 정상 호출)
+3. 신규 리스크: 완료
+   1) R-DATA-013(`execution_app` 의 `decision` schema UPDATE 권한 누락으로 Step 9 SELL execution link update 실패 위험, Status `Mitigated`)
+4. 본문 변경 없는 리스크: 보강 메모
+   1) R-DATA-005 — [2026-06-22 보강] `execution_app` 의 `decision` schema USAGE / `decision.strategy_daily_position_decision` UPDATE 누락 사례 추가 / 02 spec db-roles-and-grants 정식 매트릭스 갱신 후속 유지
+
+### 6. 안전 / 보안 점검 결과 (2026-06-22)
+
+1. 본 spec 범위에서 broker / KIS / 신규 주문 호출 0건. `--execute` 는 strategy execution 내부 상태 갱신 의미로만 사용 / 03 spec Step 12 의 broker 호출과 독립. SELL position `mark_position_sell_ordered()` 호출은 MarketConnector executor 책임. fill · position sync 자동 재시도 0건. aws-live 작업 0건.
+2. RDS DDL 0건. DML 은 본 일자 17-step 정상 흐름 한정 — `decision.strategy_daily_signal` / `decision.strategy_daily_run` / `decision.strategy_daily_position_decision`(SELL HOLD 결정 + `execution_order_id` UPDATE) / `execution.strategy_execution_plan` insert(`id 96`) / `execution.strategy_execution_order` insert · update(`id 37` READY → REQUESTED → SUBMITTED → FILLED) / `execution.strategy_position_state` update(`id 9` remaining_qty 244 → 0 / position_status OPEN → CLOSED / latest_sell_reason `SELL_HARD_STOP`). GRANT 는 운영자 직접 수행(USAGE ON SCHEMA decision + UPDATE ON decision.strategy_daily_position_decision to execution_app / 02 spec / 06 spec operation-notes 후속 갱신).
+3. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / image digest full sha256 / task ARN / job ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+4. 운영 식별자(`execution_plan_id 96` / execution_order id `37` / connector_order_request id `46` / connector_fill id `34` / position_state_id `9` / 종목 코드 / 종목명 / 수량 · 가격 · 비율 / signal_date · run_date `2026-06-22`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역). Step Functions state machine 정의 / EventBridge Scheduler 정기 트리거 / View 측 orchestration 매핑은 모두 후속 orchestration target 으로 유지.
+
+## 2026-06-23 Step Functions approval workflow 실전 검증 + Strategy Execution SELL E2E (Strategy Decision · Strategy Execution + Step Functions orchestration)
+
+운영자가 2026-06-23 직접 수행한 Daily AWS Paper Step Functions state machine `portfolio-paper-daily-step1-17-approval` 실전 검증 + Step 12 ~ Step 17 `allowPaperOrderExecute=true` approval true path 첫 실 SELL E2E 통과 결과 중 본 spec(Strategy Decision · Strategy Execution + Step Functions orchestration) 책임 step 결과를 누적 기록한다. 본 spec 범위에 해당하는 step 은 Step 6 / Step 7 / Step 8 / Step 9 / Step 10 / Step 11 / Step 14 / Step 15 / Step 16 총 9개 + Step Functions state machine orchestration 전체 흐름 측 04 spec 측 정합. Step 1 / Step 12 / Step 13 / Step 17 = 03 spec / Step 2 / Step 3 = 08 spec / Step 4 / Step 5 = 09 spec operation-notes 의 2026-06-23 섹션 정합 — 03 spec operation-notes 2026-06-23 §1 ~ §7 누적은 본 일자 2차 작업 결과로 이미 진행되었고, 08 / 09 spec operation-notes 2026-06-23 누적은 별도 후속 작업 책임으로 분리(Step 2 INTEREST_CRAWLER / Step 3 PREPROCESSOR / Step 4 BACKTEST_RESEARCH / Step 5 BACKTEST_REPORT 는 본 일자 Step Functions approval workflow 실전 검증에서 정상 통과 사실만 본 spec §1 도입 문단에서 단순 인용 / 상세 누적은 책임 spec 으로 분리). 환경 `aws-paper` / RunDate `2026-06-23` / region `ap-northeast-2`. **표현 정정** — Step Functions 자체 구현은 본 일자에 운영자 실증 단계 진입 / 정식 production 자동화 진입은 여전히 후속 phase 책임 / ms-aws-service-decision-matrix 본문의 "Step Functions 후속 orchestration target" 표현은 그대로 유지(2026-06-22 wrapper 기반 첫 실 SELL E2E 회차에 이어 본 일자 = Step Functions approval workflow 기반 첫 실 SELL E2E 회차 / OD-MS-029 신규 정합). Kiro 는 문서 작성 / 절차 정리만 수행 / 실제 Step Functions state machine 정의 · 실행 / ECS RunTask / SSM RunCommand / IAM / RDS / `port-marketconnector/connector_strategy_order_execute.py` patch · 배포 작업은 모두 운영자 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. 본 spec 범위에서 broker / KIS 직접 호출 0건(KIS paper SELL 1건은 03 spec Step 12 책임 / OD-MS-016 책임 분리 정합).
+
+### 1. Step Functions state machine `portfolio-paper-daily-step1-17-approval` orchestration 실전 검증
+
+1. state machine 운영 정책(OD-MS-029 신규 정합): 확인
+   1) 운영자 직접 정의 / 본 노트는 사실 식별자 + 운영 절차 정합만 기록 / state machine 정의 본문 / Amazon States Language(ASL) 전체 인용 0건(R-DOCS-001 정합)
+   2) **단일 state machine + 입력 파라미터 분기** — false path 와 true path 가 별도 state machine 으로 분리되지 않음 / 동일 `portfolio-paper-daily-step1-17-approval` 의 입력 파라미터(`allowPaperOrderExecute`) 와 시작 step(`StartStep` / `EndStep` 대응 input)으로만 분기
+   3) approval gate = `allowPaperOrderExecute` 입력값. true path 진입은 운영자가 false path 결과 점검 후에만 수행(R-AUTO-019 mitigation Step Functions 측 정합 / Step 12 stdout 의 `PaperOrder: True` 라벨 사후 검증)
+2. false path 사전 검증: 통과
+   1) `allowPaperOrderExecute=false` / Step 1 ~ Step 17 approval blocked path
+   2) Step 10 / Step 11 / Step 12 입력값(READY / REQUESTED 후보 / 종목 / 수량 / 사유) paper 환경 dry-run 확인
+   3) Step 12 진입 전 broker · KIS 직접 호출 0건 차단 / 04 spec 측 `execution.strategy_execution_order` 의 `READY -> REQUESTED` 전환은 정상 진행(Step 10 / Step 11 측 `--execute` 는 strategy execution 내부 상태 갱신 의미 / OD-MS-016 책임 분리 정합 / broker 호출 0건)
+   4) 운영자 결과 점검 — 본 일자 Step 7 DAILY_POSITION_SIGNAL 의 BGF리테일 `282330` SELL_HARD_STOP 결정 / Step 9 DAILY_SELL_EXECUTION 의 `execution.strategy_execution_order id 40` 생성 / 04 spec 측 흐름 정합 사전 검증 통과
+3. true path 승인 실행: 통과
+   1) `allowPaperOrderExecute=true` / Step 12 ~ Step 17 approval true path
+   2) Step 12 KIS paper SELL 1건 제출 = 03 spec 2026-06-23 §2 정합(`connector.connector_order_request id 48` / `broker_order_no 0000006143` / 04 spec 측 `execution.strategy_execution_order id 40` SUBMITTED → FILLED)
+   3) Step 14 SYNC_SELL_FILL / Step 17 BALANCE_REFRESH 정상 통과 — 본 spec §5 / 03 spec 2026-06-23 §4 정합
+4. Step Functions 측 ECS RunTask / SSM RunCommand / AWS Batch 호출 정합: 확인
+   1) 본 spec 책임 step(6 / 7 / 8 / 9 / 10 / 11 / 14 / 15 / 16) 의 ECS RunTask Task Definition 은 wrapper 기반(2026-06-17 / 2026-06-18 / 2026-06-22) 과 동일 — `portfolio-paper-strategy-decision-buy-signal:1` / `portfolio-paper-strategy-decision-position-signal:1` / `portfolio-paper-strategy-execution:1` + command override(OD-MS-013 / OD-MS-017 정합 / 회귀 0건)
+   2) 03 spec 책임 step(1 / 12 / 13 / 17) 의 SSM RunCommand 는 MarketConnector EC2 대상 / Step Functions 진입 직전 wrapper 공통 MarketConnector env bootstrap 함수 호출 흐름 유지(R-AUTO-021 [2026-06-23 보강] 정합)
+   3) 09 spec 책임 step(4 / 5) 의 AWS Batch SubmitJob 은 `portfolio-paper-strategy-research-queue` 대상(OD-MS-019 정합 / 회귀 0건)
+   4) Step Functions state 정의가 동일 entrypoint(ECS Task Definition / SSM Document / Batch Job Definition) 를 호출하므로 wrapper 기반 → Step Functions 기반 전환 시 기존 운영 정책(OD-MS-013 / OD-MS-016 / OD-MS-017 / OD-MS-019 / OD-MS-021 / OD-MS-023 / OD-MS-024 / OD-MS-025 / OD-MS-026 / OD-MS-027 / OD-MS-028) 본문은 변경 없음
+
+### 2. Step 6 ~ Step 8 (Daily Decision · Buy Execution Plan)
+
+1. Step 6 `DAILY_BUY_SIGNAL`: 완료
+   1) ECS RunTask `portfolio-paper-strategy-decision-buy-signal:1` exitCode 0
+   2) `decision.strategy_daily_signal` 신규 row 정합 / 본 일자 BUY READY 후보 0건 또는 BLOCKED(현금 상황 정합) — 정확한 후보 수 / 종목 코드는 _common 메타에서 명시되지 않음 / Step 11 DAILY_AUTO_BUY 의 신규 `READY -> REQUESTED` 전환 대상 0건 으로 정합 확인(후속 spec 확인 시점에 본 §의 BUY 후보 수 사실 보강)
+2. Step 7 `DAILY_POSITION_SIGNAL`: 완료
+   1) ECS RunTask `portfolio-paper-strategy-decision-position-signal:1` exitCode 0
+   2) 본 일자 보유 5종목(2026-06-22 §4 잔고 5종목 정합 / `003490` / `004990` / `023530` / `042660` / `282330`)의 position decision 생성
+   3) `282330` BGF리테일 SELL_HARD_STOP 결정 포함 — 정확한 entry_date / entry_price / current_price / expected_pnl_rate / hard_stop_loss_rate / holding_days / snapshot_qty / sellable_qty / remaining_qty 17 / expected_pnl_amount 는 _common 메타에서 명시되지 않음 / 후속 spec 확인 시점에 본 §의 SELL_HARD_STOP 결정 메타데이터 보강
+3. Step 8 `DAILY_BUY_EXECUTION`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python daily_buy_execution_run.py`) exitCode 0
+   2) `execution.strategy_execution_plan` 신규 row insert 정합 — 본 일자 plan id 는 _common 메타에서 명시되지 않음 / 2026-06-22 plan id `96` 의 후속 id 로 추정(후속 spec 확인 시점에 본 §의 plan id 사실 보강)
+   3) 안전 기준 위반 0건(OD-MS-021 / OD-SAFE-001 ~ OD-SAFE-004 정합) / BUY 후보 0건 또는 BLOCKED 정합 / 중복 plan 생성 0건
+
+### 3. Step 9 `DAILY_SELL_EXECUTION` — execution_order id 40 생성 (R-DATA-013 mitigation 회귀 0건)
+
+1. 권한 회귀 점검: 통과
+   1) 2026-06-22 §2 의 `execution_app` GRANT 보정(`USAGE ON SCHEMA decision` + `UPDATE ON decision.strategy_daily_position_decision`) 본 일자에도 그대로 유지 / R-DATA-013 mitigation 회귀 0건
+   2) `permission denied for table strategy_daily_position_decision` 패턴 발생 0건
+2. Step 9 실행 결과: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python daily_sell_execution_run.py`) exitCode 0
+   2) `execution.strategy_execution_order id 40` 신규 생성 — action_type SELL / 종목 코드 `282330` / 종목명 BGF리테일 / 수량 17 / order_method MARKET / `execution_status READY` / `connector_order_request_id IS NULL`(Step 12 진입 전 connector 측 link 미존재 — 03 spec Step 12 책임 / OD-MS-016 책임 분리 정합)
+   3) `decision.strategy_daily_position_decision` row 의 `execution_order_id` UPDATE 정합 — SELL 결정과 execution_order id 40 link 통과(R-DATA-013 mitigation 정합 / R-DATA-005 [2026-06-22 보강] 정합)
+3. 부수 사실: 확인
+   1) Step 9 의 SELL execution_order 생성 + daily_position_decision link UPDATE 흐름은 본 spec `daily_sell_execution_run.py` entrypoint 책임 / 04 spec Task Definition `portfolio-paper-strategy-execution:1` 의 7개 command override 중 1개(OD-MS-017 정합 / 회귀 0건)
+   2) 본 spec 측 `execution.strategy_position_state` 의 SELL 청산 상태 변경은 본 step 이 아니라 Step 14 SYNC_SELL_FILL + MarketConnector executor 의 `mark_position_sell_ordered()` 책임(OD-MS-016 정합 / 본 노트 §5 정합)
+
+### 4. Step 10 / Step 11 (Daily Auto SELL / BUY)
+
+1. Step 10 `DAILY_AUTO_SELL`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python daily_auto_sell_execute_run.py --execute`) exitCode 0
+   2) `execution.strategy_execution_order id 40` 상태 `READY -> REQUESTED` 전환(OD-MS-016 책임 분리 정합 / broker · KIS 직접 호출 0건)
+   3) `connector_order_request_id` 는 본 step 에서 NULL 유지(MarketConnector 측 Step 12 책임 / OD-MS-016 정합)
+   4) `--execute` 는 strategy execution 내부 상태 갱신 의미 / broker 직접 제출 아님(R-AUTO-014 mitigation 정합 / state ↔ command 1:1 매핑 회귀 0건)
+2. Step 11 `DAILY_AUTO_BUY`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python daily_auto_buy_execute_run.py --execute`) exitCode 0
+   2) BUY 후보 0건 또는 BLOCKED — 본 step 에서 신규 `READY -> REQUESTED` 전환 대상 0건 / 정합
+   3) broker · KIS 직접 호출 0건(03 spec Step 12 책임 / 본 일자 BUY 주문 0건)
+3. retry-normalizer 진입 검토(OD-MS-028 정합): 확인
+   1) 본 일자 `execution.strategy_execution_order` 의 `execution_status IN (READY, FAILED)` + `connector_order_request_id IS NOT NULL` 조합 row 0건 → 03 spec Step 12 시작부의 retry-normalizer 적용 0건(R-AUTO-022 mitigation 정합 / 04 spec 측 `strategy_execution_order` UPDATE 적용 0건)
+   2) Step 12 진입 직전 04 spec 측 `execution.strategy_execution_order id 40` 상태 = REQUESTED + `connector_order_request_id IS NULL` / 기본 필터 정합 / retry-normalizer 우회 없이 정상 broker 제출 진행
+
+### 5. Step 14 / Step 15 / Step 16 (Strategy Execution sync)
+
+1. Step 12 ~ Step 13 / Step 17: 03 spec operation-notes 2026-06-23 §2 / §3 / §4 정합. 본 spec 범위 밖. broker_order_no `0000006143` / `connector.connector_order_request id 48` / Step 17 BALANCE_REFRESH 후 보유 4종목 정합 — 본 spec 측 사실 인용만.
+2. Step 14 `SYNC_SELL_FILL`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python execution_sync_sell_fill.py`) exitCode 0
+   2) `connector.connector_fill` row(03 spec 2026-06-23 §3 정합 / SELL side / 종목 `282330` BGF리테일) 기준 SELL fill sync — `execution.strategy_execution_order id 40` 의 execution_status `REQUESTED -> SUBMITTED -> FILLED` 전환 정합
+   3) `connector.connector_order_request id 48` 와 `execution.strategy_execution_order id 40` 간 1:1 link 정합 / 중복 sync 0건 / idempotency 회귀 0건
+3. Step 15 `SYNC_BUY_FILL`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python execution_sync_buy_fill.py`) exitCode 0
+   2) BUY fill 0건(본 일자 BUY 주문 0건) — `[NO_TARGET]` 정상 처리
+4. Step 16 `SYNC_BUY_POSITION`: 완료
+   1) ECS RunTask(`portfolio-paper-strategy-execution:1` + command override `python execution_sync_buy_position.py`) exitCode 0
+   2) BUY position 변경 0건 / 본 일자 SELL 청산만 발생 / 추가매수 merge 패치(OD-MS-024 정합) 회귀 0건 / `strategy_position_state` 의 신규 OPEN INSERT 0건 / 추가매수 merge 경로 진입 0건
+   3) SELL 청산 측 `execution.strategy_position_state` 의 BGF리테일 OPEN → CLOSED 전이는 MarketConnector executor 의 `mark_position_sell_ordered()` 호출 + Step 17 BALANCE_REFRESH 의 `connector.connector_position_snapshot` 갱신 시점이 정합 종착점(OD-MS-016 책임 분리 정합 / 본 일자 BGF리테일 position_state row 의 OPEN → CLOSED 전이 / remaining_qty 17 → 0 / latest_sell_reason `SELL_HARD_STOP` — 정확한 position_state row id 는 _common 메타에서 명시되지 않음 / 후속 spec 확인 시점에 본 §의 position_state row id 사실 보강)
+
+### 6. Step 12 retry-normalizer 04 spec 측 정합 (OD-MS-028 신규)
+
+1. 본 spec 측 영향 범위: 확인
+   1) OD-MS-028 영향 spec = 03 · 04 · 10 / 04 spec 측 영향은 `execution.strategy_execution_order` 의 retry-normalizer UPDATE 적용 가능성
+   2) Step Functions Step 12 state 가 `port-marketconnector/connector_strategy_order_execute.py` 를 호출 시 `.venv/bin/python` 사용 정합 — Step Functions 전환 이후에도 동일 entrypoint 가 호출되어 retry-normalizer 가 그대로 동작
+   3) 04 spec 측 `execution.strategy_execution_order` 는 retry-normalizer 의 복구 처리(`execution_status = REQUESTED` + `connector_order_request_id = NULL` + `result_payload.retry_normalizer` 메타데이터 저장) 대상 / 본 일자 retry 후보 0건 / 복구 적용 0건 / 04 spec 측 UPDATE 적용 0건
+2. 책임 경계 정합: 확인
+   1) OD-MS-016 본문 변경 없음 — Strategy Execution(04 spec) `READY -> REQUESTED` / MarketConnector(03 spec) `REQUESTED -> SUBMITTED` 책임 분리는 그대로 유지
+   2) retry-normalizer 는 MarketConnector 측 Step 12 시작부 내부 안전 보완 / 04 spec 의 entrypoint(`daily_auto_sell_execute_run.py` / `daily_auto_buy_execute_run.py` / `execution_sync_sell_fill.py` 등) 본문은 본 일자 변경 없음
+   3) 04 spec 측 후속 phase 에서 Step Functions state 정의 가 Step 12 외부에서 broker 호출 / `connector.connector_order_request` 생성 흐름을 추가하지 않는 한 retry-normalizer 적용 범위는 그대로 유지(OD-MS-028 본문 위험 메모 정합)
+3. 복구 조건 6종 정합 인용: 확인 (03 spec §1 정합 / 본 노트 본문 인용은 사실 매핑 한정)
+   1) `execution_mode = PAPER_STRATEGY` + `action_type IN (BUY, SELL)` + `execution_status IN (READY, FAILED)` + `connector_order_request_id IS NOT NULL` + linked `connector_order_request.request_status = REJECTED` + `rejection_code = 40580000` + `broker_order_no IS NULL` + `connector_fill` 없음
+   2) 본 일자 04 spec 측 `execution.strategy_execution_order` 인벤토리에서 위 조건 6종 모두 만족 row 0건 / retry-normalizer 진입 0건
+
+### 7. 결정 / 리스크 변경 요약
+
+1. 신규 결정: 완료
+   1) OD-MS-028(Step 12 retry-normalizer 내장 정책 / 🟡 잠정 / 영향 spec 03 · 04 · 10 / 본 spec 측 영향은 `execution.strategy_execution_order` UPDATE 적용 범위)
+   2) OD-MS-029(Daily AWS Paper Step Functions approval workflow false / true path 운영 절차 / 🟢 확정 / 영향 spec 04 · 10 / 본 spec 측 영향은 Step Functions state machine orchestration 책임 / Step 6 ~ Step 11 / Step 14 ~ Step 16 의 ECS RunTask Task Definition · command override 매핑은 wrapper 기반과 동일)
+2. 본문 변경 없는 결정: 1차 실증 메모 보강
+   1) OD-MS-009 — Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask 의 Step Functions 측이 본 일자 실증 단계 진입(approval workflow 검증 통과) / EventBridge Scheduler 정기 트리거 / 정식 production 자동화 진입은 후속 phase
+   2) OD-MS-013 / OD-MS-017 — Strategy Decision Task Definition 2개 분리 / Strategy Execution 단일 Task Definition + command override 패턴이 Step Functions 측에서도 동일 호출 / 회귀 0건
+   3) OD-MS-016 — Strategy Execution / MarketConnector 책임 분리가 SELL 1건 한정으로 Step Functions 측에서도 1차 실증
+   4) OD-MS-021 / OD-MS-023 — 17단계 안전 기준 / wrapper 운영 정책 본문 그대로 유지 / Step Functions approval gate 는 wrapper 의 `-AllowPaperOrderExecute` PAPER_ORDER_GATE 와 등가 역할(R-AUTO-019 mitigation Step Functions 측 정합)
+   5) OD-MS-024 — `execution_sync_buy_position.py` 추가매수 merge 패치 회귀 0건 / 본 일자 BUY 0건 / merge 경로 진입 0건
+   6) OD-DB-011 — `execution_app` 의 `decision.strategy_daily_position_decision` 제한적 UPDATE 권한 유지 / Step 9 회귀 0건
+3. 신규 리스크: 완료
+   1) R-AUTO-022(장종료 REJECTED · `40580000` 후 자동 재제출 경로 끊김 위험, Status `Mitigated` — Step 12 시작부 retry-normalizer 내장 + 복구 조건 6종 / 본 일자 dry-run 통과 / 04 spec 측 `execution.strategy_execution_order` UPDATE 적용 0건 / 실 retry 후보 발생 첫 회차 검증은 followups-overview 2026-06-23 §3 후속)
+4. 본문 변경 없는 리스크: 보강 메모
+   1) R-AUTO-021 — [2026-06-23 보강] Step Functions 전환 이후에도 Step 1 / 12 / 13 / 17 wrapper 공통 bootstrap 호출 흐름 유지 필요 / Status `Mitigated` 유지
+   2) R-DATA-005 — [2026-06-22 보강] `execution_app` decision schema USAGE / UPDATE 누락 회귀 0건 / 본 일자 권한 정합 / 02 spec db-roles-and-grants 정식 매트릭스 갱신 후속 유지
+   3) R-DATA-013 — `execution_app` 의 `decision` schema UPDATE 권한 누락으로 Step 9 SELL execution link update 실패 위험 / Status `Mitigated` 유지 / 본 일자 회귀 0건
+   4) R-AUTO-001 / R-AUTO-014 / R-AUTO-015 — 자동 재시도 / command override 오매핑 / Strategy Research heavy job 실수 실행 위험 / 본 일자 모두 mitigation 회귀 0건
+   5) R-BROKER-004 — KIS paper API timeout 후 중복 주문 위험 / 본 일자 timeout 발생 0건 / mitigation 회귀 0건
+
+### 8. 안전 / 보안 점검 결과 (2026-06-23)
+
+1. 본 spec 범위에서 broker / KIS / 신규 주문 호출 0건. `--execute` 는 strategy execution 내부 상태 갱신 의미로만 사용 / 03 spec Step 12 의 broker 호출과 독립. SELL position `mark_position_sell_ordered()` 호출은 MarketConnector executor 책임(OD-MS-016 정합). fill · position sync 자동 재시도 0건. aws-live 작업 0건.
+2. RDS DDL 0건. DML 은 본 일자 Step Functions approval true path 정상 흐름 한정 — `decision.strategy_daily_signal` insert / `decision.strategy_daily_run` insert · update / `decision.strategy_daily_position_decision` insert(282330 BGF리테일 SELL_HARD_STOP 결정 포함) + `execution_order_id` UPDATE(`id 40` link) / `execution.strategy_execution_plan` insert(본 일자 plan id 는 _common 메타에서 명시되지 않음 / 후속 spec 확인 시점에 사실 보강) / `execution.strategy_execution_order` insert · update(`id 40` READY → REQUESTED → SUBMITTED → FILLED) / `execution.strategy_position_state` update(BGF리테일 OPEN → CLOSED 전이 / remaining_qty 17 → 0 / latest_sell_reason `SELL_HARD_STOP` / position_state row id 는 _common 메타에서 명시되지 않음 / 후속 spec 확인 시점에 사실 보강). GRANT 본 일자 신규 0건(2026-06-22 §2 GRANT 회귀 0건). retry-normalizer 의 `execution.strategy_execution_order` UPDATE 적용 0건(현재 retry 후보 0건 / OD-MS-028 정합).
+3. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id 본문 외 평문 / image digest full sha256 / task ARN / job ARN / Step Functions execution ARN / 운영자 PowerShell stdout 전문 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+4. AWS / Step Functions / ECS / SSM / EC2 / RDS / Secrets Manager / SSM Parameter Store / KIS API / S3 / CloudWatch 호출은 모두 운영자 직접 수행 — Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. AWS CLI / boto3 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / Step Functions execution history 본문 / state machine 정의(ASL) 본문 / SSM 응답 본문 / KIS API response body / ECS Task describe 본문 / 운영자 patch 본문 평문 인용 0건.
+5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역). 운영자 직접 patch 한 `port-marketconnector/connector_strategy_order_execute.py` 전체 교체 + Step 12 시작부 retry-normalizer 내장 변경분은 03 spec operation-notes 2026-06-23 §1 에 사실로만 기록(본 spec 본문 전체 인용 0건 / R-DOCS-001 정합 / port-marketconnector 영역). Step Functions state machine 정의 / EventBridge Scheduler 정기 트리거 / View 측 orchestration 매핑은 본 일자 실증 단계 진입 / 정식 production 자동화 진입 / state 정의 본문 정식 누적은 후속 orchestration phase 책임으로 분리.
+6. 운영 식별자(Step Functions state machine `portfolio-paper-daily-step1-17-approval` / `execution.strategy_execution_order id 40` / `connector.connector_order_request id 48` / `broker_order_no 0000006143` / 종목 코드 `282330` / 종목명 BGF리테일 / 수량 17 / 매도 방식 MARKET / SELL 사유 `SELL_HARD_STOP` / Step Functions approval gate 라벨 `allowPaperOrderExecute=false` · `allowPaperOrderExecute=true` / wrapper stdout 라벨 `PaperOrder: True` / Task Definition `portfolio-paper-strategy-decision-buy-signal:1` · `portfolio-paper-strategy-decision-position-signal:1` · `portfolio-paper-strategy-execution:1` / signal_date · run_date `2026-06-23`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+
+
+### 9. AWS 공통 Slack notifier 1차 검증 + Step Functions 3종 Slack 수신 검증 (OD-MS-030 / OD-MS-031 신규)
+
+본 § 는 같은 일자(2026-06-23) §1 ~ §8 의 후속이며, 운영자가 직접 수행한 AWS 공통 Slack notifier Lambda 구현 + Step Functions approval workflow 3종 Slack 수신 검증 결과를 04 spec 책임 영역(Step Functions orchestration + 운영 관측성 보조 계층) 한정으로 누적 기록한다. 본 일자 Slack 작업은 Lambda 코드 / IAM Role inline policy / 환경변수 값 / Slack webhook URL / Slack 메시지 본문 / Step Functions Catch state ASL 본문을 본 노트에 평문 인용 0건(R-DOCS-001 정합) — 운영 식별자(Lambda 이름 / Role 이름 / Runtime / 환경변수 key / Slack 이벤트 라벨 / 완료 marker / 봇 이름)만 사실 기록한다.
+
+1. 신규 AWS 공통 Slack notifier (OD-MS-030 신규 / 🟡 잠정): 완료
+   1) Lambda 이름: `portfolio-event-notifier`
+   2) Runtime: Python 3.12
+   3) IAM Role: `portfolio-event-notifier-lambda-role`
+   4) 역할 = PORT-STRATEGY-AI 전체 운영 이벤트 공통 Slack 알림 보조 계층 — Step Functions / EventBridge / EC2 SSM / Batch / Lambda 어디서든 호출 가능한 단일 진입점
+   5) Slack webhook URL = Lambda 환경변수 `SLACK_WEBHOOK_URL` 로 1차 검증(값 미기록 / R-DOCS-001 정합 / 본 노트 평문 출력 0건)
+   6) 운영 안정화 이후 Secrets Manager 또는 SSM Parameter Store(SecureString) 로 이전 예정(R-AUTO-024 신규 / Status `Accepted` / 06 spec 후속)
+   7) **본 Lambda 는 본 spec 의 Strategy Execution / Strategy Decision MS 의 주 compute 가 아님** — Lambda 비권고 정책(ms-aws-service-decision-matrix 본문) 그대로 유지 / Slack notifier 는 운영 이벤트 알림 보조 계층으로만 사용
+2. Smoke / template 검증: 완료
+   1) `hello wook` 수동 invoke 성공 — Lambda 콘솔 / CLI 의 invoke 경로 정합
+   2) Slack 수신 확인 — 운영자 Slack 채널에 메시지 정상 도달
+   3) Portfolio Daily Bot 메시지 수신 — Slack 봇 이름 정합
+   4) 완료 marker: `SLACK_LAMBDA_SMOKE_TEST=SUCCESS`
+   5) 공통 메시지 템플릿 6종 1차 구성 — (a) 장 전 잔고 / 보유 종목 상태 / (b) Daily 검증 완료 · 승인 필요 / (c) Daily 실행 성공 / (d) Daily 실행 실패 / (e) 장중 손절 후보 / (f) 장 후 잔고 / 보유 종목 상태
+   6) 수익 / 손실 표시 = 🔴 / 🔵 / ⚪ 이모지 적용 / Slack attachment color bar 적용
+   7) 완료 marker: `PORTFOLIO_EVENT_NOTIFIER_TEMPLATE_TEST=SUCCESS`
+3. Step Functions 3종 Slack 수신 검증 (OD-MS-031 신규 / 🟢 확정 / R-AUTO-023 신규 mitigation 1차 실증): 완료
+   1) `APPROVAL_REQUIRED` — Step 1~11 완료 후 approval gate 진입 시 발송. Role 부여 완료 / Step 1~11 완료 후 승인 필요 Slack 수신 확인 / approval gate 진입 시 운영자가 Slack 으로 수동 승인 필요 상태를 인지할 수 있는 흐름 검증 통과(본 § §2 의 false path 사전 검증 + true path 승인 실행 흐름과 정합).
+   2) `DAILY_EXECUTION_SUCCESS` — Step 17 완료 후 전체 성공 시 발송. Step 17 완료 후 Daily 성공 Slack 수신 확인 / Step Functions 전체 성공 종료 시 Slack 수신 경로 검증 통과(본 § §1 true path 검증의 Step 17 BALANCE_REFRESH 통과 정합 — 03 spec operation-notes 2026-06-23 §4 정합).
+   3) `DAILY_EXECUTION_FAILED` — Step Functions 실행 중 실패 시 발송. 12~17 test-only 실패 Slack 수신 확인 / 1~17 full workflow 실패 Slack ASL 적용 / 1~17 full workflow test-only 실패 Slack 수신 확인 / 운영 실패 케이스에서 `DAILY_EXECUTION_FAILED` 알림이 발송되는 경로를 검증. **실패 검증은 test-only 실패 주입이며 실제 broker 주문 실패를 의도적으로 발생시킨 것이 아님** — 추가 broker 호출 0건 / aws-live 작업 0건 / R-AUTO-001 · R-AUTO-002 · OD-SAFE-001 ~ OD-SAFE-004 정합.
+4. EventBridge 자동화 인계 (OD-MS-031 정합): 인계
+   1) 7번 EventBridge 자동화는 Slack 3종(`APPROVAL_REQUIRED` + `DAILY_EXECUTION_SUCCESS` + `DAILY_EXECUTION_FAILED`) 만 우선 적용 / EventBridge Scheduler 정기 트리거 cron 시각 / timezone / 휴장일 가드 결정은 04 / 10 spec 후속 phase 책임(OD-MS-009 본문 변경 없음).
+   2) 장 전 잔고 / 장 후 잔고 / 장중 손절 알림은 후속 단계로 분리 — 본 일자 6종 템플릿은 1차 구성만 완료 / 실제 발송 흐름은 본 적용 범위 밖.
+   3) 1차 목표는 메시지 문구 고도화가 아니라 Step Functions 실행 흐름에서 Slack 수신 여부를 검증하는 것이다 — 본 § §3 결과로 1차 목표 통과.
+   4) **6. Slack 구현: 완료 / 7. EventBridge 자동화는 다음 단계** — 본 spec 후속 phase 의 Step Functions state machine 정식 정의 / EventBridge Scheduler 정기 트리거 진입 / Slack 6종 전체 적용 / DLQ · retry · CloudWatch Alarm 도입은 후속 분리.
+5. 결정 / 리스크 변경 요약 (본 § §9 한정): 완료
+   1) 신규 결정 — OD-MS-030(AWS 공통 Slack notifier Lambda 도입 정책, 🟡 잠정 / 영향 spec 04 · 05 · 10) + OD-MS-031(Step Functions / EventBridge 1차 Slack 연동 범위 3종 한정 정책, 🟢 확정 / 영향 spec 04 · 05 · 10).
+   2) 본문 변경 없는 결정 — OD-MS-009(Daily Batch orchestration) / OD-MS-010(infra alarm 채널 = port-view SlackNotificationService 유지 + SNS·Lambda·Slack fan-out 보조) / OD-MS-029(Step Functions approval workflow) 본문 변경 없이 1차 실증 메모 보강.
+   3) 신규 리스크 — R-AUTO-023(Step Functions 실패 경로 Slack 누락 위험, Status `Mitigated` — Catch 경로 `DAILY_EXECUTION_FAILED` 발송 + test-only 실패 주입 수신 검증 통과). R-AUTO-024(Slack webhook URL Lambda 환경변수 장기 보관 secret 관리 약화 위험, Status `Accepted` — 운영 안정화 후 Secrets Manager · SSM Parameter Store 이전 진행).
+6. 안전 / 보안 점검 (본 § §9 한정): 완료
+   1) Slack webhook URL 평문 기록 0건 — Lambda 환경변수 key 이름과 의미만 기록 / value 평문 / Lambda 코드 본문 / Slack 메시지 본문 / Step Functions Catch state ASL 본문 / Slack webhook 응답 본문 평문 인용 0건(R-DOCS-001 정합 / 모두 `[REDACTED]` 또는 placeholder)
+   2) secret value 기록 0건 — 본 § §9 의 모든 운영 식별자(Lambda 이름 / Role 이름 / Runtime / 환경변수 key / Slack 이벤트 라벨 / 완료 marker / 봇 이름) 는 secret 가 아닌 사실 식별자
+   3) 실패 검증은 test-only 실패 주입이며 실제 broker 주문 실패 유발 0건 — Step Functions Catch state 가 test-only 실패 신호를 받아 `DAILY_EXECUTION_FAILED` Slack 을 발송하는 흐름만 검증 / 실제 broker / KIS 호출 0건 / `--execute` 추가 호출 0건 / aws-live 작업 0건
+   4) AWS Lambda / IAM / Step Functions / Slack webhook 호출은 모두 운영자 직접 수행 — Kiro 는 문서 작성 / 절차 정리만. AWS CLI / boto3 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 § 작업으로 인한 변경 0건(spec 영역 / port-view SlackNotificationService 본문 변경 없음)
+   5) 기존 port-view Slack 은 유지 — port-view SlackNotificationService 의 View Daily Batch 수동 실행 결과 알림 책임은 그대로 / 이번 작업에서 제거 · 대체되지 않음 / 향후 공통 notifier 로 이전 가능성만 기록(05 spec 후속 phase 책임)
+

@@ -818,3 +818,51 @@
 5. RDS DDL 0건. DML 은 BACKTEST_RESEARCH 정상 backtest run 흐름 한정 — `research.strategy_backtest_run` / `research.strategy_backtest_daily` / `research.strategy_backtest_daily_position` / `research.strategy_trade_log` / `research.strategy_backtest_*_analysis` 정상 insert / upsert.
 6. live 자동 batch / report 생성은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. S3 lifecycle 정책 / KMS encryption 결정은 후속(R-COST-003 정합).
 7. Daily AWS 17-step E2E paper 1차 통과로 backend AWS E2E 의 4번 / 5번 step 정합 — OD-MS-008 / OD-MS-019 mitigation 1차 실증 / Status 기존 값 그대로 유지.
+
+
+## 2026-06-22 Daily AWS Paper Step 4 / Step 5 재검증 (Strategy Research)
+
+운영자가 2026-06-22 직접 수행한 Daily AWS Paper Wrapper 1 ~ 17 두 번째 실 운영 실행 중 본 spec 책임 step(Step 4 / Step 5) 결과를 누적 기록한다. 환경 `aws-paper` / region `ap-northeast-2` / RunDate `2026-06-22`. 본 spec 범위에 해당하는 step 은 4번 `BACKTEST_RESEARCH` / 5번 `BACKTEST_REPORT` 2개. 자세한 17 step 전체 진행 상태 / Daily wrapper 1 ~ 17 두 번째 실 완주 결과는 03 / 04 / 08 spec operation-notes 2026-06-22 / [`../_common/operator-decisions.md`](../_common/operator-decisions.md) Change Log 2026-06-22 참조. Kiro 는 문서 작성 / 절차 정리만 수행. 실제 AWS Batch SubmitJob / IAM / RDS / S3 / CloudWatch 작업은 운영자 직접 수행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. heavy 분류(`run_extended_analysis` / `block_watch_*` / `block_exception_buy_*`) SubmitJob 0건 유지(OD-MS-019 / R-AUTO-015 정합).
+
+### 1. Step 4 `BACKTEST_RESEARCH`
+
+1. AWS Batch SubmitJob: 완료
+   1) Job Queue `portfolio-paper-strategy-research-queue` / Job Definition `portfolio-paper-strategy-research:5`(이전 일자 정합 / revision 변경 없음)
+   2) Job Status `SUCCEEDED` / exit code 0 — 본 노트 jobId / job ARN 평문 기록 0건 / placeholder 처리
+2. 결과 정합: 확인
+   1) `research.strategy_backtest_run` 신규 row — RunDate 정합
+   2) `research.strategy_backtest_daily` / `research.strategy_backtest_daily_position` 정상 누적
+3. heavy 분류 SubmitJob 0건 유지(R-AUTO-015 정합)
+
+### 2. Step 5 `BACKTEST_REPORT`
+
+1. AWS Batch SubmitJob: 완료
+   1) Job Queue 동일 / Job Definition `portfolio-paper-strategy-report:3`(이전 일자 정합 / revision 변경 없음)
+   2) Job Status `SUCCEEDED` / exit code 0
+2. 결과 정합: 확인
+   1) S3 prefix `s3://portfolio-paper-migration-yukiever/strategy-research/reports/20260622/<aws-batch-job-id>/`(jobId / job ARN placeholder 처리) 안 4개 리포트 객체 정합
+   2) public read 0건 / Job Role inline policy Resource 한정 정책 회귀 0건(OD-MS-019 정합 / R-COST-003 mitigation 정합)
+
+### 3. Daily wrapper 1 ~ 17 두 번째 실 완주 정합
+
+1. Daily wrapper 1 ~ 17 두 번째 실 완주 결과는 본 spec 범위 밖이며, 본 일자 Step 4 / Step 5 는 첫 번째 완주(2026-06-18) 와 동일한 흐름으로 회귀 0건 통과.
+2. Strategy Research AWS Batch 1순위 결정(OD-MS-008) / Research Batch image dependency boundary(OD-MS-018) / 포팅 대상 + S3 prefix(OD-MS-019) 본문 결정값은 변경 없음.
+3. heavy 분류 entrypoint 가 SubmitJob 으로 흘러들어가지 않도록 차단 정책 회귀 0건 / Compute Environment vCPU / Job Queue depth / Cost Explorer 비용 spike 0건.
+
+### 4. 결정 / 리스크 변경 요약
+
+1. 신규 결정: 0건. 신규 리스크: 0건.
+2. 본문 변경 없는 결정: 1차 실증 메모 보강
+   1) OD-MS-008 — Research AWS Batch 1순위가 Daily run 실 회귀 0건으로 1차 실증
+   2) OD-MS-019 — `BACKTEST_RESEARCH` + `BACKTEST_REPORT` 2종 한정 + S3 prefix `strategy-research/reports/{YYYYMMDD}/{AWS_BATCH_JOB_ID}/` 회귀 0건 / heavy 분류 SubmitJob 0건 유지
+3. 본문 변경 없는 리스크: 보강 메모
+   1) R-AUTO-015 — heavy 분류 SubmitJob 차단 정책 회귀 0건 / Status `Mitigated` 유지
+   2) R-COST-003 — S3 report 누적 비용 / lifecycle 미설정 위험은 본 일자에도 변경 없음 / 후속 lifecycle 결정 후속 유지
+
+### 5. 안전 / 보안 점검 결과 (2026-06-22)
+
+1. 본 spec 범위에서 broker / KIS 호출 0건. `--execute` 호출 0건. fill · position sync 자동 재시도 0건. aws-live 작업 0건.
+2. RDS DDL 0건. DML 은 `research.strategy_backtest_run` / `research.strategy_backtest_daily` / `research.strategy_backtest_daily_position` / `research.strategy_backtest_*_analysis` 정상 누적 한정. S3 PutObject 는 Job Role inline policy Resource 한정(OD-MS-019 정합).
+3. 실제 secret value / RDS password / RDS endpoint hostname / account-id / 실제 secret ARN / 실제 IAM Role ARN / image digest full sha256 / IAM access key id / jobId / job ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+4. AWS / Batch / IAM / Secrets Manager / RDS / S3 / CloudWatch 작업은 모두 운영자 직접 수행 — Kiro 는 문서 작성 / 절차 정리만 수행. AWS CLI / boto3 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / Batch job describe 본문 / S3 object 본문 평문 인용 0건.
+5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역). 운영 식별자(Job Queue / Job Definition family · revision / Log Group 이름 / S3 prefix 패턴 / RunDate `2026-06-22`) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.

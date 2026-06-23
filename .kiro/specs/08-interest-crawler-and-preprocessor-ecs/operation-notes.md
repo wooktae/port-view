@@ -1550,3 +1550,56 @@
 4. worker log centralized collection(CloudWatch Logs Agent 또는 SSM output 기반): 후속 유지
 5. Step 12 실제 paper 주문 제출은 별도 승인 전까지 실행하지 않음(OD-SAFE-002 / OD-SAFE-003 / R-AUTO-002 정합)
 6. 본 일자 작업 범위는 Step 2 보강 완료로 마감 — Step 3 PREPROCESSOR 이후 단계는 본 일자 다음 작업으로 강제하지 않음
+
+
+## 2026-06-22 Daily AWS Paper Step 2 / Step 3 재검증 (OD-MS-026 1차 실증 Daily run 회귀)
+
+운영자가 2026-06-22 직접 수행한 Daily AWS Paper Wrapper 1 ~ 17 두 번째 실 운영 실행 중 본 spec 책임 step(Step 2 / Step 3) 결과를 누적 기록한다. 2026-06-21 Step 2 성공판정 강화(OD-MS-026 신규 / R-AUTO-020 신규 mitigation) + KRX raw DB validation 연동이 본 일자 실 Daily run 에서 재검증 통과. 환경 `aws-paper` / RunDate `2026-06-22` / region `ap-northeast-2`. Kiro 는 문서 작성 / 절차 정리만 수행 / 실제 ECS RunTask / SSM RunCommand / Windows EC2 worker / RDS 작업은 모두 운영자가 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. broker · KIS / 주문 / 체결 / Daily Batch entrypoint 직접 호출은 본 spec 범위에서 0건.
+
+### 1. Step 2 `INTEREST_CRAWLER` 재검증 (OD-MS-026 정합)
+
+1. wrapper Step 2 결과: 완료
+   1) `StepCode INTEREST_CRAWLER` / `Status SUCCESS` / `Runner ECS+SSM`
+   2) 6개 성공 조건(non-GUI ECS exitCode 0 / Crawler Worker EC2 running / Scheduled Task Running → Ready / Last Result 0 또는 0x0 / latest worker log / KRX raw DB validation 통과) 모두 통과(OD-MS-026 정합)
+2. non-GUI ECS crawler 검증: 완료
+   1) taskDefinition `portfolio-paper-interest-crawler:7`
+   2) exitCode 0 / stoppedReason `Essential container in task exited`
+   3) CloudWatch log 저장 — 본 노트 파일 본문 평문 인용 0건
+3. Windows KRX worker SSM command 검증: 완료
+   1) crawler worker EC2 state `running`(R-AUTO-016 mitigation 갱신 fail-closed 분기 미진입)
+   2) SSM RunCommand Success / ResponseCode 0
+   3) Scheduled Task `Portfolio-KRX-Worker-Daily` Running → Ready 복귀 / `sawRunning=True` / FinalLastResult 0
+   4) latest worker log `C:\portfolio\logs\krx_worker_daily_*.log`(파일 path / last write time / size / tail 출력 — KRX login / program / shortsell SUCCESS / `DONE :: KRX worker daily` 라벨 확인 / 본문 평문 인용 0건)
+4. KRX raw DB validation 검증: 완료
+   1) SSM step `INTEREST_CRAWLER_KRX_DB_VALIDATE` / Success / ResponseCode 0
+   2) DB session user `crawler_app` / schema `interest` / search_path `interest, reference, legacy, public`
+   3) `ExpectedKrxRawDate 2026-06-19` 기준 — `interest_program_raw` 와 `interest_shortsell_raw` 둘 다 row_count > 0 / max_date ≥ expected / validation exit code 0
+   4) stderr empty / step result 에 `KrxDbValidationCommandId` 포함(R-AUTO-020 mitigation 정합)
+
+### 2. Step 3 `PREPROCESSOR` 재검증
+
+1. wrapper Step 3 결과: 완료
+   1) ECS RunTask `portfolio-paper-interest-preprocessor:1` exitCode 0
+   2) `PREPROCESSOR PIPELINE END` 라벨 확인 — 본 노트 본문 평문 인용 0건
+2. raw → feature 흐름 정합: 확인
+   1) Step 2 KRX raw + non-GUI raw 최신성 회복 후 진입했으므로 stale raw data 위험 미발생(R-DATA-009 / R-DATA-010 mitigation 정합)
+   2) `pre_total_market_daily_feature` / `pre_total_stock_daily_feature` 등 신규 feature row 가 정상 생성 — Step 4 BACKTEST_RESEARCH 및 Step 6 DAILY_BUY_SIGNAL 진입 가능 상태 확보
+
+### 3. 결정 / 리스크 변경 요약
+
+1. 신규 결정: 0건. 신규 리스크: 0건.
+2. 본문 변경 없는 결정: 1차 실증 메모 보강
+   1) OD-MS-026 — Step 2 성공판정 강화의 6개 성공 조건이 Daily run 실 통과로 회귀 0건 1차 실증
+   2) OD-MS-011 / OD-MS-022 / OD-MS-023 — hybrid execution model / KRX GUI 자동 로그인 / wrapper 운영 정책 회귀 0건
+3. 본문 변경 없는 리스크: 보강 메모
+   1) R-AUTO-020 — Scheduled Task trigger 성공만으로 Step 2 SUCCESS 처리하던 한계가 KRX raw DB validation guard 도입 후 회귀 0건 1차 실증
+   2) R-AUTO-016 — crawler worker EC2 `running` 상태 / fail-closed 분기 미진입
+   3) R-AUTO-017 — Chrome / chromedriver best-effort reset 회귀 0건 / wrapper Step 2 stdout 의 reset 라벨 정상
+
+### 4. 안전 / 보안 점검 결과 (2026-06-22)
+
+1. broker / KIS 호출 0건. `--execute` 호출 0건. 신규 BUY · SELL · 취소 · 정정 호출 0건. fill · position sync 자동 재시도 0건. aws-live 작업 0건.
+2. RDS DDL 0건. DML 은 KRX worker / non-GUI crawler / Preprocessor 의 raw → feature upsert 한정.
+3. 실제 secret value / KRX 로그인 password / RDS password / RDS endpoint hostname / account-id / 실제 ARN / IAM access key id / EIP / image digest full sha256 / task ARN / Administrator password 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+4. AWS / SSM / EC2 / ECS / RDS / KRX 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리만 수행. CloudWatch Logs 본문 / SSM 응답 본문 / wrapper PowerShell stdout 전문 평문 인용 0건.
+5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역). 운영 식별자(taskDefinition revision / RunDate / ExpectedKrxRawDate / Scheduled Task 이름 / latest worker log 파일명 / DB session user · search_path) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.

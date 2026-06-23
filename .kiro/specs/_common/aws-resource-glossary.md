@@ -183,15 +183,15 @@
 ## Secrets Manager
 
 - 한 줄 설명: AWS 관리형 비밀 저장소. 자동 rotation 지원.
-- 역할: KIS app key / app secret / base URL / 계좌번호 / DB master password / Slack webhook(예정) 등 고민감 secret 저장. 모두 `[REDACTED]`로만 표기.
+- 역할: KIS app key / app secret / base URL / 계좌번호 / DB master password / **Slack webhook URL(`portfolio-event-notifier` Lambda 의 `SLACK_WEBHOOK_URL` — 운영 안정화 후 이전 예정 / OD-MS-030 / R-AUTO-024 정합)** 등 고민감 secret 저장. 모두 `[REDACTED]`로만 표기.
 - 비용 발생: $0.40 / secret / 월 + $0.05 / 10,000 API calls.
-- 조심할 점: 본 spec에서 최종 결정 항목과 IAM 정책 매트릭스는 06 spec에서 확정. rotation 적용 시 application 재기동 영향 고려.
+- 조심할 점: 본 spec에서 최종 결정 항목과 IAM 정책 매트릭스는 06 spec에서 확정. rotation 적용 시 application 재기동 영향 고려. **Slack webhook 이전 시 Lambda 코드는 `secretsmanager:GetSecretValue` 호출로 runtime 조회 / IAM Role(`portfolio-event-notifier-lambda-role`) 에 Resource ARN 한정 read 권한 추가(wildcard 0건)**.
 - 관련 spec: 06 secrets-and-iam.
 
 ## SSM Parameter Store
 
 - 한 줄 설명: AWS 환경변수 / 설정 / SecureString 저장소.
-- 역할: `INTEREST_DB_HOST/PORT/NAME/USER`, `PORTFOLIO_DB_NAME`, `PORT_BROKER_NAME`, `PORT_ENVIRONMENT`, `PORT_STRATEGY_*`, `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT` 등 저민감 환경변수 보관 후보. SecureString으로 일부 secret 대체 가능.
+- 역할: `INTEREST_DB_HOST/PORT/NAME/USER`, `PORTFOLIO_DB_NAME`, `PORT_BROKER_NAME`, `PORT_ENVIRONMENT`, `PORT_STRATEGY_*`, `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT` 등 저민감 환경변수 보관 후보. SecureString 으로 일부 secret 대체 가능. **Slack webhook URL 도 운영 안정화 후 Secrets Manager 와 함께 후보(SecureString) — 최종 위치는 06 spec 후속 결정**(OD-MS-030 / R-AUTO-024 정합).
 - 비용 발생: Standard tier 무료(파라미터 10,000개까지). Advanced tier $0.05/파라미터/월.
 - 조심할 점: 환경변수 키 호환성을 위해 키 이름은 그대로 유지. 잘못된 환경에 잘못된 값을 넣으면 paper에서 live broker로 호출 가능 → live 자동매매 사고 위험.
 - 관련 spec: 06 secrets-and-iam.
@@ -255,26 +255,26 @@
 ## EventBridge Scheduler
 
 - 한 줄 설명: cron 또는 rate 기반 스케줄러. Daily Batch / intraday polling 트리거.
-- 역할: Daily Batch는 EventBridge Scheduler → Step Functions → ECS RunTask로 트리거. EC2/Spring 안의 subprocess 호출 구조를 대체.
-- 비용 발생: 월 14M invocations 무료. 본 프로젝트는 무료 한도 안에서 충분.
-- 조심할 점: 스케줄 시각 / timezone 설정. cron 잘못 입력 시 batch 미실행.
-- 관련 spec: 04 strategy-batch-stepfunctions.
+- 역할: Daily Batch 는 EventBridge Scheduler → Step Functions → ECS RunTask 로 트리거. EC2/Spring 안의 subprocess 호출 구조를 대체. **2026-06-23 시점에 7번 EventBridge 자동화 구현 완료(OD-MS-032 신규 / 🟢 확정)** — 2개 schedule 분리 + Dispatcher Lambda 호출 + 단계적 활성화. (a) `portfolio-paper-daily-step1-11-approval-0800-kst`(`cron(0 8 ? * MON-FRI *)` / Timezone `Asia/Seoul` / Flexible time window `OFF` / Target Lambda `portfolio-paper-daily-scheduler-dispatcher` / Target Role `portfolio-paper-eventbridge-scheduler-role` / Target input `{"scheduleType":"STEP1_11_APPROVAL","dryRun":false}` / **State `ENABLED`**). (b) `portfolio-paper-daily-step12-17-order-0901-kst`(`cron(1 9 ? * MON-FRI *)` / Asia/Seoul / OFF / Target Lambda 동일 / Target input `{"scheduleType":"STEP12_17_ORDER","dryRun":false}` / **State `DISABLED`** / 주문 자동화 ENABLE 전 최종 안전 점검 후 별도 판단). **1차 Slack 범위 3종(`APPROVAL_REQUIRED` + `DAILY_EXECUTION_SUCCESS` + `DAILY_EXECUTION_FAILED`) 한정**(OD-MS-031 정합) / 장 전 잔고 · 장 후 잔고 · 장중 손절 알림은 후속 분리.
+- 비용 발생: 월 14M invocations 무료. 본 프로젝트는 평일 2회(08:00 + 09:01) = 월 약 44회로 무료 한도 안에서 충분.
+- 조심할 점: 스케줄 시각 / timezone 설정. cron 잘못 입력 시 batch 미실행. **Scheduler 자체는 KRX 휴장일을 모르므로 Dispatcher Lambda(`portfolio-paper-daily-scheduler-dispatcher`) 가 휴장일 / 주말 guard 단일 책임**(Lambda 환경변수 `TIMEZONE=Asia/Seoul` / `HOLIDAY_COUNTRY=KR` / `FAIL_CLOSED_ON_HOLIDAY_ERROR=true` fail-closed 정책 / OD-MS-032 정합). Scheduler · Dispatcher Lambda · Step Functions 연결 사슬 실패 위험은 R-AUTO-025 신규 mitigation(simulate-principal-policy / Lambda dryRun / Scheduler `get-schedule` 상태 확인 / 단계적 활성화) 으로 1차 차단. 정기 트리거 cron 시각 / timezone / 휴장일 가드 결정은 04 / 10 spec 후속 phase 책임 — 본 일자 결정은 OD-MS-032 의 cron 표현식 + Asia/Seoul + 단계적 활성화 한정.
+- 관련 spec: 04 strategy-batch-stepfunctions, 10 cutover-and-validation-runbook.
 
 ## Step Functions
 
 - 한 줄 설명: AWS 관리형 워크플로 orchestration. state machine.
-- 역할: Daily Batch 파이프라인의 여러 ECS Task를 순서대로 실행, 실패 시 분기. live 자동 재시도 금지 정책을 state machine 레벨에서 강제.
-- 비용 발생: Standard ~$0.025 / 1,000 transitions. Express는 다른 단가. 본 프로젝트는 Standard 시작.
-- 조심할 점: BUY/SELL/fill sync/position 변경/intraday stop SELL 생성 step에는 Retry 정책을 비활성화. idempotent step만 자동 재시도 허용.
+- 역할: Daily Batch 파이프라인의 여러 ECS Task 를 순서대로 실행, 실패 시 분기. live 자동 재시도 금지 정책을 state machine 레벨에서 강제. **state machine `portfolio-paper-daily-step1-17-approval` 의 false / true path 운영 절차(OD-MS-029) + Step 12 시작부 retry-normalizer 정합(OD-MS-028) + Catch 경로에서 AWS 공통 Slack notifier Lambda(`portfolio-event-notifier`) 의 `DAILY_EXECUTION_FAILED` 발송 정합(OD-MS-031 / R-AUTO-023)**.
+- 비용 발생: Standard ~$0.025 / 1,000 transitions. Express 는 다른 단가. 본 프로젝트는 Standard 시작.
+- 조심할 점: BUY/SELL/fill sync/position 변경/intraday stop SELL 생성 step 에는 Retry 정책을 비활성화. idempotent step 만 자동 재시도 허용. **Catch 경로의 Slack notifier invoke 매핑 누락 시 운영자가 실패를 즉시 인지하지 못할 위험(R-AUTO-023) — Step Functions execution history 의 Catch state audit 로 사후 검증 가능 / DLQ · retry · CloudWatch Alarm 도입은 후속**.
 - 관련 spec: 04, 09, 10.
 
 ## Lambda
 
 - 한 줄 설명: 서버리스 함수 실행.
-- 역할: 인프라 알람 SNS → Lambda → Slack webhook fan-out, 짧은 후처리(예: Daily Batch 결과 요약). Selenium / Chrome / KRX 로그인은 Lambda 비권고(컨테이너 한계, cold start, 세션 stateful).
-- 비용 발생: 월 1M requests + 400,000 GB-sec 무료. 본 프로젝트 인프라 알람 fan-out은 무료 한도 안.
-- 조심할 점: VPC 연결 시 cold start 증가. crawler처럼 Selenium 의존 워크로드는 Lambda 부적합.
-- 관련 spec: 04, 05, 08.
+- 역할: 인프라 알람 SNS → Lambda → Slack webhook fan-out, 짧은 후처리(예: Daily Batch 결과 요약). **AWS 공통 Slack notifier(`portfolio-event-notifier` / Python 3.12 / IAM Role `portfolio-event-notifier-lambda-role` / 2026-06-23 1차 검증 통과) 의 단일 진입점 — Step Functions / EventBridge / EC2 SSM / Batch / Lambda 어디서든 호출 가능한 운영 이벤트 알림 보조 계층**(OD-MS-030 신규 정합). **Daily 자동화 Dispatcher(`portfolio-paper-daily-scheduler-dispatcher` / Python 3.12 / Handler `lambda_function.lambda_handler` / Timeout 30s / Memory 256MB / IAM Role `portfolio-paper-daily-scheduler-dispatcher-role` / 2026-06-23 dryRun 검증 통과) — EventBridge Scheduler 가 호출 / KST `runDate`(YYYY-MM-DD) 생성 + 주말 · 휴장일 skip + scheduleType 별 payload 분기 + Step Functions `StartExecution` 호출 후 즉시 종료**(OD-MS-032 신규 정합 / 장시간 batch 실행은 Lambda 에서 직접 수행하지 않음 / Step Functions 완료까지 대기하지 않음). Selenium / Chrome / KRX 로그인은 Lambda 비권고(컨테이너 한계, cold start, 세션 stateful). **Lambda 는 본 프로젝트의 8개 MS 의 주 compute 1순위가 아님 — 운영 이벤트 알림 / 운영 자동화 dispatcher / 짧은 후처리 / 인프라 알람 fan-out 보조 서비스로만 사용**(ms-aws-service-decision-matrix 본문의 Lambda 비권고 정책 정합 / OD-MS-010 / OD-MS-030 / OD-MS-032 정합).
+- 비용 발생: 월 1M requests + 400,000 GB-sec 무료. 본 프로젝트 인프라 알람 fan-out + Slack notifier 운영 이벤트 알림 + Daily 자동화 dispatcher(평일 2회 = 월 약 44회)는 모두 무료 한도 안.
+- 조심할 점: VPC 연결 시 cold start 증가. crawler 처럼 Selenium 의존 워크로드는 Lambda 부적합. **Slack notifier 의 webhook URL 은 secret 으로 취급 — 현재 Lambda 환경변수 `SLACK_WEBHOOK_URL` 로 1차 검증 / 운영 안정화 후 Secrets Manager 또는 SSM Parameter Store(SecureString) 로 이전 예정(R-AUTO-024 신규 / Status `Accepted`)**. **Daily 자동화 Dispatcher Lambda 의 환경변수(`TIMEZONE` / `HOLIDAY_COUNTRY` / `FAIL_CLOSED_ON_HOLIDAY_ERROR` / Step Functions ARN 2종)는 운영 식별자(이름 / 값 의미)만 본 spec 문서에 기록 — ARN 평문 / 환경변수 value 평문 기록 0건**(R-DOCS-001 정합). Scheduler · Dispatcher Lambda · Step Functions 연결 사슬 실패 위험은 R-AUTO-025 신규 mitigation 으로 1차 차단. webhook URL 평문은 본 spec 문서 / 운영자 노트 / Lambda 콘솔 캡처 / CloudWatch Logs / Slack 메시지 본문 / Step Functions execution history 에 기록 금지(R-DOCS-001 정합 / 모두 `[REDACTED]` 또는 placeholder).
+- 관련 spec: 04, 05, 08, 10.
 
 ## S3 (Simple Storage Service)
 

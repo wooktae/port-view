@@ -95,7 +95,7 @@
 - [ ] 54. EventBridge Scheduler → SSM RunCommand 연계 절차 정리 (후속 분리 — `schtasks /Run` 트리거 정기 실행)
 - [ ] 55. Step Functions 에서 ECS Task + EC2 worker 혼합 orchestration 골격 정리 (후속 분리)
 - [ ] 56. CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집 절차 정리 (후속 분리)
-- [x] 57. wrapper 내 DB 검증 출력 자동 추가(`interest_program_raw` / `interest_shortsell_raw` 일자별 row count 출력) 절차 정리 → 2026-06-21 완료. `step-02-interest-crawler.ps1` 가 `ExpectedKrxRawDate`(RunDate 기준 전 영업일) 계산 → Windows crawler worker EC2 SSM `INTEREST_CRAWLER_KRX_DB_VALIDATE` 호출 → `interest_krx_raw_validate_daily.py --expected-date <yyyy-mm-dd>` 실행 → row_count + `max(trade_date)` 검증 → step result 에 `KrxDbValidationCommandId` 포함 / non-zero exit 또는 row_count 0 시 Step 2 fail. 본 일자 단독 실행 검증 통과(SSM commandId `2279c6d7-2da6-4317-9c10-7cc77374b317` / interest_program_raw expected=`2026-06-19` max_date=`2026-06-19` expected_count=`1` / interest_shortsell_raw expected=`2026-06-19` max_date=`2026-06-19` expected_count=`349`). R-AUTO-007 mitigation 1차 실증 ([`./operation-notes.md`](./operation-notes.md) 2026-06-21 §4)
+- [x] 57. wrapper 내 DB 검증 출력 자동 추가(`interest_program_raw` / `interest_shortsell_raw` 일자별 row count 출력) 절차 정리 → 2026-06-21 완료. `step-02-interest-crawler.ps1` 가 `ExpectedKrxRawDate`(RunDate 기준 전 영업일) 계산 → Windows crawler worker EC2 SSM `INTEREST_CRAWLER_KRX_DB_VALIDATE` 호출 → `interest_krx_raw_validate_daily.py --expected-date <yyyy-mm-dd>` 실행 → row_count + `max(trade_date)` 검증 → step result 에 `KrxDbValidationCommandId` 포함 / non-zero exit 또는 row_count 0 시 Step 2 fail. 본 일자 단독 실행 검증 통과(SSM commandId `2279c6d7-2da6-4317-9c10-7cc77374b317` / interest_program_raw expected=`2026-06-19` max_date=`2026-06-19` expected_count=`1` / interest_shortsell_raw expected=`2026-06-19` max_date=`2026-06-19` expected_count=`349`). R-AUTO-007 mitigation 1차 실증 ([`./operation-notes.md`](./operation-notes.md) 2026-06-21 §4). **[2026-06-22 Daily run 재검증]** Daily AWS Paper 1 ~ 17 두 번째 실 운영 실행 중 Step 2 KRX raw DB validation 회귀 0건 / ExpectedKrxRawDate `2026-06-19` 기준 `interest_program_raw` · `interest_shortsell_raw` 검증 통과 / Step 2 SUCCESS ([`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1)
 - [ ] 58. ECS / Fargate non-GUI crawler 실제 Task Definition 분리(인벤토리 확정 + smoke 용 revision 과 운영용 Task Definition 분리) (후속 분리)
 - [ ] 59. EC2 worker 작업 완료 후 stop 절차 명시(idle 비용 절감) (후속 분리)
 - [ ] 60. KRX GUI 수집 headless 리팩토링은 장기 후보로만 유지(현재 결정은 EC2 worker 사용) (장기 후보)
@@ -314,4 +314,22 @@
 - [ ] 55. Step Functions 에서 ECS RunTask + SSM RunCommand 혼합 orchestration (후속 분리)
 - [ ] 56. CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집 (후속 분리)
 - [ ] 59. EC2 worker 작업 완료 후 stop 절차 명시(idle 비용 절감) — 2026-06-20 §1 / §2 의 `/tmp/inject-env.sh` 유실 대응 + 자동 start / stop lifecycle 보강과 통합 (후속 분리)
+- [ ] 111. View Daily Batch 화면에서 `KrxDbValidationCommandId` / latest worker log / Step 2 validation 결과 표시 여부 검토 (후속 분리 / 05 spec)
+
+
+## 17. 2026-06-22 Daily run 재검증 (Step 2 / Step 3 회귀 0건)
+
+본 절은 2026-06-22 Daily AWS Paper Wrapper 1 ~ 17 두 번째 실 운영 실행 결과 중 본 spec(08 / Interest Crawler · Preprocessor) 책임 task 의 재검증 메모다. 자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1 ~ §4 / [`../_common/followups-overview.md`](../_common/followups-overview.md) 2026-06-22 후속 메모 참조.
+
+- [x] 112. Step 2 KRX raw DB validation Daily run 재검증 — `INTEREST_CRAWLER_KRX_DB_VALIDATE` SSM step 회귀 0건 / DB session user `crawler_app` / schema `interest` / search_path `interest, reference, legacy, public` / `ExpectedKrxRawDate 2026-06-19` 기준 `interest_program_raw` · `interest_shortsell_raw` 검증 통과 / step result `KrxDbValidationCommandId` 자동 기록(OD-MS-026 / R-AUTO-020 mitigation 회귀 0건 / R-AUTO-007 mitigation 회귀 0건) ([`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1.4)
+- [x] 113. Step 2 worker stopped fail-closed Daily run 회귀 0건 — 본 일자 Crawler Worker EC2 state `running` / fail-closed 분기 미진입 / R-AUTO-016 mitigation 갱신 회귀 0건(자동 skip 동작 폐지 그대로 유지) ([`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1.3)
+- [x] 114. Step 2 Scheduled Task Running → Ready wait + Last Result 확인 Daily run 회귀 0건 — `Portfolio-KRX-Worker-Daily` Scheduled Task 의 `sawRunning=True` / FinalLastResult 0 / latest worker log path · last write time · size · tail 정상 출력 / Chrome / chromedriver best-effort reset 회귀 0건(R-AUTO-017 mitigation 회귀 0건) ([`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1.3)
+- [x] 115. Step 3 Preprocessor Daily wrapper 연동 검증 완료 — `portfolio-paper-interest-preprocessor:1` ECS RunTask exitCode 0 / `PREPROCESSOR PIPELINE END` 라벨 확인 / raw → feature 흐름 정합(R-DATA-009 / R-DATA-010 mitigation 회귀 0건) ([`./operation-notes.md`](./operation-notes.md) 2026-06-22 §2)
+
+### 후속 유지 (2026-06-22 그대로)
+
+- [ ] 54. EventBridge Scheduler → SSM RunCommand → `schtasks /Run` 정기 trigger 연계 (후속 분리)
+- [ ] 55. Step Functions 에서 ECS RunTask + SSM RunCommand hybrid orchestration (후속 분리)
+- [ ] 56. CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집 (후속 분리)
+- [ ] 59. EC2 worker 작업 완료 후 stop 절차 명시(idle 비용 절감) — Daily wrapper 측 EC2 lifecycle 자동 start / stop 보강과 결합(followups-overview 2026-06-20 §1 / 2026-06-22 §1 정합 / 후속 분리)
 - [ ] 111. View Daily Batch 화면에서 `KrxDbValidationCommandId` / latest worker log / Step 2 validation 결과 표시 여부 검토 (후속 분리 / 05 spec)

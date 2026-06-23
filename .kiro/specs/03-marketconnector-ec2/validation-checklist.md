@@ -99,3 +99,18 @@
 - [Kiro 후속 작업 필요] [`../_common/risk-register.md`](../_common/risk-register.md) 에 R-DATA / R-CAP / R-BROKER / R-SEC / R-AUTO 5건 다음 가용 ID 로 등록(운영자 승인 시).
 - [Kiro 후속 작업 필요] [`../_common/followups-overview.md`](../_common/followups-overview.md) 에 03 1차 적용 환경 / 1차 범위 / 04·05·08·09·10 인계 반영.
 - [운영자 확인 필요] 04 / 05 / 08 / 09 spec 진입 시 본 spec §13 EC2 → ECS 매핑을 입력으로 받는다.
+
+
+## 2026-06-22 Daily AWS Paper 1~17 두 번째 실 완주 검증 결과
+
+본 절은 2026-06-22 Daily AWS Paper Wrapper 1 ~ 17 두 번째 실 운영 실행 중 03 spec(MarketConnector EC2) 책임 항목 검증 결과를 누적 기록한다. 자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1 ~ §6 참조. 모든 항목은 운영자 직접 확인 기준. 실제 민감값(broker 계좌번호 / broker_order_no 원문 / broker_branch_code 원문 / secret value / RDS password / instance-id / EIP / 실제 ARN) 본 문서 평문 기록 0건.
+
+| 검증 항목 | 결과 | 확인 시점 / 방법 | 비고 |
+|-----------|------|------------------|------|
+| MarketConnector env bootstrap 재생성 검증(`daily-aws-paper.functions.ps1` 공통 함수 호출) | [O] | 2026-06-22 운영자 직접 확인 | OD-MS-027 신규 / R-AUTO-021 신규 mitigation 1차 실증 / runbook §2.1 정합 |
+| Step 1 `CONNECTOR_BALANCE` 재실행 성공(최초 실패 → bootstrap 패치 후 통과) | [O] | 2026-06-22 wrapper run | `/tmp/inject-env.sh not found` → bootstrap 함수 추가 후 SSM Success / ResponseCode 0 / `connector_balance_snapshot` 저장 |
+| Step 12 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` Paper SELL 주문 제출 성공 | [O] | 2026-06-22 wrapper run | `-AllowPaperOrderExecute` 명시 실행 / `088350` 한화생명 244주 MARKET / `execution_order id 37` SUBMITTED / `connector_order_request id 46` ACCEPTED / broker_order_no · broker_branch_code 생성됨(본 문서 평문 기록 0건 / R-DOCS-001 정합) / rejection 없음 |
+| Step 13 `CONNECTOR_ORDER_CHECK` 체결조회 성공 | [O] | 2026-06-22 wrapper run | `connector_order_request id 46` FILLED / `connector_fill id 34` 생성(fill_qty 244 / fill_price `5,075.8607` / fill_amount `1,238,510.01` / fill_ts `2026-06-22 00:46:58 UTC`) / OD-MS-025 정합 (단건 direct-only 조회) |
+| Step 17 `BALANCE_REFRESH` SSM Success | [O] | 2026-06-22 wrapper run | SSM Status `Success` / ResponseCode 0 / `connector_position_snapshot` 최신 `created_at 2026-06-22 00:50:50 UTC` / 보유 5종목 / `088350` 잔고 스냅샷에서 제거 확인 / R-DATA-011 회귀 0건 |
+| secret value 로그 미노출 | [O] | 2026-06-22 운영자 직접 확인 | wrapper SSM stdout / stderr / SSM 응답 본문 / KIS API response body 평문 인용 0건 / `secretsmanager:GetSecretValue` 결과값 평문 기록 0건 / bootstrap 함수 안 length / key presence 만 출력 / R-DOCS-001 정합 |
+| Step 12 `-AllowPaperOrderExecute` safety gate 준수 | [O] | 2026-06-22 wrapper summary | wrapper 중앙 PAPER_ORDER_GATE + Step 12 내부 이중 gate / `-AllowPaperOrderExecute` 명시 시에만 실행 / `PaperOrder: True` 라벨 출력(R-AUTO-019 mitigation 정합) / aws-live 작업 0건 |

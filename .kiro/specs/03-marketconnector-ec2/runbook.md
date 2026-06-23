@@ -25,6 +25,8 @@
 
 ## 2. env 주입 [실행] [확인]
 
+> **2026-06-22 보강(OD-MS-027 신규 정합 / R-AUTO-021 신규 mitigation 1차 실증)** — Daily AWS Paper Wrapper 운영(`.kiro/scripts/run-daily-aws-paper.ps1`) 에서는 Step 1 / Step 12 / Step 13 / Step 17(MarketConnector EC2 SSM step 4종) 가 진입 직전에 `daily-aws-paper.functions.ps1` 의 공통 **MarketConnector env bootstrap 함수**를 호출해 `/tmp/inject-env.sh` 를 **step 실행 시점에 재생성**한다. 즉 `/tmp/inject-env.sh` 의 EC2 상 선존재를 가정하지 않는다. EC2 stop / start 이후 `/tmp` 디렉터리는 ephemeral 로 휘발될 수 있으므로(R-AUTO-021 정합) 본 절차의 수동 export 스크립트 작성은 `/tmp/inject-env.sh` 가 부재한 상태에서 운영자가 직접 단발 검증을 수행할 때의 수동 fallback 으로만 사용한다. 정식 systemd unit + `EnvironmentFile` 등록은 본 spec 후속 task(7 / 26 / 27) 책임으로 분리 유지.
+
 1. EC2 에 SSH 또는 SSM Session Manager 로 접속.
 2. 임시 export 스크립트 작성 — `/tmp/inject-env.sh` 패턴(권한 700, secret 평문 미저장, 메모리 export 만). 자세한 패턴은 [`../06-secrets-and-iam/runbook.md`](../06-secrets-and-iam/runbook.md) §6-1 참조.
 3. 환경변수 매핑은 [`./design.md`](./design.md) §8.2 / §8.2.1 / §8.2.2 표 그대로:
@@ -38,6 +40,28 @@
    - secret value 자체는 stdout / 로그 / 콘솔 캡처 / 운영자 노트에 출력하지 않는다. value length 또는 key presence 만 확인.
 5. `source /tmp/inject-env.sh` 후 환경변수 keys 만 `env | grep -E '^(APP_KEY|APP_SECRET|PAPER_ACNT|ACNT_PRDT_CD|KIS_APP_KEY|KIS_APP_SECRET|KIS_PAPER_ACNT|KIS_ACNT_PRDT_CD|KIS_BASE_URL|INTEREST_DB_|BASE_URL|PORT_|CONNECTOR_)' | cut -d= -f1` 로 확인 (값은 출력 / 로그에 남기지 않음).
 6. 정상 운영 모드(systemd unit / startup script) 전환은 본 spec 후속 task 또는 별도 phase 책임. 본 runbook 범위 밖. [준비]
+
+### 2.1 Daily wrapper bootstrap 장애 시 복구 절차 (2026-06-22 보강)
+
+본 절은 Daily AWS Paper Wrapper 운영 중 Step 1 / Step 12 / Step 13 / Step 17 에서 `/tmp/inject-env.sh not found` 또는 동등 env missing 오류가 발생했을 때의 복구 절차다(OD-MS-027 / R-AUTO-021 정합).
+
+1. wrapper bootstrap 함수 반영 여부 확인 [확인]
+   1) `daily-aws-paper.functions.ps1` 안 MarketConnector env bootstrap 함수의 존재 여부 확인.
+   2) Step 1 / Step 12 / Step 13 / Step 17 step 파일(`.kiro/scripts/steps/`) 에서 해당 bootstrap 함수가 step 진입 직전에 호출되는지 확인.
+   3) PowerShell parser validation 통과 여부 확인(`.ps1` 파일 모두 parser error 0건).
+2. wrapper 측 patch 가 정합한 경우 → Step 단독 재실행 [실행]
+   1) `.\run-daily-aws-paper.ps1 -Environment aws-paper -RunDate <RunDate> -StartStep 1 -EndStep 1`(Step 1 단독) 또는 영향 step 단독 재실행.
+   2) `-StartStep` / `-EndStep` 파라미터만 사용(`-FromStep` / `-ToStep` 미정의 — 실수 시 default 1 / 17 진입 위험).
+   3) wrapper run summary 의 step result 가 SUCCESS / SSM ResponseCode 0 / step failure exit status 0 인지 확인.
+3. wrapper 측 patch 가 미반영 / 운영 직전 우회 필요한 경우 → 운영자 수동 fallback [실행] [확인]
+   1) 운영자가 MarketConnector EC2 에 SSM Session Manager 로 접속해 본 §2 단계 그대로 `/tmp/inject-env.sh` 수동 재생성(권한 700 / 메모리 export 한정).
+   2) JSON SecretString 내부 key 추출 흐름 유지 — `aws secretsmanager get-secret-value --secret-id <name> --query SecretString --output text` 결과를 JSON parse 후 내부 key(`APP_KEY` / `APP_SECRET` / `PAPER_ACNT` / `ACNT_PRDT_CD` / `BASE_URL`) 만 추출해 `APP_*` 호환 key + `KIS_*` alias 동시 export.
+   3) secret value 평문 출력 금지 — stdout / stderr / 콘솔 캡처 / 운영자 노트 / wrapper 로그 평문 기록 0건(R-DOCS-001 정합). 길이 / key presence 만 출력.
+   4) 수동 fallback 후 wrapper Step 단독 재실행. 영구 해결은 wrapper 측 bootstrap 함수 정식 적용 / PowerShell parser validation 후속 통과로 이행.
+4. Step 12 실제 주문 safety gate 재강조 [확인]
+   1) Step 12 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` 는 `-AllowPaperOrderExecute` 옵션을 운영자가 명시적으로 입력했을 때만 실제 KIS paper 주문 제출 가능(R-AUTO-019 mitigation 정합).
+   2) bootstrap 장애 복구 중에도 Step 12 단독 재실행 시 의도하지 않은 `-AllowPaperOrderExecute` 입력을 피한다 — `PaperOrder: True` 라벨이 wrapper summary 에 출력되는지 사후 검증.
+   3) live 환경 BUY / SELL 자동 활성화 금지(OD-SAFE-002 / OD-SAFE-003 / R-AUTO-002 정합) — wrapper 환경 입력은 `aws-paper` 만 허용 / aws-live 분기 코드 레벨 미존재.
 
 ## 3. RDS 접속 확인 [확인]
 
