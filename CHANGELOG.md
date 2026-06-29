@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 2026-06-29
+
+### Added
+
+- AWS Paper Local View 실행 스크립트 사용 방법을 README에 정리했습니다(운영자 로컬 도구 `Load-PortfolioViewAwsPaperBatchEnv.ps1`과 `Start-PortfolioViewAwsPaperBatch.ps1`, RDS port forwarding 전제 포함).
+- Dashboard / Balance / Positions 화면의 Snapshot Refresh 재활성화 동작을 문서화했습니다.
+- Daily Batch 실행 이력 카드형 UI와 status 색상 개선 사항을 문서에 반영했습니다.
+
+### Changed
+
+- `aws-paper` profile의 Snapshot Refresh 관련 설정을 env override 기준으로 README에 정리했습니다.
+- Spring View datasource user(`view_app`)와 Connector subprocess DB user(`marketconnector_app`)를 분리한 구조를 README에 명시했습니다.
+- Daily Batch 화면의 실행 이력, Step Logs, Payload, 현재 모드 표시를 운영 콘솔형으로 정리한 사실을 문서에 반영했습니다.
+
+### Fixed
+
+- `connector_balance.py`가 `view_app` 권한으로 실행되며 `permission denied for connector_account`가 발생하던 문제를 subprocess DB user 분리로 해소한 사실을 문서에 정리했습니다.
+- Daily Batch 실행 이력과 상태 pill에 CSS가 충분히 적용되지 않던 문제 개선 사항을 문서에 정리했습니다.
+
+### Notes
+
+- 본 문서 업데이트 작업에서는 Daily Batch 실행, Slack Webhook 테스트, 외부 투자/주문 API 호출, DB DDL/DML을 실행하지 않았습니다.
+- commit/add/reset/checkout/stash는 실행하지 않았습니다.
+- 비밀번호, 토큰, Webhook URL, API Key, 계좌번호 전체 값은 문서에 기록하지 않았고 필요한 경우 `[REDACTED]`로 표기했습니다.
+
 ## 2026-05-28
 
 ### Added

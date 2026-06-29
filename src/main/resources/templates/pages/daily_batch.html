@@ -1,12 +1,10 @@
 <!DOCTYPE html>
-<!-- Daily Batch 화면: 배치 실행 이력, step 로그, 수동 실행 액션을 표시한다. 실제 실행 버튼은 운영 주의가 필요하다. -->
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <title>Daily 배치</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- RUNNING 상태일 때만 5초마다 현재 Batch 상세 화면 자동 갱신 -->
     <meta th:if="${selectedRun != null and selectedRun.isRunning()}"
           http-equiv="refresh"
           th:content="${'5;url=/daily-batch/' + selectedRun.id() + '?accountNo=' + accountNo}">
@@ -25,46 +23,75 @@
     <aside th:replace="~{fragments/sidebar :: sidebar('daily-batch', ${resolvedAccountNo})}"></aside>
 
     <main class="app-main dashboard-main daily-batch-main">
+
         <header class="dashboard-page-title">
             <h1>Daily 배치</h1>
-            <p>수집, 전처리, 전략 판단, 실행 후보 생성, 자동매도/자동매수, 체결 동기화, 잔고 최신화를 한 번에 실행하는 운영 콘솔.</p>
+            <p>
+                AWS Paper 2차 로컬 실행 검증 화면. 로컬 View에서 로컬 소스를 실행하되,
+                DB target은 AWS Paper RDS로 유지한다.
+            </p>
         </header>
 
         <section class="dashboard-stage">
 
-            <!-- Flash Message -->
             <section class="dashboard-section batch-message-section"
                      th:if="${successMessage != null or errorMessage != null}">
                 <div class="batch-message success" th:if="${successMessage != null}">
                     <strong>성공</strong>
-                    <span th:text="${successMessage}">Daily Pipeline 실행 완료</span>
+                    <span th:text="${successMessage}">성공 메시지</span>
                 </div>
 
                 <div class="batch-message error" th:if="${errorMessage != null}">
                     <strong>실패</strong>
-                    <span th:text="${errorMessage}">Daily Pipeline 실행 실패</span>
+                    <span th:text="${errorMessage}">실패 메시지</span>
                 </div>
             </section>
 
-            <!-- Hero -->
             <section class="dashboard-section batch-hero-section">
                 <div class="batch-hero-card">
                     <div class="batch-hero-main">
-                        <div class="section-label">Daily Operations</div>
-                        <h2>Daily 운영 파이프라인</h2>
+                        <div class="section-label">AWS Paper Local Execution</div>
+                        <h2>Daily Step 1~17 로컬 실행 검증</h2>
                         <p>
-                            Connector 잔고 확인부터 Interest 수집, 전처리, 백테스트, Daily Signal,
-                            Execution 연결, 자동매도/자동매수, 체결/포지션 동기화까지 순차 실행.
+                            이번 단계는 ECS/Fargate 이전에 View → 로컬 소스 실행 → AWS Paper DB 저장/조회 흐름을 검증한다.
+                            기본값은 안전 모드이며, Step 12 이상은 서버단 gate로 차단된다.
                         </p>
 
                         <div class="batch-hero-badges">
-                            <span class="soft-badge badge-live">모의투자</span>
-                            <span class="soft-badge badge-connector">Connector 사전 실행 필요</span>
+                            <span class="soft-badge badge-live"
+                                  th:text="${batchEnvironment != null ? batchEnvironment : '-'}">
+                                paper
+                            </span>
+
+                            <span class="soft-badge badge-connector"
+                                  th:text="${batchDbTarget != null ? batchDbTarget : '-'}">
+                                aws-paper-rds
+                            </span>
+
+                            <span class="soft-badge badge-count"
+                                  th:text="${batchExecutionMode != null ? batchExecutionMode : '-'}">
+                                local-file
+                            </span>
+
                             <span class="soft-badge badge-count">
                                 계좌 <strong th:text="${resolvedAccountNo}">-</strong>
                             </span>
+
                             <span class="soft-badge badge-count">
-                                총 <strong>16</strong> 단계
+                                허용 범위
+                                <strong th:text="${batchMinExecutableStepOrder}">1</strong>
+                                ~
+                                <strong th:text="${batchMaxExecutableStepOrder}">11</strong>
+                            </span>
+
+                            <span class="soft-badge badge-count"
+                                  th:if="${batchPaperOrderEnabled}">
+                                Paper 주문 허용
+                            </span>
+
+                            <span class="soft-badge badge-count"
+                                  th:if="${!batchPaperOrderEnabled}">
+                                Paper 주문 차단
                             </span>
                         </div>
                     </div>
@@ -72,10 +99,18 @@
                     <div class="batch-action-panel">
                         <div class="batch-action-copy">
                             <span>Manual Trigger</span>
-                            <strong>운영 작업 수동 실행</strong>
-                            <small th:if="${!hasRunningBatch}">
-                                장중 포지션 점검은 현재가 조회/손절 후보 감지만 수행하고, Daily Pipeline은 전체 파이프라인을 실행함.
+                            <strong th:text="${canRunLocalFileBatch ? '범위 실행 가능' : '실행 비활성'}">
+                                범위 실행 가능
+                            </strong>
+
+                            <small th:if="${!canRunLocalFileBatch}">
+                                현재 local-file 실행 gate가 꺼져 있음. 버튼이 눌려도 서버단에서 차단됨.
                             </small>
+
+                            <small th:if="${canRunLocalFileBatch and !hasRunningBatch}">
+                                먼저 Step 1 단독 실행으로 시작하고, 그 다음 Step 1~11을 검증한다.
+                            </small>
+
                             <small th:if="${hasRunningBatch}">
                                 이미 실행 중인 배치가 있음. 중복 실행은 차단됨.
                             </small>
@@ -83,29 +118,63 @@
 
                         <div class="batch-action-button-row">
 
+                            <form th:action="@{/daily-batch/run-range}"
+                                  method="post"
+                                  class="batch-run-form">
+                                <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
+                                <input type="hidden" name="fromStepCode" value="CONNECTOR_BALANCE"/>
+                                <input type="hidden" name="toStepCode" value="CONNECTOR_BALANCE"/>
+
+                                <button type="submit"
+                                        class="batch-run-button"
+                                        th:disabled="${hasRunningBatch or !canRunLocalFileBatch}">
+                                    <span th:if="${hasRunningBatch}">실행 중</span>
+                                    <span th:if="${!hasRunningBatch and canRunLocalFileBatch}">Step 1 단독 실행</span>
+                                    <span th:if="${!hasRunningBatch and !canRunLocalFileBatch}">Step 1 비활성</span>
+                                </button>
+                            </form>
+
+                            <form th:action="@{/daily-batch/run-range}"
+                                  method="post"
+                                  class="batch-run-form">
+                                <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
+                                <input type="hidden" name="fromStepCode" value="CONNECTOR_BALANCE"/>
+                                <input type="hidden" name="toStepCode" value="DAILY_AUTO_BUY"/>
+
+                                <button type="submit"
+                                        class="batch-run-button"
+                                        th:disabled="${hasRunningBatch or !canRunLocalFileBatch}">
+                                    <span th:if="${hasRunningBatch}">실행 중</span>
+                                    <span th:if="${!hasRunningBatch and canRunLocalFileBatch}">Step 1~11 실행</span>
+                                    <span th:if="${!hasRunningBatch and !canRunLocalFileBatch}">Step 1~11 비활성</span>
+                                </button>
+                            </form>
+
                             <form th:action="@{/daily-batch/intraday-monitor/run}"
-                                method="post"
-                                class="batch-run-form batch-intraday-form">
+                                  method="post"
+                                  class="batch-run-form batch-intraday-form">
                                 <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
 
                                 <button type="submit"
                                         class="batch-intraday-button"
-                                        th:disabled="${hasRunningBatch}">
-                                    <span th:text="${hasRunningBatch ? '실행 중' : '장중 포지션 점검'}">
-                                        장중 포지션 점검
-                                    </span>
+                                        th:disabled="${hasRunningBatch or !canRunIntradayMonitor}">
+                                    <span th:if="${hasRunningBatch}">실행 중</span>
+                                    <span th:if="${!hasRunningBatch and canRunIntradayMonitor}">장중 포지션 점검</span>
+                                    <span th:if="${!hasRunningBatch and !canRunIntradayMonitor}">장중 점검 비활성</span>
                                 </button>
                             </form>
 
-                            <form th:action="@{/daily-batch/run}" method="post" class="batch-run-form">
+                            <form th:action="@{/daily-batch/run}"
+                                  method="post"
+                                  class="batch-run-form">
                                 <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
 
                                 <button type="submit"
-                                        class="batch-run-button"
-                                        th:disabled="${hasRunningBatch}">
-                                    <span th:text="${hasRunningBatch ? '실행 중' : 'Daily Pipeline 실행'}">
-                                        Daily Pipeline 실행
-                                    </span>
+                                        class="batch-rerun-failed-button"
+                                        th:disabled="${hasRunningBatch or !canRunFullLocalFilePipeline}">
+                                    <span th:if="${hasRunningBatch}">실행 중</span>
+                                    <span th:if="${!hasRunningBatch and canRunFullLocalFilePipeline}">전체 1~17 실행</span>
+                                    <span th:if="${!hasRunningBatch and !canRunFullLocalFilePipeline}">전체 실행 잠금</span>
                                 </button>
                             </form>
 
@@ -127,225 +196,97 @@
                 </div>
             </section>
 
-            <!-- Pre-run Metrics -->
             <section class="dashboard-section batch-ready-section">
                 <div class="section-head compact-head">
                     <div>
-                        <div class="section-label">Ready Check</div>
-                        <h2>실행 전 운영 기준</h2>
+                        <div class="section-label">Execution Gate</div>
+                        <h2>현재 실행 설정</h2>
+                        <p class="section-description">
+                            화면 버튼보다 서버단 gate가 우선한다. Step 12 이상은 Paper 주문 gate가 꺼져 있으면 실행되지 않는다.
+                        </p>
                     </div>
                 </div>
 
                 <div class="metric-grid">
                     <article class="metric-card batch-metric-total">
-                        <div class="metric-title">Pipeline 단계</div>
-                        <div class="metric-value">16</div>
-                        <div class="metric-subtitle">수집 → 전처리 → 전략 → 실행 → 동기화</div>
+                        <div class="metric-title">Execution</div>
+                        <div class="metric-value" th:text="${batchExecutionEnabled ? 'ON' : 'OFF'}">OFF</div>
+                        <div class="metric-subtitle">portfolio.batch.execution-enabled</div>
                     </article>
 
                     <article class="metric-card batch-metric-success">
-                        <div class="metric-title">자동매수</div>
-                        <div class="metric-value">ON</div>
-                        <div class="metric-subtitle">READY Daily BUY 주문만 PAPER_STRATEGY 실행</div>
+                        <div class="metric-title">Local File</div>
+                        <div class="metric-value" th:text="${batchLocalFileExecutionEnabled ? 'ON' : 'OFF'}">OFF</div>
+                        <div class="metric-subtitle">ProcessBuilder Python runner</div>
                     </article>
 
                     <article class="metric-card batch-metric-warning">
-                        <div class="metric-title">자동매도</div>
-                        <div class="metric-value">ON</div>
-                        <div class="metric-subtitle">READY Daily/장중 SELL 주문만 PAPER_STRATEGY 실행</div>
+                        <div class="metric-title">Full Pipeline</div>
+                        <div class="metric-value" th:text="${batchFullPipelineExecutionEnabled ? 'ON' : 'OFF'}">OFF</div>
+                        <div class="metric-subtitle">전체 1~17 실행 gate</div>
                     </article>
 
-                    <article class="metric-card batch-metric-neutral">
-                        <div class="metric-title">로그 저장</div>
-                        <div class="metric-value">Tail</div>
-                        <div class="metric-subtitle">stdout/stderr 마지막 로그 DB 저장</div>
+                    <article class="metric-card batch-metric-failed">
+                        <div class="metric-title">Paper Order</div>
+                        <div class="metric-value" th:text="${batchPaperOrderEnabled ? 'ON' : 'OFF'}">OFF</div>
+                        <div class="metric-subtitle">Step 12~17 gate</div>
                     </article>
+                </div>
+
+                <div class="batch-error-box mt-3">
+                    <span>현재 모드</span>
+                    <pre th:text="${batchModeText}">mode</pre>
                 </div>
             </section>
 
-            <!-- Intraday Monitor Result -->
-            <section class="dashboard-section batch-intraday-section">
+            <section class="dashboard-section batch-step-section">
                 <div class="section-head">
                     <div>
-                        <div class="section-label">Intraday Monitor</div>
-                        <h2>최근 장중 포지션 점검 결과</h2>
+                        <div class="section-label">Range Execution</div>
+                        <h2>선택 범위 실행</h2>
                         <p class="section-description">
-                            장중 포지션 점검 버튼으로 실행된 실시간 현재가 조회와 손절 후보 판단 결과.
-                            운영 기준은 기본적으로 진입가 대비 -10% hard stop.
-                        </p>
-                    </div>
-
-                    <span class="soft-badge badge-count">
-                        최근 <strong th:text="${intradayChecks != null ? #lists.size(intradayChecks) : 0}">0</strong>건
-                    </span>
-                </div>
-
-                <div class="strategy-empty-card small"
-                    th:if="${intradayChecks == null or #lists.isEmpty(intradayChecks)}">
-                    <div class="empty-mark">!</div>
-                    <div>
-                        <h2>장중 점검 이력 없음</h2>
-                        <p>
-                            장중 포지션 점검 버튼을 실행하고, 손절 후보나 warning이 발생하면 이 영역에 표시됨.
-                            정상 점검이고 후보가 없으면 저장 row가 없을 수 있음.
+                            Step 1 단독과 Step 1~11 이외의 범위를 수동으로 선택한다.
+                            잘못된 범위나 Step 12 이상은 Service에서 다시 차단된다.
                         </p>
                     </div>
                 </div>
 
-                <div class="intraday-check-list"
-                    th:if="${intradayChecks != null and !#lists.isEmpty(intradayChecks)}">
+                <form th:if="${availableSteps != null and !#lists.isEmpty(availableSteps)}"
+                      th:action="@{/daily-batch/run-range}"
+                      method="post"
+                      class="batch-partial-run-form">
 
-                    <article class="intraday-check-row"
-                            th:each="check : ${intradayChecks}"
-                            th:classappend="${check.shouldStopClass()}">
+                    <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
 
-                        <div class="intraday-check-main">
-                            <strong th:text="${check.stockName() != null ? check.stockName() : '-'}">
-                                앱클론
-                            </strong>
-                            <span th:text="${check.tickerCode() != null ? check.tickerCode() : '-'}">
-                                174900
-                            </span>
-                            <small>
-                                점검
-                                <b th:text="'#' + ${check.id()}">#1</b>
-                                /
-                                <b th:text="${check.checkTsText()}">
-                                    -
-                                </b>
-                            </small>
-                        </div>
+                    <select name="fromStepCode"
+                            class="batch-partial-select"
+                            th:disabled="${hasRunningBatch or !canRunLocalFileBatch}">
+                        <option th:each="step : ${availableSteps}"
+                                th:value="${step.stepCode()}"
+                                th:text="${step.displayLabel()}">
+                            1. 잔고/보유종목 확인
+                        </option>
+                    </select>
 
-                        <div class="intraday-check-status">
-                            <span th:class="'intraday-status-pill ' + ${check.shouldStopClass()}"
-                                th:text="${check.shouldStopLabel()}">
-                                정상
-                            </span>
-                            <em th:text="${check.stopReasonLabel()}">
-                                -
-                            </em>
-                        </div>
+                    <select name="toStepCode"
+                            class="batch-partial-select"
+                            th:disabled="${hasRunningBatch or !canRunLocalFileBatch}">
+                        <option th:each="step : ${availableSteps}"
+                                th:value="${step.stepCode()}"
+                                th:text="${step.displayLabel()}">
+                            1. 잔고/보유종목 확인
+                        </option>
+                    </select>
 
-                        <div class="intraday-check-grid">
-                            <div>
-                                <span>현재가</span>
-                                <strong th:text="${check.currentPrice() != null ? #numbers.formatDecimal(check.currentPrice(), 0, 'COMMA', 0, 'POINT') + '원' : '-'}">
-                                    -
-                                </strong>
-                            </div>
-
-                            <div>
-                                <span>손익률</span>
-                                <strong th:text="${check.pnlRate() != null ? (check.pnlRate() >= 0 ? '+' : '') + #numbers.formatDecimal(check.pnlRate() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '-'}">
-                                    -
-                                </strong>
-                            </div>
-
-                            <div>
-                                <span>손절 기준</span>
-                                <strong th:text="${check.hardStopRate() != null ? #numbers.formatDecimal(check.hardStopRate() * 100, 1, 'COMMA', 2, 'POINT') + '%' : '-'}">
-                                    -
-                                </strong>
-                            </div>
-
-                            <div>
-                                <span>Warning</span>
-                                <strong th:text="${check.warningLabel()}">
-                                    없음
-                                </strong>
-                            </div>
-
-                            <div>
-                                <span>연결 주문</span>
-                                <strong th:text="${check.executionOrderText()}">
-                                    -
-                                </strong>
-                            </div>
-                        </div>
-
-                        <div class="intraday-check-link">
-                            <a th:if="${check.createdExecutionOrderId() != null}"
-                            th:href="@{/strategy/execution/plans}">
-                                전략 실행 계획 보기 →
-                            </a>
-                            <span th:if="${check.createdExecutionOrderId() == null}">
-                                주문 후보 미생성
-                            </span>
-                        </div>
-                    </article>
-                </div>
+                    <button type="submit"
+                            class="batch-partial-button"
+                            th:disabled="${hasRunningBatch or !canRunLocalFileBatch}">
+                        <span th:if="${canRunLocalFileBatch}">선택 범위 실행</span>
+                        <span th:if="${!canRunLocalFileBatch}">범위 실행 비활성</span>
+                    </button>
+                </form>
             </section>
 
-            <!-- Pipeline Preview -->
-            <section class="dashboard-section batch-preview-section">
-                <div class="section-head">
-                    <div>
-                        <div class="section-label">Pipeline Map</div>
-                        <h2>오늘 실행될 단계</h2>
-                        <p class="section-description">
-                            버튼 클릭 시 아래 순서대로 Python 파이프라인이 실행되고, 각 결과가 step log로 저장됨.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="batch-pipeline-map">
-
-                    <div class="pipeline-group">
-                        <div class="pipeline-group-head">
-                            <span>01</span>
-                            <strong>계좌 / 수집</strong>
-                        </div>
-                        <div class="pipeline-chip-grid">
-                            <span class="pipeline-chip">잔고 확인</span>
-                            <span class="pipeline-chip">Interest 수집</span>
-                        </div>
-                    </div>
-
-                    <div class="pipeline-group">
-                        <div class="pipeline-group-head">
-                            <span>02</span>
-                            <strong>전처리 / 분석</strong>
-                        </div>
-                        <div class="pipeline-chip-grid">
-                            <span class="pipeline-chip">Preprocessor</span>
-                            <span class="pipeline-chip">백테스트 분석</span>
-                            <span class="pipeline-chip">백테스트 리포트</span>
-                        </div>
-                    </div>
-
-                    <div class="pipeline-group">
-                        <div class="pipeline-group-head">
-                            <span>03</span>
-                            <strong>Daily 판단</strong>
-                        </div>
-                        <div class="pipeline-chip-grid">
-                            <span class="pipeline-chip">매수 신호</span>
-                            <span class="pipeline-chip">포지션 신호</span>
-                            <span class="pipeline-chip">매수 연결</span>
-                            <span class="pipeline-chip">매도 연결</span>
-                        </div>
-                    </div>
-
-                    <div class="pipeline-group">
-                        <div class="pipeline-group-head">
-                            <span>04</span>
-                            <strong>주문 / 동기화</strong>
-                        </div>
-                        <div class="pipeline-chip-grid">
-                            <span class="pipeline-chip strong">자동매도</span>
-                            <span class="pipeline-chip strong">자동매수</span>
-                            <span class="pipeline-chip">체결 조회</span>
-                            <span class="pipeline-chip">매도 체결/포지션 동기화</span>
-                            <span class="pipeline-chip">매수 체결 동기화</span>
-                            <span class="pipeline-chip">포지션 동기화</span>
-                            <span class="pipeline-chip">잔고 최신화</span>
-                        </div>
-                    </div>
-
-                </div>
-            </section>
-
-            <!-- Empty State -->
             <section class="dashboard-section batch-empty-section"
                      th:if="${page == null or page.empty}">
                 <div class="batch-empty-card">
@@ -353,8 +294,8 @@
                     <div>
                         <h2>아직 실행 기록 없음</h2>
                         <p>
-                            위의 실행 버튼을 누르면 Daily Batch Run과 Step Log가 생성되고,
-                            최신 실행 요약과 단계별 로그가 여기에 표시됨.
+                            Daily Batch Run과 Step Log가 생성되면 이 화면에 표시됨.
+                            먼저 Step 1 단독 실행부터 검증한다.
                         </p>
                     </div>
                 </div>
@@ -362,20 +303,20 @@
 
             <th:block th:if="${page != null and !page.empty}">
 
-                <!-- Selected Run Summary -->
-                <section class="dashboard-section batch-summary-section">
+                <section class="dashboard-section batch-summary-section"
+                         th:if="${selectedRun != null}">
                     <div class="section-head">
                         <div>
                             <div class="section-label">Selected Run</div>
-                            <h2>선택한 Daily 배치 실행 요약</h2>
+                            <h2>선택한 실행 요약</h2>
                             <p class="section-description">
-                                현재 화면에서 보고 있는 Daily Pipeline 실행 1회의 전체 상태.
+                                현재 화면에서 보고 있는 Daily Pipeline 실행 1회의 상태.
                             </p>
                         </div>
 
-                        <span th:class="'batch-status-pill ' + ${T(my.portfolio.port_view.util.DailyBatchLabelUtils).runStatusClass(selectedRun.runStatus())}"
-                              th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).runStatusLabel(selectedRun.runStatus())}">
-                            실행 중
+                        <span class="batch-status-pill"
+                              th:text="${selectedRun.runStatus() != null ? selectedRun.runStatus() : '-'}">
+                            RUNNING
                         </span>
                     </div>
 
@@ -387,9 +328,7 @@
                                 <b th:text="${selectedRun.batchDate() != null ? selectedRun.batchDate() : '-'}">-</b>
                                 /
                                 실행 유형
-                                <b th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).runTypeLabel(selectedRun.runType())}">
-                                    수동 실행
-                                </b>
+                                <b th:text="${selectedRun.runType() != null ? selectedRun.runType() : '-'}">MANUAL</b>
                             </span>
                         </div>
 
@@ -401,30 +340,35 @@
                             <small th:text="${selectedRun.progressPercent()} + '%'">0%</small>
                         </div>
                     </div>
-                    
+
                     <div class="batch-rerun-actions"
-                        th:if="${selectedRun != null and selectedRun.isFailed()}">
+                         th:if="${selectedRun != null and selectedRun.isFailed()}">
 
                         <form th:action="@{/daily-batch/{id}/rerun-failed(id=${selectedRun.id()})}"
-                            method="post"
-                            class="batch-rerun-failed-form">
+                              method="post"
+                              class="batch-rerun-failed-form">
 
                             <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
 
                             <button type="submit"
                                     class="batch-rerun-failed-button"
-                                    th:disabled="${hasRunningBatch}">
+                                    th:disabled="${hasRunningBatch or !canRunLocalFileBatch}">
                                 실패 단계부터 재실행
                             </button>
 
                             <span class="batch-rerun-help"
-                                th:if="${!hasRunningBatch}">
+                                  th:if="${!hasRunningBatch and canRunLocalFileBatch}">
                                 첫 FAILED step부터 마지막 단계까지 새 RETRY 실행으로 재처리.
                             </span>
 
                             <span class="batch-rerun-help warning"
-                                th:if="${hasRunningBatch}">
+                                  th:if="${hasRunningBatch}">
                                 현재 실행 중인 Daily Batch가 있어 재실행할 수 없음.
+                            </span>
+
+                            <span class="batch-rerun-help warning"
+                                  th:if="${!hasRunningBatch and !canRunLocalFileBatch}">
+                                현재 실행 모드에서는 실패 단계 재실행이 비활성화되어 있음.
                             </span>
                         </form>
                     </div>
@@ -432,7 +376,7 @@
                     <div class="metric-grid batch-metric-grid">
                         <article class="metric-card batch-metric-total">
                             <div class="metric-title">전체 단계</div>
-                            <div class="metric-value" th:text="${selectedRun.safeTotalStepCount()}">14</div>
+                            <div class="metric-value" th:text="${selectedRun.safeTotalStepCount()}">17</div>
                             <div class="metric-subtitle">Daily Pipeline step</div>
                         </article>
 
@@ -462,58 +406,42 @@
                     <div class="batch-info-grid">
                         <div>
                             <span>계좌</span>
-                            <strong th:text="${selectedRun.accountNo() != null ? selectedRun.accountNo() : resolvedAccountNo}">
-                                -
-                            </strong>
+                            <strong th:text="${selectedRun.accountNo() != null ? selectedRun.accountNo() : resolvedAccountNo}">-</strong>
                         </div>
 
                         <div>
                             <span>환경</span>
-                            <strong th:text="${selectedRun.environment() != null ? selectedRun.environment() : '-'}">
-                                local
-                            </strong>
+                            <strong th:text="${selectedRun.environment() != null ? selectedRun.environment() : '-'}">paper</strong>
                         </div>
 
                         <div>
                             <span>요청자</span>
-                            <strong th:text="${selectedRun.requestedBy() != null ? selectedRun.requestedBy() : '-'}">
-                                VIEW_BUTTON
-                            </strong>
-                        </div>
-
-                        <div>
-                            <span>시작시각</span>
-                            <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatDateTime(selectedRun.startedAt())}">
-                                -
-                            </strong>
-                        </div>
-
-                        <div>
-                            <span>종료시각</span>
-                            <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatDateTime(selectedRun.finishedAt())}">
-                                -
-                            </strong>
-                        </div>
-
-                        <div>
-                            <span>소요시간</span>
-                            <strong th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).durationLabel(selectedRun.durationMs())}">
-                                -
-                            </strong>
+                            <strong th:text="${selectedRun.requestedBy() != null ? selectedRun.requestedBy() : '-'}">VIEW_BUTTON</strong>
                         </div>
 
                         <div>
                             <span>현재 단계</span>
-                            <strong th:text="${selectedRun.currentStepName() != null ? selectedRun.currentStepName() : '-'}">
-                                -
-                            </strong>
+                            <strong th:text="${selectedRun.currentStepName() != null ? selectedRun.currentStepName() : '-'}">-</strong>
                         </div>
 
                         <div>
                             <span>실패 단계</span>
-                            <strong th:text="${selectedRun.errorStepCode() != null ? T(my.portfolio.port_view.util.DailyBatchLabelUtils).stepCodeLabel(selectedRun.errorStepCode()) : '-'}">
-                                -
-                            </strong>
+                            <strong th:text="${selectedRun.errorStepCode() != null ? selectedRun.errorStepCode() : '-'}">-</strong>
+                        </div>
+
+                        <div>
+                            <span>시작시각</span>
+                            <strong th:text="${selectedRun.startedAt() != null ? selectedRun.startedAt() : '-'}">-</strong>
+                        </div>
+
+                        <div>
+                            <span>종료시각</span>
+                            <strong th:text="${selectedRun.finishedAt() != null ? selectedRun.finishedAt() : '-'}">-</strong>
+                        </div>
+
+                        <div>
+                            <span>소요시간(ms)</span>
+                            <strong th:text="${selectedRun.durationMs() != null ? selectedRun.durationMs() : '-'}">-</strong>
                         </div>
                     </div>
 
@@ -522,9 +450,14 @@
                         <span>오류 메시지</span>
                         <pre th:text="${selectedRun.errorMessage()}">error</pre>
                     </div>
+
+                    <div class="batch-error-box"
+                         th:if="${selectedRun.requestPayload() != null and !#strings.isEmpty(selectedRun.requestPayload())}">
+                        <span>요청 Payload</span>
+                        <pre th:text="${selectedRun.requestPayload()}">payload</pre>
+                    </div>
                 </section>
 
-                <!-- Step Logs -->
                 <section class="dashboard-section batch-step-section">
                     <div class="section-head">
                         <div>
@@ -535,35 +468,9 @@
                             </p>
                         </div>
 
-                        <div class="batch-step-head-actions">
-                            <span class="soft-badge badge-count">
-                                단계 <strong th:text="${steps != null ? #lists.size(steps) : 0}">0</strong>개
-                            </span>
-
-                            <form th:if="${availableSteps != null and !#lists.isEmpty(availableSteps)}"
-                                th:action="@{/daily-batch/run-from-step}"
-                                method="post"
-                                class="batch-partial-run-form">
-
-                                <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
-
-                                <select name="fromStepCode"
-                                        class="batch-partial-select"
-                                        th:disabled="${hasRunningBatch}">
-                                    <option th:each="step : ${availableSteps}"
-                                            th:value="${step.stepCode()}"
-                                            th:text="${step.displayLabel()}">
-                                        1. 잔고/보유종목 확인
-                                    </option>
-                                </select>
-
-                                <button type="submit"
-                                        class="batch-partial-button"
-                                        th:disabled="${hasRunningBatch}">
-                                    선택 단계부터 재실행
-                                </button>
-                            </form>
-                        </div>
+                        <span class="soft-badge badge-count">
+                            단계 <strong th:text="${steps != null ? #lists.size(steps) : 0}">0</strong>개
+                        </span>
                     </div>
 
                     <div class="strategy-empty-card small"
@@ -585,100 +492,89 @@
                             </div>
 
                             <div class="step-main-cell">
-                                <strong th:text="${step.stepName() != null ? step.stepName() : T(my.portfolio.port_view.util.DailyBatchLabelUtils).stepCodeLabel(step.stepCode())}">
+                                <strong th:text="${step.stepName() != null ? step.stepName() : step.stepCode()}">
                                     잔고/보유종목 확인
                                 </strong>
+
                                 <span th:text="${step.stepCode()}">CONNECTOR_BALANCE</span>
+
+                                <small>
+                                    <b>workDir</b>
+                                    <span th:text="${step.workDir() != null ? step.workDir() : '-'}">-</span>
+                                </small>
+
+                                <small>
+                                    <b>command</b>
+                                    <span th:text="${step.commandText() != null ? step.commandText() : '-'}">python connector_balance.py</span>
+                                </small>
                             </div>
 
                             <div class="step-status-cell">
-                                <span th:class="'batch-step-pill ' + ${T(my.portfolio.port_view.util.DailyBatchLabelUtils).stepStatusClass(step.stepStatus())}"
-                                      th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).stepStatusLabel(step.stepStatus())}">
-                                    성공
+                                <span class="batch-status-pill"
+                                      th:text="${step.stepStatus() != null ? step.stepStatus() : '-'}">
+                                    PENDING
                                 </span>
+
+                                <small>
+                                    exit
+                                    <b th:text="${step.exitCode() != null ? step.exitCode() : '-'}">-</b>
+                                </small>
                             </div>
 
-                            <div class="step-time-grid">
-                                <div>
-                                    <span>시작</span>
-                                    <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatTime(step.startedAt())}">
-                                        -
-                                    </strong>
-                                </div>
-                                <div>
-                                    <span>종료</span>
-                                    <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatTime(step.finishedAt())}">
-                                        -
-                                    </strong>
-                                </div>
-                                <div>
-                                    <span>소요</span>
-                                    <strong th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).durationLabel(step.durationMs())}">
-                                        -
-                                    </strong>
-                                </div>
-                                <div>
-                                    <span>종료코드</span>
-                                    <strong th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).exitCodeLabel(step.exitCode())}">
-                                        -
-                                    </strong>
-                                </div>
+                            <div class="step-time-cell">
+                                <small>
+                                    시작
+                                    <b th:text="${step.startedAt() != null ? step.startedAt() : '-'}">-</b>
+                                </small>
+
+                                <small>
+                                    종료
+                                    <b th:text="${step.finishedAt() != null ? step.finishedAt() : '-'}">-</b>
+                                </small>
+
+                                <small>
+                                    ms
+                                    <b th:text="${step.durationMs() != null ? step.durationMs() : '-'}">-</b>
+                                </small>
                             </div>
 
-                            <div class="step-command-cell">
-                                <span>작업 디렉토리</span>
-                                <strong th:text="${step.workDir() != null ? step.workDir() : '-'}">
-                                    C:/Workspaces
-                                </strong>
-                                <em th:text="${step.commandText() != null ? step.commandText() : '-'}">
-                                    python script.py
-                                </em>
-                            </div>
+                            <div class="step-log-cell"
+                                 th:if="${(step.stdoutTail() != null and !#strings.isEmpty(step.stdoutTail()))
+                                      or (step.stderrTail() != null and !#strings.isEmpty(step.stderrTail()))
+                                      or (step.errorMessage() != null and !#strings.isEmpty(step.errorMessage()))}">
 
-                            <details class="step-log-details"
-                                     th:if="${step.hasLog()}">
-                                <summary>로그 보기</summary>
+                                <details>
+                                    <summary>로그 보기</summary>
 
-                                <div class="step-log-block"
-                                     th:if="${step.hasErrorMessage()}">
-                                    <span>error_message</span>
-                                    <pre th:text="${step.errorMessage()}">error</pre>
-                                </div>
+                                    <div th:if="${step.errorMessage() != null and !#strings.isEmpty(step.errorMessage())}">
+                                        <span>error</span>
+                                        <pre th:text="${step.errorMessage()}">error</pre>
+                                    </div>
 
-                                <div class="step-log-block"
-                                     th:if="${step.hasStderr()}">
-                                    <span>stderr_tail</span>
-                                    <pre th:text="${step.stderrTail()}">stderr</pre>
-                                </div>
+                                    <div th:if="${step.stdoutTail() != null and !#strings.isEmpty(step.stdoutTail())}">
+                                        <span>stdout</span>
+                                        <pre th:text="${step.stdoutTail()}">stdout</pre>
+                                    </div>
 
-                                <div class="step-log-block"
-                                     th:if="${step.hasStdout()}">
-                                    <span>stdout_tail</span>
-                                    <pre th:text="${step.stdoutTail()}">stdout</pre>
-                                </div>
-                            </details>
-
-                            <div class="step-log-empty"
-                                 th:if="${!step.hasLog()}">
-                                로그 없음
+                                    <div th:if="${step.stderrTail() != null and !#strings.isEmpty(step.stderrTail())}">
+                                        <span>stderr</span>
+                                        <pre th:text="${step.stderrTail()}">stderr</pre>
+                                    </div>
+                                </details>
                             </div>
                         </article>
                     </div>
                 </section>
 
-                <!-- Recent Run History -->
                 <section class="dashboard-section batch-history-section">
                     <div class="section-head">
                         <div>
-                            <div class="section-label">History</div>
-                            <h2>Daily 배치 실행 히스토리</h2>
-                            <p class="section-description">
-                                최근 20개 Daily Pipeline 실행 기록. 각 행을 클릭하면 해당 실행 상세로 이동함.
-                            </p>
+                            <div class="section-label">Recent Runs</div>
+                            <h2>최근 실행 이력</h2>
                         </div>
 
                         <span class="soft-badge badge-count">
-                            기록 <strong th:text="${recentRuns != null ? #lists.size(recentRuns) : 0}">0</strong>건
+                            최근 <strong th:text="${recentRuns != null ? #lists.size(recentRuns) : 0}">0</strong>건
                         </span>
                     </div>
 
@@ -686,8 +582,8 @@
                          th:if="${recentRuns == null or #lists.isEmpty(recentRuns)}">
                         <div class="empty-mark">!</div>
                         <div>
-                            <h2>실행 히스토리가 없음</h2>
-                            <p>Daily Pipeline 실행 후 이 영역에 기록이 표시됨.</p>
+                            <h2>최근 실행 이력 없음</h2>
+                            <p>Daily Batch Run이 생성되면 여기에 표시됨.</p>
                         </div>
                     </div>
 
@@ -702,15 +598,18 @@
                             <div class="history-main">
                                 <strong th:text="'#' + ${run.id()}">#1</strong>
                                 <span th:text="${run.batchDate() != null ? run.batchDate() : '-'}">
-                                    2026-05-13
+                                    2026-06-29
                                 </span>
                             </div>
 
                             <div class="history-status">
-                                <span th:class="'batch-status-pill mini ' + ${T(my.portfolio.port_view.util.DailyBatchLabelUtils).runStatusClass(run.runStatus())}"
-                                      th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).runStatusLabel(run.runStatus())}">
-                                    성공
+                                <span class="batch-status-pill mini"
+                                      th:text="${run.runStatus() != null ? run.runStatus() : '-'}">
+                                    SUCCESS
                                 </span>
+                                <small th:text="${run.runType() != null ? run.runType() : '-'}">
+                                    MANUAL
+                                </small>
                             </div>
 
                             <div class="history-counts">
@@ -734,14 +633,14 @@
 
                             <div class="history-time">
                                 <span>시작</span>
-                                <strong th:text="${T(my.portfolio.port_view.util.ViewFormatUtils).formatMonthDayTime(run.startedAt())}">
+                                <strong th:text="${run.startedAt() != null ? run.startedAt() : '-'}">
                                     -
                                 </strong>
                             </div>
 
                             <div class="history-time">
-                                <span>소요</span>
-                                <strong th:text="${T(my.portfolio.port_view.util.DailyBatchLabelUtils).durationLabel(run.durationMs())}">
+                                <span>종료</span>
+                                <strong th:text="${run.finishedAt() != null ? run.finishedAt() : '-'}">
                                     -
                                 </strong>
                             </div>
@@ -750,8 +649,8 @@
                                 상세 →
                             </div>
                         </a>
-                    </div>
-                </section>                          
+                    </div></section>
+
             </th:block>
 
         </section>

@@ -19,7 +19,7 @@
     <main class="app-main dashboard-main">
         <header class="dashboard-page-title">
             <h1>대시보드</h1>
-            <p>계좌 잔고와 보유 종목만 빠르게 확인하는 메인 화면.</p>
+            <p>화면 진입 시 AWS Paper 계좌 스냅샷을 갱신하고, 최신 잔고·보유 종목·전략 실행 계획·백테스트 성과를 한 번에 확인하는 메인 화면.</p>
         </header>
 
         <section class="dashboard-stage">
@@ -32,14 +32,15 @@
                         <div class="section-label">계좌</div>
                         <h2 th:text="${resolvedAccountNo}">-</h2>
                         <p>
-                            해당 계좌의 최신 잔고 스냅샷이 없음.
-                            Connector 잔고 수집 실행 후 다시 확인하면 됨.
+                            해당 계좌의 최신 AWS Paper 잔고 스냅샷이 없음.
+                            화면 진입 시 Snapshot Refresh를 시도한 뒤 저장된 AWS Paper DB 기준으로 표시함.
                         </p>
                     </div>
 
                     <div class="account-badges">
-                        <span class="soft-badge badge-live">모의투자</span>
-                        <span class="soft-badge badge-connector">커넥터 확인 필요</span>
+                        <span class="soft-badge badge-live">AWS Paper</span>
+                        <span class="soft-badge badge-connector">Snapshot 기준</span>
+                        <span class="soft-badge badge-count">Refresh enabled</span>
                         <span class="soft-badge badge-count">보유 <strong>0</strong> 종목</span>
                     </div>
                 </div>
@@ -63,8 +64,9 @@
                         </div>
 
                         <div class="account-badges">
-                            <span class="soft-badge badge-live">모의투자</span>
-                            <span class="soft-badge badge-connector">커넥터</span>
+                            <span class="soft-badge badge-live">AWS Paper</span>
+                            <span class="soft-badge badge-connector">Snapshot 기준</span>
+                            <span class="soft-badge badge-count">Refresh enabled</span>
                             <span class="soft-badge badge-count">
                                 보유 <strong th:text="${dashboard.positionCount}">0</strong> 종목
                             </span>

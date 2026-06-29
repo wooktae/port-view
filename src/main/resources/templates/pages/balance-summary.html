@@ -34,7 +34,7 @@
     <main class="app-main dashboard-main balance-main">
         <header class="dashboard-page-title">
             <h1>잔고</h1>
-            <p>계좌의 총 평가금액, 초기 투자금, 현금, 보유 종목 평가금액을 확인하는 화면.</p>
+            <p>화면 진입 시 AWS Paper 계좌 스냅샷을 갱신하고, 총 평가금액·초기 투자금·현금·보유 종목 평가금액을 확인하는 화면.</p>
         </header>
 
         <section class="dashboard-stage">
@@ -88,7 +88,7 @@
                              th:text="${#numbers.formatInteger(b.totalEvalAmount != null ? b.totalEvalAmount : 0, 1, 'COMMA')} + '원'">
                             9,997,822원
                         </div>
-                        <div class="metric-subtitle">커넥터 잔고 기준 총 평가금액</div>
+                        <div class="metric-subtitle">AWS Paper 스냅샷 기준 총 평가금액</div>
                     </article>
 
                     <article class="metric-card metric-cash">
@@ -128,7 +128,7 @@
                              th:text="${#numbers.formatInteger(resolvedDisplayCashAmount, 1, 'COMMA')} + '원'">
                             8,072,062원
                         </div>
-                        <div class="metric-subtitle">총 평가금액 - 주식 평가금액</div>
+                        <div class="metric-subtitle">AWS Paper 스냅샷 기준 주문 가능 현금</div>
                     </article>
 
                     <article class="metric-card metric-stock">
@@ -137,7 +137,7 @@
                              th:text="${#numbers.formatInteger(resolvedStockEvalAmount, 1, 'COMMA')} + '원'">
                             1,859,060원
                         </div>
-                        <div class="metric-subtitle">최신 보유 종목 평가금액 합계</div>
+                        <div class="metric-subtitle">최신 보유 종목 스냅샷 평가금액 합계</div>
                     </article>
 
                     <article th:class="'metric-card ' + ${resolvedEvalProfitCardClass}">

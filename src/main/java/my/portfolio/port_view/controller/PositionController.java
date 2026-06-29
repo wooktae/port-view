@@ -3,40 +3,42 @@ package my.portfolio.port_view.controller;
 import my.portfolio.port_view.common.ViewNames;
 import my.portfolio.port_view.dto.position.PositionDetailPageDTO;
 import my.portfolio.port_view.dto.position.PositionPageDTO;
+import my.portfolio.port_view.service.ConnectorSnapshotRefreshService;
 import my.portfolio.port_view.service.PositionService;
 import my.portfolio.port_view.util.AccountNoResolver;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import my.portfolio.port_view.service.ConnectorSnapshotRefreshService;
-
 /**
  * Connector 기반 보유종목 화면 Controller
  *
  * URL:
  * - /positions
- * - /positions?accountNo=50187518
- * - /positions/{tickerCode}?accountNo=50187518
+ * - /positions?accountNo=...
+ * - /positions/{tickerCode}?accountNo=...
  */
 @Controller
 public class PositionController {
 
     private final PositionService positionService;
     private final AccountNoResolver accountNoResolver;
-
     private final ConnectorSnapshotRefreshService connectorSnapshotRefreshService;
+    private final boolean snapshotRefreshEnabled;
 
     public PositionController(
             PositionService positionService,
             AccountNoResolver accountNoResolver,
-            ConnectorSnapshotRefreshService connectorSnapshotRefreshService
+            ConnectorSnapshotRefreshService connectorSnapshotRefreshService,
+            @Value("${portfolio.snapshot-refresh.enabled:false}") boolean snapshotRefreshEnabled
     ) {
         this.positionService = positionService;
         this.accountNoResolver = accountNoResolver;
         this.connectorSnapshotRefreshService = connectorSnapshotRefreshService;
+        this.snapshotRefreshEnabled = snapshotRefreshEnabled;
     }
 
     @GetMapping("/positions")
@@ -46,7 +48,9 @@ public class PositionController {
     ) {
         String resolvedAccountNo = accountNoResolver.resolve(accountNo);
 
-        connectorSnapshotRefreshService.refreshNow(resolvedAccountNo);
+        if (snapshotRefreshEnabled) {
+            connectorSnapshotRefreshService.refreshNow(resolvedAccountNo);
+        }
 
         PositionPageDTO page = positionService.getPositionPage(resolvedAccountNo);
 
@@ -64,8 +68,10 @@ public class PositionController {
     ) {
         String resolvedAccountNo = accountNoResolver.resolve(accountNo);
 
-        connectorSnapshotRefreshService.refreshIfStale(resolvedAccountNo);
-        
+        if (snapshotRefreshEnabled) {
+            connectorSnapshotRefreshService.refreshIfStale(resolvedAccountNo);
+        }
+
         PositionDetailPageDTO page =
                 positionService.getPositionDetailPage(resolvedAccountNo, tickerCode);
 

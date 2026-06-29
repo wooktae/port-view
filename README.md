@@ -19,11 +19,14 @@ Spring MVC 기반 Portfolio View 모듈입니다. 포트폴리오 현황, 잔고
 ## 주요 화면
 
 - Dashboard: `/`, `/dashboard`
-  - 계좌 요약, 최근 주문, 보유 종목, 최신 전략 실행/리포트 요약을 표시합니다.
+  - 계좌 요약, 최근 주문, 보유 종목, 최신 전략 실행/리포트 요약을 DB 기준으로 표시합니다.
+  - `portfolio.snapshot-refresh.enabled=true` + `portfolio.dashboard.snapshot-refresh-enabled=true` 조합이면 진입 시 AWS Paper 계좌 Snapshot Refresh가 활성화될 수 있습니다.
 - Balance: `/balance-summary`
   - 계좌 잔고 요약과 평가금액 관련 정보를 표시합니다.
+  - `portfolio.snapshot-refresh.enabled=true`이면 진입 시 계좌 스냅샷 refresh 후 잔고를 조회합니다.
 - Positions: `/positions`, `/positions/{tickerCode}`
   - 보유 종목 목록과 종목 상세 화면을 제공합니다.
+  - 목록 진입 시 Snapshot Refresh 후 DB 기준으로 보유 종목을 조회하고, 상세 화면은 stale 기준으로 refresh를 수행합니다.
 - Orders: `/orders`, `/orders/{id}`
   - Connector 주문 요청, 주문 체인, 이벤트, 체결 정보를 조회합니다.
 - Strategy Execution: `/strategy/execution/plans`, `/strategy/execution/plans/{planId}`
@@ -33,7 +36,9 @@ Spring MVC 기반 Portfolio View 모듈입니다. 포트폴리오 현황, 잔고
 - Strategy Daily: `/strategy/daily/latest`, `/strategy/daily/{dailyRunId}`
   - Daily Run, signal, position decision 조회 화면입니다.
 - Daily Batch: `/daily-batch`, `/daily-batch/{batchRunId}`
-  - Daily Batch 실행 이력, step 로그, 수동 실행, 재실행, Slack 테스트 액션을 제공합니다.
+  - Daily Batch 실행 이력, 단계별 실행 결과, status 색상, 로그 보기 UI를 제공합니다.
+  - Local File 기반 Step 1~17 실행 gate를 화면에서 확인할 수 있고, 수동 실행/재실행/Slack 테스트 액션을 제공합니다.
+  - 전체 1~17 또는 Step 10/11/12 포함 범위는 AWS Paper 주문 제출 가능성이 있으므로, 운영자는 실행 버튼 클릭 전 실행 범위와 gate를 반드시 확인해야 합니다.
 
 ## 패키지 구조 요약
 
@@ -66,6 +71,24 @@ Windows PowerShell에서는 다음을 사용할 수 있습니다.
 ```
 
 기본 서버 포트는 `application.properties`의 `server.port` 설정을 따릅니다.
+
+### AWS Paper Local View 실행
+
+AWS Paper 환경의 RDS와 secret을 사용해서 Local View를 띄우는 경우에는 다음 전제가 충족되어 있어야 합니다.
+
+- AWS Paper RDS로 향하는 port forwarding(예: `127.0.0.1:15433`)이 별도 창에서 미리 열려 있어야 합니다.
+- 로컬 secret loader 또는 환경변수로 DB/KIS secret과 계좌번호가 준비되어 있어야 합니다. 실제 값은 저장소에 기록하지 않고 `[REDACTED]` 처리합니다.
+
+View 실행은 운영자 로컬 도구 폴더의 starter 스크립트 한 줄로 가능합니다.
+
+```powershell
+C:\Workspaces\portfolio-local-env\Start-PortfolioViewAwsPaperBatch.ps1
+```
+
+실행 스크립트 역할은 다음과 같습니다(스크립트 자체는 운영자 로컬 도구 폴더에 위치하며 본 저장소 범위 밖입니다).
+
+- `Load-PortfolioViewAwsPaperBatchEnv.ps1`: UTF-8 콘솔, DB/KIS secret, `aws-paper` profile, 기본 계좌, Snapshot Refresh, Daily Batch gate 환경변수를 로드합니다.
+- `Start-PortfolioViewAwsPaperBatch.ps1`: 위 Load 파일을 dot-source한 뒤 `port-view`에서 `mvnw spring-boot:run -Dspring-boot.run.profiles=aws-paper`를 실행합니다.
 
 ## 빌드 방법
 
@@ -105,6 +128,41 @@ Daily Batch와 Connector 연동은 외부 프로젝트 및 API에 의존합니�
 - `slack.*`: Slack 알림 활성화 여부와 webhook 설정
 
 민감정보 값은 저장소에 직접 두지 않고 환경변수 또는 로컬 전용 설정으로 분리해야 합니다.
+
+### Snapshot Refresh 설정
+
+Dashboard / Balance / Positions 진입 시 계좌 스냅샷을 새로 받아오는 동작은 다음 설정으로 제어합니다.
+
+- `portfolio.snapshot-refresh.enabled`: Snapshot Refresh 전체 활성 여부
+- `portfolio.dashboard.snapshot-refresh-enabled`: Dashboard 진입 시 Snapshot Refresh 사용 여부
+- `portfolio.snapshot-refresh.stale-minutes`: 스냅샷을 stale로 판정하는 분 단위 임계값
+- `portfolio.snapshot-refresh.timeout-seconds`: refresh subprocess 최대 실행 시간
+- `portfolio.snapshot-refresh.marketconnector-dir`: `connector_balance.py`를 실행할 MarketConnector 디렉터리 경로
+- `portfolio.snapshot-refresh.balance-script-name`: 실행할 balance 스크립트 파일명
+- `portfolio.snapshot-refresh.python-executable`: 사용할 Python 실행 파일 경로
+
+### DB user 분리
+
+Spring View datasource와 Connector subprocess는 서로 다른 DB user를 사용합니다.
+
+- Spring View datasource는 `view_app`을 사용합니다.
+- `ConnectorSnapshotRefreshService`가 실행하는 `connector_balance.py` subprocess는 `marketconnector_app`을 사용합니다.
+- `view_app`에 connector 쓰기 권한을 부여하는 방식이 아니라, subprocess의 DB user 자체를 분리한 구조입니다.
+
+### Daily Batch gate
+
+Daily Batch 화면에서 실행 가능한 step 범위는 다음 gate로 제한합니다.
+
+- `portfolio.batch.execution-enabled`: 화면에서 Daily Batch 실행 액션 허용 여부
+- `portfolio.batch.local-file-execution-enabled`: Local File 기반 실행 허용 여부
+- `portfolio.batch.full-pipeline-execution-enabled`: 전체 1~17 실행 허용 여부
+- `portfolio.batch.paper-order-enabled`: Paper 주문 제출 가능 step 허용 여부
+- `portfolio.batch.min-executable-step-order`: 실행 허용 최소 step order
+- `portfolio.batch.max-executable-step-order`: 실행 허용 최대 step order
+
+### 안전 주의
+
+`BATCH_PAPER_ORDER_ENABLED=true`이면 Daily Batch 화면에서 Step 12 이상 또는 전체 1~17 범위 실행 시 실제 AWS Paper 주문이 제출될 수 있습니다. 운영자는 버튼 클릭 전 실행 범위와 gate를 반드시 확인해야 합니다.
 
 DB 접속 환경변수:
 

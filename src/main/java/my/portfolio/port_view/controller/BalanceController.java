@@ -3,7 +3,9 @@ package my.portfolio.port_view.controller;
 import my.portfolio.port_view.common.ViewNames;
 import my.portfolio.port_view.entity.BalanceSummary;
 import my.portfolio.port_view.service.BalanceService;
+import my.portfolio.port_view.service.ConnectorSnapshotRefreshService;
 import my.portfolio.port_view.util.AccountNoResolver;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.math.BigDecimal;
 import java.util.List;
-import my.portfolio.port_view.service.ConnectorSnapshotRefreshService;
 
 @Controller
 public class BalanceController {
@@ -19,15 +20,18 @@ public class BalanceController {
     private final BalanceService balanceService;
     private final AccountNoResolver accountNoResolver;
     private final ConnectorSnapshotRefreshService connectorSnapshotRefreshService;
+    private final boolean snapshotRefreshEnabled;
 
     public BalanceController(
             BalanceService balanceService,
             AccountNoResolver accountNoResolver,
-            ConnectorSnapshotRefreshService connectorSnapshotRefreshService
+            ConnectorSnapshotRefreshService connectorSnapshotRefreshService,
+            @Value("${portfolio.snapshot-refresh.enabled:false}") boolean snapshotRefreshEnabled
     ) {
         this.balanceService = balanceService;
         this.accountNoResolver = accountNoResolver;
         this.connectorSnapshotRefreshService = connectorSnapshotRefreshService;
+        this.snapshotRefreshEnabled = snapshotRefreshEnabled;
     }
 
     @GetMapping("/balance-summary")
@@ -37,8 +41,10 @@ public class BalanceController {
     ) {
         String resolvedAccountNo = accountNoResolver.resolve(accountNo);
 
-        connectorSnapshotRefreshService.refreshNow(resolvedAccountNo);
-        
+        if (snapshotRefreshEnabled) {
+            connectorSnapshotRefreshService.refreshNow(resolvedAccountNo);
+        }
+
         List<BalanceSummary> list = balanceService.listByAccount(resolvedAccountNo);
         BigDecimal stockEvalAmount = balanceService.getLatestStockEvalAmount(resolvedAccountNo);
         int holdingCount = balanceService.getLatestHoldingCount(resolvedAccountNo);

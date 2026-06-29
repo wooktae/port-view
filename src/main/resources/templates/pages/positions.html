@@ -21,7 +21,7 @@
     <main class="app-main dashboard-main positions-main">
         <header class="dashboard-page-title">
             <h1>보유 종목</h1>
-            <p>현재 계좌의 보유 종목, 평가금액, 수익률, 포트폴리오 비중을 확인하는 화면.</p>
+            <p>화면 진입 시 AWS Paper 계좌 스냅샷을 갱신하고, 현재 보유 종목·평가금액·수익률·포트폴리오 비중을 확인하는 화면.</p>
         </header>
 
         <section class="dashboard-stage">
@@ -35,7 +35,7 @@
                         <h2>현재 보유 종목 없음</h2>
                         <p>
                             현재 계좌에 표시할 보유 종목이 없음.
-                            필요 시 Connector 잔고 수집을 다시 실행하거나 계좌번호를 확인하면 됨.
+                            화면 진입 시 Snapshot Refresh를 시도한 뒤 저장된 AWS Paper DB 기준으로 표시함.
                         </p>
                     </div>
                 </div>

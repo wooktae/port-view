@@ -3,7 +3,9 @@
 <body>
 <aside class="app-sidebar" th:fragment="sidebar(activeMenu, accountNo)">
     <div class="sidebar-brand">
-        <a class="brand-mark" th:href="@{/dashboard(accountNo=${accountNo})}" aria-label="Portfolio View Home">
+        <a class="brand-mark"
+           th:href="@{/balance-summary(accountNo=${accountNo})}"
+           aria-label="Portfolio View Home">
             <span>PV</span>
         </a>
         <div class="brand-copy">
@@ -14,6 +16,7 @@
 
     <nav class="sidebar-nav" aria-label="주요 메뉴">
         <a class="sidebar-link"
+           th:if="${@environment.getProperty('portfolio.view.menu.dashboard-enabled', 'true') == 'true'}"
            th:classappend="${activeMenu == 'dashboard'} ? ' active' : ''"
            th:href="@{/dashboard(accountNo=${accountNo})}">
             <span class="sidebar-icon">⌂</span>
@@ -21,6 +24,7 @@
         </a>
 
         <a class="sidebar-link"
+           th:if="${@environment.getProperty('portfolio.view.menu.balance-enabled', 'true') == 'true'}"
            th:classappend="${activeMenu == 'balance'} ? ' active' : ''"
            th:href="@{/balance-summary(accountNo=${accountNo})}">
             <span class="sidebar-icon">₩</span>
@@ -28,6 +32,7 @@
         </a>
 
         <a class="sidebar-link"
+           th:if="${@environment.getProperty('portfolio.view.menu.positions-enabled', 'true') == 'true'}"
            th:classappend="${activeMenu == 'positions'} ? ' active' : ''"
            th:href="@{/positions(accountNo=${accountNo})}">
             <span class="sidebar-icon">▦</span>
@@ -35,6 +40,7 @@
         </a>
 
         <a class="sidebar-link"
+           th:if="${@environment.getProperty('portfolio.view.menu.orders-enabled', 'true') == 'true'}"
            th:classappend="${activeMenu == 'orders'} ? ' active' : ''"
            th:href="@{/orders(accountNo=${accountNo})}">
             <span class="sidebar-icon">↕</span>
@@ -42,20 +48,23 @@
         </a>
 
         <a class="sidebar-link"
+           th:if="${@environment.getProperty('portfolio.view.menu.strategy-enabled', 'true') == 'true'}"
            th:classappend="${activeMenu == 'strategy'} ? ' active' : ''"
            th:href="@{/strategy/execution/plans}">
             <span class="sidebar-icon">◇</span>
             <span class="sidebar-text">전략 운영</span>
         </a>
-        
+
         <a class="sidebar-link"
-        th:classappend="${activeMenu == 'daily-batch'} ? ' active' : ''"
-        th:href="@{/daily-batch(accountNo=${accountNo})}">
+           th:if="${@environment.getProperty('portfolio.view.menu.daily-batch-enabled', 'true') == 'true'}"
+           th:classappend="${activeMenu == 'daily-batch'} ? ' active' : ''"
+           th:href="@{/daily-batch(accountNo=${accountNo})}">
             <span class="sidebar-icon">⟳</span>
             <span class="sidebar-text">Daily 배치</span>
         </a>
 
         <a class="sidebar-link"
+           th:if="${@environment.getProperty('portfolio.view.menu.report-enabled', 'true') == 'true'}"
            th:classappend="${activeMenu == 'report'} ? ' active' : ''"
            th:href="@{/strategy/reports/latest}">
             <span class="sidebar-icon">⌁</span>
@@ -66,9 +75,9 @@
     <div class="sidebar-spacer"></div>
 
     <div class="sidebar-card">
-        <div class="sidebar-card-kicker">LIVE OPS</div>
+        <div class="sidebar-card-kicker">SNAPSHOT REFRESH</div>
         <strong>운영 콘솔 v2</strong>
-        <p>좌측 메뉴와 우측 콘텐츠가 하나의 운영 화면처럼 이어지는 구조.</p>
+        <p>Dashboard·잔고·보유 종목 진입 시 AWS Paper 계좌 스냅샷을 갱신하고 DB 기준으로 표시.</p>
     </div>
 </aside>
 </body>

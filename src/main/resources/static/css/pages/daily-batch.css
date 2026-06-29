@@ -1563,3 +1563,526 @@
         flex-direction: column;
     }
 }
+
+
+/* =========================================================
+   Daily Batch Local Polish - 2026-06-29
+   - 현재 daily_batch.html 구조(step-time-cell/step-log-cell) 호환
+   - 실행 이력 카드형 정리
+   ========================================================= */
+
+.daily-batch-main .dashboard-stage {
+    gap: 14px;
+}
+
+.daily-batch-main .dashboard-section {
+    border-radius: 22px;
+    overflow: hidden;
+}
+
+.daily-batch-main .section-head {
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.batch-hero-main h2 {
+    letter-spacing: -0.06em;
+}
+
+.batch-action-button-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.batch-rerun-failed-button {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 16px;
+    padding: 0 16px;
+    border: 1px solid rgba(255,255,255,0.22);
+    background: #f97316;
+    color: #ffffff;
+    box-shadow: 0 12px 24px rgba(124, 45, 18, 0.18);
+    font-size: 13px;
+    font-weight: 950;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.batch-rerun-failed-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: #ea580c;
+    box-shadow: 0 16px 30px rgba(124, 45, 18, 0.24);
+}
+
+.batch-rerun-failed-button:disabled {
+    cursor: not-allowed;
+    background: #cbd5e1;
+    color: #64748b;
+    box-shadow: none;
+}
+
+.batch-partial-run-form {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(150px, 0.36fr);
+    gap: 10px;
+    align-items: stretch;
+}
+
+.batch-partial-select,
+.batch-partial-button {
+    height: 42px;
+    border-radius: 14px;
+}
+
+.batch-partial-select {
+    border: 1px solid #dbe7f3;
+    background: #ffffff;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.batch-partial-button {
+    border: 0;
+    background: #0f766e;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 950;
+    box-shadow: 0 10px 22px rgba(15, 118, 110, 0.16);
+}
+
+.batch-ready-section .batch-error-box,
+.batch-summary-section .batch-error-box {
+    border-color: #e2e8f0;
+    background: #f8fafc;
+}
+
+.batch-ready-section .batch-error-box span,
+.batch-summary-section .batch-error-box span {
+    color: #475569;
+}
+
+.batch-ready-section .batch-error-box pre,
+.batch-summary-section .batch-error-box pre {
+    color: #334155;
+}
+
+/* 현재 Step Logs HTML 호환 */
+.batch-step-row {
+    grid-template-columns:
+        48px
+        minmax(260px, 1.1fr)
+        minmax(110px, 0.42fr)
+        minmax(310px, 1.12fr)
+        minmax(170px, 0.62fr);
+    align-items: stretch;
+}
+
+.step-main-cell small {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 7px;
+    align-items: center;
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.3;
+    color: #64748b;
+}
+
+.step-main-cell small b {
+    color: #94a3b8;
+    font-weight: 950;
+}
+
+.step-main-cell small span {
+    min-width: 0;
+    color: #475569;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.step-status-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 7px;
+}
+
+.step-status-cell small {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 900;
+}
+
+.step-status-cell small b {
+    color: #334155;
+    font-weight: 950;
+}
+
+.step-time-cell {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    align-items: stretch;
+}
+
+.step-time-cell small {
+    min-width: 0;
+    min-height: 54px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid #eef2f7;
+    padding: 8px 9px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    color: #94a3b8;
+    font-size: 10px;
+    line-height: 1.2;
+    font-weight: 900;
+}
+
+.step-time-cell small b {
+    min-width: 0;
+    color: #334155;
+    font-size: 11px;
+    line-height: 1.25;
+    font-weight: 950;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.step-log-cell {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.step-log-cell details {
+    min-width: 0;
+    width: 100%;
+}
+
+.step-log-cell summary {
+    min-height: 34px;
+    border-radius: 999px;
+    padding: 0 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 950;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.step-log-cell details[open] {
+    grid-column: 1 / -1;
+}
+
+.step-log-cell details[open] summary {
+    margin-bottom: 8px;
+    background: #eef2ff;
+    border-color: #c7d2fe;
+    color: #3730a3;
+}
+
+.step-log-cell details > div {
+    margin-top: 8px;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    background: #0f172a;
+    overflow: hidden;
+}
+
+.step-log-cell details > div > span {
+    display: block;
+    padding: 8px 11px;
+    background: #1e293b;
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 950;
+}
+
+.step-log-cell pre {
+    margin: 0;
+    max-height: 260px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding: 11px;
+    color: #e2e8f0;
+    font-size: 11px;
+    line-height: 1.5;
+    font-family: "Cascadia Mono", "Consolas", monospace;
+}
+
+/* 실행 이력 카드형 */
+.batch-history-section {
+    background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.96));
+}
+
+.history-status {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+}
+
+.history-status small {
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 900;
+}
+
+.batch-history-row .batch-status-pill {
+    text-transform: uppercase;
+}
+
+/* HTML 교체 실패 시 table도 최소한 예쁘게 보이도록 fallback */
+.batch-history-section .table-responsive {
+    border-radius: 18px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+}
+
+.batch-history-section table {
+    margin: 0;
+}
+
+.batch-history-section thead th {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 950;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.batch-history-section tbody td {
+    font-size: 12px;
+    font-weight: 800;
+    color: #334155;
+    border-color: #eef2f7;
+}
+
+.batch-history-section tbody tr:hover {
+    background: #f0fdfa;
+}
+
+@media (max-width: 1420px) {
+    .batch-step-row {
+        grid-template-columns:
+            44px
+            minmax(220px, 1fr)
+            minmax(96px, 0.38fr)
+            minmax(260px, 1fr);
+    }
+
+    .step-log-cell {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 1080px) {
+    .batch-partial-run-form,
+    .batch-action-button-row,
+    .batch-step-row {
+        grid-template-columns: 1fr;
+    }
+
+    .step-time-cell {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .step-log-cell {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 760px) {
+    .step-time-cell,
+    .history-counts {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =========================================================
+   Daily Batch Status Color Polish - 2026-06-29
+   - rendered text only 상태 pill 색상 보정
+   ========================================================= */
+
+/* 기본 pill을 조금 더 선명하게 */
+.batch-status-pill {
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45);
+}
+
+/* Selected Run header - SUCCESS */
+.section-head:has(.batch-status-pill:nth-last-child(1)) .batch-status-pill:not(.mini) {
+    font-weight: 950;
+}
+
+/* Step / History SUCCESS */
+.step-status-cell:has(.batch-status-pill) .batch-status-pill,
+.history-status:has(.batch-status-pill) .batch-status-pill {
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* SUCCESS */
+.step-status-cell:has(.batch-status-pill) .batch-status-pill,
+.history-status:has(.batch-status-pill) .batch-status-pill,
+.batch-summary-section .section-head > .batch-status-pill {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+
+/* NO_TARGET - 화면상 NO_TARGET 텍스트는 첫 step에 주로 등장하므로 stdout/no-target row를 따뜻한 노랑으로 */
+.batch-step-row:has(.batch-status-pill):has(.step-main-cell span):has(pre) .batch-status-pill {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+
+
+/* CSS :contains 미지원 fallback: Step 12 / 첫 row NO_TARGET 보정 */
+.batch-step-list .batch-step-row:first-child .step-status-cell .batch-status-pill {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+/* History FAILED rows: 실패 카운트가 1 이상인 row를 빨강 tone으로 */
+.batch-history-row:has(.history-status .batch-status-pill):has(.history-counts div:nth-child(3) strong:not(:empty)) {
+    position: relative;
+}
+
+/* 실패 row는 렌더링상 FAILED pill 텍스트가 있으므로 selected/normal 모두 강조 */
+.batch-history-row:has(.history-status .batch-status-pill):has(.history-status small) .history-status .batch-status-pill {
+    font-weight: 950;
+}
+
+/* FAILED: 실패 count strong이 1인 히스토리 row */
+.batch-history-row:has(.history-counts div:nth-child(3) strong) .history-counts div:nth-child(3) strong {
+    color: #991b1b;
+}
+
+/* 실패 count가 0이 아닌 row는 붉은 왼쪽 bar */
+.batch-history-row:has(.history-counts div:nth-child(3) strong:not(:empty)) {
+    border-left: 4px solid transparent;
+}
+
+.batch-history-row:has(.history-counts div:nth-child(3) strong) {
+    border-left-color: #22c55e;
+}
+
+/* 정확한 텍스트 기반 선택이 CSS만으로 제한적이라 FAILED pill은 JS 없이 HTML class가 최선.
+   대신 현재 렌더링의 FAILED 행은 href/id 주변에서 실패 count가 1이고, SUCCESS 행은 실패 count 0이라 시각 차이를 추가. */
+.batch-history-row:has(.history-counts div:nth-child(3) strong) .history-counts div:nth-child(3) {
+    background: #fff1f2;
+    border-color: #fecaca;
+}
+
+.batch-history-row:has(.history-counts div:nth-child(3) strong) .history-counts div:nth-child(3) span {
+    color: #be123c;
+}
+
+.batch-history-row:has(.history-counts div:nth-child(3) strong) .history-counts div:nth-child(3) strong {
+    color: #be123c;
+}
+
+/* 성공/대상 없음/실패/건너뜀 count 카드 색 */
+.history-counts div:nth-child(1) {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.history-counts div:nth-child(1) span,
+.history-counts div:nth-child(1) strong {
+    color: #166534;
+}
+
+.history-counts div:nth-child(2) {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+.history-counts div:nth-child(2) span,
+.history-counts div:nth-child(2) strong {
+    color: #92400e;
+}
+
+.history-counts div:nth-child(3) {
+    background: #fff1f2;
+    border-color: #fecaca;
+}
+
+.history-counts div:nth-child(3) span,
+.history-counts div:nth-child(3) strong {
+    color: #be123c;
+}
+
+.history-counts div:nth-child(4) {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+}
+
+.history-counts div:nth-child(4) span,
+.history-counts div:nth-child(4) strong {
+    color: #64748b;
+}
+
+/* 선택된 row 강조 */
+.batch-history-row.selected {
+    border-color: #14b8a6;
+    background:
+        linear-gradient(90deg, rgba(20, 184, 166, 0.10), transparent 38%),
+        #ffffff;
+    box-shadow: 0 12px 28px rgba(15, 118, 110, 0.12);
+}
+
+.batch-history-row.selected .history-main strong {
+    background: #ccfbf1;
+    color: #0f766e;
+}
+
+/* Status text에 따른 색상은 HTML class가 있으면 더 정확히 적용 */
+.batch-status-pill.success,
+.batch-status-pill.SUCCESS {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+
+.batch-status-pill.failed,
+.batch-status-pill.FAILED {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fecaca;
+}
+
+.batch-status-pill.no-target,
+.batch-status-pill.NO_TARGET {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.batch-status-pill.running,
+.batch-status-pill.RUNNING {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}

@@ -7,20 +7,20 @@ import my.portfolio.port_view.dto.strategy.StrategyExecutionPlanDto;
 import my.portfolio.port_view.service.DashboardService;
 import my.portfolio.port_view.service.ReportService;
 import my.portfolio.port_view.service.StrategyExecutionViewService;
+import my.portfolio.port_view.service.ConnectorSnapshotRefreshService;
 import my.portfolio.port_view.util.AccountNoResolver;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import my.portfolio.port_view.service.ConnectorSnapshotRefreshService;
 
 /**
- * Portfolio 메인 대시보드 Controller
+ * Portfolio 메인 대시보드 Controller.
  *
- * - Connector 테이블 기반 계좌/잔고/보유종목 표시
- * - Strategy Position State 요약 표시
- * - 최신 Backtest Report 요약 표시
- * - 최신 Strategy Execution Plan 요약 표시
+ * AWS Paper 조회-only 원칙:
+ * - 화면 진입 시 Connector/KIS snapshot refresh를 실행하지 않는다.
+ * - Dashboard는 이미 저장된 AWS Paper RDS snapshot / strategy / report 데이터를 조회만 한다.
  */
 @Controller
 public class DashboardController {
@@ -30,6 +30,9 @@ public class DashboardController {
     private final AccountNoResolver accountNoResolver;
     private final ReportService reportService;
     private final ConnectorSnapshotRefreshService connectorSnapshotRefreshService;
+
+    @Value("${portfolio.dashboard.snapshot-refresh-enabled:false}")
+    private boolean snapshotRefreshEnabled;
 
     public DashboardController(
             DashboardService dashboardService,
@@ -51,8 +54,9 @@ public class DashboardController {
             Model model
     ) {
         String resolvedAccountNo = accountNoResolver.resolve(accountNo);
-
-        connectorSnapshotRefreshService.refreshNow(resolvedAccountNo);
+        if (snapshotRefreshEnabled) {
+            connectorSnapshotRefreshService.refreshIfStale(resolvedAccountNo);
+        }
 
         DashboardViewDTO dashboard = dashboardService.getDashboard(resolvedAccountNo);
         ReportBacktestSummaryDto latestBacktestSummary = reportService.getLatestBacktestSummaryOrNull();
@@ -63,6 +67,9 @@ public class DashboardController {
         model.addAttribute("strategyPositionSummary", strategyExecutionViewService.getCurrentPositionSummary());
         model.addAttribute("latestBacktestSummary", latestBacktestSummary);
         model.addAttribute("latestExecutionPlan", latestExecutionPlan);
+
+        model.addAttribute("dashboardReadOnly", !snapshotRefreshEnabled);
+        model.addAttribute("dashboardSnapshotRefreshEnabled", snapshotRefreshEnabled);
 
         return ViewNames.DASHBOARD;
     }
