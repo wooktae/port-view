@@ -7,6 +7,7 @@ import my.portfolio.port_view.dto.dailybatch.DailyBatchPageDto;
 import my.portfolio.port_view.service.DailyBatchAsyncService;
 import my.portfolio.port_view.service.DailyBatchService;
 import my.portfolio.port_view.service.SlackNotificationService;
+import my.portfolio.port_view.service.StepFunctionsDailyBatchExecutionService;
 import my.portfolio.port_view.util.AccountNoResolver;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -22,6 +23,7 @@ public class DailyBatchController {
 
     private final DailyBatchService dailyBatchService;
     private final DailyBatchAsyncService dailyBatchAsyncService;
+    private final StepFunctionsDailyBatchExecutionService stepFunctionsDailyBatchExecutionService;
     private final AccountNoResolver accountNoResolver;
     private final SlackNotificationService slackNotificationService;
     private final DailyBatchProperties batchProperties;
@@ -157,6 +159,55 @@ public class DailyBatchController {
         }
     }
 
+
+    /**
+     * AWS Step Functions Daily Pipeline range StartExecution.
+     *
+     * 기존 local-file ProcessBuilder 실행과 분리한다.
+     * 1차 연결에서는 Step 1~11 safe range만 사용한다.
+     */
+    @PostMapping("/daily-batch/aws-stepfunctions/start-range")
+    public String startAwsStepfunctionsRange(
+            @RequestParam String fromStepCode,
+            @RequestParam String toStepCode,
+            @RequestParam(required = false) String accountNo,
+            RedirectAttributes redirectAttributes
+    ) {
+        String resolvedAccountNo = accountNoResolver.resolve(accountNo);
+
+        if (!batchProperties.canStartAwsStepfunctions()) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "AWS Step Functions 실행은 현재 비활성화되어 있습니다. " + currentModeText()
+            );
+
+            return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
+        }
+
+        try {
+            StepFunctionsDailyBatchExecutionService.StartExecutionResult result =
+                    stepFunctionsDailyBatchExecutionService.startSafeRange(
+                            fromStepCode,
+                            toStepCode,
+                            resolvedAccountNo
+                    );
+
+            redirectAttributes.addFlashAttribute(
+                    "successMessage",
+                    "AWS Step Functions 실행 시작: "
+                            + result.executionName()
+                            + " / executionArn="
+                            + result.redactedExecutionArn()
+            );
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "AWS Step Functions 실행 시작 실패: " + e.getMessage()
+            );
+        }
+
+        return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
+    }
     /**
      * Slack 테스트 메시지 전송.
      */

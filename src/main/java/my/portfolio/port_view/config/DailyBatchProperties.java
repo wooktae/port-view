@@ -138,6 +138,23 @@ public class DailyBatchProperties {
     private boolean awsStepfunctionsStepStartEnabled = false;
 
     /**
+     * AWS Step Functions region.
+     */
+    private String awsStepfunctionsRegion = "ap-northeast-2";
+
+    /**
+     * AWS Step Functions state machine ARN.
+     *
+     * 실제 값은 properties 파일에 직접 쓰지 않고 환경변수로 주입한다.
+     */
+    private String awsStepfunctionsStateMachineArn = "";
+
+    /**
+     * AWS Step Functions execution name prefix.
+     */
+    private String awsStepfunctionsExecutionNamePrefix = "port-view-daily";
+
+    /**
      * 장중 포지션 점검 수동 실행 gate.
      *
      * false이면 /daily-batch/intraday-monitor/run 을 서버단에서 차단한다.
@@ -324,6 +341,30 @@ public class DailyBatchProperties {
         this.awsStepfunctionsStepStartEnabled = awsStepfunctionsStepStartEnabled;
     }
 
+
+    public String getAwsStepfunctionsRegion() {
+        return awsStepfunctionsRegion;
+    }
+
+    public void setAwsStepfunctionsRegion(String awsStepfunctionsRegion) {
+        this.awsStepfunctionsRegion = awsStepfunctionsRegion;
+    }
+
+    public String getAwsStepfunctionsStateMachineArn() {
+        return awsStepfunctionsStateMachineArn;
+    }
+
+    public void setAwsStepfunctionsStateMachineArn(String awsStepfunctionsStateMachineArn) {
+        this.awsStepfunctionsStateMachineArn = awsStepfunctionsStateMachineArn;
+    }
+
+    public String getAwsStepfunctionsExecutionNamePrefix() {
+        return awsStepfunctionsExecutionNamePrefix;
+    }
+
+    public void setAwsStepfunctionsExecutionNamePrefix(String awsStepfunctionsExecutionNamePrefix) {
+        this.awsStepfunctionsExecutionNamePrefix = awsStepfunctionsExecutionNamePrefix;
+    }
     public boolean isIntradayMonitorEnabled() {
         return intradayMonitorEnabled;
     }

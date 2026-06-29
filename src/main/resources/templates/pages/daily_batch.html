@@ -150,7 +150,23 @@
                                 </button>
                             </form>
 
-                            <form th:action="@{/daily-batch/intraday-monitor/run}"
+                            
+                            <form th:action="@{/daily-batch/aws-stepfunctions/start-range}"
+                                  method="post"
+                                  class="batch-run-form">
+                                <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
+                                <input type="hidden" name="fromStepCode" value="CONNECTOR_BALANCE"/>
+                                <input type="hidden" name="toStepCode" value="DAILY_AUTO_BUY"/>
+
+                                <button type="submit"
+                                        class="batch-run-button"
+                                        th:disabled="${hasRunningBatch or !canStartAwsStepfunctions}">
+                                    <span th:if="${hasRunningBatch}">실행 중</span>
+                                    <span th:if="${!hasRunningBatch and canStartAwsStepfunctions}">AWS Step 1~11 시작</span>
+                                    <span th:if="${!hasRunningBatch and !canStartAwsStepfunctions}">AWS Step 1~11 비활성</span>
+                                </button>
+                            </form>
+<form th:action="@{/daily-batch/intraday-monitor/run}"
                                   method="post"
                                   class="batch-run-form batch-intraday-form">
                                 <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>

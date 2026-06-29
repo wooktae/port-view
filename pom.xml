@@ -49,6 +49,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- AWS SDK v2: Step Functions StartExecution -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sfn</artifactId>
+            <version>2.32.20</version>
+        </dependency>
+
         <!-- Lombok: compile-time only -->
         <dependency>
             <groupId>org.projectlombok</groupId>
