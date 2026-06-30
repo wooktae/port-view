@@ -229,3 +229,70 @@
  4) IAM Policy 전체 본문 / `simulate-principal-policy` 응답 본문 / Secrets Manager `GetSecretValue` 응답 본문 / SSM Parameter Store 응답 본문 / Spring Boot application log 전문 평문 인용 0건
  5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / 실제 state machine ARN / Slack webhook URL / DB password / Administrator password) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder
  6) 운영 식별자(commit hash `e72de6f` / Class 이름 `StepFunctionsDailyBatchExecutionService` / Spring properties key 라벨 / 환경변수 패턴 `INTEREST_DB_*` / Spring profile `aws-paper`) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님
+
+## 2026-06-30 (오후) — port-view ECS Fargate Task Role / Task Execution Role 분리 검증 1차 실증
+
+본 일자 오후 운영자가 직접 수행한 port-view ECS Fargate 1차 포팅 통과 + ECS View → AWS Step Functions Step 12~17 승인 실행 1차 실증 결과 중 06 spec(secrets / IAM) 범위에 해당하는 ECS Task Role / Task Execution Role 분리 검증 사실을 누적 기록한다. 본 노트는 port-view 측 코드 본문 / IAM Policy 전체 본문 / `simulate-principal-policy` 응답 본문 / Secrets Manager `GetSecretValue` 응답 본문 / Task Definition JSON 전체 본문 / Step Functions execution history 본문 / Slack 메시지 본문 / CloudWatch Logs 전문 평문 인용 0건(R-DOCS-001 정합).
+
+§1. Task Role / Task Execution Role 분리 1차 실증
+ 1) Task Role: 완료
+   (1) 이름 `portfolio-paper-view-task-role`(실제 ARN `[REDACTED_ARN]` placeholder / 본 노트 평문 기록 0건)
+   (2) 책임 = application 측 권한
+       - `states:StartExecution` 권한이 Step 12~17 approval state machine ARN(`portfolio-paper-daily-step12-17-approval`) 한정으로 부여
+       - 일반 workflow ARN(`portfolio-paper-daily-step1-17-approval`) 한정 부여는 06 spec 후속 phase 책임 그대로 유지
+       - Action / Resource wildcard 0건
+   (3) 1차 실증 evidence
+       - ECS View → Step Functions Step 12~17 승인 실행 통과(executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / status `SUCCEEDED`)
+       - R-AUTO-034 mitigation 의 (a) Task Role `states:StartExecution` 최소 권한 1차 실증 evidence
+ 2) Task Execution Role: 완료
+   (1) 이름 `portfolio-paper-ecs-task-execution-role`(실제 ARN `[REDACTED_ARN]` placeholder / 본 노트 평문 기록 0건)
+   (2) 책임 = ECS task 기동 시점 권한
+       - ECR repository `portfolio-view` pull
+       - CloudWatch Logs group `/ecs/portfolio-view` `PutLogEvents`
+       - Secrets Manager `GetSecretValue`(Resource = `/portfolio/paper/...` prefix 한정 부여 정책 그대로 유지 / 06 spec 후속 phase 책임)
+   (3) 1차 실증 evidence
+       - ECR pull 성공 + ECS task RUNNING + CloudWatch Logs 에 Spring Boot started 확인(log group `/ecs/portfolio-view` / raw 본문 평문 인용 0건)
+       - HikariPool RDS connection 성공 + default schema `ops` 확인(RDS 접속정보 Secrets Manager 주입 1차 실증 / 실제 secret ARN `[REDACTED_SECRET_ARN]` placeholder)
+ 3) 분리 정책 1차 실증: 완료
+   (1) Task Role 과 Task Execution Role 이 같은 IAM Role 로 합쳐지지 않도록 분리 부여 1차 실증
+       - Task Role 은 application 책임(예: `states:StartExecution`)
+       - Task Execution Role 은 기동 시점 책임(예: ECR pull / CloudWatch Logs / Secrets Manager)
+       - OD-SEC-005 / OD-SEC-006 / R-AUTO-034 mitigation 정합
+
+§2. Fargate task definition `environment` / `secrets` 블록 1차 실증
+ 1) `environment` 블록: 완료
+   (1) Spring profile `aws-paper` 주입
+   (2) `portfolio.batch.local-file-execution-enabled=false`(Fargate 안전 기본값 / R-AUTO-034 mitigation 정합)
+   (3) `paperOrderEnabled` · `fullPipelineExecutionEnabled` · `maxExecutableStepOrder` 등 gate 값 default 보다 완화 회귀 0건
+   (4) 기본 계좌번호 env 보정 — `PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO` + `PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO`(revision 1 → 2 보정 한정 / 계좌번호 12자리 원문 본 노트 평문 기록 0건 / `[REDACTED_ACCOUNT_NO]` placeholder)
+   (5) `portfolio.batch.aws-stepfunctions-approval-state-machine-arn` env 주입 — 실제 ARN `[REDACTED_ARN]` placeholder / 본 노트 평문 기록 0건
+ 2) `secrets` 블록: 완료
+   (1) RDS 접속정보 Secrets Manager 주입 1차 실증
+   (2) Resource ARN 패턴은 `/portfolio/paper/...` prefix 한정 정책 그대로 유지(R-SEC-005 / R-SEC-008 / R-DOCS-001 정합)
+   (3) KIS app key · app secret · 계좌번호 · DB password · Slack webhook URL 평문 기록 0건 / 모두 `[REDACTED]` 또는 placeholder
+
+§3. 결정 / 리스크 매핑
+ 1) 결정 본문 변경 없음
+   (1) OD-SEC-005 / OD-SEC-006 / OD-SEC-007 / OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 메모 보강
+       - 자세한 결정 변경은 `../_common/operator-decisions.md` Change Log 2026-06-30 (오후) 항목 참조
+ 2) 리스크 매핑
+   (1) R-AUTO-034 [2026-06-30 오후 보강] — Fargate Task Role `states:StartExecution` 권한이 Step 12~17 approval state machine ARN 한정 부여 1차 실증 / Task Role + Task Execution Role 분리 1차 실증 / Task Definition `environment` 안 gate 회귀 0건 / Status `Open` 유지(일반 + approval ARN 2종 모두 한정 부여 + Fargate 외부 노출 시점 default ENABLE 회귀 audit 통과 시점에 `Mitigated` 승격 후보)
+   (2) R-AUTO-033 [2026-06-30 오후 보강] — 운영자 IP/32 SG inbound + Public IP direct access + ECS View → Step 12~17 approval 3차 실증 통과 / Status `Mitigated` 유지(05 spec 책임)
+   (3) R-DOCS-001 / R-DOCS-002 / R-SEC-010 정합 — secret value / DB password / Slack webhook URL / Administrator password / 실제 ARN / image digest full sha256 / public IP / task ARN / ENI ID / broker_order_no 원문 평문 기록 금지 정책 그대로 유지
+
+§4. 후속 (06 spec 후속 phase 책임)
+ 1) Fargate port-view Task Role 의 `states:StartExecution` Resource 패턴을 일반 workflow ARN + approval workflow ARN 2종 모두 한정 부여
+   (1) `simulate-principal-policy` 검증 + Resource · Action wildcard 0건 audit
+   (2) IAM Policy 전체 본문 평문 기록 0건(R-DOCS-001 정합)
+ 2) Fargate task definition `secrets` 블록 정식 작성 — RDS 접속정보 + Slack webhook URL(R-AUTO-024 정합) + KIS app key · app secret 분리
+ 3) ALB / HTTPS / Route53 / Cloudflare Tunnel 도입 시점에 ACM / Route53 IAM 권한 추가 cross-spec audit
+ 4) DB password rotate(R-SEC-010 신규) 진입 시점에 Fargate port-view 측 secret 재검증
+ 5) CloudWatch Logs alarms / DLQ / retry / failure Slack 연동 점검 시 06 spec 측 IAM 권한 cross-spec audit
+
+§5. 본 일자 사실 기록 범위
+ 1) Kiro 작업 = 06 spec `operation-notes.md` 본 섹션 누적만 수행
+ 2) 운영자 직접 수행한 ECS task role / execution role 생성 · IAM Policy 작성 · ECR pull · CloudWatch Logs 연결 · Secrets Manager `GetSecretValue` 작업은 운영자 영역으로 cross-service AWS Migration spec 본 일자 작업으로 인한 변경 0건(spec 영역)
+ 3) AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건
+ 4) IAM Policy 전체 본문 / `simulate-principal-policy` 응답 본문 / Secrets Manager `GetSecretValue` 응답 본문 / SSM Parameter Store 응답 본문 / Task Definition JSON 전체 본문 / Step Functions execution history 본문 / Slack 메시지 본문 / CloudWatch Logs 전문 / Spring Boot application log 전문 평문 인용 0건
+ 5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / 실제 state machine ARN / Slack webhook URL / DB password / Administrator password / image digest full sha256 / public IP / task ARN / ENI ID / broker_order_no 원문) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]` placeholder
+ 6) 운영 식별자(Task Role 이름 `portfolio-paper-view-task-role` / Task Execution Role 이름 `portfolio-paper-ecs-task-execution-role` / ECR `portfolio-view` / CloudWatch Logs `/ecs/portfolio-view` / Security Group `sgroup-port-view-ecs` / ECS cluster `portfolio-paper-cluster` / ECS service `portfolio-view-service` / task definition `portfolio-view:2` / Spring profile `aws-paper` / state machine `portfolio-paper-daily-step12-17-approval` / executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / status `SUCCEEDED` / Spring properties env 라벨 / Secrets Manager prefix `/portfolio/paper/...`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님

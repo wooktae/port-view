@@ -10,6 +10,39 @@
 - 항목 분류는 `Added`, `Changed`, `Removed`, `Security`로 통일한다.
 - 날짜는 한국 기준의 작업 일자를 사용한다.
 
+## 2026-06-30 (오후) (port-view ECS Fargate Public IP 1차 포팅 완료 + ECS View → AWS Step Functions Step 12~17 승인 실행 통과 + desiredCount 0 종료)
+
+### Added
+
+- **port-view ECS Fargate Public IP 1차 포팅 통과 결과 추가** — 운영자가 직접 수행 / ALB 미사용 + public subnet + `assignPublicIp=ENABLED` + NAT Gateway 미사용 + SG inbound TCP 8080 운영자 IP/32 한정 + CloudWatch Logs retention 7일 / ECR repository `portfolio-view` 생성 + image push / ECS task definition `portfolio-view:1` → `portfolio-view:2`(기본 계좌번호 env 누락 보정) / ECS service `portfolio-view-service` RUNNING / Fargate public IP 직접 접속 + Dashboard / Balance / Positions / Orders / Reports / Daily 화면 조회 통과.
+- **ECS View → AWS Step Functions Step 12~17 승인 실행 통과 결과 추가** — executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / state machine `portfolio-paper-daily-step12-17-approval` / status `SUCCEEDED` / start `2026-06-30T14:15:42.899+09:00` / stop `2026-06-30T14:18:48.358+09:00` / Slack `DAILY_EXECUTION_SUCCESS` 수신 / NO_TARGET 안전 종료.
+- **DB after-check 통과 결과 추가** — REQUESTED `strategy_execution_order` 0건 / retryable rejected 0건 / active `connector_order_request` 0건 / today connector orders 0건 / 최신 `connector_balance_snapshot id=281`(`as_of_date=2026-06-30` / `total_eval_amount=8,706,505` / `cash_balance=8,706,505`). 과거 stale `connector_order_request` 6건 식별(2026-04-27 ACCEPTED 잔여 / 후속 cleanup 후보).
+- **View 운영 경로 5종 정합 정리** — 기존 4종 + ECS View → AWS Step Functions Step 12~17 승인 실행(본 일자 오후) 추가.
+- **`.kiro/specs/05-port-view-ecs-and-runbook/runbook.md` 신규 생성** — ECS service desiredCount 0/1 운영 명령 + public IP 자동 조회 패턴 + 브라우저 URL 출력 + AWS CLI `list/describe → 변수 추출 → 후속 검증` 패턴 + 운영자 IP 변경 시 SG inbound 갱신 절차 + Step 12~17 승인 실행 절차.
+- **`.kiro/specs/05-port-view-ecs-and-runbook/validation-checklist.md` 신규 생성** — 13개 체크 항목 + 본 일자 통과 결과.
+- **`.kiro/AGENTS.md` 운영 명령 작성 규칙 3종 추가** — (1) AWS CLI 명령은 ARN / task ARN / ENI ID / LOG_STREAM 수동 치환 없이 `list/describe → 변수 추출 → 후속 검증` 패턴, (2) psql 검증 쿼리는 `information_schema.columns` 사전 확인(추정 컬럼명 사용 금지), (3) 실패한 SQL/명령 뒤에 SUCCESS/DONE marker 금지.
+
+### Changed
+
+- `.kiro/specs/_common/risk-register.md` — **R-AUTO-033 mitigation 에 [2026-06-30 오후 보강] 메모 추가**(Public IP direct access + 운영자 IP/32 SG + ECS View → AWS Step Functions Step 12~17 approval 3차 실증 / Status `Mitigated` 유지). **R-AUTO-034 mitigation 에 [2026-06-30 오후 보강] 메모 추가**(Fargate ECS task role `portfolio-paper-view-task-role` 의 `states:StartExecution` 권한이 실제 Fargate 환경에서 Step 12~17 approval state machine ARN 한정 부여 1차 실증 / Status `Open` 유지 — Fargate Task Role 권한 분리는 06 spec 후속 phase 책임 그대로 유지).
+- `.kiro/specs/_common/followups-overview.md` — 2026-06-30 (오후) 후속 메모 추가(완료 4건 + 후속 6건 + Public IP / desiredCount / 추정 컬럼명 / stale connector_order_request 위험 메모).
+- `.kiro/specs/_common/operator-decisions.md` — Change Log 2026-06-30 (오후) 항목 추가(OD-MS-002 / OD-MS-009 / OD-MS-037 / OD-SAFE-001 ~ OD-SAFE-004 본문 변경 없이 evidence 보강 / 본 일자 신규 결정 없음 / Decision Summary 카운트 변경 없음 — 전체 96 / 확정 51 / 잠정 42 유지).
+- `.kiro/specs/_common/ms-aws-service-decision-matrix.md` — port-view 4.2 행에 2026-06-30 (오후) ECS Fargate Service 1차 실증 완료 메모 추가(ALB / HTTPS / Route53 / Cloudflare Tunnel 보류 / Elastic Beanstalk · App Runner · Lambda 1차 선택 아님 유지 / desiredCount 0/1 수동 운영 메모).
+- `.kiro/specs/_common/cost-simulation.md` — port-view Fargate 비용 가정에 2026-06-30 (오후) 메모 추가(0.5 vCPU / 1 GB 상시 가정 vs desiredCount 1 일시 운영 / Public IPv4 비용 추가 / ALB · NAT 제외 / AWS Pricing Calculator 재확인 문구 유지).
+- `.kiro/specs/_common/aws-resource-glossary.md` — ECS Fargate / IAM Role / IAM Policy / public subnet / CloudWatch Logs 항목에 port-view 운영 예시 메모 보강(`portfolio-view-service` / `portfolio-view:2` / `assignPublicIp=ENABLED` / desiredCount 0/1 / 운영자 IP/32 SG / Logs retention 7일).
+- `.kiro/specs/05-port-view-ecs-and-runbook/operation-notes.md` — "3. ECS Fargate 포팅: 완료" 전체 block(1)~6) + 운영 절차 + 검증 체크리스트 + 결정/리스크 매핑 + 본 일자 사실 기록 범위) append(2026-06-30 오후 단일 기준 block).
+- `.kiro/specs/04-strategy-batch-stepfunctions/operation-notes.md` — 2026-06-30 (오후) 짧은 cross-reference append(ECS View → `portfolio-paper-daily-step12-17-approval` 정상 `StartExecution` + `SUCCEEDED` + Slack 수신 / Step Functions 자체 구조 변경 없음).
+- `.kiro/specs/06-secrets-and-iam/operation-notes.md` — 2026-06-30 (오후) 짧은 task role(`portfolio-paper-view-task-role`) + execution role(`portfolio-paper-ecs-task-execution-role`) 분리 검증 결과 append.
+- `.kiro/README.md` "현재 진행 상태 요약" 섹션의 port-view / 05 spec 관련 라인에 2026-06-30 (오후) ECS Fargate 1차 검증 완료 + executionName + desiredCount 0 종료 짧게 반영.
+- `.kiro/WORKLOG.md` 2026-06-30 (오후) 섹션 prepend(5~10줄 요약 / 오전 Local View 검증과 구분 / ECS service desiredCount 0 종료까지 포함).
+
+### Security
+
+- 본 변경에서도 secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / public IP / image digest full sha256 / task ARN / ENI ID / job ARN / broker_order_no 원문 / KIS paper login credential / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN 평문 기록 0건. 모두 `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]` placeholder.
+- AWS 리소스 신규 생성 · 수정 · 삭제는 운영자 직접 수행 영역으로 본 일자 Kiro 측 변경 0건 — Kiro 는 본 일자 `.kiro` 루트 + `.kiro/specs` 하위 문서 갱신만 수행. AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 0건 / commit/add/reset/checkout/stash 0건. CloudWatch Logs · Step Functions execution history 본문 · Lambda 응답 본문 · KIS API response body · Spring Boot application log 전문 · `StartExecution` 응답 본문 · Slack 메시지 본문 · commit diff 본문 · DB after-check raw output 전문 / `ENI_ID` raw / `TASK_ARN` raw / `LOG_STREAM` raw 평문 인용 0건(R-DOCS-001 정합).
+- broker / KIS 호출 = 오전 Step 1~11 자동 trigger + Local View → Step 12~17 승인 실행 + 본 일자 오후 ECS View → Step 12~17 승인 실행 1건(`SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
+- 운영 식별자(ECS cluster `portfolio-paper-cluster` / ECS service `portfolio-view-service` / task definition `portfolio-view:2` / ECR `portfolio-view` / CloudWatch Logs `/ecs/portfolio-view` / SG `sgroup-port-view-ecs` / task execution role 이름 `portfolio-paper-ecs-task-execution-role` / task role 이름 `portfolio-paper-view-task-role` / launch type `FARGATE` / awsvpc / cpu 512 / memory 1024 / container port 8080 / executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / state machine `portfolio-paper-daily-step12-17-approval` / status `SUCCEEDED` / start · stop timestamp `2026-06-30T14:15:42.899+09:00` ~ `2026-06-30T14:18:48.358+09:00` / Slack 이벤트 `DAILY_EXECUTION_SUCCESS` / balance snapshot `id=281` · `as_of_date=2026-06-30` · `total_eval_amount=8,706,505` · `cash_balance=8,706,505` / Spring profile `aws-paper` / desired count 0/1 라벨 / stale `connector_order_request` 6건 식별 사실 / Spring properties env 라벨 `PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO` · `PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+
 ## 2026-06-30 (Local View → AWS Step Functions Step 12~17 승인 실행 검증 통과 + Daily Batch gate 수정 + View 운영 경로 4종 정리)
 
 ### Added

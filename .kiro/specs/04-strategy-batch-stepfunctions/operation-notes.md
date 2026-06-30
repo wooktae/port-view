@@ -1651,3 +1651,60 @@
 - broker / KIS 호출 = 오전 Step 1~11 자동 trigger 한정(`connector_order_request` 신규 0건) + Local View → AWS Step Functions Step 12~17 승인 실행 1건(`SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
 - 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN / broker_order_no 원문 / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
 - 운영 식별자(executionName `port-view-daily-step12-17-20260630-095111-aae2595c` / state machine 이름 `portfolio-paper-daily-step12-17-approval` / Controller class `DailyBatchController` / Daily Batch gate 라벨 6종 / 화면 표시 라벨 / balance snapshot `id=281` · `as_of_date=2026-06-30` · `total_eval_amount=8,706,505` · `cash_balance=8,706,505` · `eval_profit=0` · `source_version=connector-intraday-snapshot-refresh-1.0.0` / DB 컬럼명 `balance_snapshot_id`(부재) · `account_no` · `as_of_date` / Run id `#46` · `#47` · `#48` / Spring profile `aws-paper` / start · stop timestamp) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+
+
+## 2026-06-30 (오후) — ECS View 가 Step 12~17 approval state machine external caller 로 붙는 세 번째 phase 검증 (cross-reference)
+
+본 일자 오후 운영자가 직접 수행한 port-view ECS Fargate 1차 포팅 통과 + ECS View → AWS Step Functions Step 12~17 승인 실행 1차 실증 결과를 04 spec 의 Step Functions state machine 운영 관점에서 짧게 cross-reference 한다. **Step Functions 자체 구조 변경 0건** — 본 일자 04 spec 범위 내 state machine ASL · IAM Role · EventBridge Scheduler · Dispatcher Lambda · ECS RunTask · SSM RunCommand · AWS Batch 변경 0건. 운영자 직접 수행 영역은 05 spec / 06 spec 책임. 본 노트는 ASL / IAM Policy / Step Functions execution history 본문 / Slack 메시지 본문 / CloudWatch Logs 전문 / `StartExecution` 응답 본문 평문 인용 0건(R-DOCS-001 정합).
+
+### 1. ECS View → approval state machine StartExecution 1차 실증
+
+ 1) 외부 caller 1차 실증: 완료
+   (1) ECS View → `portfolio-paper-daily-step12-17-approval` StartExecution
+       - executionName: `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8`
+       - state machine: `portfolio-paper-daily-step12-17-approval`(2026-06-29 (3) 분리 완료 그대로 유지 / 본 일자 ASL 변경 0건)
+       - status: `SUCCEEDED`
+       - start: `2026-06-30T14:15:42.899+09:00`
+       - stop: `2026-06-30T14:18:48.358+09:00`
+       - 마지막 state: `ExecutionSucceeded`
+       - 외부 caller = port-view Fargate task / Task Role `portfolio-paper-view-task-role` 의 `states:StartExecution` Resource = approval state machine ARN 한정 부여(`[REDACTED_ARN]` placeholder / 본 노트 평문 기록 0건)
+   (2) Slack `DAILY_EXECUTION_SUCCESS` 수신
+       - 본 일자 Slack notifier Lambda `portfolio-event-notifier` 수신 사실 한정 / 메시지 본문 평문 기록 0건
+   (3) NO_TARGET 안전 종료
+       - Step 12 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` NO_TARGET / 신규 `connector_order_request` 0건 / broker 주문 제출 0건 / READY · REQUESTED `strategy_execution_order` 0건 / active `connector_order_request` 0건
+
+### 2. 04 spec 범위 변경 사실
+
+ 1) Step Functions 구조 변경 없음: 완료
+   (1) state machine ASL 변경 0건
+       - approval workflow `portfolio-paper-daily-step12-17-approval` ASL 본 일자 변경 0건 / 2026-06-29 (3) 의 boolean / numeric payload 정합 그대로 유지
+       - 일반 workflow `portfolio-paper-daily-step1-17-approval` ASL 본 일자 변경 0건
+   (2) EventBridge Scheduler / Dispatcher Lambda 변경 0건
+       - 08:00 KST `portfolio-paper-daily-step1-11-approval-0800-kst` ENABLED 그대로 유지
+       - 09:01 KST `portfolio-paper-daily-step12-17-order-0901-kst` DISABLED 그대로 유지(OD-MS-033 09:01 자동 ENABLE 보류 정책 정합)
+       - 07:50 / 15:50 EC2 lifecycle Scheduler 본 일자 변경 0건
+   (3) IAM Role / Policy 변경 0건
+       - `portfolio-paper-stepfunctions-execution-role` 본 일자 변경 0건 / Fargate Task Role 측 IAM 변경은 06 spec 후속 phase 책임 그대로 유지
+ 2) 본 일자 cross-spec 책임 분리: 완료
+   (1) 05 spec — port-view ECS Fargate 1차 포팅 / Public IP 직접 접근 / SG inbound / CloudWatch Logs retention / ECS task definition `portfolio-view:2` / ECS service `portfolio-view-service` / desiredCount 0 종료
+   (2) 06 spec — port-view ECS task role(`portfolio-paper-view-task-role`) + execution role(`portfolio-paper-ecs-task-execution-role`) 분리 검증
+   (3) 04 spec — 본 노트(외부 caller 가 ECS View 로 확장된 사실 cross-reference 한정 / Step Functions 자체 변경 0건)
+
+### 3. 결정 / 리스크 매핑
+
+ 1) 결정 본문 변경 없음
+   (1) OD-MS-009(Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) 본문 변경 없이 evidence 보강
+       - ECS View 가 Step Functions `StartExecution` external caller 로 붙는 세 번째 phase 1차 실증 evidence
+   (2) OD-MS-032(EventBridge Scheduler + Dispatcher Lambda) / OD-MS-033(Step 12 retry-normalizer + 09:01 보류) / OD-MS-034(EC2 lifecycle 자동 실행) 본문 변경 없음
+   (3) OD-SAFE-001 ~ OD-SAFE-004(자동 BUY · SELL E2E 단계적 도입 / 자동 재시도 금지 idempotent 한정) 본문 변경 없음
+       - Step 12~17 주문성 구간은 운영자 명시 승인(approval) 후에만 활성 / NO_TARGET 안전 종료 / broker 주문 제출 0건
+ 2) 리스크 매핑
+   (1) R-AUTO-033 [2026-06-30 오후 보강] — ECS View → Step 12~17 approval 3차 실증 통과(Local View → Step 1~11 / Local View → Step 12~17 approval / ECS View → Step 12~17 approval) / Status `Mitigated` 유지
+   (2) R-AUTO-034 [2026-06-30 오후 보강] — Fargate Task Role `states:StartExecution` 권한이 Step 12~17 approval state machine ARN 한정 부여 1차 실증 / Status `Open` 유지(일반 + approval ARN 2종 모두 한정 부여 + Fargate 외부 노출 시점 default ENABLE 회귀 audit 통과 시점에 `Mitigated` 승격 / 06 spec 후속 phase 책임)
+
+### 4. 본 일자 사실 기록 범위
+
+- AWS / EventBridge Scheduler / Lambda / Step Functions / SSM / EC2 / IAM / RDS / S3 / KIS API 호출은 본 일자 04 spec 측 Kiro 변경 0건 / AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 04 spec 측 Kiro 변경 0건.
+- broker / KIS 호출 = 오전 Step 1~11 자동 trigger + Local View → Step 12~17 승인 실행(2026-06-30 오전) + ECS View → Step 12~17 승인 실행 1건(`SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
+- 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / public IP / image digest full sha256 / task ARN / ENI ID / broker_order_no 원문 / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` / `[REDACTED_ARN]` / `[REDACTED_ACCOUNT_NO]` placeholder.
+- 운영 식별자(executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / state machine `portfolio-paper-daily-step12-17-approval` / status `SUCCEEDED` / start · stop timestamp / Slack 이벤트 `DAILY_EXECUTION_SUCCESS` / Task Role 이름 `portfolio-paper-view-task-role` / Task Execution Role 이름 `portfolio-paper-ecs-task-execution-role` / state 이름 `ExecutionSucceeded`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.

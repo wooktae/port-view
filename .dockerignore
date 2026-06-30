@@ -1,0 +1,10 @@
+.git
+.kiro
+.vscode
+.mvn
+docs
+target/*
+!target/port-view-0.0.1-SNAPSHOT.jar
+*.md
+*.log
+*.tmp

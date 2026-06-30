@@ -391,3 +391,240 @@
 - broker / KIS 호출 = 오전 Step 1~11 자동 trigger 한정(`connector_order_request` 신규 0건) + Local View → AWS Step Functions Step 12~17 승인 실행 1건(`SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
 - 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN / broker_order_no 원문 / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
 - 운영 식별자(executionName `port-view-daily-step12-17-20260630-095111-aae2595c` / state machine 이름 `portfolio-paper-daily-step12-17-approval` / Controller class `DailyBatchController` / Daily Batch gate 라벨 6종 / 화면 표시 라벨 / balance snapshot `id=281` · `as_of_date=2026-06-30` · `total_eval_amount=8,706,505` · `cash_balance=8,706,505` · `eval_profit=0` · `source_version=connector-intraday-snapshot-refresh-1.0.0` / DB 컬럼명 `balance_snapshot_id`(부재) · `account_no` · `as_of_date` / Run id `#46` · `#47` · `#48` / Spring profile `aws-paper` / start · stop timestamp) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+
+
+3. ECS Fargate 포팅: 완료
+ 1) 1차 접근 방식
+   (1) ALB 미사용 Public IP 직접 접근
+       - ECS Fargate task 를 public subnet 에 배치
+       - assign public IP enabled 설정
+       - ALB 는 생성하지 않음
+       - NAT Gateway 는 생성하지 않음
+       - Fargate task public IP 와 port 8080 으로 View 접속
+       - 접근 URL 형식은 `http://<FARGATE_TASK_PUBLIC_IP>:8080`
+       - task 재시작 또는 재배포 시 public IP 가 변경될 수 있음을 전제로 운영
+   (2) 보안 원칙
+       - Security Group inbound 는 TCP 8080 만 허용
+       - source 는 운영자 공인 IP/32 만 허용
+       - 초기 검증 중 0.0.0.0/0 전체 오픈은 금지
+       - 모바일 접근은 같은 Wi-Fi 또는 임시 모바일 공인 IP/32 추가 방식으로 확인
+       - 확인 완료 후 불필요한 inbound rule 은 제거
+   (3) 비용 절감 원칙
+       - ALB 비용 제거
+       - NAT Gateway 비용 제거
+       - public IPv4 비용과 Fargate 실행 시간 비용만 부담
+       - ECS service desired count 는 필요할 때만 1
+       - 확인 완료 후 desired count 0 전환 가능하도록 운영
+       - CloudWatch Logs retention 은 짧게 설정(7일)
+ 2) 1차 목표
+   (1) read-only View 배포
+       - Local View 에서 검증된 AWS Paper View 를 ECS Fargate 에 배포
+       - 초기 배포 범위는 read-only View 우선
+       - Dashboard / Balance / Positions / Orders / Reports / Daily 화면 확인
+       - Spring Boot property 구조 변경은 최소화
+       - PowerShell 구동 스크립트에서 주입하던 환경변수를 ECS Task Definition 환경변수로 이관
+   (2) Step Functions 버튼 safe gate 확인
+       - AWS Step 1~11 버튼 표시 여부 확인
+       - AWS Step 12~17 승인 버튼 표시 여부 확인
+       - `fullPipelineExecutionEnabled` / `paperOrderEnabled` 조건 충돌 없음 확인
+       - 실제 Step Functions 실행은 read-only 화면 검증 후 별도 승인 단계에서 진행
+   (3) ECS View 에서 Step Functions 수동 실행 검증
+       - ECS View Daily 화면에서 AWS Step 12~17 승인 실행 버튼 클릭
+       - ECS task role 을 통해 AWS Step Functions `StartExecution` 호출
+       - `portfolio-paper-daily-step12-17-approval` state machine 실행
+       - 실행 완료 후 Slack `DAILY_EXECUTION_SUCCESS` 수신
+       - DB after-check 정상 확인
+ 3) 완료 기준
+   (1) ECS 배포 완료 기준
+       - Docker image build 성공
+       - ECR image push 완료
+       - ECS task definition 생성 완료
+       - ECS service desired count 1 기동 성공
+       - ECS task RUNNING 확인
+       - CloudWatch Logs 에서 Spring Boot started 확인
+   (2) 네트워크 완료 기준
+       - Fargate task public IP 확인
+       - `http://<FARGATE_TASK_PUBLIC_IP>:8080` 접속 성공
+       - Security Group inbound TCP 8080 source 운영자 IP/32 확인
+       - ECS task 에서 Private RDS 연결 성공
+       - NAT Gateway 없이 RDS 접근 구성 확인
+   (3) View 완료 기준
+       - Dashboard 조회 성공
+       - Balance 조회 성공
+       - Positions 조회 성공
+       - Orders 조회 성공
+       - Reports 조회 성공
+       - Daily 조회 성공
+       - 최초 접속 및 메뉴 이동 시 기본 계좌번호 정상 반영
+   (4) safe gate 완료 기준
+       - AWS Step 1~11 버튼 조건 확인
+       - AWS Step 12~17 승인 버튼 조건 확인
+       - `fullPipelineExecutionEnabled=true` 상태에서도 Step 12~17 승인 버튼 표시 확인
+       - `paperOrderEnabled=true` 상태에서도 Step 1~11 버튼 조건 충돌 없음 확인
+       - local-file 실행 버튼은 ECS 환경에서 비활성 상태 확인
+       - 전체 실행 버튼은 잠금 상태 확인
+   (5) Step Functions 실행 완료 기준
+       - ECS View 에서 AWS Step 12~17 승인 실행 버튼 클릭 성공
+       - execution `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` 생성 확인
+       - state machine `portfolio-paper-daily-step12-17-approval` 실행 확인
+       - execution status `SUCCEEDED` 확인
+       - Slack `DAILY_EXECUTION_SUCCESS` 수신 확인
+       - after-check 결과 REQUESTED strategy order 0 확인
+       - after-check 결과 retryable rejected strategy order 0 확인
+       - after-check 결과 active connector order 0 확인
+       - after-check 결과 당일 신규 connector order 0 rows 확인
+       - latest connector balance snapshot 기준일 2026-06-30 확인
+ 4) 완료 결과
+   (1) AWS 리소스
+       - ECS cluster: `portfolio-paper-cluster`
+       - ECS service: `portfolio-view-service`
+       - ECS task definition: `portfolio-view:2`
+       - ECR repository: `portfolio-view`
+       - CloudWatch Logs group: `/ecs/portfolio-view`
+       - task execution role: `portfolio-paper-ecs-task-execution-role` (실제 ARN 평문 기록 0건 / `[REDACTED_ARN]`)
+       - task role: `portfolio-paper-view-task-role` (실제 ARN 평문 기록 0건 / `[REDACTED_ARN]`)
+       - security group: `sgroup-port-view-ecs`
+   (2) ECS task definition 주요 설정
+       - launch type: FARGATE
+       - network mode: awsvpc
+       - cpu: 512
+       - memory: 1024
+       - container port: 8080
+       - Spring profile: `aws-paper`
+       - default account no: `[REDACTED_ACCOUNT_NO]`
+       - local file execution: false
+       - execution mode: `aws-stepfunctions`
+       - Step Functions start enabled: true
+       - Step Functions step start enabled: true
+       - full pipeline execution enabled: true
+       - paper order enabled: true
+   (3) 검증된 접속 결과
+       - Fargate public IP 직접 접속 성공(public IP 평문 기록 0건 / `[REDACTED_PUBLIC_IP]`)
+       - Spring Boot started 확인
+       - HikariPool RDS connection 성공
+       - default schema `ops` 확인
+       - Dashboard / Balance / Positions / Orders / Reports / Daily 화면 정상 표시
+       - 기본 계좌번호 누락 문제는 task definition revision 2 에서 env 추가로 보정 완료(`PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO` + `PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO`)
+   (4) 검증된 실행 결과
+       - ECS View Daily 화면에서 AWS Step 12~17 승인 실행 성공
+       - execution `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8`
+       - start: 2026-06-30 14:15:42 KST
+       - stop: 2026-06-30 14:18:48 KST
+       - status: SUCCEEDED
+       - history 최종 `ExecutionSucceeded`
+       - Slack `DAILY_EXECUTION_SUCCESS` 수신
+       - after-check 정상
+   (5) after-check 결과
+       - REQUESTED strategy orders after: 0
+       - retryable rejected strategy orders after: 0
+       - active connector orders after: 0
+       - today connector orders after: 0 rows
+       - latest connector_balance_snapshot id: 281
+       - latest connector_balance_snapshot as_of_date: 2026-06-30
+       - total_eval_amount: 8,706,505
+       - cash_balance: 8,706,505
+       - 과거 stale connector order 6건 식별 — 모두 운영 계좌가 아닌 과거 테스트 계좌의 2026-04-27 ACCEPTED 잔여 / 이번 Step 12~17 실행과 무관 / 후속 cleanup 후보로 분리
+   (6) 비용 절감 종료 결과
+       - 검증 완료 후 ECS service desired count 0 전환 완료
+       - Fargate task 종료 완료
+       - public IP 해제 전제로 운영
+       - 다음 기동 시 desired count 1 전환 후 새 public IP 확인 필요
+ 5) 보류 항목
+   (1) 1차 포팅 이후로 보류
+       - ALB 생성
+       - HTTPS 정식 구성
+       - Route53 도메인 연결
+       - Cloudflare Tunnel
+       - 인증 / 인가 고도화
+       - Slack 문구 개선
+       - property 구조 재정리
+       - application-ecs.yml 신규 분리
+       - ECS Auto Scaling
+       - Blue/Green 배포
+   (2) 후속 정리 후보
+       - Daily 화면 문구에서 "로컬 실행 검증" 표현을 ECS / AWS mode 에 맞게 수정
+       - stale `connector_order_request` 과거 ACCEPTED 6건 처리 여부 검토
+       - ECS service desired count 0/1 운영 명령 문서화(runbook.md 후속)
+       - 운영자 IP 변경 시 Security Group inbound 갱신 절차 문서화
+       - 필요 시 AWS Step 1~11 ECS View 실행 별도 검증
+ 6) 결론
+   (1) 1차 포팅 방향
+       - ALB 없이 ECS Fargate Public IP 직접 접근 방식으로 진행
+       - 최소 비용으로 View ECS 배포 완료
+       - 운영자 IP 제한으로 외부 노출 범위 최소화
+       - Spring Boot property 구조 변경 없이 ECS Task Definition env 이관 방식으로 완료
+       - 이후 필요 시 ALB / HTTPS / Cloudflare Tunnel 은 별도 검토
+   (2) 완료 판정
+       - ECS Fargate View 접속 성공
+       - read-only 화면 정상 조회
+       - Private RDS 연결 정상
+       - 기본 계좌번호 정상 반영
+       - Step Functions 버튼 조건 정상
+       - ECS View 에서 AWS Step 12~17 승인 실행 성공
+       - Slack 성공 알림 수신
+       - DB after-check 정상
+       - desired count 0 종료 완료
+       - **3. ECS Fargate 포팅: 완료**
+
+### 운영 절차 (runbook 후속 책임 / 본 노트는 사실 기록)
+
+운영자 명령 예시는 ARN / task ARN / ENI ID / LOG_STREAM 수동 치환 없이 `list/describe → 변수 추출 → 후속 검증` 패턴을 따른다. 본 노트는 사실 기록만 담고 정식 runbook 은 05 spec 후속 phase 책임.
+
+ECS View 기동:
+ 1) ECS service desired count 1 전환
+   (1) `aws ecs update-service --cluster portfolio-paper-cluster --service portfolio-view-service --desired-count 1`
+   (2) `aws ecs wait services-stable` 로 `RUNNING` 진입 대기
+ 2) public IP 자동 조회
+   (1) `aws ecs list-tasks --cluster portfolio-paper-cluster --service-name portfolio-view-service` → `TASK_ARN` 추출
+   (2) `aws ecs describe-tasks --cluster portfolio-paper-cluster --tasks $TASK_ARN` → `ENI_ID` 추출(`attachments[].details[?name=='networkInterfaceId'].value`)
+   (3) `aws ec2 describe-network-interfaces --network-interface-ids $ENI_ID` → `PUBLIC_IP` 추출(`Association.PublicIp`)
+   (4) 브라우저 접속 URL 출력: `http://$PUBLIC_IP:8080`(본 노트 평문 기록 0건 / `[REDACTED_PUBLIC_IP]`)
+
+ECS View 종료:
+ 1) ECS service desired count 0 전환
+   (1) `aws ecs update-service --cluster portfolio-paper-cluster --service portfolio-view-service --desired-count 0`
+   (2) Fargate task 종료 / public IP 해제
+ 2) 다음 기동 시 주의
+   (1) desired count 0 → 1 전환 시 새로운 public IP 가 발급됨
+   (2) 운영자가 새 public IP 를 다시 조회해 브라우저 URL 갱신
+   (3) Security Group inbound rule 의 운영자 IP/32 는 그대로 유지
+
+### 검증 체크리스트 (validation-checklist 후속 책임 / 본 노트는 사실 기록)
+
+본 일자 검증 통과 항목:
+ 1) Docker image build: 완료
+ 2) ECR push: 완료
+ 3) task definition registration: 완료(revision 1 → 2 보정)
+ 4) ECS service `portfolio-view-service` RUNNING: 완료
+ 5) CloudWatch Logs `/ecs/portfolio-view` 에서 Spring Boot started: 완료
+ 6) RDS connection success(HikariPool start completed): 완료
+ 7) Dashboard / Balance / Positions / Orders / Reports / Daily 화면 조회: 완료
+ 8) AWS Step 1~11 버튼 표시: 완료
+ 9) AWS Step 12~17 승인 버튼 표시: 완료
+ 10) ECS View → Step 12~17 execution `SUCCEEDED`: 완료(executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8`)
+ 11) Slack `DAILY_EXECUTION_SUCCESS` 수신: 완료
+ 12) DB after-check 0건 확인: 완료(REQUESTED / retryable rejected / active / today connector orders 모두 0)
+ 13) desired count 0 종료: 완료
+
+### 결정 / 리스크 매핑 (2026-06-30 오후)
+
+- OD-MS-002(port-view 컴퓨트 = ECS Fargate Service 1순위) 정합 — 본 일자 실증 완료(ALB 없이 Public IP direct access + 운영자 IP/32 SG inbound + desiredCount 0/1 수동 운영 / 결정 본문 변경 없이 evidence 보강).
+- OD-MS-009(Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) 정합 — ECS View 가 Step Functions `StartExecution` external caller 로 붙는 세 번째 phase 1차 실증(Local View → AWS Step Functions Step 1~11 / Local View → AWS Step Functions Step 12~17 approval / ECS View → AWS Step Functions Step 12~17 approval).
+- OD-MS-037(View Local AWS Paper read-only 1차 scope + ECS / Fargate 진입 전 batch 2차 검증 선행 정책) 정합 — Local 검증(2026-06-27 read-only / 2026-06-28 Step 1 + Step 1~11 / 2026-06-29 (1) Step 12~17 local-file / 2026-06-29 (2) Step 1~11 aws-stepfunctions / 2026-06-29 (3) + 2026-06-30 오전 Step 12~17 approval) 후 본 일자 오후 ECS Fargate 진입 + Step 12~17 ECS View 승인 실행 완료.
+- R-AUTO-033 [2026-06-30 오후 보강] — ECS Fargate Public IP direct access + 운영자 IP/32 SG inbound + ECS View → AWS Step Functions Step 12~17 approval 3차 실증 / Status `Mitigated` 유지.
+- R-AUTO-034 [2026-06-30 오후 보강] — Fargate ECS task role(`portfolio-paper-view-task-role`) 의 `states:StartExecution` 권한이 실제 Fargate 환경에서 1차 실증 통과 / Step 12~17 approval state machine ARN 한정 부여 사실 / Status `Open` 유지(향후 ALB · HTTPS · CloudWatch alarms 도입 시 cross-spec audit / 06 spec 후속 phase 책임).
+- 신규 후속 리스크 보강 (followups-overview 2026-06-30 오후 후속 메모 + risk-register 참조):
+       - Public IP 직접 접근 시 SG inbound 오픈 실수 위험(운영자 IP/32 한정 정책 정합)
+       - desiredCount 1 유지로 인한 불필요한 Fargate / public IPv4 비용 누적 위험(desiredCount 0 종료 운영 정책 정합)
+       - task 재시작 후 public IP 변경으로 접속 URL 이 바뀌는 위험(운영자가 매 기동 시 재조회 정책)
+       - AWS CLI / psql 검증 쿼리에서 추정 컬럼명을 사용해 오진하는 위험(`information_schema.columns` 사전 확인 정책 정합 / 2026-06-29 (1) DB password 노출 + 2026-06-30 오전 `connector_position_snapshot.balance_snapshot_id` 부재 사례 결합)
+       - 과거 stale `connector_order_request` 가 preflight count 를 오염시키는 위험(2026-06-30 오후 식별된 6건 / 후속 cleanup 결정)
+
+### 본 일자 사실 기록 범위 (2026-06-30 오후)
+
+- 본 일자 Kiro 작업 = 05 spec `operation-notes.md` 본 섹션(3. ECS Fargate 포팅: 완료) 누적 + `_common` 5개(`followups-overview` · `operator-decisions` · `ms-aws-service-decision-matrix` · `cost-simulation` · `risk-register` · `aws-resource-glossary`) + 04 spec `operation-notes.md` append + 06 spec `operation-notes.md` append + `.kiro` 루트 3개(`WORKLOG.md` / `CHANGELOG.md` / `README.md` 짧은 상태 보강) + `.kiro/AGENTS.md` 운영 명령 작성 규칙 보강.
+- 운영자 직접 수행 작업(Dockerfile / `.dockerignore` 추가 + Docker image build + ECR push + ECS Task Definition 등록 + ECS Service 생성 + Security Group · CloudWatch Logs · IAM Role 구성 + ECS View 접속 + AWS Step 12~17 승인 실행 클릭 + desiredCount 0 종료)은 port-view MS 및 AWS 운영자 영역으로 cross-service AWS Migration spec 본 일자 작업으로 인한 변경 0건(spec 영역).
+- AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건 / commit/add/reset/checkout/stash 0건.
+- broker / KIS 호출 = 오전 Step 1~11 자동 trigger 한정 + Local View → Step 12~17 승인 실행(2026-06-30 오전) + ECS View → Step 12~17 승인 실행(2026-06-30 오후 / executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / `SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
+- 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / public IP / image digest full sha256 / task ARN / ENI ID / job ARN / broker_order_no 원문 / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]` placeholder.
+- 운영 식별자(ECS cluster `portfolio-paper-cluster` / ECS service `portfolio-view-service` / ECS task definition `portfolio-view:2` / ECR repository `portfolio-view` / CloudWatch Logs group `/ecs/portfolio-view` / Security Group `sgroup-port-view-ecs` / task execution role 이름 `portfolio-paper-ecs-task-execution-role` / task role 이름 `portfolio-paper-view-task-role` / executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / state machine `portfolio-paper-daily-step12-17-approval` / Spring profile `aws-paper` / Tomcat port `8080` / start · stop timestamp `2026-06-30T14:15:42.899+09:00` ~ `2026-06-30T14:18:48.358+09:00` / status `SUCCEEDED` / balance snapshot `id=281` · `as_of_date=2026-06-30` · `total_eval_amount=8,706,505` · `cash_balance=8,706,505` / 화면 라벨 6종(Dashboard / Balance / Positions / Orders / Reports / Daily) / launch type `FARGATE` / network mode `awsvpc` / cpu 512 / memory 1024 / container port 8080 / Spring properties env label / Slack 이벤트 라벨 `DAILY_EXECUTION_SUCCESS` / stale `connector_order_request` 6건 식별 사실 / `connector_position_snapshot.balance_snapshot_id` 컬럼 부재 사실) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
