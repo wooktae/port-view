@@ -54,7 +54,7 @@
                         <h2>Daily Step 1~17 로컬 실행 검증</h2>
                         <p>
                             이번 단계는 ECS/Fargate 이전에 View → 로컬 소스 실행 → AWS Paper DB 저장/조회 흐름을 검증한다.
-                            기본값은 안전 모드이며, Step 12 이상은 서버단 gate로 차단된다.
+                            local-file 실행과 AWS Step Functions 실행을 분리하고, Step 12 이상은 승인형 gate로만 실행한다.
                         </p>
 
                         <div class="batch-hero-badges">
@@ -108,7 +108,7 @@
                             </small>
 
                             <small th:if="${canRunLocalFileBatch and !hasRunningBatch}">
-                                먼저 Step 1 단독 실행으로 시작하고, 그 다음 Step 1~11을 검증한다.
+                                local-file 모드에서는 Step 1 단독 실행으로 시작하고, 그 다음 Step 1~11을 검증한다.
                             </small>
 
                             <small th:if="${hasRunningBatch}">
@@ -160,13 +160,30 @@
 
                                 <button type="submit"
                                         class="batch-run-button"
-                                        th:disabled="${hasRunningBatch or !canStartAwsStepfunctions}">
+                                        th:disabled="${hasRunningBatch or !canStartAwsStepfunctionsSafe}">
                                     <span th:if="${hasRunningBatch}">실행 중</span>
-                                    <span th:if="${!hasRunningBatch and canStartAwsStepfunctions}">AWS Step 1~11 시작</span>
-                                    <span th:if="${!hasRunningBatch and !canStartAwsStepfunctions}">AWS Step 1~11 비활성</span>
+                                    <span th:if="${!hasRunningBatch and canStartAwsStepfunctionsSafe}">AWS Step 1~11 시작</span>
+                                    <span th:if="${!hasRunningBatch and !canStartAwsStepfunctionsSafe}">AWS Step 1~11 비활성</span>
                                 </button>
                             </form>
-<form th:action="@{/daily-batch/intraday-monitor/run}"
+
+                            <form th:action="@{/daily-batch/aws-stepfunctions/start-approval-range}"
+                                  method="post"
+                                  class="batch-run-form">
+                                <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
+                                <input type="hidden" name="fromStepCode" value="MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE"/>
+                                <input type="hidden" name="toStepCode" value="BALANCE_REFRESH"/>
+
+                                <button type="submit"
+                                        class="batch-run-button"
+                                        th:disabled="${hasRunningBatch or !canStartAwsStepfunctionsApproval}">
+                                    <span th:if="${hasRunningBatch}">실행 중</span>
+                                    <span th:if="${!hasRunningBatch and canStartAwsStepfunctionsApproval}">AWS Step 12~17 승인 실행</span>
+                                    <span th:if="${!hasRunningBatch and !canStartAwsStepfunctionsApproval}">AWS Step 12~17 승인 비활성</span>
+                                </button>
+                            </form>
+
+                            <form th:action="@{/daily-batch/intraday-monitor/run}"
                                   method="post"
                                   class="batch-run-form batch-intraday-form">
                                 <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
@@ -261,8 +278,8 @@
                         <div class="section-label">Range Execution</div>
                         <h2>선택 범위 실행</h2>
                         <p class="section-description">
-                            Step 1 단독과 Step 1~11 이외의 범위를 수동으로 선택한다.
-                            잘못된 범위나 Step 12 이상은 Service에서 다시 차단된다.
+                            local-file 모드에서만 선택 범위 실행을 사용한다.
+                            aws-stepfunctions 모드에서는 상단의 AWS Step 1~11 또는 AWS Step 12~17 승인 버튼을 사용한다.
                         </p>
                     </div>
                 </div>

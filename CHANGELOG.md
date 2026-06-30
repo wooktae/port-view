@@ -1,5 +1,63 @@
 # CHANGELOG
 
+## 2026-06-29 (3)
+
+### Added
+
+- AWS Step 12~17 승인 실행 endpoint `POST /daily-batch/aws-stepfunctions/start-approval-range` 와 화면 승인 버튼을 추가했습니다. 성공 시 `executionName` 과 account-id 를 redaction 한 `executionArn` 을 flash message 로 표시합니다.
+- Step 12~17 전용 state machine ARN 분리 — 일반 workflow ARN `portfolio-paper-daily-step1-17-approval` 과 approval workflow ARN `portfolio-paper-daily-step12-17-approval` 을 분리했습니다. `application.properties` 키 `portfolio.batch.aws-stepfunctions-approval-state-machine-arn` 와 환경변수 `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_APPROVAL_STATE_MACHINE_ARN` 을 추가했습니다.
+- README 의 Daily Batch 섹션에 일반 / approval ARN 분리, 승인 버튼 endpoint, payload boolean / numeric 타입 정합 사실을 추가했습니다.
+- 운영자 로컬 도구 폴더(`C:\Workspaces\portfolio-local-env\`) 에 wrapper 2종(`Start-PortfolioViewAwsPaperLocalFile.ps1` + `Start-PortfolioViewAwsPaperStepFunctions.ps1`) 과 env loader 2종(`Load-PortfolioViewAwsPaperLocalFileEnv.ps1` + `Load-PortfolioViewAwsPaperStepFunctionsEnv.ps1`) 분리 사실을 README 에 정리했습니다(스크립트 본체는 본 저장소 범위 밖).
+
+### Changed
+
+- `DailyBatchProperties` 에 `awsStepfunctionsApprovalStateMachineArn` 필드 + getter / setter 를 추가했습니다.
+- `StepFunctionsDailyBatchExecutionService` 의 `startSafeRange` 는 일반 state machine ARN 을, `startApprovalRange` 는 approval 전용 state machine ARN 을 사용하도록 분리했습니다. approval ARN 이 비어 있으면 승인형 실행을 서비스 레벨에서 차단합니다.
+- StartExecution payload 의 타입을 보완했습니다. `allowPaperOrderExecute` · `paperOrderEnabled` 는 boolean JSON, `fromStepOrder` · `toStepOrder` · `startStep` · `endStep` 는 numeric JSON 으로 전달합니다.
+- `DailyBatchController` 에 `POST /daily-batch/aws-stepfunctions/start-approval-range` endpoint 와 승인형 Step 12~17 `StartExecution` 처리를 추가했습니다.
+- `/daily-batch` 화면(`daily_batch.html`) 에서 AWS Step 1~11 시작 버튼과 AWS Step 12~17 승인 실행 버튼을 분리했고, safe / approval 활성화 조건을 분리했습니다.
+
+### Fixed
+
+- 최초 Step 12~17 approval 실행이 전용 state machine 에 진입한 뒤 `Step12_CheckApproval` 에서 차단되던 문제(원인: `allowPaperOrderExecute` · `paperOrderEnabled` 가 문자열 `"true"` 로 전달되어 Choice `BooleanEquals` 조건과 맞지 않음 + `fromStepOrder` · `toStepOrder` · `startStep` · `endStep` 가 문자열로 전달)를 해소했습니다. boolean / numeric 타입으로 보완 후 재검증에서 `Step12_CheckApproval` 통과 + `ExecutionSucceeded` 확인.
+- View approval 버튼이 일반 Step 1~17 state machine ARN 을 호출하던 문제를 approval 전용 ARN 사용으로 분리했습니다.
+- 로컬 View 실행 wrapper 에서 safe-only gate 가 남아 운영자 의도와 다르게 Step 1~17 전체 실행이 막히던 문제를 wrapper 2종 분리로 해소했습니다.
+
+### Notes
+
+- 본 변경의 코드 수정 사실은 commit `e72de6f`(`feat(view): add Step Functions daily batch trigger`) 후속의 추가 commit (변경 파일 = `DailyBatchProperties.java` · `StepFunctionsDailyBatchExecutionService.java` · `application-aws-paper.properties` · `DailyBatchController.java` · `daily_batch.html`) 및 운영자 로컬 도구 폴더 wrapper 4종 변경을 참조합니다. 본 저장소 범위 밖의 wrapper 본체는 기록하지 않습니다.
+- AWS Step Functions `portfolio-paper-daily-step12-17-approval` 검증 결과: executionName `port-view-step12-17-step12-17-20260629-194314-ba5edaf8` / status `SUCCEEDED` / start `2026-06-29T19:43:15.673+09:00` / stop `2026-06-29T19:46:06.546+09:00`. DB 후검증 통과(운영 marker `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS` / 오늘 신규 `connector_order_request` 0건 / 신규 broker 주문 0건).
+- 본 문서 업데이트 작업에서는 Daily Batch 실행, Slack Webhook 테스트, 외부 투자/주문 API 호출, DB DDL/DML, AWS CLI / boto3 / Spring Boot 실행을 추가로 수행하지 않았습니다.
+- commit/add/reset/checkout/stash 는 실행하지 않았습니다.
+- secret value, KIS app key, KIS app secret, token, RDS password, account-id 12자리 원문, 계좌번호 전체값, 실제 secret ARN, 실제 IAM Role ARN, 실제 state machine ARN, Slack webhook URL 은 본 변경 문서에 기록하지 않았습니다. 필요 시 `[REDACTED]` 로 표기했습니다.
+
+## 2026-06-29 (2)
+
+### Added
+
+- Daily Batch 실행 backend로 `aws-stepfunctions` 모드를 추가했습니다. `StepFunctionsDailyBatchExecutionService`가 AWS SDK v2 Step Functions client로 `StartExecution`을 호출하고, Python subprocess나 로컬 source 직접 실행 없이 Daily Batch를 트리거합니다.
+- `POST /daily-batch/aws-stepfunctions/start-range` Controller endpoint를 추가했습니다. 성공 시 `executionName`과 account-id를 redaction한 `executionArn`을 flash message로 표시합니다.
+- `/daily-batch` 화면에 AWS Step 1~11 safe trigger 버튼을 추가했습니다.
+- README의 Daily Batch 섹션에 `local-file` / `aws-stepfunctions` backend 분리 설명과 `portfolio.batch.aws-stepfunctions-*` 환경변수 주입 키, Fargate 안전 기본값(`local-file-execution-enabled=false`, `paperOrderEnabled=false`, `fullPipelineExecutionEnabled=false`) 설명을 추가했습니다.
+
+### Changed
+
+- `application-aws-paper.properties`에 `portfolio.batch.execution-mode`, `portfolio.batch.aws-stepfunctions-region`, `portfolio.batch.aws-stepfunctions-state-machine-arn`, `portfolio.batch.aws-stepfunctions-execution-name-prefix`, `portfolio.batch.aws-stepfunctions-start-enabled`, `portfolio.batch.aws-stepfunctions-step-start-enabled` 환경변수 주입 placeholder를 추가했습니다. 실제 값은 본 저장소에 기록하지 않습니다.
+- `DailyBatchProperties`에 aws-stepfunctions backend gate(`canStartAwsStepfunctions`, `awsStepfunctionsStartEnabled`, `awsStepfunctionsStepStartEnabled` 등)를 추가했습니다. `stateMachineArn`이 비어 있거나 `hasRunningBatch` 상태이면 버튼이 비활성화됩니다.
+- Daily Batch StartExecution payload 구성을 보완했습니다. `environment=paper`, `dbTarget=aws-paper`, `source=PORT_VIEW`, `requestedBy=VIEW_BUTTON`, `requestedFrom=port-view`, `fromStepCode` / `toStepCode`, `fromStepOrder` / `toStepOrder`, `startStep` / `endStep`, `allowPaperOrderExecute`, `paperOrderEnabled`, `runDate`(Asia/Seoul 기준 yyyy-MM-dd) 필드를 포함합니다. `accountNo`는 payload에는 포함하되 화면 / 로그 / 본 저장소 문서에는 원문을 노출하지 않습니다.
+
+### Fixed
+
+- 최초 검증에서 Step 1~11 후 `StopCrawlerEc2AfterStep11Success` 상태에서 `States.Runtime` 오류가 발생하던 문제(원인: ASL Payload의 `runDate.$=$.runDate` 참조에 대해 View `StartExecution` input에 `runDate`가 누락)를 해소했습니다. `StepFunctionsDailyBatchExecutionService`가 Asia/Seoul 기준 `runDate`를 input JSON에 추가하도록 보완했고, 재검증에서 `StopCrawlerEc2AfterStep11Success` → `SendApprovalRequiredSlack`까지 통과하여 `APPROVAL_REQUIRED` Slack 수신을 확인했습니다.
+
+### Notes
+
+- 본 변경의 코드 수정 사실은 commit `e72de6f` (`feat(view): add Step Functions daily batch trigger`)을 참조합니다. 변경 파일 범위: `pom.xml`, `src/main/java/my/portfolio/port_view/config/DailyBatchProperties.java`, `src/main/java/my/portfolio/port_view/controller/DailyBatchController.java`, `src/main/java/my/portfolio/port_view/service/StepFunctionsDailyBatchExecutionService.java`, `src/main/resources/application-aws-paper.properties`, `src/main/resources/templates/pages/daily_batch.html`.
+- 로컬 Step 1~11 `StartExecution` 검증 완료. Step 12~17 주문성 구간은 `allowPaperOrderExecute=false` 기준으로 차단을 유지했고, broker 주문 제출은 없었습니다.
+- 본 문서 업데이트 작업에서는 Daily Batch 실행, Slack Webhook 테스트, 외부 투자/주문 API 호출, DB DDL/DML, AWS CLI / boto3 / Spring Boot 실행을 수행하지 않았습니다.
+- commit/add/reset/checkout/stash는 실행하지 않았습니다.
+- secret value, KIS app key, KIS app secret, token, RDS password, account-id 12자리 원문, 계좌번호 전체값, 실제 secret ARN, 실제 IAM Role ARN, Slack webhook URL은 본 변경 문서에 기록하지 않았습니다. 필요 시 `[REDACTED]`로 표기했습니다.
+
 ## 2026-06-29
 
 ### Added

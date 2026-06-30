@@ -209,6 +209,55 @@ public class DailyBatchController {
         return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
     }
     /**
+     * AWS Step Functions Daily Pipeline approval range StartExecution.
+     *
+     * 기존 Step 1~11 safe trigger와 분리한다.
+     * Step 12~17 주문성 구간은 paper-order gate와 step range gate를 통과해야 실행한다.
+     */
+    @PostMapping("/daily-batch/aws-stepfunctions/start-approval-range")
+    public String startAwsStepfunctionsApprovalRange(
+            @RequestParam String fromStepCode,
+            @RequestParam String toStepCode,
+            @RequestParam(required = false) String accountNo,
+            RedirectAttributes redirectAttributes
+    ) {
+        String resolvedAccountNo = accountNoResolver.resolve(accountNo);
+
+        if (!canStartAwsStepfunctionsApproval()) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "AWS Step Functions 승인형 Step 12~17 실행은 현재 비활성화되어 있습니다. " + currentModeText()
+            );
+
+            return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
+        }
+
+        try {
+            StepFunctionsDailyBatchExecutionService.StartExecutionResult result =
+                    stepFunctionsDailyBatchExecutionService.startApprovalRange(
+                            fromStepCode,
+                            toStepCode,
+                            resolvedAccountNo
+                    );
+
+            redirectAttributes.addFlashAttribute(
+                    "successMessage",
+                    "AWS Step Functions 승인형 Step 12~17 실행 시작: "
+                            + result.executionName()
+                            + " / executionArn="
+                            + result.redactedExecutionArn()
+            );
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "AWS Step Functions 승인형 Step 12~17 실행 시작 실패: " + e.getMessage()
+            );
+        }
+
+        return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
+    }
+
+    /**
      * Slack 테스트 메시지 전송.
      */
     @PostMapping("/daily-batch/slack-test")
@@ -451,6 +500,8 @@ public class DailyBatchController {
         model.addAttribute("canRunFullLocalFilePipeline", canRunFullLocalFilePipeline());
         model.addAttribute("canStartAwsStepfunctions", batchProperties.canStartAwsStepfunctions());
         model.addAttribute("canStartAwsStepfunctionsStep", batchProperties.canStartAwsStepfunctionsStep());
+        model.addAttribute("canStartAwsStepfunctionsSafe", canStartAwsStepfunctionsSafe());
+        model.addAttribute("canStartAwsStepfunctionsApproval", canStartAwsStepfunctionsApproval());
         model.addAttribute("canRunIntradayMonitor", canRunIntradayMonitor());
         model.addAttribute("canUseSlackAction", batchProperties.isSlackActionEnabled());
 
@@ -464,6 +515,22 @@ public class DailyBatchController {
 
     private boolean canRunFullLocalFilePipeline() {
         return batchProperties.canRunFullLocalFilePipeline();
+    }
+
+    private boolean canStartAwsStepfunctionsSafe() {
+        return batchProperties.canStartAwsStepfunctions()
+                && !batchProperties.isPaperOrderEnabled()
+                && batchProperties.getMinExecutableStepOrder() <= 1
+                && batchProperties.getMaxExecutableStepOrder() >= 11;
+    }
+
+    private boolean canStartAwsStepfunctionsApproval() {
+        return batchProperties.canStartAwsStepfunctions()
+                && batchProperties.canStartAwsStepfunctionsStep()
+                && batchProperties.isPaperOrderEnabled()
+                && !batchProperties.isFullPipelineExecutionEnabled()
+                && batchProperties.getMinExecutableStepOrder() <= 12
+                && batchProperties.getMaxExecutableStepOrder() >= 17;
     }
 
     private boolean canRunIntradayMonitor() {
@@ -490,6 +557,7 @@ public class DailyBatchController {
                 + ", minExecutableStepOrder=" + batchProperties.getMinExecutableStepOrder()
                 + ", maxExecutableStepOrder=" + batchProperties.getMaxExecutableStepOrder()
                 + ", awsStepfunctionsStartEnabled=" + batchProperties.isAwsStepfunctionsStartEnabled()
+                + ", awsStepfunctionsStepStartEnabled=" + batchProperties.isAwsStepfunctionsStepStartEnabled()
                 + ", intradayMonitorEnabled=" + batchProperties.isIntradayMonitorEnabled();
     }
 }

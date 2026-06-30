@@ -159,3 +159,73 @@
 4. JSON SecretString 내부 key parsing 사실은 mapping 사실로만 기록(value 평문 0건). raw SecretString export 금지 정책 1차 실증(R-DOCS-001 [2026-06-17 보강] / [2026-06-17 보강(17-step E2E)] 정합).
 5. broker / KIS 호출은 KIS paper BUY 4건(03 spec Step 12) + balance / order check 조회성 한정. SELL / 취소 / 정정 / 추가 `--execute` 호출 0건. live 자동 BUY / SELL E2E 검증은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건.
 6. Daily AWS 17-step E2E paper 1차 통과로 본 spec 의 IAM / Secrets / SSM Parameter / DB role 보정 정책이 backend AWS E2E 흐름에서 정상 동작함이 1차 실증 — OD-SEC-005 / OD-SEC-006 / OD-SEC-007 mitigation 정합 / Status 기존 값 그대로 유지(🟡 잠정).
+
+
+## 2026-06-29 (2) — Fargate port-view Task Role / env 주입 후속 추가
+
+본 일자 port-view 측 commit `e72de6f`(`feat(view): add Step Functions daily batch trigger`) 의 결과로 Fargate 진입 시점에 06 spec 측 추가로 락해야 할 IAM / Secrets / env 주입 정책을 후속으로 남긴다. 본 노트는 port-view 측 코드 본문 / IAM Policy / ASL / 응답 본문 평문 인용 0건(R-DOCS-001 정합).
+
+§1. Fargate port-view Task Role 후속
+ 1) `states:StartExecution` 최소 권한
+   (1) Resource 패턴 한정
+       - Fargate port-view Task Role 의 `states:StartExecution` 권한 scope 는 `portfolio-paper-daily-step1-17-approval` state machine ARN 한정 권장
+       - Resource · Action wildcard 0건 유지(OD-SEC-005 / OD-SEC-006 / R-AUTO-034 신규 mitigation 정합)
+       - Step 12~17 승인형 state machine 이 별도 추가될 경우 동일 패턴으로 한정
+   (2) 본 spec 본문 평문 기록 0건
+       - 실제 IAM Role ARN / IAM Policy 전체 본문 / state machine ARN 의 account-id 부분(`[REDACTED]` 처리)
+ 2) 기타 Task Role 권한
+   (1) ECR pull / Secrets Manager(specific ARN) / SSM Parameter Store(specific ARN) / CloudWatch Logs `CreateLogStream` + `PutLogEvents` 최소 권한 부여
+   (2) Resource 패턴은 환경별 prefix(`/portfolio/paper/...`) 로 좁힘
+   (3) ECS Task Definition `executionRoleArn` 과 `taskRoleArn` 분리 유지
+
+§2. Secrets 주입 정책
+ 1) RDS 접속정보
+   (1) image / properties 직접 기록 금지
+       - Dockerfile / `application.properties` / `application-aws-paper.properties` 에 RDS host · port · user · password 평문 기록 금지
+       - Secrets Manager(또는 SSM SecureString) 주입 / ECS Task Definition `secrets` 블록 또는 startup hook 으로 환경변수 주입
+       - `INTEREST_DB_*` 환경변수 패턴 그대로 유지(port-view README 정합)
+   (2) Fargate Task 안에서만 환경변수 노출 / 외부 audit log / 운영자 노트 / 콘솔 캡처에 평문 노출 금지(R-DOCS-001 / R-DOCS-002 / R-SEC-010 정합)
+ 2) KIS secret / Slack webhook
+   (1) Fargate View 측은 KIS broker 직접 호출이 없으므로 KIS secret 주입은 본 spec 1차 적용 범위 밖
+       - KIS secret 은 03 spec MarketConnector EC2 측 책임으로 유지(OD-SEC-003 / OD-MS-027 정합)
+   (2) Slack webhook URL 은 `portfolio-event-notifier` Lambda 측 환경변수로 1차 운영 / Secrets Manager 또는 SSM SecureString 이전은 후속(R-AUTO-024 정합)
+       - port-view 측 Slack webhook 사용 정책 변경 없음
+
+§3. Step Functions 식별자 env 주입
+ 1) `stateMachineArn` / region / `executionNamePrefix`
+   (1) `application.properties` 직접 고정 금지
+       - port-view `aws-stepfunctions` mode 의 `portfolio.batch.aws-stepfunctions-state-machine-arn` / `portfolio.batch.aws-stepfunctions-region` / `portfolio.batch.aws-stepfunctions-execution-name-prefix` 는 env 또는 config 주입
+       - ECS Task Definition `environment` 또는 `secrets` 블록으로 주입
+       - 본 spec 본문 평문 기록 0건(`[REDACTED]` 또는 placeholder)
+ 2) 안전 기본값
+   (1) `portfolio.batch.local-file-execution-enabled=false`
+   (2) `portfolio.batch.paper-order-enabled=false`
+   (3) `portfolio.batch.full-pipeline-execution-enabled=false`
+   (4) `portfolio.batch.max-executable-step-order=11`(Step 12 이상은 별도 승인형 phase 도입 후 ENABLE)
+   (5) R-AUTO-034 신규 mitigation 정합 / 05 spec 후속 phase 책임
+
+§4. 결정 / 리스크 매핑
+ 1) 결정 본문 변경 없음
+   (1) OD-SEC-005 / OD-SEC-006 / OD-SEC-007 / OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 메모 보강
+       - 자세한 결정 변경은 `../_common/operator-decisions.md` Change Log 2026-06-29 (2) 항목 참조
+ 2) 리스크 매핑
+   (1) R-AUTO-034 신규 — Fargate View `states:StartExecution` 권한 과다 + Step 12 gate 우회 위험 / Status `Open` / 06 spec 후속 phase 책임
+   (2) R-DOCS-001 / R-DOCS-002 / R-SEC-010 정합 — secret value / DB password / Slack webhook URL / Administrator password 평문 기록 금지 정책 그대로 유지
+
+§5. 후속 (06 spec 후속 phase 책임)
+ 1) Fargate port-view Task Role 정식 정의 + IAM Policy 작성
+   (1) `states:StartExecution` Resource 한정 + ECR pull + Secrets Manager(`/portfolio/paper/...`) + CloudWatch Logs 최소 권한
+   (2) `simulate-principal-policy` 검증 + Resource · Action wildcard 0건 audit
+ 2) ECS Task Definition `secrets` / `environment` 블록 정식 작성
+   (1) RDS 접속정보 Secrets Manager 주입 / `INTEREST_DB_*` 환경변수 매핑
+   (2) `portfolio.batch.aws-stepfunctions-*` env 주입 매핑
+ 3) DB password rotate(R-SEC-010 신규) 진입 시점에 Fargate port-view 측 secret 재검증
+ 4) Slack webhook URL Secrets Manager 또는 SSM Parameter Store 이전(R-AUTO-024) 진입 시 port-view 측 secret loader 영향 cross-spec audit
+
+§6. 본 일자 사실 기록 범위
+ 1) Kiro 작업 = 06 spec `operation-notes.md` 본 섹션 누적만 수행
+ 2) 운영자 직접 commit `e72de6f` 코드 변경분은 port-view MS 영역(06 spec 영역 변경 0건)
+ 3) AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 본 일자 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 0건
+ 4) IAM Policy 전체 본문 / `simulate-principal-policy` 응답 본문 / Secrets Manager `GetSecretValue` 응답 본문 / SSM Parameter Store 응답 본문 / Spring Boot application log 전문 평문 인용 0건
+ 5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / 실제 state machine ARN / Slack webhook URL / DB password / Administrator password) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder
+ 6) 운영 식별자(commit hash `e72de6f` / Class 이름 `StepFunctionsDailyBatchExecutionService` / Spring properties key 라벨 / 환경변수 패턴 `INTEREST_DB_*` / Spring profile `aws-paper`) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님

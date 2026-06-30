@@ -145,9 +145,18 @@ public class DailyBatchProperties {
     /**
      * AWS Step Functions state machine ARN.
      *
+     * Step 1~11 safe trigger 또는 기본 Daily workflow용 ARN.
      * 실제 값은 properties 파일에 직접 쓰지 않고 환경변수로 주입한다.
      */
     private String awsStepfunctionsStateMachineArn = "";
+
+    /**
+     * AWS Step Functions approval state machine ARN.
+     *
+     * Step 12~17 승인형 workflow 전용 ARN.
+     * 실제 값은 properties 파일에 직접 쓰지 않고 환경변수로 주입한다.
+     */
+    private String awsStepfunctionsApprovalStateMachineArn = "";
 
     /**
      * AWS Step Functions execution name prefix.
@@ -356,6 +365,14 @@ public class DailyBatchProperties {
 
     public void setAwsStepfunctionsStateMachineArn(String awsStepfunctionsStateMachineArn) {
         this.awsStepfunctionsStateMachineArn = awsStepfunctionsStateMachineArn;
+    }
+
+    public String getAwsStepfunctionsApprovalStateMachineArn() {
+        return awsStepfunctionsApprovalStateMachineArn;
+    }
+
+    public void setAwsStepfunctionsApprovalStateMachineArn(String awsStepfunctionsApprovalStateMachineArn) {
+        this.awsStepfunctionsApprovalStateMachineArn = awsStepfunctionsApprovalStateMachineArn;
     }
 
     public String getAwsStepfunctionsExecutionNamePrefix() {

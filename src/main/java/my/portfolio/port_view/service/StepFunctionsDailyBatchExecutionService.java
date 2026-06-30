@@ -51,20 +51,21 @@ public class StepFunctionsDailyBatchExecutionService {
             String requestedBy,
             String accountNo
     ) {
-        assertStartAllowed();
+        assertStartAllowed(allowPaperOrderExecute);
 
         BatchStepRange range = resolveRange(fromStepCode, toStepCode);
         assertRangeAllowed(range, allowPaperOrderExecute);
 
         String executionName = buildExecutionName(range);
         String input = buildInput(range, allowPaperOrderExecute, requestedBy, accountNo);
+        String stateMachineArn = resolveStateMachineArn(allowPaperOrderExecute);
 
         try (SfnClient client = SfnClient.builder()
                 .region(Region.of(properties.getAwsStepfunctionsRegion()))
                 .build()) {
 
             StartExecutionResponse response = client.startExecution(StartExecutionRequest.builder()
-                    .stateMachineArn(properties.getAwsStepfunctionsStateMachineArn())
+                    .stateMachineArn(stateMachineArn)
                     .name(executionName)
                     .input(input)
                     .build());
@@ -78,7 +79,7 @@ public class StepFunctionsDailyBatchExecutionService {
         }
     }
 
-    private void assertStartAllowed() {
+    private void assertStartAllowed(boolean allowPaperOrderExecute) {
         if (!properties.canStartAwsStepfunctions()) {
             throw new IllegalStateException(
                     "AWS Step Functions StartExecution 차단됨. executionEnabled="
@@ -94,9 +95,23 @@ public class StepFunctionsDailyBatchExecutionService {
             throw new IllegalStateException("AWS Step Functions region 설정이 비어 있음.");
         }
 
-        if (isBlank(properties.getAwsStepfunctionsStateMachineArn())) {
-            throw new IllegalStateException("AWS Step Functions state machine ARN 설정이 비어 있음.");
+        if (allowPaperOrderExecute) {
+            if (isBlank(properties.getAwsStepfunctionsApprovalStateMachineArn())) {
+                throw new IllegalStateException("AWS Step Functions approval state machine ARN 설정이 비어 있음.");
+            }
+        } else {
+            if (isBlank(properties.getAwsStepfunctionsStateMachineArn())) {
+                throw new IllegalStateException("AWS Step Functions state machine ARN 설정이 비어 있음.");
+            }
         }
+    }
+
+    private String resolveStateMachineArn(boolean allowPaperOrderExecute) {
+        if (allowPaperOrderExecute) {
+            return properties.getAwsStepfunctionsApprovalStateMachineArn();
+        }
+
+        return properties.getAwsStepfunctionsStateMachineArn();
     }
 
     private BatchStepRange resolveRange(String fromStepCode, String toStepCode) {
@@ -212,13 +227,13 @@ public class StepFunctionsDailyBatchExecutionService {
                 + "\"requestedBy\":\"" + requestedBy + "\","
                 + "\"accountNo\":\"" + jsonEscape(accountNo) + "\","
                 + "\"fromStepCode\":\"" + jsonEscape(range.fromStep().stepCode()) + "\","
-                + "\"fromStepOrder\":\"" + range.fromStep().stepOrder() + "\","
+                + "\"fromStepOrder\":" + range.fromStep().stepOrder() + ","
                 + "\"toStepCode\":\"" + jsonEscape(range.toStep().stepCode()) + "\","
-                + "\"toStepOrder\":\"" + range.toStep().stepOrder() + "\","
-                + "\"startStep\":\"" + range.fromStep().stepOrder() + "\","
-                + "\"endStep\":\"" + range.toStep().stepOrder() + "\","
-                + "\"allowPaperOrderExecute\":\"" + allowPaperOrderExecute + "\","
-                + "\"paperOrderEnabled\":\"" + properties.isPaperOrderEnabled() + "\","
+                + "\"toStepOrder\":" + range.toStep().stepOrder() + ","
+                + "\"startStep\":" + range.fromStep().stepOrder() + ","
+                + "\"endStep\":" + range.toStep().stepOrder() + ","
+                + "\"allowPaperOrderExecute\":" + allowPaperOrderExecute + ","
+                + "\"paperOrderEnabled\":" + properties.isPaperOrderEnabled() + ","
                 + "\"requestedFrom\":\"port-view\""
                 + "}";
     }

@@ -1405,3 +1405,176 @@
    4) AWS Lambda / IAM / Step Functions / Slack webhook 호출은 모두 운영자 직접 수행 — Kiro 는 문서 작성 / 절차 정리만. AWS CLI / boto3 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 § 작업으로 인한 변경 0건(spec 영역 / port-view SlackNotificationService 본문 변경 없음)
    5) 기존 port-view Slack 은 유지 — port-view SlackNotificationService 의 View Daily Batch 수동 실행 결과 알림 책임은 그대로 / 이번 작업에서 제거 · 대체되지 않음 / 향후 공통 notifier 로 이전 가능성만 기록(05 spec 후속 phase 책임)
 
+
+
+## 2026-06-29 (2) — port-view 가 Step Functions StartExecution external caller 로 붙는 첫 local 검증
+
+본 일자 운영자가 직접 수행한 port-view 측 commit `e72de6f`(`feat(view): add Step Functions daily batch trigger`) 결과를 04 spec 의 Step Functions state machine 운영 관점에서 누적 기록한다. 본 노트는 port-view 측 코드 본문 / IAM Policy / ASL / 응답 본문 평문 인용 0건(R-DOCS-001 정합).
+
+§1. port-view 가 외부 caller 로 추가됨
+ 1) 기존 자동 trigger 경로(OD-MS-032)
+   (1) EventBridge Scheduler → Dispatcher Lambda → Step Functions `StartExecution`
+       - Scheduler `portfolio-paper-daily-step1-11-approval-0800-kst`(`ENABLED`) / 08:00 KST
+       - Scheduler `portfolio-paper-daily-step12-17-order-0901-kst`(`DISABLED`) / 09:01 KST 자동 ENABLE 보류(OD-MS-033)
+ 2) 신규 운영자 수동 trigger 경로(OD-MS-002 / OD-MS-009 / OD-MS-037 메모 보강)
+   (1) View `/daily-batch` 화면 AWS Step 1~11 safe trigger 버튼
+       - port-view 의 `StepFunctionsDailyBatchExecutionService` 가 AWS SDK v2 Step Functions client 로 `StartExecution` 호출
+       - Controller endpoint `POST /daily-batch/aws-stepfunctions/start-range`
+       - 성공 시 `executionName` + account-id redaction `executionArn` flash message 표시
+       - `aws-stepfunctions` mode 에서는 View 가 Python subprocess · `C:/Workspaces` 로컬 source 직접 실행 없음
+   (2) 본 경로는 자동 trigger 가 아닌 **운영자 수동 trigger** 한정 — Daily Batch 자동 trigger 정책(OD-MS-032 / OD-MS-033) 변경 없음.
+
+§2. View input 의 `runDate` 필수 사실
+ 1) ASL 의 `runDate.$=$.runDate` 참조 state
+   (1) `StopCrawlerEc2AfterStep11Success`(OD-MS-034 정합) 가 input 의 `runDate` 를 직접 참조
+       - 외부 caller 의 `StartExecution` input 에 `runDate` 가 없으면 `States.Runtime` 발생
+       - View 1차 검증에서 식별 후 보완
+ 2) 보완 정책
+   (1) 외부 `StartExecution` caller 는 input JSON 에 `runDate`(Asia/Seoul yyyy-MM-dd) 를 반드시 포함
+       - port-view `StepFunctionsDailyBatchExecutionService` 가 Asia/Seoul 기준 `runDate` 를 input 에 자동 포함하도록 보완 완료
+       - EventBridge Scheduler + Dispatcher Lambda 경로는 OD-MS-032 정합으로 Lambda 가 KST `runDate` 를 생성해 input 에 포함 / 기존 정책 변경 없음
+   (2) ASL 측 후속 검토
+       - `runDate` 가 외부 caller input 누락 시 fail-fast 분기 또는 default `runDate` 보강 분기 도입 검토(04 spec 후속 phase 책임 / 본 일자 작업 범위 밖)
+
+§3. Step 1~11 → StopCrawlerEc2AfterStep11Success → SendApprovalRequiredSlack 흐름 검증
+ 1) end-to-end 통과
+   (1) View 운영자 수동 trigger 경유 1차 실증
+       - Step 1~11 workflow 실행 통과
+       - `StopCrawlerEc2AfterStep11Success` task state(OD-MS-034) `runDate` 보완 후 통과
+       - `SendApprovalRequiredSlack` 도달
+       - Slack `APPROVAL_REQUIRED` 수신 확인
+       - `connector_order_request` 신규 0건 / broker 주문 제출 0건
+ 2) Step 12~17 정책 유지
+   (1) `allowPaperOrderExecute=false` 기준 차단 유지
+       - Step 12 approval gate 차단 정합
+       - paper-order gate 정책 변경 없음
+       - 09:01 schedule 자동 ENABLE 보류 정책(OD-MS-033) 그대로 유지
+
+§4. View 측 안전 gate 정합(외부 caller 책임 분리)
+ 1) `StepFunctionsDailyBatchExecutionService` 서비스 레벨 안전 gate
+   (1) 서비스 레벨 차단 조건
+       - `canStartAwsStepfunctions=false`
+       - `hasRunningBatch=true`
+       - `stateMachineArn` 빈 값
+       - `minExecutableStepOrder` · `maxExecutableStepOrder` 범위 밖
+       - `allowPaperOrderExecute=false` 상태 Step 12 이상
+       - approval 요청은 `paperOrderEnabled=true` 외 모두 차단
+   (2) 04 spec 측 정합
+       - state machine 자체의 approval gate(`Step12_CheckApproval`) 와 View 측 서비스 레벨 gate 는 별도 계층
+       - 둘 다 만족해야 Step 12 이상 broker 호출 진입 / R-AUTO-033 [2026-06-29 보강 (2)] / R-AUTO-034 신규 정합
+
+§5. 결정 / 리스크 매핑
+ 1) 결정 본문 변경 없음
+   (1) OD-MS-009 / OD-MS-029 / OD-MS-031 / OD-MS-032 / OD-MS-033 / OD-MS-034 / OD-SAFE-001 ~ OD-SAFE-004 본문 변경 없이 1차 실증 메모 보강
+       - 자세한 결정 변경은 `../_common/operator-decisions.md` Change Log 2026-06-29 (2) 항목 참조
+ 2) 리스크 매핑
+   (1) R-AUTO-033 [2026-06-29 보강 (2)] / R-AUTO-034 신규 — `../_common/risk-register.md` 참조
+       - port-view 외부 caller 1차 검증 통과 / Status `Mitigated` 유지
+       - Fargate View 권한 과다 + Step 12 gate 우회 위험 / Status `Open` / 06 spec 후속 phase 책임
+
+§6. 후속 (04 spec 후속 phase 책임)
+ 1) ASL `runDate` 누락 대응 검토
+   (1) 외부 caller 의 input `runDate` 누락 시 fail-fast 또는 default 보강 분기 도입 검토
+ 2) Step 12~17 외부 caller 책임 분리
+   (1) Step 12~17 승인형 trigger 가 신규 추가될 경우 View 측 preflight + approval gate + paper-order gate 와 04 spec state machine 의 approval gate 정합 cross-spec audit
+ 3) Slack `APPROVAL_REQUIRED` summary 0/0 표시 개선(R-AUTO-027 mitigation 확장) 후속 그대로 유지
+ 4) 09:01 schedule 자동 ENABLE 여부(OD-MS-033 보류 정책) 그대로 유지
+
+§7. 본 일자 사실 기록 범위
+ 1) Kiro 작업 = 04 spec `operation-notes.md` 본 섹션 누적만 수행
+ 2) 운영자 직접 commit `e72de6f` 코드 변경분은 port-view MS 영역(04 spec 영역 변경 0건)
+ 3) AWS / EventBridge Scheduler / Lambda / Step Functions / SSM / EC2 / RDS / S3 / KIS API 호출 본 일자 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 0건
+ 4) `StartExecution` 응답 본문 / Step Functions execution history 본문 / Slack 메시지 본문 / Lambda 응답 본문 / KIS API response body / Spring Boot application log 전문 평문 인용 0건
+ 5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / 실제 state machine ARN / Slack webhook URL) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder
+ 6) 운영 식별자(commit hash `e72de6f` / commit message / Class 이름 `StepFunctionsDailyBatchExecutionService` / Controller endpoint path `/daily-batch/aws-stepfunctions/start-range` / state name 4종(`StopCrawlerEc2AfterStep11Success` · `SendApprovalRequiredSlack` · `Step6ToStep11_Succeeded` · `Step12_CheckApproval`) / Slack 이벤트 라벨 `APPROVAL_REQUIRED` / 에러 라벨 `States.Runtime` / payload 필드 라벨 / Spring profile `aws-paper`) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님
+
+
+## 2026-06-29 (3) — port-view 가 Step 12~17 approval state machine 의 external caller 로 붙는 두 번째 phase 검증
+
+본 일자 운영자가 직접 수행한 port-view 측 추가 변경(`DailyBatchProperties.java` · `StepFunctionsDailyBatchExecutionService.java` · `application-aws-paper.properties` · `DailyBatchController.java` · `daily_batch.html`) 의 결과를 04 spec 의 Step Functions state machine 운영 관점에서 누적 기록한다. 본 노트는 port-view 측 코드 본문 / IAM Policy / ASL / 응답 본문 / `StartExecution` 입력 JSON 본문 평문 인용 0건(R-DOCS-001 정합).
+
+§1. Step 12~17 approval state machine ARN 분리
+ 1) 일반 workflow 와 approval workflow 분리: 완료
+   (1) 대상 state machine 2종
+       - 일반 workflow: `portfolio-paper-daily-step1-17-approval`
+       - approval workflow: `portfolio-paper-daily-step12-17-approval`
+   (2) View 측 매핑
+       - `startSafeRange` = 일반 ARN 사용
+       - `startApprovalRange` = approval 전용 ARN 사용
+       - approval ARN 비어 있으면 View 서비스 레벨에서 차단
+   (3) Fargate Task Role 후속 (06 spec 책임)
+       - `states:StartExecution` Resource 패턴은 일반 ARN + approval ARN 2종 모두 한정 부여 필요
+       - Resource · Action wildcard 0건 유지 정책 그대로 유지
+
+§2. `Step12_CheckApproval` Choice `BooleanEquals` 조건과 외부 caller payload 정합
+ 1) payload 타입 정합 1차 실증: 완료
+   (1) boolean 필드
+       - `allowPaperOrderExecute=true` (boolean JSON)
+       - `paperOrderEnabled=true` (boolean JSON)
+       - 문자열 `"true"` 로 전달되면 `Step12_CheckApproval` 에서 차단되는 사례 식별
+   (2) numeric 필드
+       - `fromStepOrder` · `toStepOrder` · `startStep` · `endStep` 는 numeric JSON 으로 전달
+       - 문자열 numeric 도 일부 state 에서 비정상 분기 가능성 존재 → numeric 전달 권장
+   (3) ASL 측 후속 검토
+       - 외부 caller payload 타입 정합을 강제하기 위한 fail-fast 분기 또는 default coercion 분기 도입은 04 spec 후속 phase 책임(본 일자 작업 범위 밖)
+       - 외부 caller 가 본 노트 §2.1.1 / §2.1.2 정합으로 payload 를 전달하면 현재 ASL 그대로 동작 정합
+
+§3. Step 12~17 → 13~17 흐름 검증
+ 1) end-to-end 통과: 완료
+   (1) state 진행 정합
+       - `Step12_CheckApproval` 통과
+       - `Step12_RunMarketConnectorStrategyOrderExecute` 실행
+       - `Step12_GetCommandInvocation` 성공
+       - Step 13~17 전체 진행
+       - `ExecutionSucceeded` 확인
+   (2) DB 후검증
+       - 운영 marker `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS`
+       - 오늘 신규 `connector_order_request` 0건
+       - READY / REQUESTED `strategy_execution_order` 0건
+       - 신규 broker 주문 제출 없음
+       - 최근 `connector_order_request` 는 2026-06-22 ~ 2026-06-24 기존 주문만 표시
+   (3) 검증 식별자
+       - executionName `port-view-step12-17-step12-17-20260629-194314-ba5edaf8`
+       - status `SUCCEEDED`
+       - start `2026-06-29T19:43:15.673+09:00`
+       - stop `2026-06-29T19:46:06.546+09:00`
+       - 본 노트에 Step Functions execution history 본문 / SSM stdout 본문 평문 인용 0건
+
+§4. View 측 안전 gate 정합(외부 caller 책임 분리)
+ 1) `StepFunctionsDailyBatchExecutionService` 서비스 레벨 안전 gate
+   (1) 서비스 레벨 차단 조건(approval 진입 추가)
+       - `canStartAwsStepfunctions=false`
+       - `hasRunningBatch=true`
+       - 일반 `stateMachineArn` 빈 값 또는 approval `stateMachineArn` 빈 값
+       - `minExecutableStepOrder` · `maxExecutableStepOrder` 범위 밖
+       - `allowPaperOrderExecute=false` 상태 Step 12 이상
+       - approval 요청은 `paperOrderEnabled=true` 외 모두 차단
+       - `startApprovalRange` 진입 시 approval ARN 없으면 즉시 차단
+   (2) 04 spec 측 정합
+       - state machine 자체의 approval gate(`Step12_CheckApproval`) 와 View 측 서비스 레벨 gate 는 별도 계층
+       - 둘 다 만족해야 Step 12 이상 broker 호출 진입 / R-AUTO-033 [2026-06-29 보강 (3)] / R-AUTO-034 [2026-06-29 보강] 정합
+
+§5. 결정 / 리스크 매핑
+ 1) 결정 본문 변경 없음
+   (1) OD-MS-009 / OD-MS-029 / OD-MS-031 / OD-MS-032 / OD-MS-033 / OD-MS-034 / OD-SAFE-001 ~ OD-SAFE-004 본문 변경 없이 1차 실증 메모 보강
+       - 자세한 결정 변경은 `../_common/operator-decisions.md` Change Log 2026-06-29 (3) 항목 참조
+ 2) 리스크 매핑
+   (1) R-AUTO-033 [2026-06-29 보강 (3)] / R-AUTO-034 [2026-06-29 보강] — `../_common/risk-register.md` 참조
+       - port-view 외부 caller approval phase 검증 통과 / Status `Mitigated` 유지 / Fargate Task Role 권한 분리는 06 spec 후속 phase 책임
+
+§6. 후속 (04 spec 후속 phase 책임)
+ 1) ASL payload 타입 정합 강제 검토
+   (1) `Step12_CheckApproval` 진입 전 외부 caller payload 의 boolean / numeric 타입 정합을 fail-fast 또는 default coercion 으로 강제하는 분기 도입 검토
+ 2) approval workflow Step 12~17 외부 caller 책임 분리
+   (1) 신규 외부 caller(예: Fargate View / 다른 운영자 도구) 가 추가될 경우 boolean / numeric payload 타입 정합 cross-spec audit
+ 3) Slack `APPROVAL_REQUIRED` summary 0/0 표시 개선(R-AUTO-027 mitigation 확장) 후속 그대로 유지
+ 4) 09:01 schedule 자동 ENABLE 여부(OD-MS-033 보류 정책) 그대로 유지
+ 5) Step Functions execution history Catch state audit + DLQ · retry · CloudWatch Alarm 도입(R-AUTO-023) 그대로 유지
+
+§7. 본 일자 사실 기록 범위
+ 1) Kiro 작업 = 04 spec `operation-notes.md` 본 섹션 누적만 수행
+ 2) 운영자 직접 변경분(port-view MS 영역) 은 04 spec 영역 변경 0건
+ 3) AWS / EventBridge Scheduler / Lambda / Step Functions / SSM / EC2 / RDS / S3 / KIS API 호출 본 일자 신규 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 0건
+ 4) `StartExecution` 응답 본문 / Step Functions execution history 본문 / Slack 메시지 본문 / Lambda 응답 본문 / KIS API response body / Spring Boot application log 전문 / SSM stdout 본문 / commit diff 본문 / PowerShell wrapper 본체 평문 인용 0건
+ 5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / 실제 state machine ARN / Slack webhook URL / DB password) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder
+ 6) 운영 식별자(executionName `port-view-step12-17-step12-17-20260629-194314-ba5edaf8` / 운영 marker `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS` / state machine 이름 2종(`portfolio-paper-daily-step1-17-approval` · `portfolio-paper-daily-step12-17-approval`) / state 이름 4종(`Step12_CheckApproval` · `Step12_RunMarketConnectorStrategyOrderExecute` · `Step12_GetCommandInvocation` · `ExecutionSucceeded`) / Controller endpoint path 2종(`/daily-batch/aws-stepfunctions/start-range` · `/daily-batch/aws-stepfunctions/start-approval-range`) / Spring properties key 7종 / 환경변수 라벨 / payload 필드 라벨 + boolean / numeric 타입 / `requestedBy=VIEW_APPROVAL_BUTTON` 라벨 / Spring profile `aws-paper` / start · stop timestamp) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님

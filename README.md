@@ -197,6 +197,47 @@ Daily Batch는 여러 외부 모듈의 Python command를 순차 실행하고, �
 
 상세 내용은 [docs/daily-batch.md](docs/daily-batch.md)를 참고합니다.
 
+### Daily Batch 실행 backend
+
+Daily Batch 실행 backend는 두 가지로 분리되어 있습니다. `portfolio.batch.execution-mode` 값으로 선택합니다.
+
+- `local-file`: 운영자 로컬 검증 도구로 보존하는 backend. Local View 버튼이 ProcessBuilder로 로컬 source(예: `C:/Workspaces/port-marketconnector`)의 Python command를 직접 실행해 AWS Paper DB에 결과를 저장합니다. Fargate에서는 사용하지 않습니다.
+- `aws-stepfunctions`: View가 Python subprocess나 로컬 source를 직접 실행하지 않고 AWS Step Functions `StartExecution`만 호출하는 backend입니다. 실제 Step 1~17 실행은 Step Functions state machine + ECS RunTask + SSM RunCommand + AWS Batch 가 담당합니다.
+
+`aws-stepfunctions` backend 는 `StepFunctionsDailyBatchExecutionService`가 담당하고, Daily Batch 화면에 `AWS Step 1~11` safe trigger 버튼과 `AWS Step 12~17` 승인 실행 버튼을 분리해 노출합니다. 기본은 `allowPaperOrderExecute=false` 기준이며, Step 12~17 주문성 구간은 별도 approval / preflight / paper-order gate 뒤에서만 활성화됩니다.
+
+Controller endpoint(기존 endpoint 이름은 그대로 유지):
+
+- `POST /daily-batch/aws-stepfunctions/start-range`: Step 1~11 safe trigger
+- `POST /daily-batch/aws-stepfunctions/start-approval-range`: Step 12~17 승인 실행
+
+성공 시 `executionName`과 account-id를 redaction한 `executionArn`을 flash message로 표시합니다. 승인 실행은 `requestedBy=VIEW_APPROVAL_BUTTON`, `allowPaperOrderExecute=true`, `paperOrderEnabled=true` payload를 사용합니다.
+
+State machine 식별자는 일반 workflow와 approval workflow를 분리해 환경변수로 주입합니다. 실제 ARN 값은 본 저장소 문서에 기록하지 않고 `[REDACTED]` 또는 placeholder로 표기합니다.
+
+- `portfolio.batch.aws-stepfunctions-region`: Step Functions 호출 region (예: `ap-northeast-2`)
+- `portfolio.batch.aws-stepfunctions-state-machine-arn`: 일반 workflow state machine ARN (`portfolio-paper-daily-step1-17-approval`)
+- `portfolio.batch.aws-stepfunctions-approval-state-machine-arn`: 승인형 workflow state machine ARN (`portfolio-paper-daily-step12-17-approval`). 승인 ARN이 비어 있으면 승인형 실행은 서비스 레벨에서 차단됩니다.
+- `portfolio.batch.aws-stepfunctions-execution-name-prefix`: `StartExecution` `name` prefix
+- `portfolio.batch.aws-stepfunctions-start-enabled`: aws-stepfunctions backend 사용 허용 여부
+- `portfolio.batch.aws-stepfunctions-step-start-enabled`: AWS Step 1~11 safe trigger 버튼 활성 허용 여부
+
+`StartExecution` payload의 타입은 다음을 따릅니다(Step Functions Choice `BooleanEquals` 조건과 정합).
+
+- `allowPaperOrderExecute` · `paperOrderEnabled`: boolean JSON
+- `fromStepOrder` · `toStepOrder` · `startStep` · `endStep`: numeric JSON
+- `runDate`: Asia/Seoul 기준 yyyy-MM-dd 문자열
+- `environment` · `dbTarget` · `source` · `requestedBy` · `requestedFrom` · `fromStepCode` · `toStepCode`: 문자열
+
+Fargate에서는 `portfolio.batch.local-file-execution-enabled=false`, `portfolio.batch.paper-order-enabled=false`, `portfolio.batch.full-pipeline-execution-enabled=false`를 기본값으로 권장하고, Step 1~11 safe trigger부터 단계적으로 활성화합니다. Step 12 이상 또는 전체 1~17 범위는 운영자가 별도 gate를 명시적으로 ENABLE한 뒤에만 허용됩니다.
+
+운영자 로컬 도구 폴더(`C:\Workspaces\portfolio-local-env\`)에는 backend별 wrapper 2종이 분리되어 있습니다. 본 저장소 범위 밖이라 스크립트 본체는 두지 않고 파일명만 참고로 적습니다.
+
+- `Start-PortfolioViewAwsPaperLocalFile.ps1` + `Load-PortfolioViewAwsPaperLocalFileEnv.ps1`: `local-file` backend 기준으로 View를 띄웁니다. `PORTFOLIO_BATCH_EXECUTION_MODE=local-file`, `PORTFOLIO_BATCH_LOCAL_FILE_EXECUTION_ENABLED=true`, `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_START_ENABLED=false`로 설정됩니다.
+- `Start-PortfolioViewAwsPaperStepFunctions.ps1` + `Load-PortfolioViewAwsPaperStepFunctionsEnv.ps1`: `aws-stepfunctions` backend 기준으로 View를 띄웁니다. `PORTFOLIO_BATCH_EXECUTION_MODE=aws-stepfunctions`, `PORTFOLIO_BATCH_LOCAL_FILE_EXECUTION_ENABLED=false`, 일반 + approval ARN 환경변수가 모두 set 되어야 합니다.
+
+두 wrapper 모두 `aws-paper` profile + Step 1~17 전체 실행 가능 gate로 구성되며, safe-only 검증용이 아니라 운영자 선택형 전체 실행 wrapper입니다.
+
 ## Slack 알림 요약
 
 `SlackNotificationService`는 Daily Batch 결과, Daily Run 요약, 전략 실행 요약, 잔고/보유 요약을 텍스트 메시지로 조립해 Slack webhook으로 전송합니다.
