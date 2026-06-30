@@ -10,6 +10,30 @@
 - 항목 분류는 `Added`, `Changed`, `Removed`, `Security`로 통일한다.
 - 날짜는 한국 기준의 작업 일자를 사용한다.
 
+## 2026-06-30 (Local View → AWS Step Functions Step 12~17 승인 실행 검증 통과 + Daily Batch gate 수정 + View 운영 경로 4종 정리)
+
+### Added
+
+- **오전 AWS Step Functions Step 1~11 정기 실행 통과 결과 추가** — 기존 EventBridge Scheduler · Dispatcher Lambda 자동 trigger 경로(OD-MS-032 정합) / Step 12~17 주문성 구간은 별도 승인형 state machine + paper-order gate 정책 그대로 유지(OD-MS-033 09:01 자동 ENABLE 보류).
+- **Local View → AWS Step Functions Step 12~17 승인 실행 통과 결과 추가** — Daily Batch gate(`DailyBatchController.java`) 수정 후 운영자 의도 정합으로 활성 / executionName `port-view-daily-step12-17-20260630-095111-aae2595c` / state machine `portfolio-paper-daily-step12-17-approval` / trigger = Local View / AWS Step Functions approval range button / status `SUCCEEDED` / start `2026-06-30T09:51:11.903+09:00` / stop `2026-06-30T09:54:16.484+09:00` / 주문 대상 없음 상태에서 안전 종료.
+- **DB 후검증 통과 결과 추가** — 신규 `connector_order_request` 0건 / REQUESTED `strategy_execution_order` 잔여 0건 / active `connector_order_request` 0건. 최신 `connector_balance_snapshot id=281`(`as_of_date=2026-06-30` / `total_eval_amount=8,706,505` / `cash_balance=8,706,505` / `eval_profit=0` / `source_version=connector-intraday-snapshot-refresh-1.0.0`). 보유 종목 0건. `connector_position_snapshot` 은 `balance_snapshot_id` 컬럼 부재로 `account_no` + `as_of_date` 기준으로 검증.
+- **View 운영 경로 4종 정리 결과 추가** — (a) Local View → Local File Step 1 단독(2026-06-28 Run #46) / (b) Local View → Local File Step 1~11(2026-06-28 Run #47) / (c) Local View → Local File Step 12~17(2026-06-29 Run #48) / (d) **Local View → AWS Step Functions Step 12~17 승인 실행(본 일자)**. Local File 실행과 AWS Step Functions 실행이 분리 동작 정합 / Step 12~17 주문성 구간은 별도 승인형 state machine + paper-order gate 를 통해 실행 정합.
+
+### Changed
+
+- `.kiro/specs/_common/risk-register.md` — **R-AUTO-033 mitigation 에 [2026-06-30 보강] 메모 추가**(Daily Batch gate 운영 의도 정합 + AWS Step Functions 승인 실행 1차 실증 / `fullPipelineExecutionEnabled=true` + `paperOrderEnabled=true` 상태에서 AWS Step 1~11 + AWS Step 12~17 승인 버튼 동시 활성 조건과 Local File gate 분리 정합 / Status `Mitigated` 유지). **R-AUTO-034 mitigation 에 [2026-06-30 보강] 메모 추가**(View 측 4가지 운영 경로 분리 1차 실증 + DB 검증 쿼리 작성 원칙 보강 사실 / Status `Open` 유지 — Fargate Task Role 권한 분리는 06 spec 후속 phase 책임 그대로 유지).
+- `.kiro/specs/_common/followups-overview.md` — 2026-06-30 후속 메모 추가(완료 5건 + 후속 7건 + DB 검증 쿼리 작성 원칙 신규 기록).
+- `.kiro/specs/04-strategy-batch-stepfunctions/operation-notes.md` — 2026-06-30 §1~§6 append(오전 Step 1~11 자동 trigger 통과 + Local View → approval workflow 운영자 수동 trigger 두 번째 phase 2차 실증 + Daily Batch gate 운영 의도 정합).
+- `.kiro/specs/05-port-view-ecs-and-runbook/operation-notes.md` — 2026-06-30 8) View 운영 경로 4종 검증 완료 섹션 append + 9) Daily Batch gate 운영 의도 정합 수정 사실 + 10) DB 검증 쿼리 작성 원칙 추가.
+- `.kiro/WORKLOG.md` 2026-06-30 섹션 prepend(5~10줄 요약 / Daily Batch gate 수정 + executionName + DB 후검증 + 4종 운영 경로 정리).
+
+### Security
+
+- 본 변경에서도 secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN / broker_order_no 원문 / broker_branch_code 원문 / KIS paper login credential / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+- AWS / EventBridge Scheduler / Lambda / Step Functions / SSM / EC2 / RDS / S3 호출은 본 일자 변경 0건 — Kiro 는 본 일자 루트 / `_common` / 05 · 04 spec 문서 갱신만 수행. AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 0건. CloudWatch Logs · Step Functions execution history 본문 · Lambda 응답 본문 · KIS API response body · Spring Boot application log 전문 · `StartExecution` 응답 본문 · Slack 메시지 본문 · commit diff 본문 · DB 후검증 raw output 전문 평문 인용 0건(R-DOCS-001 정합). commit/add/reset/checkout/stash 0건.
+- broker / KIS 호출 = 오전 Step 1~11 자동 trigger 한정(`connector_order_request` 신규 0건) + Local View → AWS Step Functions Step 12~17 승인 실행 1건(`SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
+- 운영 식별자(executionName `port-view-daily-step12-17-20260630-095111-aae2595c` / state machine 이름 `portfolio-paper-daily-step12-17-approval` / Controller class `DailyBatchController` / Daily Batch gate 라벨 6종(`executionEnabled` · `localFileExecutionEnabled` · `fullPipelineExecutionEnabled` · `paperOrderEnabled` / 허용 범위 `1~17` / 화면 표시 라벨 `Execution ON` · `Local File OFF` · `Full Pipeline ON` · `Paper Order ON`) / balance snapshot id `281` / DB 컬럼명 `balance_snapshot_id`(부재) · `account_no` · `as_of_date` / Run id `#46` · `#47` · `#48` / 운영 경로 4종 라벨) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+
 ## 2026-06-29 (3) (port-view Step 12~17 승인형 검증 완료 + Local View wrapper 정리 완료 + Approval state machine ARN 분리)
 
 ### Added

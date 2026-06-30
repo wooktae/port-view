@@ -1578,3 +1578,76 @@
  4) `StartExecution` 응답 본문 / Step Functions execution history 본문 / Slack 메시지 본문 / Lambda 응답 본문 / KIS API response body / Spring Boot application log 전문 / SSM stdout 본문 / commit diff 본문 / PowerShell wrapper 본체 평문 인용 0건
  5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / 실제 state machine ARN / Slack webhook URL / DB password) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder
  6) 운영 식별자(executionName `port-view-step12-17-step12-17-20260629-194314-ba5edaf8` / 운영 marker `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS` / state machine 이름 2종(`portfolio-paper-daily-step1-17-approval` · `portfolio-paper-daily-step12-17-approval`) / state 이름 4종(`Step12_CheckApproval` · `Step12_RunMarketConnectorStrategyOrderExecute` · `Step12_GetCommandInvocation` · `ExecutionSucceeded`) / Controller endpoint path 2종(`/daily-batch/aws-stepfunctions/start-range` · `/daily-batch/aws-stepfunctions/start-approval-range`) / Spring properties key 7종 / 환경변수 라벨 / payload 필드 라벨 + boolean / numeric 타입 / `requestedBy=VIEW_APPROVAL_BUTTON` 라벨 / Spring profile `aws-paper` / start · stop timestamp) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님
+
+
+## 2026-06-30 — View 운영 경로 4종 정리 완료 + Daily Batch gate 운영 의도 정합 수정 + DB 검증 쿼리 작성 원칙 추가
+
+본 일자 운영자가 직접 수행한 `DailyBatchController.java` Daily Batch gate 운영 의도 정합 수정 + Local View → AWS Step Functions Step 12~17 승인 실행 2차 실증 통과 결과를 05 spec 의 ECS Fargate 포팅 관점에서 누적 기록한다. 본 노트는 port-view 측 코드 본문 / IAM Policy / ASL / 응답 본문 / `StartExecution` 입력 JSON 본문 / DB 후검증 raw output 전문 평문 인용 0건(R-DOCS-001 정합).
+
+8. View 운영 경로 4종 정리: 완료
+ 1) Local View 측 운영자 수동 trigger 분리 4종: 완료
+   (1) Local View → Local File Step 1 단독 실행: 완료(2026-06-28 Run #46)
+   (2) Local View → Local File Step 1~11 실행: 완료(2026-06-28 Run #47)
+   (3) Local View → Local File Step 12~17 실행: 완료(2026-06-29 (1) Run #48)
+   (4) Local View → AWS Step Functions Step 12~17 승인 실행: 완료(본 일자)
+       - executionName `port-view-daily-step12-17-20260630-095111-aae2595c`
+       - state machine `portfolio-paper-daily-step12-17-approval`
+       - status `SUCCEEDED`
+       - start `2026-06-30T09:51:11.903+09:00`
+       - stop `2026-06-30T09:54:16.484+09:00`
+       - 주문 대상 없음 상태에서 안전 종료
+       - DB 후검증 통과(신규 `connector_order_request` 0건 / 신규 broker 주문 0건)
+ 2) 운영 경로 분리 정합: 완료
+   (1) Local File 실행과 AWS Step Functions 실행 분리 동작 정합
+       - Local File 실행 gate: `localFileExecutionEnabled`
+       - AWS Step Functions 실행 gate: `awsStepfunctionsStartEnabled` / `awsStepfunctionsStepStartEnabled`
+       - approval range gate: `paperOrderEnabled=true` + approval ARN set
+   (2) Step 12~17 주문성 구간 별도 승인형 state machine + paper-order gate 통과 시에만 실행 정합
+
+9. Daily Batch gate 운영 의도 정합 수정: 완료
+ 1) `DailyBatchController.java` 수정: 완료
+   (1) AWS Step Functions 버튼 활성 조건 수정
+       - `fullPipelineExecutionEnabled=true` 상태에서도 AWS Step 12~17 승인 버튼 활성
+       - `paperOrderEnabled=true` 상태에서도 AWS Step 1~11 버튼 조건과 충돌 회피
+       - Local File 실행 gate 와 AWS Step Functions 실행 gate 분리 유지
+       - Step 12~17 은 `paperOrderEnabled=true` + approval range gate 통과 시에만 실행
+       - 본 노트 Java 본문 / commit diff 평문 인용 0건(R-DOCS-001 정합)
+   (2) 검증
+       - mvn compile 성공
+       - Local View `aws-paper` profile 재기동 성공
+       - 화면 표시 통과(Execution ON / Local File OFF / Full Pipeline ON / Paper Order ON / 허용 범위 `1~17` / AWS Step 12~17 승인 실행 버튼 활성)
+
+10. DB 검증 쿼리 작성 원칙 추가: 미완료 (정식 반영은 후속 phase 책임)
+ 1) 본 일자 식별된 운영 원칙: 완료 (사실 기록)
+   (1) 컬럼명 사전 확인 의무화
+       - `information_schema.columns` 로 대상 컬럼 사전 확인 후 SELECT
+       - 본 일자 `connector_position_snapshot.balance_snapshot_id` 컬럼 부재 사례 식별
+   (2) 확인된 컬럼만 SELECT
+       - 관계 컬럼(예: `balance_snapshot_id`) 도 예상 사용 금지
+       - 부재 시 `account_no` + `as_of_date` 같은 자연키로 검증
+   (3) 결과 노출 패턴
+       - 후검증 쿼리는 `DO` / `EXECUTE` 로 결과 숨김 금지
+       - 최종 SELECT 결과가 화면에 직접 나오게 작성
+   (4) Windows / PowerShell / psql 환경 정합
+       - 한글 SQL 은 `psql -c` 직접 실행 대신 UTF-8 No BOM `.sql` 파일 + `psql -f` 패턴 유지
+       - SSM multiline command 는 UTF-8 No BOM JSON 파일 + `--parameters file://...` 패턴 유지
+ 2) 정식 반영 후속 (05 spec 후속 phase 책임)
+   (1) `validation-checklist.md` 또는 동등 문서 신규 생성 시 본 원칙 정식 반영
+   (2) Fargate cutover 시점 cross-spec audit 항목으로 등록
+   (3) DB 후검증 쿼리 모음 정리 시 본 원칙 정합
+
+### 결정 / 리스크 매핑
+
+- OD-MS-002 / OD-MS-009 / OD-MS-037 / OD-SAFE-001 ~ OD-SAFE-004 본문 변경 없이 1차 실증 메모 보강(2026-06-29 (3) Change Log 항목 정합 그대로 유지 / 본 일자 신규 결정 없음 / Decision Summary 카운트 변경 없음).
+- R-AUTO-033 [2026-06-30 보강] — Daily Batch gate 운영 의도 정합 + AWS Step Functions Step 12~17 승인 실행 2차 실증 / Status `Mitigated` 유지.
+- R-AUTO-034 [2026-06-30 보강] — View 측 4가지 운영 경로 분리 1차 실증 + DB 검증 쿼리 작성 원칙 보강 / Status `Open` 유지 / Fargate Task Role 권한 분리는 06 spec 후속 phase 책임 그대로 유지.
+
+### 본 일자 사실 기록 범위
+
+- 본 일자 Kiro 작업 = 05 spec `operation-notes.md` 본 섹션 누적(8 · 9 · 10 항목)만 수행.
+- 운영자 직접 변경분(`DailyBatchController.java` Daily Batch gate 수정) 은 port-view MS 영역으로 cross-service AWS Migration spec 본 일자 작업으로 인한 변경 0건(spec 영역).
+- AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 본 일자 변경 0건.
+- AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 변경 0건.
+- broker / KIS 호출 = 오전 Step 1~11 자동 trigger 한정(`connector_order_request` 신규 0건) + Local View → AWS Step Functions Step 12~17 승인 실행 1건(`SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
+- 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN / broker_order_no 원문 / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
+- 운영 식별자(executionName `port-view-daily-step12-17-20260630-095111-aae2595c` / state machine 이름 `portfolio-paper-daily-step12-17-approval` / Controller class `DailyBatchController` / Daily Batch gate 라벨 6종 / 화면 표시 라벨 / balance snapshot `id=281` · `as_of_date=2026-06-30` · `total_eval_amount=8,706,505` · `cash_balance=8,706,505` · `eval_profit=0` · `source_version=connector-intraday-snapshot-refresh-1.0.0` / DB 컬럼명 `balance_snapshot_id`(부재) · `account_no` · `as_of_date` / Run id `#46` · `#47` · `#48` / Spring profile `aws-paper` / start · stop timestamp) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.

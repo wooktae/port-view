@@ -519,7 +519,6 @@ public class DailyBatchController {
 
     private boolean canStartAwsStepfunctionsSafe() {
         return batchProperties.canStartAwsStepfunctions()
-                && !batchProperties.isPaperOrderEnabled()
                 && batchProperties.getMinExecutableStepOrder() <= 1
                 && batchProperties.getMaxExecutableStepOrder() >= 11;
     }
@@ -528,7 +527,6 @@ public class DailyBatchController {
         return batchProperties.canStartAwsStepfunctions()
                 && batchProperties.canStartAwsStepfunctionsStep()
                 && batchProperties.isPaperOrderEnabled()
-                && !batchProperties.isFullPipelineExecutionEnabled()
                 && batchProperties.getMinExecutableStepOrder() <= 12
                 && batchProperties.getMaxExecutableStepOrder() >= 17;
     }
