@@ -891,3 +891,110 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
 5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역). 운영자 직접 patch 한 `port-marketconnector/connector_strategy_order_execute.py` 전체 교체 + Step 12 시작부 retry-normalizer 내장 변경분은 본 노트 §1 에 사실로만 기록(본문 전체 인용 0건 / 함수 시그니처 / SQL 본문 / patch diff 인용 0건 / R-DOCS-001 정합 / port-marketconnector 영역).
 6. 운영 식별자(Step Functions state machine `portfolio-paper-daily-step1-17-approval` / `execution.strategy_execution_order id 40` / `connector.connector_order_request id 48` / `broker_order_no 0000006143` / 종목 코드 `282330` / 종목명 BGF리테일 / 수량 17 / 매도 방식 MARKET / Step Functions approval gate 라벨 `allowPaperOrderExecute=false` · `allowPaperOrderExecute=true` / wrapper stdout 라벨 `PaperOrder: True` / EC2 instance id `i-0fce77927b7397b88`(OD-NET-010 정합 / 본 일자 이전 spec 산출물에 이미 사실 기록) / signal_date · run_date `2026-06-23` / `server_encoding` · `client_encoding` 값 `UTF8` / KIS error code `EGW00123` · `EGW00215`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
 
+
+
+## 2026-06-30 (오후) — 장중 손절 Slack 실 연동(MarketConnector evaluate 교체 배포 + 장중 runner `--create-order --notify-slack` 연결 + EC2 IAM `lambda:InvokeFunction` 부여 + 1회 안전 검증 통과)
+
+본 일자 오후 추가 작업분으로 운영자가 직접 수행한 장중 손절 Slack 실 연동 결과를 MarketConnector EC2 운영 관점에서 누적 기록한다. 본 노트는 `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / Lambda 코드 본문 / IAM Policy 전체 본문 / SSM 응답 본문 / Slack 메시지 본문 / CloudWatch Logs 전문 평문 인용 0건(R-DOCS-001 정합).
+
+1. MarketConnector evaluate 교체 배포: 완료
+ 1) 대상 파일 / 배포 식별자
+   (1) 파일 경로
+       - `/home/ec2-user/apps/port-marketconnector/src/connector_intraday_position_evaluate.py`
+       - 운영자 직접 교체 배포
+   (2) 배포 버전 / SHA256
+       - 배포 버전 `connector-intraday-position-evaluate-1.1.1-slack-notify`
+       - 배포 SHA256 `5ec6914853ab34e200682f256de53693f972b3e5d337a5bd8ab8ebf5296230ed`
+   (3) 신규 CLI option 3종 추가
+       - `--notify-slack`
+       - `--slack-function-name`
+       - `--slack-region`
+   (4) 정적 검증
+       - `.venv/bin/python` 기준 `py_compile` 통과
+       - `--help` 출력 검증 통과
+
+2. 장중 runner 갱신: 완료
+ 1) 대상 파일 / 식별자
+   (1) runner 경로
+       - `/home/ec2-user/apps/port-marketconnector/scripts/run_intraday_snapshot_and_evaluate.sh`
+       - 운영자 직접 갱신
+   (2) backup / SHA256
+       - backup 이름 `run_intraday_snapshot_and_evaluate.sh.bak.20260630T112255Z.create-order-notify-slack`
+       - runner SHA256 `8fe7657a75b5d7637ec645b6d8a55bf75c993d46c1c71e8a5e88bded29baa8a0`
+   (3) 변경 사항
+       - 기존 evaluate 호출에 `--create-order` 추가
+       - 기존 evaluate 호출에 `--notify-slack` 추가
+       - runner 문법 검증 통과
+
+3. MarketConnector EC2 IAM 권한 부여: 완료
+ 1) Instance Role / inline policy
+   (1) IAM Role 이름 `portfolio-paper-marketconnector-ec2-role`
+   (2) inline policy 이름 `portfolio-paper-marketconnector-event-notifier-invoke`
+   (3) action `lambda:InvokeFunction`
+   (4) Resource = `portfolio-event-notifier` Lambda 한정 / Resource · Action wildcard 0건
+   (5) OD-SEC-005 / OD-SEC-006 정합
+ 2) EC2 invoke smoke
+   (1) EC2 측에서 Notifier Lambda invoke smoke 성공
+   (2) Lambda 응답 본문 평문 인용 0건
+
+4. 실제 runner 1회 안전 검증: 완료
+ 1) SSM commandId / 결과
+   (1) commandId `5b19d5da-5e2e-4b35-821b-c3cf2b36d131`
+   (2) snapshot refresh 성공
+   (3) evaluate 실행 성공
+   (4) source_version `connector-intraday-position-evaluate-1.1.1-slack-notify` 확인
+   (5) `create_order=True` 확인
+   (6) `notify_slack=True` 확인
+   (7) `open_position_count=0` 확인
+   (8) `EMPTY_NORMAL` 확인
+   (9) `INTRADAY_SNAPSHOT_AND_EVALUATE=SUCCESS` 확인
+   (10) runner exit code 0 확인
+   (11) OPEN position 0건 상태라 check / order / slack 없이 정상 종료
+
+5. DB after-check: 완료
+ 1) marker / count
+   (1) marker `STEP19C_INTRADAY_STOP_FINAL_DB_AFTER_CHECK=SUCCESS`
+   (2) `TODAY_INTRADAY_CHECKS` count 0
+   (3) `TODAY_INTRADAY_STOP_EXECUTION_ORDERS` count 0
+   (4) `ACTIVE_INTRADAY_STOP_EXECUTION_ORDERS` count 0
+   (5) `TODAY_INTRADAY_STOP_CONNECTOR_ORDERS` count 0
+   (6) `TODAY_INTRADAY_STOP_CONNECTOR_ORDER_ROWS` 0 rows
+ 2) balance snapshot
+   (1) latest balance snapshot id `281`
+   (2) `as_of_date=2026-06-30`
+   (3) `as_of_ts=2026-06-30 11:23:34.973842+00`
+   (4) `total_eval_amount=8,706,505`원
+   (5) `cash_balance=8,706,505`원
+   (6) `source_version=connector-intraday-snapshot-refresh-1.0.0`
+   (7) PSQL exit code 0
+ 3) DB 검증 쿼리 작성 원칙
+   (1) `information_schema.columns` 사전 확인 후 작성된 컬럼만 사용
+   (2) 추정 컬럼명 사용 0건
+   (3) `.kiro/AGENTS.md` "운영 명령 작성 규칙(추가)" 규칙 2 · 4 정합
+
+6. 결정 / 리스크 매핑 (2026-06-30 오후 장중 손절 Slack)
+ 1) 결정 본문 변경 없음
+   (1) OD-MS-001(port-marketconnector 컴퓨트 = EC2+EIP) / OD-MS-016(Strategy Execution / MarketConnector 책임 분리) / OD-MS-035(장중 포지션 확인 3단계 구조) / OD-MS-036(Intraday Stop Sell Submit Workflow) / OD-MS-030(AWS 공통 Slack notifier Lambda) / OD-MS-038(Daily Brief Slack mini workflow) 본문 변경 없이 evidence 보강
+   (2) 자세한 결정 변경은 `../_common/operator-decisions.md` Change Log `2026-06-30 (오후) 장중 손절 Slack` 항목 참조
+   (3) 신규 결정 없음 / Decision Summary 카운트 변경 없음(전체 97 / 확정 52 / 잠정 42 유지)
+ 2) 리스크 매핑
+   (1) R-AUTO-036 신규 — 장중 손절 READY 생성 후 Slack 발송 실패 시 rollback 없는 정책의 부작용 위험 / Status `Mitigated`
+   (2) R-AUTO-035 [2026-06-30 오후 추가 보강] — Notifier Lambda 호출 진입점이 MarketConnector EC2 runner 까지 확대 / Status `Mitigated` 그대로 유지
+   (3) R-AUTO-024(Slack webhook URL 평문 노출 위험 / `Accepted`) mitigation 그대로 유지
+
+7. 후속 (03 spec 후속 phase 책임 또는 04 / 06 spec 후속 phase 책임)
+ 1) 실제 보유 종목 발생 후 hard stop 조건 충족 시 `INTRADAY_STOP_LOSS` Slack 실이벤트 수신 확인
+ 2) 실제 보유 종목 발생 후 `INTRADAY_STOP_SELL` READY 생성 + approval gate 차단 상태 재확인
+ 3) Slack 메시지에 계좌 / 현재가 / 진입가 / 예상손익금액 추가 여부 검토(03 spec 후속 phase 책임)
+ 4) 장중 손절 READY 생성 후 별도 approval summary Slack 추가 여부 검토(04 spec 후속 phase 책임)
+ 5) `portfolio-paper-intraday-stop-sell-approval` state machine 자동 ENABLE 진입 운영자 별도 승인 후 후속(04 spec 후속 phase 책임 / OD-MS-035 / OD-MS-036 / R-AUTO-030 ~ R-AUTO-032 / R-BROKER-005 정합)
+ 6) Slack webhook URL Secrets Manager 또는 SSM SecureString 이전(R-AUTO-024 / 06 spec 후속 phase 책임)
+ 7) R-AUTO-036 운영 detection 자동화(05 · 06 spec 후속 phase 책임)
+
+8. 본 일자 사실 기록 범위 (2026-06-30 오후)
+ 1) Kiro 작업 = 03 spec `operation-notes.md` 본 섹션 누적만 수행
+ 2) 운영자 직접 수행 영역 = `connector_intraday_position_evaluate.py` 교체 배포 + 장중 runner 갱신 + EC2 IAM inline policy 부여 + EC2 invoke smoke + 1회 실제 runner 안전 검증
+ 3) AWS CLI / boto3 / psql / Lambda 실행 / Step Functions 실행 / SSM RunCommand / 외부 API 호출 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건
+ 4) `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / IAM Policy 전체 본문 / Lambda 코드 본문 / Step Functions ASL 본문 / SSM 응답 본문 / Slack 메시지 본문 / CloudWatch Logs 전문 평문 인용 0건(R-DOCS-001 정합)
+ 5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / 실제 state machine ARN / Slack webhook URL / DB password / Administrator password / EIP / public IP / broker_order_no 원문) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder
+ 6) 운영 식별자(파일 경로 / 배포 SHA256 / 배포 버전 / CLI option 라벨 / runner SHA256 / runner backup 이름 / SSM commandId / IAM Role 이름 / inline policy 이름 / Lambda 이름 / state machine 이름 / Slack 이벤트 라벨 / 문구 라벨 / source_version 2종 / marker 이름 3종 / table count 라벨 5종 / balance snapshot id · as_of_date · as_of_ts · 금액 요약) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님

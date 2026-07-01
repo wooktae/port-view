@@ -1708,3 +1708,149 @@
 - broker / KIS 호출 = 오전 Step 1~11 자동 trigger + Local View → Step 12~17 승인 실행(2026-06-30 오전) + ECS View → Step 12~17 승인 실행 1건(`SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
 - 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / public IP / image digest full sha256 / task ARN / ENI ID / broker_order_no 원문 / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` / `[REDACTED_ARN]` / `[REDACTED_ACCOUNT_NO]` placeholder.
 - 운영 식별자(executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / state machine `portfolio-paper-daily-step12-17-approval` / status `SUCCEEDED` / start · stop timestamp / Slack 이벤트 `DAILY_EXECUTION_SUCCESS` / Task Role 이름 `portfolio-paper-view-task-role` / Task Execution Role 이름 `portfolio-paper-ecs-task-execution-role` / state 이름 `ExecutionSucceeded`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+
+
+## 2026-06-30 (오후) — Approval Required Slack Builder 연동 완료(`BuildApprovalSlackPayload → SendApprovalRequiredSlack`)
+
+같은 일자 오후의 port-view ECS Fargate 1차 포팅 cross-reference(§ 위 섹션) 와 별도로, Daily Batch state machine 측 Slack 문구 개선 결과를 본 spec 의 Step Functions state machine 운영 관점에서 누적 기록한다. 본 노트는 Lambda 코드 본문 / Step Functions ASL 본문 / Slack 메시지 본문 / Builder output 전문 / Notifier input 전문 / CloudWatch Logs 전문 / IAM Policy 본문 평문 인용 0건(R-DOCS-001 정합).
+
+### 1. Approval Required Builder 연동 1차 실증
+
+ 1) 신규 Builder Lambda: 완료
+   (1) Lambda 이름 `portfolio-approval-slack-summary-builder`(운영자 직접 신규 생성)
+       - 책임 = RDS read + Daily Batch 전략 상태 요약 + Notifier Slack 입력 payload 생성
+       - 호출 대상 = `portfolio-paper-daily-step1-17-approval` ASL 의 `BuildApprovalSlackPayload` state
+       - 실제 Lambda 코드 본문 / IAM Role ARN 평문 기록 0건(`[REDACTED_ARN]` placeholder)
+ 2) state machine ASL 갱신: 완료
+   (1) `portfolio-paper-daily-step1-17-approval` 의 success path 변경
+       - `StopCrawlerEc2AfterStep11Success → BuildApprovalSlackPayload → SendApprovalRequiredSlack → Step12_CheckApproval`
+       - 운영자 직접 update + 배포 definition 에 `BuildApprovalSlackPayload` 반영 확인 완료
+       - revisionId `da8642c6-8409-41b6-ad57-e066ff672332`
+       - State Machine `ACTIVE` 유지 / OD-MS-029(false / true path 운영 절차) 본문 변경 없음
+   (2) ASL 본문 / Catch 경로 본문 / 실제 state machine ARN 평문 인용 0건(R-DOCS-001 정합)
+ 3) Slack smoke 통과: 완료
+   (1) Builder output → Notifier Lambda(`portfolio-event-notifier`) Slack smoke 성공
+       - eventType `APPROVAL_REQUIRED`
+       - Slack attachment color `#ECB22E`
+       - `marketStatusCode=BLOCK`
+       - `marketStatusLabel=차단`
+       - 차단 이유: `시장 수급 압력이 약해서 신규 매수를 차단했음`
+       - Daily 매수 신호: `신호 0 / 후보 0`
+       - Daily 포지션 판단: `없음`
+       - 매수 후보 없음 + 매도 후보 없음 표시 확인
+   (2) Slack 메시지 본문 평문 인용 0건
+
+### 2. 본 일자 04 spec 범위 변경 사실
+
+ 1) Step Functions 구조 변경: 부분
+   (1) `portfolio-paper-daily-step1-17-approval` ASL 만 `BuildApprovalSlackPayload` state 추가(운영자 직접 update / revisionId 갱신)
+   (2) `portfolio-paper-daily-step12-17-approval` ASL 본 일자 변경 0건
+   (3) `portfolio-paper-intraday-stop-sell-approval` ASL 본 일자 변경 0건
+ 2) IAM Role / Policy 변경: 부분
+   (1) Approval Builder Lambda 의 IAM Role 은 RDS read + Step Functions 측 `lambda:InvokeFunction` 매핑 한정(운영자 직접 작성 / IAM Policy 본문 평문 기록 0건)
+   (2) 기존 `portfolio-paper-stepfunctions-execution-role` 의 Resource 패턴이 Builder Lambda ARN 한정 부여 + Resource · Action wildcard 0건 유지(06 spec 후속 phase 책임)
+ 3) EventBridge Scheduler 변경: 없음
+   (1) 08:00 / 09:01 Scheduler 2개 본 일자 변경 0건(OD-MS-032 / OD-MS-033 정합)
+   (2) 07:50 / 15:50 EC2 lifecycle Scheduler 2개 본 일자 변경 0건(OD-MS-034 정합)
+
+### 3. 결정 / 리스크 매핑
+
+ 1) 결정 본문 변경 없음
+   (1) OD-MS-009(Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) 본문 변경 없이 evidence 보강
+       - Daily Batch state machine 안 Slack 알림 builder 만 추가(state machine 자체 책임 변경 없음)
+   (2) OD-MS-029(Step Functions approval workflow false / true path 운영 절차) 본문 변경 없이 evidence 보강
+       - `allowPaperOrderExecute` 입력 정책 그대로 유지 / Slack 알림 builder 추가가 진입 정책에 영향 없음
+   (3) OD-MS-030(AWS 공통 Slack notifier Lambda) 본문 변경 없이 evidence 보강
+       - 본 일자 Approval Required + Daily Brief 까지 운영 범위 확대
+   (4) OD-MS-031(1차 Slack 연동 범위 3종 한정) 본문 변경 없이 evidence 보강
+       - 3종(`APPROVAL_REQUIRED` / `DAILY_EXECUTION_SUCCESS` / `DAILY_EXECUTION_FAILED`) 의 풍부한 메시지 적용
+       - 장 전 잔고 + 장 후 잔고는 OD-MS-038 신규로 별도 mini workflow 분리
+   (5) OD-SAFE-001 ~ OD-SAFE-004 본문 변경 없음 — broker 주문 / 자동 재시도 / aws-live 정책 영향 0건
+ 2) 리스크 매핑
+   (1) R-AUTO-023(Step Functions 실패 경로 Slack 누락 위험) mitigation 그대로 유지
+   (2) R-AUTO-024(Slack webhook URL 평문 노출 위험 / `Accepted`) mitigation 그대로 유지
+   (3) R-AUTO-027(`APPROVAL_REQUIRED` Slack summary 0/0 표시 위험 / `Accepted`) — 본 일자 Builder 연동으로 풍부한 메시지가 제공되면 향후 Step1~11 실 실행에서 0/0 패턴 회귀가 발생하는지 별도 audit / 09:01 schedule 자동 ENABLE 보류 정책(OD-MS-033) 그대로 유지
+
+### 4. 본 일자 사실 기록 범위
+
+- 본 일자 Kiro 작업 = 04 spec `operation-notes.md` 본 섹션 누적만 수행
+- 운영자 직접 수행 영역 = Builder Lambda 신규 생성 + `portfolio-paper-daily-step1-17-approval` ASL update + 배포 definition 확인 + Slack smoke 확인 + IAM Role / Policy 변경
+- AWS CLI / boto3 / psql / Lambda 실행 / Step Functions 실행 / Slack webhook / KIS API 호출 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건
+- Lambda 코드 본문 / Step Functions ASL 본문 / Slack 메시지 본문 / Builder output 전문 / Notifier input 전문 / CloudWatch Logs 전문 / IAM Policy 전체 본문 / Slack webhook URL / 실제 IAM Role ARN / 실제 state machine ARN / 계좌번호 12자리 원문 / DB password 평문 인용 0건(R-DOCS-001 정합)
+- 운영 식별자(Builder Lambda 이름 `portfolio-approval-slack-summary-builder` / Notifier Lambda 이름 `portfolio-event-notifier` / state machine 이름 `portfolio-paper-daily-step1-17-approval` / state 이름 `StopCrawlerEc2AfterStep11Success` · `BuildApprovalSlackPayload` · `SendApprovalRequiredSlack` · `Step12_CheckApproval` / revisionId `da8642c6-8409-41b6-ad57-e066ff672332` / Slack 이벤트 라벨 `APPROVAL_REQUIRED` / Slack color `#ECB22E` / `marketStatusCode` · `marketStatusLabel` / 차단 이유 텍스트(시장 수급 압력 차단 사유) / Daily 매수 신호 `0/0` / Daily 포지션 판단 `없음`) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님
+
+### 5. 후속
+
+ 1) 다음 Step1~11 실제 실행 시 자동 `APPROVAL_REQUIRED` Slack 자동 수신 확인: 후속
+   (1) `portfolio-paper-daily-step1-11-approval-0800-kst`(ENABLED) 첫 실 호출 후 풍부한 메시지가 Slack 채널에 자동 수신되는지 audit
+   (2) Builder output 의 `marketStatusCode` / 매수·매도 후보 실데이터 반영 audit
+   (3) Approval Builder Lambda CloudWatch Logs 의 RDS read 실패 / 예외 패턴 0건 audit
+ 2) `DAILY_EXECUTION_SUCCESS` 주문 / 체결 / 잔고 refresh 요약 강화: 후속
+ 3) `DAILY_EXECUTION_FAILED` cause truncation 정책: 후속
+ 4) `INTRADAY_STOP_LOSS` 실제 장중 포지션 이벤트 연동: 후속(OD-MS-035 / OD-MS-036 / R-AUTO-030 ~ R-AUTO-032 / R-BROKER-005 정합 후속 phase 책임)
+
+
+## 2026-06-30 (오후) — 장중 손절 Slack 실 연동 cross-reference(`INTRADAY_STOP_LOSS` 발송은 MarketConnector EC2 runner 책임 / broker 주문 제출은 `portfolio-paper-intraday-stop-sell-approval` Step Functions approval gate 후속 책임 그대로 유지)
+
+본 일자 오후 추가 작업분으로 운영자가 직접 수행한 장중 손절 Slack 실 연동 결과를 04 spec 의 Step Functions state machine 운영 관점에서 짧게 cross-reference 한다. **Step Functions 자체 구조 변경 0건** — 본 일자 04 spec 범위 안 state machine ASL · IAM Role · EventBridge Scheduler · Dispatcher Lambda 변경 0건. 운영자 직접 수행 영역은 03 spec(MarketConnector EC2) / 06 spec(IAM 권한) 책임. 본 노트는 Lambda 코드 본문 / Step Functions ASL 본문 / SSM 응답 본문 / IAM Policy 전체 본문 / `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / Slack 메시지 본문 평문 인용 0건(R-DOCS-001 정합).
+
+### 1. 장중 손절 책임 분리 cross-reference
+
+ 1) `INTRADAY_STOP_LOSS` Slack 발송 책임: MarketConnector EC2 runner
+   (1) 실 흐름
+       - 장중 runner `/home/ec2-user/apps/port-marketconnector/scripts/run_intraday_snapshot_and_evaluate.sh`(SHA256 `8fe7657a75b5d7637ec645b6d8a55bf75c993d46c1c71e8a5e88bded29baa8a0`) 가 snapshot refresh + position evaluate 수행
+       - `connector_intraday_position_evaluate.py`(버전 `connector-intraday-position-evaluate-1.1.1-slack-notify` / SHA256 `5ec6914853ab34e200682f256de53693f972b3e5d337a5bd8ab8ebf5296230ed`) 가 hard stop 조건 충족 시 `strategy_execution_order` `INTRADAY_STOP_SELL` `READY` 생성 + Notifier Lambda `portfolio-event-notifier` invoke
+       - `INTRADAY_STOP_LOSS` Slack 발송은 MarketConnector EC2 측 직접 책임 / Step Functions state machine 측 책임 아님
+   (2) Slack 실패 시 정책
+       - READY 생성 자체는 rollback 하지 않고 warning 출력
+       - broker 주문 제출은 본 흐름에서 여전히 불가능
+       - R-AUTO-036 신규 / Status `Mitigated`
+ 2) broker 주문 제출 책임: `portfolio-paper-intraday-stop-sell-approval` state machine
+   (1) approval gate 책임 분리 그대로 유지
+       - `CheckIntradayStopApproval` Choice `allowIntradayStopOrderExecute=true` 통과 후에만 broker 주문 제출 가능
+       - 본 일자 오후 추가 작업분으로 state machine ASL 변경 0건
+       - state machine 자동 ENABLE 진입은 여전히 후속(OD-MS-036 / R-AUTO-030 ~ R-AUTO-032 / R-BROKER-005 정합 그대로 유지)
+   (2) 실 사용 검증 사실
+       - 본 일자 오후 실 runner 1회 안전 검증(SSM commandId `5b19d5da-5e2e-4b35-821b-c3cf2b36d131`) 에서 `open_position_count=0` / `EMPTY_NORMAL` 상태로 READY 생성 0건 + Slack 발송 0건 + state machine 호출 0건
+       - 실제 보유 종목 hard stop 조건 충족 회차에서 state machine 진입 + broker 주문 제출 + Slack `DAILY_EXECUTION_SUCCESS` / `DAILY_EXECUTION_FAILED` 발송 여부는 후속 phase 책임
+
+### 2. 04 spec 범위 변경 사실
+
+ 1) Step Functions state machine 변경 없음: 완료
+   (1) `portfolio-paper-daily-step1-17-approval` 변경 0건
+   (2) `portfolio-paper-daily-step12-17-approval` 변경 0건
+   (3) `portfolio-paper-intraday-stop-sell-approval` 변경 0건
+   (4) `portfolio-daily-brief-slack-notification` 변경 0건
+ 2) EventBridge Scheduler / Dispatcher Lambda 변경 없음: 완료
+   (1) 08:00 / 09:01 / 07:50 / 15:50 / 10분 Snapshot Refresh Scheduler 모두 변경 0건
+   (2) Dispatcher Lambda 3종 변경 0건
+ 3) IAM Role / Policy 변경 없음: 완료
+   (1) Step Functions execution role / EventBridge Scheduler role 본 일자 변경 0건
+   (2) MarketConnector EC2 IAM inline policy 부여는 06 spec 책임 영역
+
+### 3. 결정 / 리스크 매핑
+
+ 1) 결정 본문 변경 없음
+   (1) OD-MS-009 / OD-MS-030 / OD-MS-035 / OD-MS-036 / OD-MS-038 본문 변경 없이 evidence 보강
+   (2) 자세한 결정 변경은 `../_common/operator-decisions.md` Change Log `2026-06-30 (오후) 장중 손절 Slack` 항목 참조
+   (3) 신규 결정 없음 / Decision Summary 카운트 변경 없음(전체 97 / 확정 52 / 잠정 42 유지)
+ 2) 리스크 매핑
+   (1) R-AUTO-036 신규 / Status `Mitigated`(03 / 04 / 06 / 10 spec affected)
+   (2) R-AUTO-035 [2026-06-30 오후 추가 보강] / Status `Mitigated` 그대로 유지
+   (3) R-AUTO-024 / Status `Accepted` mitigation 그대로 유지
+   (4) R-AUTO-030 / R-AUTO-031 / R-AUTO-032 / R-BROKER-005 mitigation 그대로 유지 — `portfolio-paper-intraday-stop-sell-approval` state machine 자동 ENABLE 진입은 여전히 후속
+
+### 4. 후속
+
+ 1) 실제 보유 종목 발생 후 hard stop 조건 충족 시 `INTRADAY_STOP_LOSS` Slack 실이벤트 수신 + state machine 진입 cross-reference 통합 audit
+ 2) 장중 손절 READY 생성 후 별도 approval summary Slack 추가 여부 검토(`APPROVAL_REQUIRED` 와 유사한 별도 summary Slack)
+ 3) `portfolio-paper-intraday-stop-sell-approval` state machine 자동 ENABLE 진입 운영자 별도 승인 후 후속
+
+### 5. 본 일자 사실 기록 범위
+
+- 본 일자 Kiro 작업 = 04 spec `operation-notes.md` 본 섹션 cross-reference 누적만 수행
+- 운영자 직접 수행 영역 = MarketConnector EC2 측(03 spec 책임) + IAM 권한 부여(06 spec 책임)
+- AWS CLI / boto3 / psql / Lambda 실행 / Step Functions 실행 / SSM RunCommand / 외부 API 호출 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건
+- Lambda 코드 본문 / Step Functions ASL 본문 / SSM 응답 본문 / IAM Policy 전체 본문 / `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / Slack 메시지 본문 평문 인용 0건(R-DOCS-001 정합)
+- 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / 실제 state machine ARN / Slack webhook URL / DB password / Administrator password / broker_order_no 원문) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder
+- 운영 식별자(state machine 이름 4종 / Lambda 이름 / SSM commandId / runner SHA256 / evaluate 배포 SHA256 / source_version / Slack 이벤트 라벨 / marker 라벨 / IAM Role 이름 / inline policy 이름) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님

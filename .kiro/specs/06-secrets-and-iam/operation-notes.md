@@ -296,3 +296,142 @@
  4) IAM Policy 전체 본문 / `simulate-principal-policy` 응답 본문 / Secrets Manager `GetSecretValue` 응답 본문 / SSM Parameter Store 응답 본문 / Task Definition JSON 전체 본문 / Step Functions execution history 본문 / Slack 메시지 본문 / CloudWatch Logs 전문 / Spring Boot application log 전문 평문 인용 0건
  5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / 실제 state machine ARN / Slack webhook URL / DB password / Administrator password / image digest full sha256 / public IP / task ARN / ENI ID / broker_order_no 원문) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]` placeholder
  6) 운영 식별자(Task Role 이름 `portfolio-paper-view-task-role` / Task Execution Role 이름 `portfolio-paper-ecs-task-execution-role` / ECR `portfolio-view` / CloudWatch Logs `/ecs/portfolio-view` / Security Group `sgroup-port-view-ecs` / ECS cluster `portfolio-paper-cluster` / ECS service `portfolio-view-service` / task definition `portfolio-view:2` / Spring profile `aws-paper` / state machine `portfolio-paper-daily-step12-17-approval` / executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / status `SUCCEEDED` / Spring properties env 라벨 / Secrets Manager prefix `/portfolio/paper/...`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님
+
+## 2026-06-30 (오후) Slack — Daily Brief Builder Lambda Secrets Manager `valueFrom` + 알림 전용 IAM Role 2종 분리 검증
+
+본 일자 오후의 port-view ECS Fargate Task Role / Task Execution Role 분리 검증(앞 섹션) 과 별도로, 같은 일자 오후에 운영자가 직접 수행한 Daily Brief Slack 자동화 측 IAM Role 신규 분리 + Builder Lambda 의 DB password 주입 방식 사실을 06 spec 범위에서 누적 기록한다. 본 노트는 Lambda 코드 본문 / IAM Policy 전체 본문 / `simulate-principal-policy` 응답 본문 / Secrets Manager `GetSecretValue` 응답 본문 / Step Functions ASL 본문 / Slack 메시지 본문 평문 인용 0건(R-DOCS-001 정합).
+
+§1. 알림 전용 IAM Role 2종 신규 분리 1차 실증
+ 1) `portfolio-daily-brief-sfn-role`: 완료
+   (1) 책임 = Daily Brief mini Step Functions 안 Builder Lambda + Notifier Lambda invoke 권한
+       - Resource = Builder Lambda `portfolio-approval-slack-summary-builder` 와 별도 / Daily Brief Builder `portfolio-daily-brief-slack-summary-builder` + Notifier `portfolio-event-notifier` 한정
+       - Action = `lambda:InvokeFunction` 한정
+       - Action / Resource wildcard 0건
+   (2) 실제 ARN 평문 기록 0건(`[REDACTED_ARN]` placeholder)
+   (3) Daily 본 실행 IAM Role(`portfolio-paper-stepfunctions-execution-role`) 와 분리하여 알림 측 권한 확장이 본 실행 권한에 영향을 주지 않도록 격리(OD-SEC-005 / OD-SEC-006 정합)
+ 2) `portfolio-daily-brief-scheduler-role`: 완료
+   (1) 책임 = Daily Brief Scheduler 2개의 mini state machine StartExecution 권한
+       - Resource = `portfolio-daily-brief-slack-notification` state machine ARN 한정
+       - Action = `states:StartExecution` 한정
+       - Action / Resource wildcard 0건
+   (2) 실제 ARN 평문 기록 0건(`[REDACTED_ARN]` placeholder)
+   (3) Daily 본 실행 Scheduler IAM Role(`portfolio-paper-eventbridge-scheduler-role`) / EC2 lifecycle Scheduler IAM Role 과 분리
+
+§2. Builder Lambda DB password 주입 방식 1차 실증
+ 1) `portfolio-daily-brief-slack-summary-builder` Lambda 구성: 완료
+   (1) Lambda runtime
+       - Python 3.12
+       - DB driver `pg8000`(`psycopg2` 미사용)
+   (2) DB password 주입 방식
+       - Lambda 환경변수 `DB_PASSWORD_SECRET_VALUE_FROM` 에 Secrets Manager `valueFrom` 매핑
+       - Lambda 코드 안에서 `secretsmanager:GetSecretValue` runtime 조회
+       - Lambda 환경변수 / Secrets Manager `valueFrom` 매핑 / `GetSecretValue` 응답 본문 평문 기록 0건
+       - 실제 secret ARN `[REDACTED_SECRET_ARN]` placeholder
+       - secret value 자체는 RDS 접속 시점 이후 메모리 안에서만 사용 / Lambda CloudWatch Logs 평문 기록 0건
+       - OD-SEC-002 / R-DOCS-001 / R-SEC-010 정합
+ 2) RDS read 책임
+   (1) Lambda 가 SSM Port Forwarding 경유지 의존 없이 직접 RDS endpoint 로 접속(VPC 안 Lambda)
+       - 본 spec 본 노트 평문 RDS endpoint hostname 기록 0건
+       - `connector_balance_snapshot` + `connector_position_snapshot` SELECT 한정
+       - DDL / DML 0건 / `executemany` 0건
+   (2) SELECT 결과 평문 인용 0건 — 운영자 노트에는 summary 결과만 사실 기록
+
+§3. Builder Lambda 측 IAM Policy (책임 분리)
+ 1) `portfolio-daily-brief-slack-summary-builder` Lambda 의 Execution Role(별도 Lambda 자체 Execution Role / IAM Role 이름 본 노트 평문 기록 0건)
+   (1) `secretsmanager:GetSecretValue` Resource = Daily Brief 용 RDS app role secret ARN 한정
+   (2) RDS connection 권한 = VPC 안에서 RDS endpoint TCP 5432 outbound 한정
+   (3) `logs:CreateLogGroup` / `logs:CreateLogStream` / `logs:PutLogEvents` Resource = `/aws/lambda/portfolio-daily-brief-slack-summary-builder` 한정
+   (4) Action / Resource wildcard 0건 / 06 spec 후속 phase 책임으로 정식 매트릭스 갱신
+ 2) 실제 IAM Policy 본문 / `simulate-principal-policy` 응답 본문 평문 기록 0건
+
+§4. 결정 / 리스크 매핑
+ 1) 결정 본문 변경 없음
+   (1) OD-SEC-002(RDS master password Secrets Manager 보관) / OD-SEC-005(EC2 / 8개 MS Access Key 미사용 원칙) / OD-SEC-006(MS 별 Secret 접근 분리) / OD-MS-030(AWS 공통 Slack notifier) 본문 변경 없이 1차 실증 메모 보강
+       - 자세한 결정 변경은 `../_common/operator-decisions.md` Change Log `2026-06-30 (오후) Slack` 항목 + OD-MS-038 신규 참조
+ 2) 리스크 매핑
+   (1) R-AUTO-035 신규 — Daily Brief Slack 자동 발송 실패 또는 중복 발송 위험 / Status `Mitigated` / mini Step Functions 분리 + Scheduler 2개 ENABLED + 수동 smoke `SUCCEEDED` + 알림 전용 IAM Role 분리(권한 광역화 0건)
+   (2) R-DOCS-001 / R-SEC-010 정합 — Lambda 코드 본문 / Secrets Manager secret value / DB password / 실제 ARN 평문 기록 금지 / 본 일자 추가분 0건
+   (3) R-AUTO-024(Slack webhook URL 평문 노출 위험 / `Accepted`) mitigation 그대로 유지 / Notifier Lambda `portfolio-event-notifier` 환경변수 `SLACK_WEBHOOK_URL` 평문 유지 / 운영 안정화 후 Secrets Manager 또는 SSM SecureString 이전 / 06 spec 후속 phase 책임
+
+§5. 후속 (06 spec 후속 phase 책임)
+ 1) Daily Brief Builder Lambda 의 IAM Policy 정식 정의 + `simulate-principal-policy` 검증 + Resource · Action wildcard 0건 audit
+ 2) Slack webhook URL 을 Lambda 환경변수에서 Secrets Manager 또는 SSM SecureString 으로 이전(R-AUTO-024 정합)
+ 3) `portfolio-daily-brief-sfn-role` / `portfolio-daily-brief-scheduler-role` 의 Resource 패턴이 Daily Brief 전용 ARN 한정인지 정기 audit
+ 4) Daily Brief Builder Lambda 의 RDS connection 풀링 / 재사용 정책 + Lambda cold start 시점의 Secrets Manager `GetSecretValue` 호출 횟수 audit(평일 2회 = 월 약 44회 / `GetSecretValue` 단가 매우 작음 그대로 유지)
+ 5) DB password rotate(R-SEC-010) 진입 시점에 Daily Brief Builder Lambda 측 Secrets Manager secret 재검증
+
+§6. 본 일자 사실 기록 범위
+ 1) Kiro 작업 = 06 spec `operation-notes.md` 본 섹션 누적만 수행
+ 2) 운영자 직접 수행 영역 = Builder Lambda 2개 신규 생성 + mini state machine 1개 신규 생성 + Scheduler 2개 ENABLED + IAM Role 2종 신규 생성 + IAM Policy 작성 + Notifier formatter 개선 + `portfolio-paper-daily-step1-17-approval` ASL update
+ 3) AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건
+ 4) IAM Policy 전체 본문 / `simulate-principal-policy` 응답 본문 / Secrets Manager `GetSecretValue` 응답 본문 / Step Functions ASL 본문 / Lambda 코드 본문 / Slack 메시지 본문 / Builder output 전문 / Notifier input 전문 / CloudWatch Logs 전문 평문 인용 0건
+ 5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / 실제 state machine ARN / Slack webhook URL / DB password / Administrator password) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` / `[REDACTED_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_ACCOUNT_NO]` placeholder
+ 6) 운영 식별자(IAM Role 이름 `portfolio-daily-brief-sfn-role` · `portfolio-daily-brief-scheduler-role` / Builder Lambda 이름 `portfolio-approval-slack-summary-builder` · `portfolio-daily-brief-slack-summary-builder` / Notifier Lambda 이름 `portfolio-event-notifier` / state machine 이름 `portfolio-daily-brief-slack-notification` / Scheduler 이름 2종 / Lambda runtime `Python 3.12` / DB driver `pg8000` / DB password 주입 방식 `DB_PASSWORD_SECRET_VALUE_FROM` / Slack webhook 환경변수명 `SLACK_WEBHOOK_URL` / Lambda log group `/aws/lambda/portfolio-daily-brief-slack-summary-builder`) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님
+
+## 2026-06-30 (오후) 장중 손절 Slack — MarketConnector EC2 Instance Role inline policy(`lambda:InvokeFunction` Resource 한정) 분리 검증
+
+본 일자 오후 추가 작업분으로 운영자가 직접 수행한 장중 손절 Slack 실 연동 중 06 spec 범위에 해당하는 MarketConnector EC2 Instance Role inline policy 부여 사실을 누적 기록한다. 본 노트는 IAM Policy 전체 본문 / `simulate-principal-policy` 응답 본문 / Lambda 코드 본문 / `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / SSM 응답 본문 / Slack 메시지 본문 / CloudWatch Logs 전문 평문 인용 0건(R-DOCS-001 정합 / 운영 식별자만 사실 기록).
+
+§1. MarketConnector EC2 Instance Role inline policy 분리 1차 실증
+ 1) Instance Role
+   (1) 이름 `portfolio-paper-marketconnector-ec2-role`
+       - 03 spec 의 정식 운영 EC2(MarketConnector EC2) Instance Role
+       - 실제 ARN 평문 기록 0건(`[REDACTED_ARN]` placeholder)
+   (2) 본 inline policy 부여 전 기존 권한 범위
+       - SSM Session Manager / `AmazonSSMManagedInstanceCore` managed policy
+       - KIS Secrets Manager / SSM Parameter Store read
+       - RDS 접속(`marketconnector_app` DB role 기준)
+       - CloudWatch Logs write
+       - S3 access_token 백업
+       - 기존 권한은 본 일자 변경 없음
+ 2) 신규 inline policy 부여
+   (1) policy 이름 `portfolio-paper-marketconnector-event-notifier-invoke`
+   (2) action
+       - `lambda:InvokeFunction`
+   (3) Resource
+       - `portfolio-event-notifier` Lambda 한정
+       - 실제 Lambda ARN 평문 기록 0건(`[REDACTED_ARN]` placeholder)
+       - Resource · Action wildcard 0건
+       - OD-SEC-005 / OD-SEC-006 정합
+   (4) 본 inline policy 는 Daily Batch state machine / Step Functions execution role / EventBridge Scheduler role / Daily Brief 알림 전용 IAM Role 2종(`portfolio-daily-brief-sfn-role` · `portfolio-daily-brief-scheduler-role`) 와 모두 분리
+ 3) EC2 invoke smoke 통과
+   (1) EC2 측에서 Notifier Lambda invoke smoke 성공
+   (2) Lambda 응답 본문 평문 인용 0건
+   (3) 본 smoke 는 `connector_intraday_position_evaluate.py --notify-slack` runtime 호출 경로의 IAM 권한 사전 검증 목적
+
+§2. MarketConnector evaluate 의 `DB_PASSWORD_SECRET_VALUE_FROM` 정책 정합
+ 1) DB password 주입 방식
+   (1) 본 일자 추가 분에서도 MarketConnector EC2 측 DB password 주입 방식 변경 없음
+   (2) MarketConnector evaluate 는 기존 EC2 Instance Role 기반 Secrets Manager `GetSecretValue` runtime 조회 정책 그대로 유지(OD-SEC-002 / R-DOCS-001 / R-SEC-010 정합)
+   (3) Daily Brief Builder Lambda 의 `DB_PASSWORD_SECRET_VALUE_FROM` 환경변수 valueFrom 방식과 별도 — MarketConnector evaluate 는 Lambda 가 아니라 EC2 venv Python 으로 실행되므로 환경변수 주입 방식이 EC2 측 운영자 셋업에 따라 다름 / 본 일자 추가 분에서 변경 없음
+ 2) Slack webhook URL 측 정책 정합
+   (1) Notifier Lambda `portfolio-event-notifier` 의 환경변수 `SLACK_WEBHOOK_URL` 평문 유지(R-AUTO-024 `Accepted`)
+   (2) MarketConnector evaluate 는 Slack webhook URL 을 직접 알지 않음 — Notifier Lambda invoke 만 수행 / webhook URL 평문 노출 위험은 Notifier Lambda 측 책임으로 분리
+   (3) Slack webhook URL Secrets Manager 또는 SSM SecureString 이전 후속(R-AUTO-024 / 06 spec 후속 phase 책임 그대로 유지)
+
+§3. 결정 / 리스크 매핑
+ 1) 결정 본문 변경 없음
+   (1) OD-SEC-002 / OD-SEC-005 / OD-SEC-006 / OD-SEC-007 / OD-MS-001 / OD-MS-016 / OD-MS-030 / OD-MS-035 / OD-MS-036 / OD-MS-038 본문 변경 없이 evidence 보강
+   (2) 자세한 결정 변경은 `../_common/operator-decisions.md` Change Log `2026-06-30 (오후) 장중 손절 Slack` 항목 참조
+   (3) 신규 결정 없음 / Decision Summary 카운트 변경 없음(전체 97 / 확정 52 / 잠정 42 유지)
+ 2) 리스크 매핑
+   (1) R-AUTO-036 신규 — 장중 손절 READY 생성 후 Slack 발송 실패 시 rollback 없는 정책의 부작용 위험 / Status `Mitigated` / mitigation 핵심 항목 중 IAM 권한 한정 부여 + EC2 invoke smoke + DB after-check 보강은 본 일자 1차 통과
+   (2) R-AUTO-035 [2026-06-30 오후 추가 보강] — Notifier Lambda 호출 진입점이 MarketConnector EC2 runner 까지 확대 / Status `Mitigated` 그대로 유지
+   (3) R-AUTO-024(Slack webhook URL 평문 노출 위험 / `Accepted`) mitigation 그대로 유지 / 운영 안정화 후 Secrets Manager 또는 SSM SecureString 이전 / 06 spec 후속 phase 책임
+   (4) R-SEC-010(DB password 평문 노출 후속 rotation / `Open`) mitigation 그대로 유지 / 운영자 로컬 세션에서 우연히 노출된 사실은 본 노트에 password 값 없이 "credential rotation / history cleanup 권고" 수준으로만 기록(R-DOCS-001 / R-DOCS-002 정합)
+   (5) R-DOCS-001 / R-DOCS-002 정합 — IAM Policy 전체 본문 / Lambda 코드 본문 / `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / SSM 응답 본문 / `simulate-principal-policy` 응답 본문 평문 기록 0건
+
+§4. 후속 (06 spec 후속 phase 책임)
+ 1) MarketConnector EC2 Instance Role 의 inline policy 매트릭스 정식 정의 + `simulate-principal-policy` 검증 + Resource · Action wildcard 0건 audit(Daily Brief Builder Lambda Execution Role + Daily Brief mini Step Functions IAM Role 2종 + MarketConnector EC2 inline policy 통합 매트릭스 정합 audit 포함)
+ 2) Slack webhook URL 을 Notifier Lambda 환경변수에서 Secrets Manager 또는 SSM SecureString 으로 이전(R-AUTO-024 정합)
+ 3) DB password rotate(R-SEC-010) 진입 시점에 MarketConnector EC2 측 Secrets Manager secret 재검증
+ 4) R-AUTO-036 운영 detection 자동화(Lambda CloudWatch Logs metric filter / Slack 발송 실패 alarm / DB after-check ↔ Slack 수신 cross-reference 자동화) — 05 · 06 spec 후속 phase 책임
+ 5) Daily Brief Builder Lambda Execution Role + Daily Brief mini Step Functions IAM Role 2종 + MarketConnector EC2 inline policy 가 모두 `portfolio-event-notifier` Lambda 만 invoke 하도록 cross-spec audit(권한 광역 회귀 0건 유지)
+
+§5. 본 일자 사실 기록 범위
+ 1) Kiro 작업 = 06 spec `operation-notes.md` 본 섹션 누적만 수행
+ 2) 운영자 직접 수행 영역 = MarketConnector EC2 Instance Role 에 inline policy 신규 부여 + EC2 측 Lambda invoke smoke + 1회 실 runner 안전 검증
+ 3) AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 / Lambda 실행 / Step Functions 실행 / SSM RunCommand 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건
+ 4) IAM Policy 전체 본문 / `simulate-principal-policy` 응답 본문 / Secrets Manager `GetSecretValue` 응답 본문 / Lambda 코드 본문 / `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / SSM 응답 본문 / Slack 메시지 본문 / CloudWatch Logs 전문 평문 인용 0건
+ 5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / 실제 state machine ARN / Slack webhook URL / DB password / Administrator password / EIP / public IP / broker_order_no 원문) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder
+ 6) 운영 식별자(IAM Role 이름 `portfolio-paper-marketconnector-ec2-role` / inline policy 이름 `portfolio-paper-marketconnector-event-notifier-invoke` / Lambda 이름 `portfolio-event-notifier` / state machine 이름 `portfolio-paper-intraday-stop-sell-approval` / SSM commandId `5b19d5da-5e2e-4b35-821b-c3cf2b36d131` / MarketConnector evaluate 파일 경로 / 배포 SHA256 / 배포 버전 / runner 파일 경로 / runner SHA256 / source_version) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님

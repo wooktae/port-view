@@ -169,3 +169,39 @@ AWS Console 작업이나 구현 절차가 필요한 경우에는 실제 실행�
 - 본 3종 규칙은 본 spec 작업공간이 작성하는 runbook / validation-checklist / operation-notes / 운영 메모 안의 명령 예시에만 적용된다.
 - 8개 MS 의 소스 코드 / 패키징 / docs / worklog / README / AGENTS.md / CHANGELOG 영역에 본 규칙을 강제 적용하지 않는다(본 작업공간 외부 책임 영역).
 - 본 규칙의 추가 evidence 가 발생하면 본 절을 그대로 유지하고 영향을 받은 운영 노트 안에 사례를 사실 기록한다.
+
+### 규칙 4: 추정 컬럼명 사용 금지(R-AUTO-035 / R-AUTO-036 mitigation 강화)
+
+- 2026-06-30 오후 운영자 노트 작성 중 `connector_order_request.order_side` 같은 실제 존재하지 않는 컬럼명을 추정해 SQL 작성한 사례 1건 식별. 추정 컬럼명으로 작성된 검증 쿼리는 DB after-check 자체가 실패하거나, 잘못된 SUCCESS marker 와 결합되면 운영자가 검증을 통과한 것으로 오인할 위험.
+- `connector_order_request` / `strategy_execution_order` / `strategy_intraday_position_check` / `connector_position_snapshot` 등 본 spec 영역의 모든 DB after-check 쿼리는 `information_schema.columns` 로 실제 컬럼명 사전 확인 후 작성한다(규칙 2 의 강화 적용).
+- 본 작업공간이 작성하는 모든 SQL 예시는 컬럼명을 추정해서 쓰지 않으며, 운영자가 직접 수행하는 검증 쿼리도 동일 정책을 따른다.
+- 추정 컬럼명 발견 시 즉시 운영 노트에 반성점 기록 + 검증 쿼리를 재작성 + 실패 출력을 그대로 유지(SUCCESS marker 회피 — 규칙 3 결합).
+
+### 규칙 5: PowerShell native command not found / psql 실패 시 `$LASTEXITCODE` 처리 주의
+
+- PowerShell 에서 `psql` 같은 native command 가 not found 이거나 비정상 종료될 경우 `$LASTEXITCODE` 와 `$?` 의 처리 차이를 주의한다 — `$?` 는 마지막 cmdlet 의 성공 여부, `$LASTEXITCODE` 는 마지막 native command 의 exit code 로 의미가 다르다.
+- 명령 실패 직후 `if ($?)` 만 보고 SUCCESS marker 를 찍으면 native command 실패를 놓칠 위험이 있다.
+- 본 작업공간이 작성하는 PowerShell 예시는 native command 호출 직후 `if ($LASTEXITCODE -ne 0) { ... }` 패턴으로 exit code 를 명시적으로 점검한 뒤 다음 단계로 진입한다.
+- 본 규칙은 규칙 3(실패 명령 뒤 SUCCESS marker 금지) 의 PowerShell 측 적용 사례로 결합된다.
+
+### 규칙 6: Windows AWS CLI stdout 의 emoji / 특수문자 cp949 encoding 오류 대응
+
+- Windows PowerShell / cmd 에서 AWS CLI 또는 SSM 응답 본문이 emoji(`🚨` · `🔵` · `🔴` · `⚪`) / 한글 / 특수문자를 포함하는 경우 콘솔 출력이 cp949 encoding 오류로 깨지거나 운영자가 검증 결과를 오해할 수 있다(2026-06-30 오후 장중 손절 Slack 연동 회차 식별 사례 정합).
+- 본 작업공간이 작성하는 운영 노트 / runbook / validation-checklist 의 SSM 출력 점검 패턴은 다음 중 하나를 우선한다.
+  - EC2 측에서 출력 자체를 sanitize 한 뒤 SSM 으로 받기
+  - SSM 응답에서 `status` / exit code / marker 만 추출하는 status-only 조회
+  - 한글 / emoji 포함 본문은 운영자 별도 화면(예: CloudWatch Logs / Slack 채널 / 로컬 EC2 SSH)에서 직접 점검
+- Windows PowerShell `chcp 65001` / `[Console]::OutputEncoding = [Text.UTF8Encoding]::new()` 같은 임시 우회는 본 spec 영역의 정식 운영 권고가 아니며, 운영자가 임의로 적용해도 본 규칙의 sanitize 또는 status-only 정책을 우회할 수 없다.
+
+### 규칙 7: SSM multiline command 는 UTF-8 No BOM JSON + `--parameters file://...` 패턴
+
+- SSM RunCommand 의 multiline command(특히 한글 / emoji / Python 스크립트 본문 / SQL 본문이 포함된 경우)는 PowerShell `--parameters '{...}'` 인라인 JSON 으로 전달하지 않는다 — Windows PowerShell 측 BOM / cp949 / 따옴표 escape 문제로 명령이 실패하거나 의도와 다르게 실행될 수 있다.
+- 본 작업공간이 작성하는 SSM 명령 예시는 UTF-8 No BOM 으로 저장된 JSON 파일을 만들고 `--parameters file://<path>` 패턴으로 전달한다.
+- 본 규칙은 02 spec(RDS) 검증 SQL · 03 spec(MarketConnector EC2) 운영 SSM 명령 · 04 spec(Strategy Batch) Step Functions 측 SSM 호출 등 본 작업공간의 모든 SSM 명령 예시에 적용된다.
+
+### 규칙 8: DB password / secret 값 채팅 / 문서 / 로그 / 명령 예시 절대 포함 금지
+
+- DB password / secret value / KIS app key / KIS app secret / token / Slack webhook URL / RDS password / Secrets Manager value / 계좌번호 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / 실제 state machine ARN / 실제 public IP / 실제 account-id / broker_order_no 원문 / image digest full sha256 은 본 작업공간의 어떤 문서 / 채팅 / 명령 예시 / runbook / validation-checklist / operation-notes / WORKLOG / CHANGELOG / README / AGENTS.md / 로그 인용에도 절대 포함하지 않는다.
+- 필요한 경우 `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]` / `[REDACTED_TASK_ARN]` placeholder 만 사용한다.
+- 운영자가 로컬 세션 / 운영 채팅 / 운영자 노트 작성 중 실수로 secret 값을 노출한 사실이 식별되면 본 spec 산출물에는 password 값 없이 "credential rotation / history cleanup 권고" 수준으로만 기록한다(R-SEC-010 / R-DOCS-001 / R-DOCS-002 정합).
+- 본 규칙은 본 작업공간의 모든 spec / 모든 일자 / 모든 phase 에 적용된다 — R-DOCS-001 (secret 평문 기록 금지) 의 본 spec 작업공간 측 핵심 적용 규칙이다.

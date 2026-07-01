@@ -628,3 +628,65 @@ ECS View 종료:
 - broker / KIS 호출 = 오전 Step 1~11 자동 trigger 한정 + Local View → Step 12~17 승인 실행(2026-06-30 오전) + ECS View → Step 12~17 승인 실행(2026-06-30 오후 / executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / `SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
 - 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / public IP / image digest full sha256 / task ARN / ENI ID / job ARN / broker_order_no 원문 / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]` placeholder.
 - 운영 식별자(ECS cluster `portfolio-paper-cluster` / ECS service `portfolio-view-service` / ECS task definition `portfolio-view:2` / ECR repository `portfolio-view` / CloudWatch Logs group `/ecs/portfolio-view` / Security Group `sgroup-port-view-ecs` / task execution role 이름 `portfolio-paper-ecs-task-execution-role` / task role 이름 `portfolio-paper-view-task-role` / executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / state machine `portfolio-paper-daily-step12-17-approval` / Spring profile `aws-paper` / Tomcat port `8080` / start · stop timestamp `2026-06-30T14:15:42.899+09:00` ~ `2026-06-30T14:18:48.358+09:00` / status `SUCCEEDED` / balance snapshot `id=281` · `as_of_date=2026-06-30` · `total_eval_amount=8,706,505` · `cash_balance=8,706,505` / 화면 라벨 6종(Dashboard / Balance / Positions / Orders / Reports / Daily) / launch type `FARGATE` / network mode `awsvpc` / cpu 512 / memory 1024 / container port 8080 / Spring properties env label / Slack 이벤트 라벨 `DAILY_EXECUTION_SUCCESS` / stale `connector_order_request` 6건 식별 사실 / `connector_position_snapshot.balance_snapshot_id` 컬럼 부재 사실) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+
+
+## 2026-06-30 (오후) — Daily Brief Slack 자동화 독립 운영 cross-reference
+
+같은 일자 오후의 port-view ECS Fargate 1차 포팅 + ECS View → AWS Step Functions Step 12~17 승인 실행(앞의 "3. ECS Fargate 포팅: 완료" block) 과 별도로, Daily Brief Slack 자동화가 본 일자 오후에 추가로 운영자 직접 작업으로 구성된 사실을 cross-reference 한다. 본 노트는 Lambda 코드 본문 / Step Functions ASL 본문 / Scheduler target JSON 본문 / Slack 메시지 본문 / Builder output 전문 / Notifier input 전문 / CloudWatch Logs 전문 / IAM Policy 본문 평문 인용 0건(R-DOCS-001 정합).
+
+12. Daily Brief Slack 자동화 cross-reference: 사실 기록
+ 1) Daily Brief 알림은 Daily 본 실행 / ECS View / MarketConnector EC2 와 모두 독립 운영: 완료
+   (1) Daily 본 실행 state machine 과 분리
+       - Daily Brief 알림은 `portfolio-paper-daily-step1-17-approval` / `portfolio-paper-daily-step12-17-approval` 와 별도 mini Step Functions `portfolio-daily-brief-slack-notification` 책임
+       - Daily 본 실행 실패가 Daily Brief Slack 발송에 영향을 주지 않고, Daily Brief Slack 실패가 Daily 본 실행에 영향을 주지 않도록 격리
+       - OD-MS-038 신규 정합
+   (2) MarketConnector EC2 start · stop 과 독립 운영
+       - MarketConnector EC2 의 07:50 KST start / 15:50 KST stop(OD-MS-034 정합) 과 Daily Brief Slack 의 07:50 KST 장전 발송 / 15:50 KST 장후 발송은 시간대만 동일 / Target / Lambda / IAM Role 모두 독립
+       - Daily Brief Builder Lambda `portfolio-daily-brief-slack-summary-builder` 는 RDS read 만 수행 / MarketConnector EC2 가 stop 상태여도 정상 동작
+       - EC2 lifecycle Lambda `portfolio-paper-ec2-lifecycle-dispatcher` 와 책임 분리 / IAM Role / 호출 경로 / Target 모두 독립
+   (3) ECS View 와 독립 운영
+       - ECS View(`portfolio-view-service`) 의 desiredCount 0/1 운영과 무관하게 Daily Brief Slack 은 자동 발사
+       - port-view 의 기존 `SlackNotificationService` 는 제거되지 않고 유지(View Daily Batch 수동 실행 결과 알림 책임)
+       - AWS 공통 Slack notifier(`portfolio-event-notifier`) 는 운영 이벤트 알림 단일 진입점으로 별도 분리(OD-MS-030 정합)
+ 2) 본 일자 운영자 직접 신규 작업 사실
+   (1) Builder Lambda 2종 신규
+       - `portfolio-approval-slack-summary-builder` — Daily 본 실행 측 Approval Required Slack builder
+       - `portfolio-daily-brief-slack-summary-builder` — Daily Brief Slack builder(Python 3.12 + `pg8000` + `DB_PASSWORD_SECRET_VALUE_FROM` Secrets Manager `valueFrom`)
+   (2) mini Step Functions 신규
+       - `portfolio-daily-brief-slack-notification`(ACTIVE / 구조 `BuildDailyBriefPayload → SendSlackNotifier`)
+   (3) IAM Role 2종 신규
+       - `portfolio-daily-brief-sfn-role`(Builder + Notifier Lambda invoke 한정 / Resource · Action wildcard 0건)
+       - `portfolio-daily-brief-scheduler-role`(Daily Brief state machine StartExecution 한정 / Resource · Action wildcard 0건)
+   (4) Scheduler 2개 ENABLED 추가
+       - 장전 `portfolio-daily-brief-morning-slack-0750-kst`(cron `cron(50 7 ? * MON-FRI *)` / Asia/Seoul / Flexible OFF / input `MORNING_BRIEF`)
+       - 장후 `portfolio-daily-brief-evening-slack-1550-kst`(cron `cron(50 15 ? * MON-FRI *)` / Asia/Seoul / Flexible OFF / input `EVENING_BRIEF`)
+   (5) Notifier formatter 개선
+       - eventType alias 2종(`MORNING_BRIEF → PRE_MARKET_STATUS` / `EVENING_BRIEF → POST_MARKET_STATUS`)
+       - nested `balance` / `positions` adapter
+       - Builder `title` 우선
+       - 장후 `어제 대비` 표시
+       - 손익 prefix 규칙(음수 `🔵` / 양수 `🔴` / 0 `⚪`) 일관 적용
+   (6) smoke 통과
+       - morning smoke `daily-brief-morning-smoke-safe-20260630-193255-68f50aeb` `SUCCEEDED`
+       - evening smoke `daily-brief-evening-smoke-safe-20260630-193300-aa2b9a12` `SUCCEEDED`
+       - Slack 장전 · 장후 수신 확인
+       - latest balance snapshot `id=281` / `as_of_date=2026-06-30` / `total_eval_amount=8,706,505` / `cash_balance=8,706,505` / `cumulativeProfitRate=-12.94%` / `cumulativeProfitAmount=-1,293,495` / `positionCount=0` / evening delta `0원`
+ 3) 본 일자 05 spec 범위 변경 사실
+   (1) port-view ECS Fargate task definition `portfolio-view:2` 변경 0건(Daily Brief 자동화는 ECS View 와 무관 / port-view image / SG / CloudWatch Logs `/ecs/portfolio-view` 변경 0건)
+   (2) ECS service desiredCount 0/1 운영 정책 그대로 유지(검증 후 desiredCount 0 종료 정합)
+   (3) ECS View → AWS Step Functions Step 12~17 승인 실행 흐름 변경 0건
+   (4) MarketConnector EC2 / Crawler EC2 lifecycle 자동화 변경 0건
+
+### 결정 / 리스크 매핑 (2026-06-30 오후 Slack)
+
+- OD-MS-002 / OD-MS-009 / OD-MS-030 / OD-MS-031 / OD-MS-037 본문 변경 없이 evidence 보강 / OD-MS-038 신규(Daily Brief Slack mini workflow 운영 방식 / Decision Summary 카운트 96 → 97 / 확정 51 → 52 / 잠정 42 유지)
+- R-AUTO-035 신규(Daily Brief Slack 자동 발송 실패 또는 중복 발송 위험 / Status `Mitigated` / 첫 실 자동 발사 검증은 다음 평일 후속)
+- R-AUTO-024(Slack webhook URL 평문 노출 위험 / `Accepted`) mitigation 그대로 유지 / 운영 안정화 후 Secrets Manager 또는 SSM SecureString 이전(06 spec 후속 phase 책임)
+
+### 본 일자 사실 기록 범위 (2026-06-30 오후 Slack)
+
+- 본 일자 Kiro 작업 = 05 spec `operation-notes.md` 본 섹션 cross-reference 누적만 수행
+- 운영자 직접 수행 영역 = Builder Lambda 2개 신규 + mini state machine 1개 신규 + Scheduler 2개 ENABLED + IAM Role 2종 신규 + Notifier formatter 개선 + `portfolio-paper-daily-step1-17-approval` ASL update
+- AWS CLI / boto3 / psql / Lambda 실행 / Step Functions 실행 / Slack webhook / KIS API 호출 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건
+- Lambda 코드 본문 / Step Functions ASL 본문 / Scheduler target JSON 본문 / Slack 메시지 본문 / Builder output 전문 / Notifier input 전문 / CloudWatch Logs 전문 / IAM Policy 전체 본문 / Slack webhook URL / 실제 IAM Role ARN / 실제 state machine ARN / 계좌번호 12자리 원문 / DB password 평문 인용 0건(R-DOCS-001 정합)
+- 운영 식별자(Builder Lambda 이름 2종 / Notifier Lambda 이름 / mini state machine 이름 / IAM Role 이름 2종 / Scheduler 이름 2종 / cron 표현식 2종 / Asia/Seoul / Flexible OFF / eventType alias 4종 + 본 라벨 3종 / Lambda runtime `Python 3.12` / DB driver `pg8000` / DB password 주입 방식 `DB_PASSWORD_SECRET_VALUE_FROM` / Slack webhook 환경변수명 `SLACK_WEBHOOK_URL` / 손익 prefix 라벨 / smoke execution name 2종 / balance snapshot 요약) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님
