@@ -26,18 +26,18 @@ raw log 전문 · SQL 전체 출력 · AWS CLI 전체 JSON 응답 · CloudWatch 
 
 ## Risk Dashboard
 
-운영자가 매일 조회하는 리스크 요약이다. 집계 시점 2026-07-01 기준. 상세 근거와 mitigation 이력은 아래 `Risk Table` 및 `Risk Details` 섹션에서 확인한다. 상태 배지 우선순위 🔴 Open High · 🟠 Open · 🟢 Mitigated · 🔵 Accepted · ⚫ Closed.
+운영자가 매일 조회하는 리스크 요약이다. 집계 시점 2026-07-03 기준. 상세 근거와 mitigation 이력은 아래 `Risk Table` 및 `Risk Details` 섹션에서 확인한다. 상태 배지 우선순위 🔴 Open High · 🟠 Open · 🟢 Mitigated · 🔵 Accepted · ⚫ Closed.
 
-### 상태 요약 (전체 75건 기준)
+### 상태 요약 (전체 76건 기준)
 
 | 상태 | 건수 | 배지 |
 |---|---|---|
 | Open | 31 | 🟠 (High 21건은 🔴) |
-| Mitigated | 42 | 🟢 |
+| Mitigated | 43 | 🟢 |
 | Accepted | 2 | 🔵 |
 | Closed | 0 | ⚫ |
 
-Area count: Automation 37 · Data 17 · Security 7 · Broker 5 · Network 4 · Cost 3 · Docs 2. Impact count: High 46 · Medium 27 · Low 2.
+Area count: Automation 38 · Data 17 · Security 7 · Broker 5 · Network 4 · Cost 3 · Docs 2. Impact count: High 46 · Medium 28 · Low 2. (2026-07-03 R-AUTO-038 신규 · Mitigated 정합)
 
 ### 그룹 1 — 🔴 Open High risks (21건 · 즉시 관심 대상)
 
@@ -98,10 +98,11 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
 | R-BROKER-005 | Broker | 없는 포지션 매도 사전 점검 4종 통과 후 진입 | 03, 04, 10 |
 | R-DOCS-002 | Docs | wrapper 로그 secret grep 정기 점검 | 06, 08 |
 
-### 그룹 3 — 🟠 Newly added risks (2026-06-24 ~ 2026-07-01, 8건)
+### 그룹 3 — 🟠 Newly added risks (2026-06-24 ~ 2026-07-03, 9건)
 
 | Risk ID | Area | 추가 일자 | Status |
 |---|---|---|---|
+| R-AUTO-038 | Automation | 2026-07-03 | 🟢 Mitigated |
 | R-AUTO-034 | Automation | 2026-06-29 | 🔴 Open |
 | R-AUTO-035 | Automation | 2026-06-30 | 🟢 Mitigated |
 | R-AUTO-036 | Automation | 2026-06-30 | 🟢 Mitigated |
@@ -223,6 +224,7 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
 | R-AUTO-035 | Automation | 🟢 Mitigated | Medium | Daily Brief Slack 자동 발송 실패 · 중복 발송으로 운영자 인지 누락 · 오해 위험 | mini SF + Scheduler 2개 + Builder / Notifier / IAM 분리 정합. [See details: R-AUTO-035 Details](#r-auto-035-details) |
 | R-AUTO-036 | Automation | 🟢 Mitigated | Medium | Intraday hard stop 후 Slack 실패 시 READY rollback 없이 warning 만 출력 위험 | state machine approval gate 통과 후에만 broker 제출 · Notifier IAM 한정. [See details: R-AUTO-036 Details](#r-auto-036-details) |
 | R-AUTO-037 | Automation | 🟢 Mitigated | High | Step 12~17 자동 실행이 Step 1~11 실패 · 데이터 미준비 상태에서 실행될 위험 | Dispatcher 휴장일 fail-closed + SF Choice paperOrderEnabled + retry-normalizer. [See details: R-AUTO-037 Details](#r-auto-037-details) |
+| R-AUTO-038 | Automation | 🟢 Mitigated | Medium | Step Functions 실행 이력이 `ops.strategy_daily_batch_run` 에 mirror 되지 않아 View Daily Batch 화면이 AWS Step Functions 실행 이력을 직접 보여주지 못하는 위험 | Recorder Lambda `portfolio-daily-batch-ops-recorder` + `ops_recorder_app` 전용 최소 권한 role + `chk_strategy_daily_batch_run_type` 에 `AWS_STEPFUNCTIONS` 추가 · State Machine 이 RECORD_START / RECORD_STEP / RECORD_SUCCESS / RECORD_FAILURE 호출 · run-level + 대표 workflow step mirror 1차 완료 (OD-DB-012 / OD-MS-039 정합). [See details: R-AUTO-038 Details](#r-auto-038-details) |
 
 ## Risk Details
 
@@ -410,6 +412,23 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
   - (c) 07:50 EC2 lifecycle 실패 시 08:00 Step 1~11 실패 → 09:01 fail-closed(R-AUTO-028 결합). (d) 잘못된 broker 주문 발견 시 KIS 취소 + SQL 정리 + ASL 안전 gate 강화 + 운영자 승인 후 ENABLED 복귀. (e) Status 승격 조건 — 1주일 운영 회차 누적에서 잘못된 broker 주문 · stale 신호 실행 · market status 미확인 실행 0건 audit 통과. (f) aws-live 재검토는 10 spec 후속.
 - Evidence links: [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md).
 
+### R-AUTO-038 Details <a id="r-auto-038-details"></a>
+
+- Current status (R-AUTO-038): `Mitigated` (2026-07-03) — aws-paper 한정. run-level + 대표 workflow step mirror 1차 완료. 전체 세부 step mirror 확장 · View Daily Batch 화면 실 렌더링 검증은 후속.
+- R-AUTO-038 · Impact Medium · Probability Medium · Affected Spec 04, 05, 10.
+- Background: 2026-07-02 View Daily Batch 화면 기준선 smoke 회차에서 Step Functions 실행 이력이 `ops.strategy_daily_batch_run` 에 기록되지 않아 화면이 AWS Step Functions 실행 이력을 직접 보여주지 못하는 이슈가 식별되었다(followups-overview `Done recently` 2026-07-02 정합). Slack 및 업무 테이블은 정상 갱신되고 있었으나 이력 표시 계층만 부재.
+- Mitigation summary:
+  - (a) `ops_recorder_app` 전용 최소 권한 role 신설 — `ops` schema USAGE + `ops.strategy_daily_batch_run` + `ops.strategy_daily_batch_step_log` SELECT / INSERT / UPDATE + 관련 sequence USAGE / SELECT · DELETE 미부여 (OD-DB-012 정합).
+  - (b) `chk_strategy_daily_batch_run_type` 에 `AWS_STEPFUNCTIONS` 값 추가. 기존 `MANUAL` / `SCHEDULED` / `RETRY` / `MANUAL_PARTIAL` 값 유지 (OD-DB-012 정합).
+  - (c) Recorder Lambda `portfolio-daily-batch-ops-recorder` (Python 3.12 / ap-northeast-2 / VPC Lambda / Secrets Manager `ops_recorder_app` secret) 배포. 지원 action `RECORD_START` · `RECORD_STEP` · `RECORD_SUCCESS` · `RECORD_FAILURE` (OD-MS-039 정합).
+  - (d) Step Functions 실행 role 에 `lambda:InvokeFunction` 을 Recorder Lambda ARN 한정으로 부여. Resource wildcard 0건 · Action wildcard 0건 (OD-SEC-006 정합).
+  - (e) 대상 State Machine 2종 `portfolio-paper-daily-step1-17-approval` · `portfolio-paper-daily-step12-17-approval` 이 run-level + 대표 workflow step 진입 · 종료 · 실패 지점에서 Recorder 호출.
+  - (f) fail-open 정책 — Recorder 실패는 Step Functions 흐름 자체를 중단시키지 않는다. 업무 테이블 · Slack 은 정상 진행.
+  - (g) 권한 분리 — View 는 reader / controller 역할 유지. `execution_app` / `view_app` 권한 확대 0건. 업무 테이블 write 권한 확대 0건.
+- Detection: (a) `RECORD_START` 응답 `ok true` 확인. (b) `RECORD_STEP` 응답 `ok true` + `stepLogId` 생성 확인. (c) `RECORD_SUCCESS` 응답 `ok true` 확인. (d) commit smoke `batchRunId=53` 확인. (e) Step 12 approval-blocked smoke 후 `ops.strategy_daily_batch_run` + `ops.strategy_daily_batch_step_log` row 정합 확인. (f) Recorder Lambda CloudWatch Logs 의 action 별 invocation 결과 · duration · error 여부.
+- Rollback: (a) mirror 실패 반복 시 Recorder Lambda 롤백 또는 Step Functions 안 mirror step 을 `Retry` + `Catch → NoOp` 로 재구성. (b) `ops` schema 안 stale row 는 SQL 로 정리 (DELETE 권한은 별도 운영자 role 로만 수행 · `ops_recorder_app` 은 DELETE 없음). (c) `chk_strategy_daily_batch_run_type` 롤백 시 `AWS_STEPFUNCTIONS` 값 사용 row 를 먼저 정리 후 constraint drop · re-create. (d) 광역 mirror 실패 시 View Daily Batch 화면 문구를 "AWS Step Functions 이력 표시 일시 비활성" 으로 임시 표시하고 followups-overview 에 후속 남긴다.
+- Evidence links: `.kiro/specs/_common/operator-decisions.md` 의 OD-DB-012 · OD-MS-039 Details + Change Log Details 2026-07-03 (1차). 실행 상세는 [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) · [`../05-port-view-ecs-and-runbook/operation-notes.md`](../05-port-view-ecs-and-runbook/operation-notes.md) 후속 반영 후 참조.
+
 ### R-SEC-010 Details
 
 - Current status (R-SEC-010): `Open` — 영향받은 role password rotate + Secrets Manager 갱신 + secret loader / env 재검증 완료 시점에 `Mitigated` 승격 후보.
@@ -585,6 +604,10 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
   - (d) Dispatcher Lambda application log 보강(후속) — CloudWatch Logs 에 SF input · output · runDate · scheduleType · 휴장일 skip 판정 구조화 기록.
   - (e) Slack 본문 · Lambda 코드 · SF ASL 평문 인용 0건(R-DOCS-001 정합).
   - [2026-06-24 1차 식별] 08:00 schedule 첫 실 실행 + Step 12~17 수동 invoke 검증 중 Slack summary 0/0 사례 식별. DB · SF output 직접 점검으로 사후 검증 통과.
+  - [2026-07-02 evidence 보강] Slack 문구 개선 회차 — Lambda `portfolio-event-notifier` 재배포(`LastUpdateStatus=Successful` / `LastModified=2026-07-02T05:27:53.000+0000`) 로 `APPROVAL_REQUIRED` 제목 → `[Daily 검증] 성공` · `승인: Step 12~17 수동 승인 대기` 라인 제거 · `DAILY_EXECUTION_SUCCESS` 제목 → `[Daily 실행] 성공` · finalStatus `SUCCESS` → `성공` 표기.
+    - 본 회차 mitigation direction 은 유지 — 라벨 / 승인 라인 정리는 운영자 오해 감소에 기여하나 0/0 표시 자체는 그대로. 실제 후보 수 · 종목 · 사유 표시 개선(payload builder 개선)은 04 / 05 spec 후속 phase 책임.
+    - Status `Accepted` 유지. `Mitigated` 승격 조건 = SF approval state input 에 실 값 채움 + Slack 에 실 값 표시.
+    - Slack 본문 · Lambda 코드 · webhook URL 평문 인용 0건(R-DOCS-001 정합).
 - Detection: Slack `APPROVAL_REQUIRED` summary vs SF output 후보 수 · 종목 · 사유 불일치 / Slack 0/0 + DB 신규 row 존재 / Slack summary 만 보고 09:01 결정 사례 / Dispatcher Lambda CloudWatch Logs input·output 구조화 부재.
 - Rollback: payload builder 개선 전까지 운영자가 SF history + DB 직접 점검 사후 검증. 09:01 자동 ENABLE 결정은 Slack summary 만이 아닌 SF output + DB + 운영자 노트 결합. 개선 시점에 Status `Accepted` → `Mitigated` 승격. 개선 전까지 09:01 자동 ENABLE 보류(OD-MS-033) 유지.
 - Evidence links: [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md), [`../05-port-view-ecs-and-runbook/operation-notes.md`](../05-port-view-ecs-and-runbook/operation-notes.md).
@@ -721,7 +744,11 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
   - (e) Slack notifier Lambda IAM Role 최소 권한(Slack webhook 호출만 · Resource · Action wildcard 0건 · OD-SEC-005/006).
 - Mitigation history:
   - [2026-06-23 1차 실증] 3종 Slack 수신 검증 통과 — `APPROVAL_REQUIRED` · `DAILY_EXECUTION_SUCCESS` · `DAILY_EXECUTION_FAILED` 12~17 test-only + 1~17 full test-only 수신 · Portfolio Daily Bot 메시지 표시.
-- Detection: SF Failed/TimedOut/Aborted state 발생 시 Slack `DAILY_EXECUTION_FAILED` 부재 · Lambda CloudWatch error/timeout · webhook 응답 비-200 · Catch state input↔invoke output 매핑 실패. 메시지 본문/Lambda 코드/SF history/webhook 응답 본문 평문 인용 0건(R-DOCS-001 정합) — metadata 만 점검.
+  - [2026-07-02 보강] Slack 문구 개선 회차에서 Lambda `portfolio-event-notifier` 재배포(`LastUpdateStatus=Successful` / `LastModified=2026-07-02T05:27:53.000+0000`) 후 성공 formatter 2종(`APPROVAL_REQUIRED` → `[Daily 검증] 성공` / `DAILY_EXECUTION_SUCCESS` → `[Daily 실행] 성공` / finalStatus `SUCCESS` → `성공`) smoke 수신 확인.
+    - `DAILY_EXECUTION_FAILED` 실패 formatter 는 본 smoke 회차 미확인 — 재배포 후 실 실패 회차 또는 test-only 실패 주입 회차에서 별도 검증 필요(followups-overview 2026-07-02 후속 메모 남은 후속 1 정합).
+    - Status `Mitigated` 유지 근거 = 2026-06-23 3종 test-only base 검증 결과 유효 · 재배포 후 실패 formatter 재검증 완료 시점까지 caveat 유지.
+    - Slack 본문 · Lambda 코드 · webhook URL · webhook 응답 본문 평문 인용 0건(R-DOCS-001 정합).
+- Detection: SF Failed/TimedOut/Aborted state 발생 시 Slack `DAILY_EXECUTION_FAILED` 부재 · Lambda CloudWatch error/timeout · webhook 응답 비-200 · Catch state input↔invoke output 매핑 실패. 메시지 본문/Lambda 코드/SF history/webhook 응답 본문 평문 인용 0건(R-DOCS-001 정합) — metadata 만 점검. [2026-07-02 보강] Lambda 재배포 후 실패 formatter 별도 smoke 미완료 상태 audit 항목 추가.
 - Rollback: Slack 누락 시 Catch 정의 · invoke 매핑 · IAM 권한 점검 · Lambda 실패 시 운영자 직접 webhook 수동 호출(webhook URL 평문 0건) 또는 port-view 콘솔에서 Daily Batch 상태 확인 · broker 흐름 끊김은 R-AUTO-001/002 · R-BROKER-004 rollback 결합. DLQ/retry/CloudWatch Alarm 도입은 후속.
 - Evidence links: [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md), [`../05-port-view-ecs-and-runbook/operation-notes.md`](../05-port-view-ecs-and-runbook/operation-notes.md).
 

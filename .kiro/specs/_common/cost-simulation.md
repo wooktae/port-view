@@ -10,6 +10,8 @@
 
 운영자 매일 조회용 월 비용 요약. 모든 수치는 서울 `ap-northeast-2` 기준 근사치 · **AWS Pricing Calculator 확인 필요**. 상세 단가 · 자원 가정 · 시나리오 비교는 아래 chapter 2 ~ 6 참조.
 
+> **모델링 vs 실측 구분** — 본 Dashboard 및 chapter 4 의 `paper realistic ~212 USD` · `live realistic ~492 USD` 등의 수치는 **NAT Gateway 사용 · multi-AZ Endpoint 등을 포함한 모델링 시나리오** 값이다. 현재 aws-paper 운영은 **NAT Gateway 미사용 · VPC Endpoint 비용 중심 구조**이므로 실측 청구액과는 다르다. 2026 년 6 월 실제 청구액 · cost driver · 절감 실행 내역은 아래 `2026-07-01 Actual Cost Analysis (June 2026)` 섹션을 참조한다.
+
 ### paper 월 예상 비용 (realistic 시나리오)
 
 **약 212 USD/월** (chapter 4.2 realistic 합계). AWS Pricing Calculator 확인 필요.
@@ -79,6 +81,113 @@
 | 5 | EIP attach 유지 (detach / stop 회피) | attach + running 무료 vs detach/stop ~$3.6/월 |
 
 > **안전 안내** — 본 Dashboard 의 수치는 모두 공개 가격 기준 근사치. 실제 청구 금액은 인터넷 데이터 전송량 · 거래일 수 · 장애 재실행 빈도에 따라 변동한다. IaC 작성 시 AWS Pricing Calculator 로 재검증 필요.
+
+## 2026-07-01 Actual Cost Analysis (June 2026)
+
+본 절은 2026-07-01 운영자 직접 수행한 2026 년 6 월 AWS 실제 청구액 분석과 VPC Endpoint 정리 절감 실행 결과를 사실 그대로 반영한다. 모든 수치는 실 청구액 근사치 · **AWS Pricing Calculator 확인 필요**. 상세 근거는 아래 `Cost Details` 하위 섹션 참조.
+
+### 6 월 실측 요약
+
+| 항목 | 값 |
+|---|---|
+| 대상 월 | 2026 년 6 월 |
+| 세전 실제 비용 | 135.40 USD |
+| 세금 | 13.55 USD |
+| 세금 포함 실제 비용 | 약 148.95 USD |
+| 기존 월말 예상(180 USD) 재평가 | 7 월 full automation 기준 보수적이지만 합리적인 추정 |
+| 예상 월 절감액(SSM endpoint 제거 + endpoint 1 AZ 축소 완료) | 약 56.16 USD |
+| 현재 aws-paper NAT Gateway 사용 여부 | 미사용 (VPC Endpoint 비용 중심 구조) |
+
+### 카테고리별 실측 비용 (2026 년 6 월)
+
+| 항목 | 값 |
+|---|---|
+| Virtual Private Cloud | 74.24 USD |
+| Relational Database Service | 32.57 USD |
+| Elastic Compute Cloud | 25.15 USD |
+| Secrets Manager | 2.88 USD |
+| ECS / S3 / ECR / Cost Explorer / Data Transfer | 소액 (합산 소액) |
+| CloudWatch / Lambda / Step Functions / CloudWatch Events | 0.00 USD 수준 |
+| 합계 (세전) | 135.40 USD |
+| 세금 | 13.55 USD |
+| 합계 (세금 포함) | 약 148.95 USD |
+
+### 핵심 cost driver — VPC Endpoint
+
+| 항목 | 값 |
+|---|---|
+| VPC 총 비용 | 74.24 USD/월 |
+| 그중 VPC Endpoint 비용 | 70.69 USD/월 |
+| VPC Endpoint Hours (6 월 누적) | 5,438 시간 |
+| 월 720 시간 기준 상시 유지 Interface VPC Endpoint 추정 개수 | 약 7 ~ 8 개 |
+| 판단 | 핵심 cost driver 는 VPC Endpoint |
+
+### 2026-07-01 절감 실행 (분석 아님)
+
+본 절감은 "분석만 한 것" 이 아니라 **실제 VPC Endpoint 정리 실행** 결과다.
+
+| 실행 항목 | 상태 |
+|---|---|
+| SSM endpoint 제거 | 완료 |
+| `com.amazonaws.ap-northeast-2.ecr.api` endpoint 2 AZ → 1 AZ 축소 | 완료 |
+| `com.amazonaws.ap-northeast-2.ecr.dkr` endpoint 2 AZ → 1 AZ 축소 | 완료 |
+| `com.amazonaws.ap-northeast-2.logs` endpoint 2 AZ → 1 AZ 축소 | 완료 |
+| `com.amazonaws.ap-northeast-2.secretsmanager` endpoint 2 AZ → 1 AZ 축소 | 완료 |
+| 추가 endpoint 삭제 | 보류 (작동 리스크 대비 절감 명분 약함) |
+
+| 항목 | 값 |
+|---|---|
+| 예상 월 절감액 | 약 56.16 USD |
+| 절감 형태 | 상시 컴퓨트 아님 · Interface Endpoint AZ · 개수 축소 |
+| 검증 방식 | 다음 청구 주기 실측 · **AWS Pricing Calculator 확인 필요** |
+
+### 다른 서비스 판단
+
+| 서비스 | 6 월 실제 비용 위치 | 판단 |
+|---|---|---|
+| RDS PostgreSQL | 32.57 USD | 운영 persistence 중심 · 유지 가치 높음 |
+| EC2 (Linux + Windows worker) | 25.15 USD | 6 월 기준 핵심 비용 원인 아님 |
+| Secrets Manager | 2.88 USD | 소액 유지 |
+| ECS / S3 / ECR / Cost Explorer / Data Transfer | 소액 | 소액 유지 |
+| CloudWatch / Lambda / Step Functions / CloudWatch Events | 0.00 USD 수준 | 무료 한도 안 |
+
+### 7 월 full automation 재평가
+
+| 항목 | 값 |
+|---|---|
+| 기존 월말 예상 | 180 USD |
+| 6 월 세금 포함 실측 | 약 148.95 USD |
+| 6 월 실측 대비 7 월 여유 | 약 31 USD |
+| 판단 | 7 월 full automation 기준 보수적이지만 합리적인 추정 |
+| 흡수 가능 요소 | 자동화 시간 확대 · intraday 실행 회차 증가 · 장애 재실행 |
+
+### 운영 모드별 월 비용 모델 (근사치)
+
+현재 aws-paper 운영은 NAT Gateway 미사용 · VPC Endpoint 비용 중심 구조. 아래 표는 운영 모드별 월 비용 근사치로, IaC / Pricing Calculator 재확인 없이는 절대값으로 인용하지 않는다. **AWS Pricing Calculator 확인 필요**.
+
+| 운영 모드 | 월 예상 비용 (USD) |
+|---|---|
+| Archive Mode | 5 ~ 20 |
+| DB Retained Mode | 45 ~ 70 |
+| Private AWS API Mode | 110 ~ 150 |
+| Paper Daily Full ON | 150 ~ 190 |
+| Demo / Interview Mode | 170 ~ 220 |
+| Live Trading Ready Mode | 200 ~ 280 |
+
+### Cost Details — 2026 년 6 월 실측 근거
+
+- 실측 청구 기준 — AWS Billing 세전 총액 135.40 USD + 세금 13.55 USD = 약 148.95 USD. 청구 원문 · account-id · billing report URL 은 본 문서에 포함하지 않는다 (secret / 계정 식별자 보호 정책 정합).
+- VPC 74.24 USD 중 VPC Endpoint 70.69 USD · 5,438 endpoint hours 는 6 월 누적치. 720 시간/월 기준으로 나누면 상시 유지 Interface VPC Endpoint 는 약 7 ~ 8 개 수준으로 해석된다.
+- 절감 실행 후 유지 중인 Interface VPC Endpoint 는 `ecr.api` · `ecr.dkr` · `logs` · `secretsmanager` 를 포함해 최소 필요 세트만 1 AZ 로 축소된 상태. Gateway Endpoint (`s3`) 는 무료이므로 비용 영향 없음.
+- 추가 endpoint 삭제 후보 — endpoint 를 더 제거하면 NAT Gateway 를 재도입해야 하거나 인터넷 outbound 를 public subnet 으로 우회해야 하므로 절감 명분이 약해진다. 본 회차에서는 **보류**.
+- OD-NET-005 (VPC Endpoint 활성 항목 — 권고 세트) 는 결정 수준의 변경이 아니므로 본 회차에서 `operator-decisions.md` 는 수정하지 않는다. AZ 축소 · SSM endpoint 제거를 결정 문서에 반영할지는 후속 결정 (`needs_manual_review=true`).
+- 7 월 full automation 재평가 근거 — Step 12 ~ 17 Scheduler ENABLE 전환 (chapter 3.3 `[2026-07-01 …]` 메모) 로 상시 컴퓨트 증가는 없고 EventBridge / Step Functions transitions 증가분은 무료 한도 안. 따라서 6 월 대비 7 월 증가분은 intraday 실행 회차 · CloudWatch Logs ingestion 소폭 상승 정도로 예상.
+
+### Historical Notes — Modeling vs Actual 차이
+
+- chapter 4.2 paper realistic 합계 `~212 USD/월` 은 NAT Gateway 1 개 + 데이터 처리 + Endpoint 일부 포함한 **모델링 시나리오** 값이다. 현재 실제 aws-paper 운영은 NAT Gateway 미사용 이므로 NAT 관련 두 행 (`NAT Gateway (1개) $43` · `NAT 데이터 처리 $5`) 은 실측 청구에 포함되지 않는다.
+- 실측 148.95 USD (세금 포함) 는 chapter 4.2 low 합계 `~182 USD` 보다도 낮다. 이는 (a) NAT 미사용 · (b) VPC Endpoint 를 필요 최소 세트로만 유지 · (c) Fargate desiredCount 상시 1 이 아닌 검증 시점만 활성 (chapter 3.1 `[2026-06-30 (오후) …]` 메모 정합) · (d) CloudWatch Logs / Metrics / Alarms 사용량이 표 가정 (20 GB · 20 metrics · 20 alarms) 보다 낮음 등의 조합 결과로 해석된다.
+- chapter 4.2 표 자체는 IaC 작성 시 재검증 기준 (상한 참고값) 으로 유지하고, 실측값은 본 절 `2026-07-01 Actual Cost Analysis` 를 우선 참조한다.
 
 ## 1. 가정과 단서
 

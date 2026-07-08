@@ -10,6 +10,175 @@
 - 항목 분류는 `Added`, `Changed`, `Removed`, `Security`로 통일한다.
 - 날짜는 한국 기준의 작업 일자를 사용한다.
 
+## 2026-07-07 (root-docs-readability · Kiro 실행 오버헤드 개선 · _common 10차 결과 요약)
+
+### Added
+
+- 🟢 `_common` 10차 회차 결과 요약 기록 (본 CHANGELOG · WORKLOG 상단 append)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 대상 파일 (1) | `_common/risk-register.md` |
+  | 대상 파일 (2) | `_common/followups-overview.md` |
+  | 대상 파일 (3) | `_common/operator-decisions.md` |
+  | risk-register.md over300 | 134 → 9 |
+  | followups-overview.md over300 | 210 → 70 |
+  | operator-decisions.md over300 | 240 → 2 |
+  | tableO300 | 0건 |
+  | 인코딩 | UTF-8 No BOM 유지 |
+  | 신규 민감정보 원문 유입 | 0건 |
+  | 판정 | 장문 Details 이동 완료 |
+
+- 🟢 루트 3개 문서 가독성 정리 목표 정의 기록
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 대상 | `.kiro/README.md` · `.kiro/WORKLOG.md` · `.kiro/CHANGELOG.md` |
+  | 참조 스타일 | 2026-07-01 CHANGELOG 섹션 |
+  | 서식 방향 | 표 중심 · 짧은 bullet · Security 표 |
+  | 대상 아님 | `.kiro/specs/**` · 8개 MS 저장소 문서 |
+  | README 실제 수정 | 미수행 |
+
+### Changed
+
+- 🟠 Kiro 문서 작업 방식 개선 방향 기록
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 지연 지점 | 루트 3개 파일 위반 매트릭스 정리 단계 |
+  | 원인 요약 | ViolationRecord matrix · content_hash · safety_exception 분류 |
+  | 부가 원인 | sub-agent 호출 · workspace 밖 scan · 긴 PowerShell one-liner |
+  | 판정 | 국소 문서 편집 대비 audit pipeline 과도 |
+  | 개선 방향 | 새로 작성/직접 수정 부분에만 0번 규칙 적용 |
+
+- 🟠 AGENTS.md 보강 필요성 기록(본 회차 실제 수정 없음)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 유지 원칙 | 0번 최우선 문서 가독성 규칙 |
+  | 기본 적용 범위 조항 | 새로 작성/직접 수정 부분 한정 (신설 필요) |
+  | 예외 조항 | ViolationRecord matrix · content_hash · 전체 before/after audit 은 명시 요청 시만 수행 |
+  | 기존 문서 전체 위반 처리 | 명시 요청 없으면 후속 후보로만 기록 |
+  | 반영 시점 | 별도 AGENTS.md 수정 회차로 분리 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| AWS · DB · psql · Spring Boot 실행 | 0건 |
+| Slack webhook · Step Functions · Lambda · ECS 실행 | 0건 |
+| SSM · EC2 · broker · KIS · crawler 실행 | 0건 |
+| 자동 매수 · 자동 매도 · fill sync · position sync · intraday monitor 실행 | 0건 |
+| secret · password · token · webhook URL 원문 기록 | 0건 |
+| 실제 ARN · account-id · public IP · broker_order_no 원문 기록 | 0건 |
+| git 쓰기 (`git add` · `git commit` · `git push`) 실행 | 0건 |
+| placeholder 정책 | `[REDACTED*]` 계열만 사용 |
+
+## 2026-07-06 (spec-docs-readability-sessions · 01~09 spec 하위 폴더 4개 Session 병렬 가독성 개선)
+
+### Added
+
+- 🟢 Session A — 01~03 spec 문서 가독성 개선
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 범위 앞부분 | 01-aws-migration-foundation |
+  | 범위 중간부 | 02-aws-network-and-rds |
+  | 범위 뒷부분 | 03-marketconnector-ec2 |
+  | 수정 파일 수 | 13개 |
+  | 원본 유지 파일 수 | 5개 |
+  | >300 · >500 라인 | 18개 파일 전체 0건 |
+  | 초장문 table row · bullet | 0건 |
+
+- 🟢 Session B — 04~05 spec 문서 가독성 개선
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 범위 앞부분 | 04-strategy-batch-stepfunctions / operation-notes.md |
+  | 범위 중간부 | 05-port-view-ecs-and-runbook / operation-notes.md |
+  | 범위 뒷부분 | 05 runbook.md · validation-checklist.md |
+  | 04 신설 | Automation Lineup Dashboard · 일자별 인덱스 |
+  | 05 신설 | View 실행 위치별 backend 매트릭스 |
+  | >500 라인 | 04 / 05 주요 문서 0건 |
+  | Table rows · Bullets >300 · >500 | 0건 |
+
+- 🟢 Session C — 06 secrets-and-iam spec 문서 가독성 개선
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 수정 파일 수 | 6개 |
+  | 수정 파일 앞부분 | requirements.md · design.md · tasks.md |
+  | 수정 파일 뒷부분 | operation-notes.md · runbook.md · validation-checklist.md |
+  | gt300 (>300 라인) | 39 → 0 |
+  | gt500 (>500 라인) | 9 → 0 |
+  | Placeholder Coverage | 정리 완료 |
+  | 보안 정책 약화 | 없음 |
+
+- 🟢 Session D — 08 / 09 data · research 계열 spec 가독성 개선
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 범위 앞부분 | 08 requirements.md · design.md · tasks.md · operation-notes.md |
+  | 범위 뒷부분 | 09 operation-notes.md |
+  | 수정 파일 수 | 5개 |
+  | 편집 방식 | additive-only |
+  | 신설 블록 앞부분 | Role Split · Runtime Role Split · Task Section Overview |
+  | 신설 블록 뒷부분 | Open Risks & Next Checks · Key Fact Preservation |
+  | 500자 초과 라인 | 0건 |
+  | critical fact 보존 | stale data · latest_trade_date · KRX worker · research batch fact-loss 0건 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| AWS · DB · psql · Spring Boot 실행 | 0건 |
+| Slack webhook · Step Functions · Lambda · ECS 실행 | 0건 |
+| SSM · EC2 · broker · KIS · 크롤러 실행 | 0건 |
+| secret · password · token · webhook URL 원문 기록 | 0건 |
+| 실제 ARN · account-id · public IP · broker_order_no 원문 기록 | 0건 |
+| placeholder 정책 | `[REDACTED*]` 계열만 사용 |
+
+## 2026-07-06 (kiro-common-docs-readability-6-7 · 6~7차 복구 성격 회차)
+
+### Changed
+
+- 🟢 `_common/operator-decisions.md`
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 처리 | 표시 문구 mojibake 복구 |
+  | fact-loss | 없음 |
+  | Decision ID · Status · [REDACTED*] count | baseline 이상 유지 |
+
+- 🟢 `_common/risk-register.md`
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 처리 | 일부 wrap artifact 복구 |
+  | 확인 항목 앞부분 | 단일 문자 bullet · 깨진 한글 |
+  | 확인 항목 뒷부분 | broken wrap 후보 식별 |
+  | fact-loss | 없음 |
+  | Risk ID · Status · [REDACTED*] count | baseline 이상 유지 |
+
+- 🟢 편집 미대상 문서 (본 회차)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 편집 없음 앞부분 | `_common/followups-overview.md` · `_common/ms-aws-service-decision-matrix.md` |
+  | 편집 없음 중간부 | `_common/cost-simulation.md` · `_common/aws-resource-glossary.md` |
+  | 상태 | 6~7차 편집 대상 아님 또는 후속 후보 유지 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| AWS · DB · Slack · crawler · broker · KIS 실행 | 0건 |
+| Step Functions · Lambda · SSM · psql · Spring Boot 실행 | 0건 |
+| secret · password · token · webhook 원문 기록 | 0건 |
+| 실제 ARN · account-id · public IP · broker_order_no 원문 기록 | 0건 |
+| 6개 대상 문서 저장 인코딩 | UTF-8 No BOM 유지 |
+| placeholder 정책 | `[REDACTED*]` 계열만 사용 |
+
 ## 2026-07-06 (kiro-common-docs-readability-9 · 9차 회차 · _common 6개 문서 구조 재편)
 
 ### Added
@@ -177,6 +346,108 @@
   | intraday monitor 실행 | 0건 |
   | 쓰기 계열 · 롤백 계열 git 명령 실행 | 0건 |
 
+## 2026-07-03 (Step Functions 실행 이력 OPS mirror 기반 완료)
+
+### Added
+
+- 🟢 `ops.strategy_daily_batch_run` 사용 확장
+
+  | 항목 | 값 |
+  | --- | --- |
+  | run_type 신규 값 | `AWS_STEPFUNCTIONS` |
+  | 기록 주체 | Lambda `portfolio-daily-batch-ops-recorder` |
+  | 최소 권한 role | `ops_recorder_app` |
+
+- 🟢 Smoke 통과
+
+  | 항목 | 값 |
+  | --- | --- |
+  | RECORD_START / RECORD_STEP / RECORD_SUCCESS | 3종 smoke 통과 |
+  | commit smoke | `batchRunId=53` |
+  | Step 12 approval-blocked smoke | OPS 테이블 기록 확인 |
+
+### Changed
+
+- 🟢 `_common/operator-decisions.md`
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 신규 결정 | `OD-DB-012` (OPS mirror 스키마) |
+  | 신규 결정 | `OD-MS-039` (기록 주체 · 최소 권한 role) |
+
+- 🟢 `_common/risk-register.md`
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 신규 리스크 | `R-AUTO-038` |
+  | 초기 상태 | 🟢 Mitigated (smoke 통과) |
+
+- 🟢 `_common/followups-overview.md`
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 2026-07-03 후속 메모 | 추가 |
+  | 잔여 후속 앞부분 | View Daily Batch 화면 반영 |
+  | 잔여 후속 뒷부분 | 실 자동 실행 회차 정합 관찰 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| AWS CLI · boto3 · psql · Spring Boot · Lambda · SFN · Slack webhook · KIS 실행 | 0건 |
+| broker 주문 제출 · aws-live 작업 | 0건 |
+| secret · password · token · webhook URL · 계좌번호 · 실제 ARN · public IP · broker_order_no 원문 기록 | 0건 |
+| placeholder 정책 | `[REDACTED*]` 계열만 사용 |
+
+## 2026-07-02 (portfolio-event-notifier Slack 문구 개선 + View 조회 화면 안정화 smoke)
+
+### Added
+
+- 🟢 `portfolio-event-notifier` 성공 formatter 개선
+
+  | 항목 | 값 |
+  | --- | --- |
+  | APPROVAL_REQUIRED 제목 | `[Daily 검증] 성공` |
+  | APPROVAL_REQUIRED 변경 | "승인 대기" 라인 제거 |
+  | DAILY_EXECUTION_SUCCESS 제목 | `[Daily 실행] 성공` |
+  | DAILY_EXECUTION_SUCCESS 변경 | `SUCCESS` → `성공` 통일 |
+  | Smoke | 성공 formatter 2종 통과 |
+
+- 🟢 View 조회 화면 기준선 smoke 통과
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 화면 앞부분 | `/dashboard` · `/balance-summary` · `/positions` · `/orders` |
+  | 화면 뒷부분 | `/strategy/execution/plans` · `/strategy/reports/latest` · `/daily-batch` |
+  | 최신 balance snapshot | `id=357` · `as_of_date=2026-07-02` |
+  | 금액 | `total_eval_amount=8,706,505` · `cash_balance=8,706,505` |
+  | 보유 종목 | 0건 |
+  | /positions 과거 종목 노출 | 없음 |
+
+### Changed
+
+- 🟢 `_common/followups-overview.md`
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 2026-07-02 후속 메모 | 추가 (Slack · View) |
+  | Daily Batch 화면 이력 불일치 원인 | View 조회 버그 아님 · Step Functions run mirror 부재로 정리 |
+
+- 🟢 `_common/risk-register.md`
+
+  | 항목 | 값 |
+  | --- | --- |
+  | Slack formatter 계열 리스크 | 성공 formatter mitigation 진전 · FAILED formatter 잔여 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| AWS CLI · boto3 · psql · Spring Boot · Lambda · SFN · Slack webhook · KIS 실행 | 0건 |
+| broker 주문 제출 · aws-live 작업 | 0건 |
+| secret · password · token · webhook URL · 계좌번호 · 실제 ARN · public IP · broker_order_no 원문 기록 | 0건 |
+| placeholder 정책 | `[REDACTED*]` 계열만 사용 |
+
 ## 2026-07-02 (kiro-common-docs-readability · 8차 회차 · _common 문서 라인 밀도 완화)
 
 ### Changed
@@ -235,6 +506,56 @@
   | `[REDACTED*]` placeholder count | before ≤ after 유지 |
   | `risk-register.md` pre-existing BOM (1개) | 상태 그대로 유지 |
   | 신규 BOM 도입 | 0건 |
+
+## 2026-07-01 (6월 실제 AWS 비용 분석 · VPC Endpoint 절감 정합)
+
+### Added
+
+- 🟢 6월 aws-paper 실제 비용 확인
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 세전 | `135.40 USD` |
+  | 세금 | `13.55 USD` |
+  | 세금 포함 | 약 `148.95 USD` |
+  | 월말 추정 정합 | `180 USD` 는 7월 full automation 기준 보수적이지만 합리적 |
+
+- 🟢 6월 cost driver 정합
+
+  | 항목 | 값 |
+  | --- | --- |
+  | VPC 비용 | `74.24 USD` |
+  | 그중 VPC Endpoint | `70.69 USD` |
+  | 판정 | 핵심 cost driver 는 VPC Endpoint |
+
+### Changed
+
+- 🟢 VPC Endpoint 축소 정합
+
+  | 항목 | 값 |
+  | --- | --- |
+  | SSM endpoint | 제거 완료 |
+  | 4종 endpoint | `ecr.api` · `ecr.dkr` · `logs` · `secretsmanager` 2 AZ → 1 AZ 축소 완료 |
+  | 예상 절감액 | 약 `56.16 USD` / 월 |
+  | 추가 endpoint 삭제 | 작동 리스크 대비 보류 |
+
+- 🟢 `_common/cost-simulation.md`
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 6월 실측 결과 | 정합 반영 |
+  | Cost driver Top | VPC Endpoint 반영 |
+  | 절감 정합 앞부분 | SSM endpoint 제거 |
+  | 절감 정합 뒷부분 | 4종 endpoint 1 AZ 축소 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| AWS CLI · boto3 · psql · Billing Console 자동 조회 실행 | 0건 |
+| broker 주문 제출 · aws-live 작업 | 0건 |
+| secret · password · token · billing account id · payment method 원문 기록 | 0건 |
+| placeholder 정책 | `[REDACTED*]` 계열만 사용 |
 
 ## 2026-07-01 (kiro-common-docs-readability spec 실행 · _common 문서 Dashboard-first 재구성)
 

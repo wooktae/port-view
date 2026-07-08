@@ -427,6 +427,16 @@
   - broker 주문 제출은 `portfolio-paper-intraday-stop-sell-approval` Step Functions approval gate 통과 후에만 가능 — 분리 구조 그대로 유지(OD-MS-035 / OD-MS-036 정합).
   - Lambda code 본문 / IAM Policy 전체 본문 / `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / Slack 메시지 본문 / SSM 응답 본문 평문 인용 0건(R-DOCS-001 정합 / 운영 식별자 만 사실 기록).
 
+**[2026-07-03 Step Functions 실행 이력 OPS mirror Recorder Lambda 신규]** — Daily Batch 화면이 AWS Step Functions 실행 이력을 볼 수 있는 기반을 마련하기 위한 Recorder Lambda 1종이 운영자 직접 작업으로 추가(OD-MS-039 신규 · OD-DB-012 신규 · R-AUTO-038 신규 Mitigated 정합).
+
+- (d) `portfolio-daily-batch-ops-recorder` — `portfolio-paper-daily-step1-17-approval` · `portfolio-paper-daily-step12-17-approval` 2종 State Machine 안 mirror step 에서 호출 / Python 3.12 · ap-northeast-2 · VPC Lambda / Secrets Manager `ops_recorder_app` secret 사용 / 지원 action `RECORD_START` · `RECORD_STEP` · `RECORD_SUCCESS` · `RECORD_FAILURE` / `ops.strategy_daily_batch_run` + `ops.strategy_daily_batch_step_log` writer 책임.
+  - DB role 은 `ops_recorder_app` 전용 최소 권한(`ops` schema USAGE · run · step_log SELECT / INSERT / UPDATE · 관련 sequence USAGE / SELECT · DELETE 미부여) — `view_app` 재사용 안 함 · `execution_app` 권한 확대 안 함 · 업무 테이블 write 권한 확대 0건 · View 는 reader / controller 역할 유지(OD-DB-012 / OD-SEC-006 정합).
+  - Step Functions 실행 role 에 `lambda:InvokeFunction` 을 본 Recorder Lambda ARN 한정으로 부여 · Resource · Action wildcard 0건.
+  - `chk_strategy_daily_batch_run_type` 에 `AWS_STEPFUNCTIONS` 값 추가 · 기존 `MANUAL` / `SCHEDULED` / `RETRY` / `MANUAL_PARTIAL` 값 유지.
+  - 1차 범위 = 전체 세부 step mirror 가 아니라 run-level + 대표 workflow step 중심. 세부 step 확장은 후속(followups-overview 2026-07-03 후속 반영).
+  - 검증 요약 — RECORD_START 응답 `ok true` · RECORD_STEP 응답 `ok true` + `stepLogId` 생성 · RECORD_SUCCESS 응답 `ok true` · commit smoke `batchRunId=53` · Step 12 approval-blocked smoke 후 `ops.strategy_daily_batch_run` + step log 기록 확인 통과.
+  - Lambda code 본문 / Secrets Manager value / RDS 응답 본문 / Step Functions execution history 본문 / IAM Policy 본문 평문 인용 0건(R-DOCS-001 정합 / 운영 식별자 = Lambda 이름 · runtime · DB role 이름 · action 이름 · 테이블 이름 · check constraint 이름 · smoke `batchRunId=53` 만 사실 기록 — secret 아님).
+
 **[2026-06-30 (오후) Approval Required Builder + Daily Brief Builder 신규 Lambda 2종]** — Daily Batch 측 Slack 알림을 풍부한 메시지로 보내기 위한 Builder Lambda 2종이 운영자 직접 작업으로 추가(OD-MS-038 신규 / R-AUTO-035 신규 정합).
 
 - (a) `portfolio-approval-slack-summary-builder` — `portfolio-paper-daily-step1-17-approval` 안의 `BuildApprovalSlackPayload` state 에서 호출 / RDS read 책임(전략 상태 · Daily 매수 신호 · Daily 포지션 판단 · 매수/매도 후보 요약) / Builder output 을 Notifier Lambda `portfolio-event-notifier` 의 `APPROVAL_REQUIRED` 입력으로 전달.

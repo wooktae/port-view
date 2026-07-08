@@ -12,11 +12,15 @@
 
 ## Current Follow-up Dashboard
 
-운영자가 매일 조회하는 후속 작업 요약이다. 상세 이력은 아래 `Historical Notes` (2026-06-10 ~ 2026-07-01) 에서 확인한다. 오래된 완료 항목은 `Done recently` 에서 밀려나면 아래 `Historical Notes` 로 이동한다.
+운영자가 매일 조회하는 후속 작업 요약이다. 상세 이력은 아래 `Historical Notes` (2026-06-10 ~ 2026-07-03) 에서 확인한다. 오래된 완료 항목은 `Done recently` 에서 밀려나면 아래 `Historical Notes` 로 이동한다.
 
 ### 🟠 Now — 즉시 착수
 
 - [ ] 다음 영업일 09:01 Step 12~17 Scheduler 첫 자동 실행 실전 관찰 (`APPROVAL_REQUIRED` · `DAILY_EXECUTION_SUCCESS` Slack 수신 · DB after-check) — 04 spec
+- [ ] `DAILY_EXECUTION_FAILED` Slack formatter 별도 smoke 확인 (2026-07-02 Lambda 재배포 후 실패 formatter 미확인 · 실 실패 회차 또는 test-only 실패 주입 회차에서 재검증) — 04, 05 spec
+- [ ] Step Functions 실행 이력 OPS mirror 세부 step 확장 (2026-07-03 완료된 run-level + 대표 workflow step 범위를 전체 세부 step 으로 확장) — 04 spec
+- [ ] View Daily Batch 화면이 `AWS_STEPFUNCTIONS` run 이력을 실 렌더링하는지 실 실행 회차에서 확인 (2026-07-03 OPS mirror 기반 완료 후 UI consumption 검증) — 05 spec
+- [ ] Recorder Lambda `portfolio-daily-batch-ops-recorder` 실패 CloudWatch Alarm 도입 검토 (mirror 누락 재발 방지) — 04 spec
 - [ ] 후보 있는 날 자동 주문 제출 · 체결 · balance refresh · Slack end-to-end 첫 실증 — 04 spec
 - [ ] 다음 평일 07:50 자동 장전 Slack · 15:50 장후 Slack 수신 확인 (Daily Brief mini workflow) — 04 spec
 - [ ] stale `connector_position_snapshot` 정리 또는 최신 balance 기준 판정 쿼리 정합 보완 — 03, 05 spec
@@ -59,10 +63,13 @@
 | Step 12 retry-normalizer 실제 후보 발생 검증 | REQUESTED / retry 후보 0건 상태 | 다음 장종료 REJECTED · `40580000` / `EGW00201` 실 케이스 발생 |
 | psql PATH 등록 (R-AUTO-013) | 운영자 로컬 PC 환경변수 미등록 | 운영자 로컬 PC `setx PATH` 또는 GUI 등록 |
 
-### 🟢 Done recently — 최근 완료 (2026-06-22 ~ 2026-07-01)
+### 🟢 Done recently — 최근 완료 (2026-06-22 ~ 2026-07-02)
 
 | 항목 | 완료 일자 | Evidence 링크 |
 |---|---|---|
+| Step Functions 실행 이력 OPS mirror 기반 완료 (Recorder Lambda `portfolio-daily-batch-ops-recorder` + `ops_recorder_app` 전용 최소 권한 role + `chk_strategy_daily_batch_run_type` 에 `AWS_STEPFUNCTIONS` 추가 · run-level + 대표 workflow step mirror · RECORD_START / RECORD_STEP / RECORD_SUCCESS smoke 통과 · 2026-07-02 View Daily Batch 이력 불일치 이슈 후속 조치) | 2026-07-03 | [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md), [05 operation-notes](../05-port-view-ecs-and-runbook/operation-notes.md), `_common/operator-decisions.md` OD-DB-012 · OD-MS-039 · `_common/risk-register.md` R-AUTO-038 |
+| Slack 문구 개선 (`APPROVAL_REQUIRED` / `DAILY_EXECUTION_SUCCESS` 라벨 · 승인 라인 정리) · `portfolio-event-notifier` 배포 · 성공 formatter smoke 수신 확인 (실패 formatter 별도 확인 필요) | 2026-07-02 | [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md), [06 operation-notes](../06-secrets-and-iam/operation-notes.md) |
+| View 조회 화면 기준선 smoke 통과 (6종 URL / 잔고 · 보유 정합성 · Daily Batch 화면 이력 mirror 이슈 식별) | 2026-07-02 | [05 operation-notes](../05-port-view-ecs-and-runbook/operation-notes.md) |
 | paper Daily 자동화 1차 풀 ON · 09:01 Scheduler ENABLED | 2026-07-01 | [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md), [05 operation-notes](../05-port-view-ecs-and-runbook/operation-notes.md) |
 | port-view ECS Fargate Public IP 1차 포팅 · desiredCount 0 종료 | 2026-06-30 (오후) | [05 operation-notes](../05-port-view-ecs-and-runbook/operation-notes.md), [05 runbook](../05-port-view-ecs-and-runbook/runbook.md) |
 | Slack Daily Brief mini workflow · 장전/장후 Scheduler ENABLED · Approval Required Builder | 2026-06-30 (오후) Slack | [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md), [06 operation-notes](../06-secrets-and-iam/operation-notes.md) |
@@ -101,7 +108,7 @@ Spec 사이의 진행 순서 · 의존성 · 환경 모델 · 각 spec 요약을
 8. `07-cicd-pipelines`
 9. `10-cutover-and-validation-runbook`
 
-## Historical Notes — 후속 메모 (2026-06-10 ~ 2026-07-01)
+## Historical Notes — 후속 메모 (2026-06-10 ~ 2026-07-03)
 
 아래는 날짜별 후속 메모의 누적 이력이다. 각 항목은 3~5개 bullet 이내 요약으로 유지하고, 자세한 실행 결과 / 실패 사례 / 조치는 각 spec 의 `operation-notes.md` 링크를 통해 확인한다. Dashboard(문서 상단)와 본 섹션이 중복되는 사실은 Dashboard 쪽에 짧은 현재 상태만 남기고 본 섹션은 원문 이력으로 유지한다.
 
@@ -1867,3 +1874,53 @@ Spec 사이의 진행 순서 · 의존성 · 환경 모델 · 각 spec 요약을
 - 민감정보 정책 — 아래 항목 평문 기록 0건.
   - Slack webhook URL / DB password / Secrets Manager secret value.
   - 실제 IAM Role · secret · state machine · Lambda ARN / 실제 public IP / 계좌번호 / KIS app key · secret / token / RDS password · endpoint / account-id / broker_order_no / image digest / task ARN / ENI ID 평문 기록 0건(`[REDACTED]` placeholder). 운영 식별자(Scheduler 이름 · cron · Target Input · state machine 이름 · executionName · timestamp · Slack 라벨 · balance snapshot id · as_of_date · 금액 · count · 라인업 7종 이름) 만 사용자 명시 정책 정합으로 기록.
+
+### 2026-07-02 후속 메모 — Slack 문구 개선 + View 조회 화면 안정화 (04 / 05 / 06 spec)
+
+- Slack 문구 개선 완료 — Lambda `portfolio-event-notifier` 배포 갱신(`LastUpdateStatus=Successful` / `LastModified=2026-07-02T05:27:53.000+0000`) / smoke 회차에서 `APPROVAL_REQUIRED` · `DAILY_EXECUTION_SUCCESS` Slack 수신 확인 / `DAILY_EXECUTION_FAILED` 실패 formatter 는 본 smoke 회차 미확인(별도 확인 필요, follow-up 유지).
+- Slack 문구 변경 요약(before / after 요약 · 전문 인용 0건):
+
+| 항목 | 값 |
+|---|---|
+| APPROVAL_REQUIRED 제목 (before → after) | `APPROVAL_REQUIRED` → `[Daily 검증] 성공` |
+| APPROVAL_REQUIRED 승인 라인 | `승인: Step 12~17 수동 승인 대기` 라인 제거 |
+| DAILY_EXECUTION_SUCCESS 제목 (before → after) | `DAILY_EXECUTION_SUCCESS` → `[Daily 실행] 성공` |
+| DAILY_EXECUTION_SUCCESS finalStatus | `SUCCESS` → `성공` 표시 |
+| Lambda LastUpdateStatus | `Successful` |
+| Lambda LastModified | `2026-07-02T05:27:53.000+0000` |
+| Smoke 결과 (APPROVAL_REQUIRED) | Slack 수신 확인 |
+| Smoke 결과 (DAILY_EXECUTION_SUCCESS) | Slack 수신 확인 |
+| Smoke 결과 (DAILY_EXECUTION_FAILED) | 본 회차 미확인 · 별도 smoke 필요 |
+
+- View 조회 화면 안정화 — 코드 수정보다 현 상태 기준선 smoke 고정에 중점. 6종 URL 기준선 smoke 통과(HTTP 200 · Whitelabel / Stacktrace / SQLGrammar / AccessDenied / PSQLException 힌트 부재 · empty-state 가 오류로 오해되지 않음).
+- View 조회 화면 smoke 대상 6종:
+
+| 항목 | 값 |
+|---|---|
+| `/dashboard` | 200 · 기준선 정상 |
+| `/balance-summary` | 200 · 잔고 요약 표시 |
+| `/positions` | 200 · 최신 balance 기준 보유 0건 표시 |
+| `/orders` | 200 · empty-state 정상 |
+| `/strategy/execution/plans` | 200 · empty-state 정상 |
+| `/strategy/reports/latest` | 200 · empty-state 정상 |
+| `/daily-batch` | 200 · Step Functions 실행 이력 mirror 미표시(후속 이슈) |
+
+- 잔고 · 보유 정합성 확인:
+
+| 항목 | 값 |
+|---|---|
+| 최신 balance 기준일 | 2026-07-02 |
+| 최신 balance snapshot id | 357 |
+| 총 평가금액 | 8,706,505 |
+| 현금 | 8,706,505 |
+| 최신 기준 보유종목 수 | 0 |
+| 과거 `connector_position_snapshot` row 노출 | `/positions` 화면에 노출되지 않음(최신 balance 기준일과 분리) |
+
+- Daily Batch 화면 정합성 이슈(본 회차 식별) — Step Functions 자동 실행은 실제 수행되고 업무 테이블 · Slack 은 업데이트됐으나 `ops.strategy_daily_batch_run` 에 Step Functions execution 이력이 기록되지 않아 Daily Batch 화면이 local / manual 이력 중심으로 표시됨. View 조회 버그가 아니라 AWS Step Functions 실행 이력 mirror 설계가 빠진 상태로 정리. 2026-07-03 OPS mirror 작업의 선행 배경으로 연결.
+- 남은 후속:
+  1. **`DAILY_EXECUTION_FAILED` Slack formatter 별도 smoke 확인** — 본 회차 성공 formatter 만 확인 / 실패 formatter 는 실 실패 회차 또는 test-only 실패 주입 회차에서 별도 검증 필요(R-AUTO-023 [2026-07-02 보강] 정합).
+  2. **Daily Batch 화면 Step Functions 실행 이력 mirror 설계** — `ops.strategy_daily_batch_run` 에 SF execution ARN · executionName · start · stop · status 기록 구조 도입 필요(2026-07-03 OPS mirror 작업 선행 배경 · 05 spec 후속 phase).
+  3. **Slack payload builder 실 값 표시 개선 (R-AUTO-027)** — 본 회차는 라벨 · 승인 라인 정리만 완료 / 실제 후보 수 · 종목 · 사유 표시 개선은 별도 후속 phase(0/0 표시 개선 mitigation direction 유지).
+- 자세한 리스크 보강은 [`./risk-register.md`](./risk-register.md) R-AUTO-023 [2026-07-02 보강] · R-AUTO-027 [2026-07-02 evidence 보강] 참조.
+- 실제 AWS 실행 사실 기록 — Kiro 는 본 일자 문서 갱신만 수행 / AWS CLI / boto3 / psql / Lambda / Step Functions / SSM RunCommand / Slack webhook / KIS API 호출 · AWS 리소스 변경 · commit / stash 0건(운영자 직접 수행 영역 — `portfolio-event-notifier` Lambda 배포 갱신 + Slack smoke 수신 확인 + View 6종 URL smoke + balance · position 정합성 SQL 확인).
+- 민감정보 정책 — Slack webhook URL / DB password / Secrets Manager secret value / 실제 IAM Role · secret · state machine · Lambda ARN / 실제 public IP / 계좌번호 / KIS app key · secret / token / RDS password · endpoint / account-id / broker_order_no / image digest / task ARN / ENI ID 평문 기록 0건(`[REDACTED]` placeholder). Lambda 이름(`portfolio-event-notifier`) · `LastUpdateStatus` · `LastModified` · Slack 라벨 · balance snapshot id · as_of_date · 금액 · count · View URL path 는 사용자 명시 정책 정합으로 기록.

@@ -9,6 +9,267 @@
 - 상세 구현 로그, 긴 검증 로그, 코드 변경 세부사항은 기록하지 않는다.
 - 실제 AWS 리소스 생성 여부, 애플리케이션 소스 코드 수정 여부, 8개 MS 문서 수정 여부, 민감정보 기록 여부는 짧게 남긴다.
 
+## 2026-07-07 (root-docs-readability · Kiro 실행 오버헤드 개선 · _common 10차 결과 요약)
+
+### 🧭 Summary
+
+`.kiro` 루트 3개 문서(README · WORKLOG · CHANGELOG) 가독성 정리를 시도한 회차. 실제 AWS 운영/기능 구현 없이 문서 편집과 Kiro 작업 방식 점검만 수행. 목표 스타일은 2026-07-01 CHANGELOG 스타일(표 중심 · 짧은 bullet · Security 표). 병행하여 `_common` 10차 회차 결과 요약을 본 로그에 기록.
+
+### ✅ Completed
+
+- 🟢 루트 3개 문서 가독성 목표 정의
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 대상 | `.kiro/README.md` · `.kiro/WORKLOG.md` · `.kiro/CHANGELOG.md` |
+  | 목표 스타일 참조 | 2026-07-01 CHANGELOG 섹션 |
+  | 목표 서식 | 표 중심 · 짧은 bullet · Security 표 중심 |
+  | 실제 수정 범위 | 루트 3개 문서 한정 |
+  | 대상 아님 | `.kiro/specs/**` · 8개 MS README/CHANGELOG/docs/worklog/AGENTS.md |
+
+- 🟢 `_common` 10차 결과 요약 기록
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 대상 | `_common/risk-register.md` · `_common/followups-overview.md` · `_common/operator-decisions.md` |
+  | risk-register.md over300 | 134 → 9 |
+  | followups-overview.md over300 | 210 → 70 |
+  | operator-decisions.md over300 | 240 → 2 |
+  | tableO300 | 0건 |
+  | 인코딩 | UTF-8 No BOM 유지 |
+  | 신규 민감정보 원문 유입 | 0건 |
+  | 판정 | 장문 Details 이동 완료 |
+
+- 🟠 Kiro 실행 오버헤드 확인
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 지연 지점 | 루트 3개 파일 위반 매트릭스 정리 단계 |
+  | 원인(1) | ViolationRecord matrix 생성 |
+  | 원인(2) | content_hash 기록 |
+  | 원인(3) | safety_exception 분류 |
+  | 원인(4) | sub-agent 호출 시도 |
+  | 원인(5) | workspace 밖/TEMP 기반 scan 시도 |
+  | 원인(6) | 긴 PowerShell one-liner · trust prompt 발생 |
+  | 판정 | 문서 국소 편집에 비해 audit pipeline 과도 |
+
+- 🟠 대응 방향(문서화만 · 규칙 변경은 별도 회차)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 원칙 유지 | 0번 최우선 문서 가독성 규칙 |
+  | 기본 적용 범위 | 새로 작성/직접 수정하는 문장 · 표 · bullet 로 한정 |
+  | 기존 문서 전체 위반 | 명시 요청 없으면 수정하지 않고 후속 후보로만 기록 |
+  | 전수 감사 항목 | ViolationRecord matrix · content_hash · 전체 before/after audit 은 명시 요청 시만 수행 |
+  | AGENTS.md 실제 수정 | 본 회차 미수행 · 별도 후속 회차 |
+
+### 🔵 Evidence
+
+- 🔵 `_common` 10차 회차의 실제 편집 상세는 각 파일 자체와 `.kiro/CHANGELOG.md` 10차 관련 항목에서 참조 가능. 본 회차는 루트 로그 요약만 기록.
+- 🔵 본 회차는 실제 AWS 리소스 생성/수정/삭제 없이 문서 편집과 작업 방식 점검만 수행.
+
+### ⚠️ Risks
+
+- 🟠 루트 3개 문서 가독성 정리 원안이 audit pipeline 과부하로 완전 반영되지 못했음. 잔여 라인 위반은 후속 회차 대상.
+- 🟠 0번 규칙의 적용 범위가 명문화되지 않아 다음 회차에서도 전수 스캔이 재발할 여지가 있음. AGENTS.md 보강 회차로 분리 예정.
+
+### 📌 Follow-ups
+
+- [ ] AGENTS.md 0번 규칙에 "기본 적용 범위 = 새로 작성/직접 수정 부분" 조항 명시(별도 회차).
+- [ ] 전수 스캔/ViolationRecord matrix/content_hash 는 명시 요청 시만 수행한다는 예외 조항 명시(별도 회차).
+- [ ] 루트 3개 문서 잔여 가독성 정리 대상 재산정 후 국소 편집으로 재시도.
+- [ ] `_common` 3개 파일 잔여 over300 라인(risk-register 9 · followups-overview 70 · operator-decisions 2) 후속 감소 판단.
+
+### 🔐 Security
+
+- 🟢 실행 카테고리 (문서만 수정 · 각 0건)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | AWS · DB · psql · Spring Boot 실행 | 0건 |
+  | Slack webhook · Step Functions · Lambda · ECS 실행 | 0건 |
+  | SSM · EC2 · broker · KIS · crawler 실행 | 0건 |
+  | 자동 매수 · 자동 매도 · fill sync · position sync 실행 | 0건 |
+  | intraday monitor · live cutover 실행 | 0건 |
+
+- 🟢 git 작업
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 쓰기 계열 (`git add` · `git commit` · `git push`) | 0건 |
+  | 롤백 계열 (`git reset` · `git checkout` · `git restore`) | 0건 |
+  | 상태 확인 명령 | 미실행 |
+
+- 🟢 민감정보 원문 신규 기록 (각 0건)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | secret · password · token · webhook URL | 0건 |
+  | KIS app key · KIS app secret | 0건 |
+  | 계좌번호 · account-id · 실제 ARN | 0건 |
+  | 실제 public IP · broker_order_no · image digest full sha256 | 0건 |
+  | placeholder 정책 | `[REDACTED*]` 계열만 사용 |
+
+## 2026-07-06 (spec-docs-readability-sessions · 01~09 spec 하위 폴더 4개 Session 병렬 가독성 개선)
+
+### 🧭 Summary
+
+`.kiro/specs/` 01~09 하위 폴더 문서를 Session A ~ D 4개 그룹으로 나눠 병렬 가독성 개선을 진행했다. 실제 AWS 운영/기능 구현 없이 문서 편집만 수행한 회차.
+
+- 각 Session 은 별도 대상 범위와 개별 목표(>300 · >500 라인 축소 · table row / bullet 축소 · placeholder coverage 정리)로 진행.
+- critical fact-loss 없음 · secret · 실제 ARN · account-id · public IP · broker_order_no 원문 신규 기록 0건.
+
+### ✅ Completed
+
+- 🟢 Session A — 01~03 spec 문서 가독성 개선
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 범위 앞부분 | 01-aws-migration-foundation · 02-aws-network-and-rds |
+  | 범위 뒷부분 | 03-marketconnector-ec2 |
+  | 수정 파일 수 | 13개 |
+  | 원본 유지 파일 수 | 5개 |
+  | >300 · >500 라인 | 18개 파일 전체 0건 달성 |
+  | 초장문 table row · bullet | 0건 |
+  | secret · ARN · account-id · public IP 원문 추가 | 0건 |
+
+- 🟢 Session B — 04~05 spec 문서 가독성 개선
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 범위 앞부분 | 04-strategy-batch-stepfunctions / operation-notes.md |
+  | 범위 중간부 | 05-port-view-ecs-and-runbook / operation-notes.md |
+  | 범위 뒷부분 | 05 runbook.md · validation-checklist.md |
+  | 04 신설 앞부분 | Automation Lineup Dashboard |
+  | 04 신설 뒷부분 | 일자별 인덱스 |
+  | 05 신설 | View 실행 위치별 backend 매트릭스 |
+  | >500 라인 | 04 / 05 주요 문서 0건 달성 |
+  | Table rows >300 · >500 | 0건 |
+  | Bullets >300 · >500 | 0건 |
+  | secret 원문 추가 | 0건 |
+
+- 🟢 Session C — 06 secrets-and-iam spec 문서 가독성 개선
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 범위 앞부분 | requirements.md · design.md · tasks.md |
+  | 범위 뒷부분 | operation-notes.md · runbook.md · validation-checklist.md |
+  | 수정 파일 수 | 6개 |
+  | gt300 (>300 라인) | 39 → 0 |
+  | gt500 (>500 라인) | 9 → 0 |
+  | Placeholder Coverage | 정리 완료 |
+  | 보안 정책 약화 | 없음 |
+  | 민감정보 원문 신규 기록 | 0건 |
+
+- 🟢 Session D — 08 / 09 data · research 계열 spec 문서 가독성 개선
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 범위 앞부분 | 08 requirements.md · design.md · tasks.md · operation-notes.md |
+  | 범위 뒷부분 | 09 operation-notes.md |
+  | 수정 파일 수 | 5개 |
+  | 편집 방식 | additive-only |
+  | 신설 블록 앞부분 | Role Split · Runtime Role Split · Task Section Overview |
+  | 신설 블록 뒷부분 | Open Risks & Next Checks · Key Fact Preservation |
+  | 500자 초과 라인 | 0건 |
+  | fact-loss (stale data · latest_trade_date · KRX worker · research batch) | 0건 |
+  | secret 원문 추가 | 0건 |
+
+### 🔵 Evidence
+
+- 🔵 각 Session 별 실제 수정 파일 상세는 개별 spec 폴더의 operation-notes.md · runbook.md · validation-checklist.md 안에서 확인 가능(본 회차에서 해당 파일들은 수정 대상이었으므로 하위 문서 우선 참조).
+- 🔵 본 회차는 실제 AWS 운영/기능 구현이 아닌 `.kiro/specs` 문서 가독성 개선 전용 회차임을 명시.
+
+### ⚠️ Risks
+
+- 신규 리스크 없음. R-DOCS-001(secret 평문 기록 금지) 정합 유지.
+
+### 📌 Follow-ups
+
+- [ ] 07 spec 하위 폴더 가독성 개선 대상 여부 별도 판단.
+- [ ] 10 spec 이후 후속 spec 대상 회차 판단.
+- [ ] Session A ~ D 각 Session 결과의 baseline metric 을 각 spec operation-notes.md 안에 소규모 append 여부 판단.
+
+### 🔐 Security
+
+- 🟢 실행 카테고리 (문서만 수정 · 각 0건)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | AWS · DB · psql · Spring Boot 실행 | 0건 |
+  | Slack webhook · Step Functions · Lambda · ECS 실행 | 0건 |
+  | SSM · EC2 · broker · KIS 실행 | 0건 |
+  | 크롤러 · Selenium 실행 | 0건 |
+  | 자동 매수 · 자동 매도 · fill sync · position sync 실행 | 0건 |
+  | intraday monitor · live cutover 실행 | 0건 |
+
+- 🟢 민감정보 원문 신규 기록 (각 0건)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | secret · password · token · webhook URL | 0건 |
+  | KIS app key · KIS app secret | 0건 |
+  | 계좌번호 · account-id · 실제 ARN | 0건 |
+  | 실제 public IP · broker_order_no · image digest full sha256 | 0건 |
+  | placeholder 정책 | `[REDACTED*]` 계열만 사용 |
+
+## 2026-07-06 (kiro-common-docs-readability-6-7 · 6~7차 복구 성격 회차)
+
+### 🧭 Summary
+
+`.kiro/specs/_common/` 문서에 대해 6~7차 복구 성격 작업을 수행했다. 8차 라인 밀도 완화(별도 2026-07-02 섹션) · 9차 구조 재편(하단 2026-07-06 섹션) 사이의 복구 전용 회차로 분리 기록한다.
+
+- `operator-decisions.md` 표시 문구 mojibake 복구.
+- `risk-register.md` 일부 wrap artifact 복구.
+- 단일 문자 bullet · 깨진 한글 · broken wrap 후보 확인.
+- UTF-8 No BOM 정책 유지 · 신규 secret 원문 기록 0건.
+
+### ✅ Completed
+
+- 🟢 `_common/operator-decisions.md`
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 처리 | 표시 문구 mojibake 복구 |
+  | fact-loss | 없음 |
+  | Decision ID · Status · [REDACTED*] count | baseline 이상 유지 |
+
+- 🟢 `_common/risk-register.md`
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 처리 | 일부 wrap artifact 복구 |
+  | 확인 항목 앞부분 | 단일 문자 bullet · 깨진 한글 |
+  | 확인 항목 뒷부분 | broken wrap 후보 식별 |
+  | fact-loss | 없음 |
+  | Risk ID · Status · [REDACTED*] count | baseline 이상 유지 |
+
+### 🔵 Evidence
+
+- 🔵 6차 / 7차 각 회차의 문서 metrics 는 후속 9차 baseline 문서(2026-07-06 kiro-common-docs-readability-9 섹션)에 흡수 완료.
+- 🔵 본 회차는 실제 AWS 운영 없이 문서 국소 편집만 수행.
+
+### ⚠️ Risks
+
+- 신규 리스크 없음. broken wrap 후속 후보만 관찰 유지.
+
+### 📌 Follow-ups
+
+- [ ] 후속 문서 편집 회차에서 broken wrap 후보 추가 발견 시 국소 복구.
+- [ ] mojibake / wrap artifact 재발 감지 시 재확인.
+
+### 🔐 Security
+
+- 🟢 실행 · 민감정보 원문 신규 기록 (각 0건)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | AWS · DB · Slack · crawler · broker · KIS 실행 | 0건 |
+  | Step Functions · Lambda · SSM · psql · Spring Boot 실행 | 0건 |
+  | secret · password · token · webhook · 실제 ARN · account-id | 0건 |
+  | public IP · broker_order_no · image digest full sha256 원문 | 0건 |
+  | 6개 대상 문서 저장 인코딩 | UTF-8 No BOM 유지 |
+
 ## 2026-07-06 (kiro-common-docs-readability-9 · 9차 회차 · 6개 _common 문서 구조 재편)
 
 ### 🧭 Summary
@@ -150,6 +411,120 @@
   | 6개 대상 문서 저장 인코딩 | UTF-8 No BOM 통일 |
   | `risk-register.md` pre-existing BOM | Option A (제거) 처리 |
 
+## 2026-07-03 (Step Functions 실행 이력 OPS mirror 기반 완료)
+
+### 🧭 Summary
+
+AWS Step Functions 실행 이력을 OPS 테이블에 mirror 하기 위한 기반이 완료됐다.
+
+- 대상 테이블: `ops.strategy_daily_batch_run` · `ops.strategy_daily_batch_step_log`.
+- `run_type` 에 `AWS_STEPFUNCTIONS` 추가 · 전용 최소 권한 role · `portfolio-daily-batch-ops-recorder` Lambda 사용.
+- RECORD_START / RECORD_STEP / RECORD_SUCCESS smoke 통과 · commit smoke `batchRunId=53` · Step 12 approval-blocked smoke 후 OPS 테이블 기록 확인.
+- View Daily Batch 화면이 AWS Step Functions run 이력을 조회할 수 있는 기반이 마련됨(2026-07-02 View 화면에서 확인된 Daily Batch 이력 불일치 원인 정합).
+
+### ✅ Completed
+
+1. OPS mirror 기반 완료
+   1) DB 스키마 정합:완료
+       - `ops.strategy_daily_batch_run` · `ops.strategy_daily_batch_step_log` 사용
+       - `run_type` 값에 `AWS_STEPFUNCTIONS` 추가
+   2) 실행 주체 분리:완료
+       - Lambda `portfolio-daily-batch-ops-recorder`
+       - 전용 최소 권한 role `ops_recorder_app` 채택
+   3) Smoke 통과:완료
+       - RECORD_START · RECORD_STEP · RECORD_SUCCESS 3종 smoke
+       - commit smoke `batchRunId=53`
+       - Step 12 approval-blocked smoke 후 OPS 테이블 기록 확인
+
+### 🔵 Evidence
+
+- 🔵 결정/리스크/후속 상세
+
+  | 문서 | 위치 |
+  | --- | --- |
+  | operator-decisions | `OD-DB-012` · `OD-MS-039` |
+  | risk-register | `R-AUTO-038` |
+  | followups-overview | 2026-07-03 항목 |
+
+### ⚠️ Risks
+
+- 🟢 신규 리스크 `R-AUTO-038` 등록 · 초기 상태 `Mitigated` (smoke 통과 · 실 운영 관찰 후속).
+- 🟠 View Daily Batch 화면과 OPS 테이블 연결은 후속 phase(View 조회 반영 필요).
+
+### 📌 Follow-ups
+
+- [ ] View Daily Batch 화면이 `ops.strategy_daily_batch_run` `AWS_STEPFUNCTIONS` run 이력을 조회하도록 반영.
+- [ ] 실 Step 1~17 자동 실행 회차에서 OPS mirror 정합 관찰.
+- [ ] `ops_recorder_app` role 최소 권한 정합 재점검(장기 유지 여부).
+
+### 🔐 Security
+
+- 🟢 Kiro 는 본 작업에서 문서만 수정. 실행 0건 · broker 주문 0건 · aws-live 작업 0건 · secret 원문 기록 0건.
+- 🟢 AWS CLI · psql · Spring Boot · Slack webhook · Step Functions · Lambda · ECS · SSM · KIS API 실행 0건.
+- 🟢 신규 secret · password · token · webhook URL · 계좌번호 · 실제 ARN · public IP · broker_order_no 원문 기록 0건 · `[REDACTED*]` placeholder 정책 유지.
+
+## 2026-07-02 (portfolio-event-notifier Slack 문구 개선 + View 조회 화면 안정화 smoke)
+
+### 🧭 Summary
+
+`portfolio-event-notifier` 성공 계열 Slack 문구 개선과 View 조회 화면 기준선 smoke 를 함께 통과했다.
+
+- APPROVAL_REQUIRED · DAILY_EXECUTION_SUCCESS 2종 성공 formatter smoke 통과.
+- View 화면 7종(`/dashboard` · `/balance-summary` · `/positions` · `/orders` · `/strategy/execution/plans` · `/strategy/reports/latest` · `/daily-batch`) 기준선 smoke 통과.
+- 최신 balance snapshot `id=357` · `as_of_date=2026-07-02` · `total_eval_amount=8,706,505` · `cash_balance=8,706,505` · 보유 종목 0건.
+
+### ✅ Completed
+
+1. Slack 문구 개선
+   1) APPROVAL_REQUIRED formatter:완료
+       - 제목 `[Daily 검증] 성공` 으로 정리
+       - "승인 대기" 라인 제거
+   2) DAILY_EXECUTION_SUCCESS formatter:완료
+       - 제목 `[Daily 실행] 성공` 으로 정리
+       - `SUCCESS` 표기를 `성공` 으로 통일
+   3) Smoke 통과:완료
+       - 성공 formatter 2종 smoke 수신 확인
+       - DAILY_EXECUTION_FAILED formatter 는 별도 smoke 필요 · 후속 유지
+
+2. View 조회 화면 안정화 smoke
+   1) 화면 7종 기준선 smoke 통과:완료
+       - `/dashboard` · `/balance-summary` · `/positions` · `/orders`
+       - `/strategy/execution/plans` · `/strategy/reports/latest` · `/daily-batch`
+   2) 최신 balance snapshot 정합:완료
+       - `id=357` · `as_of_date=2026-07-02`
+       - `total_eval_amount=8,706,505` · `cash_balance=8,706,505` · 보유 종목 0건
+   3) /positions 과거 종목 미노출:확인
+       - 과거 `connector_position_snapshot` row 가 있어도 최신 기준일 기준으로 화면에 노출되지 않음
+   4) Daily Batch 화면 이력 불일치 원인 정리:확인
+       - View 조회 버그 아님
+       - Step Functions 실행 이력 mirror 부재로 정리(2026-07-03 OPS mirror 후속에서 해소 진행)
+
+### 🔵 Evidence
+
+- 🔵 상세 evidence 링크
+
+  | 문서 | 위치 |
+  | --- | --- |
+  | followups-overview | 2026-07-02 항목 (Slack · View) |
+  | risk-register | Slack formatter 계열 리스크 잔여 항목 |
+
+### ⚠️ Risks
+
+- 🟠 DAILY_EXECUTION_FAILED formatter 는 별도 smoke 미통과 상태 유지 · 실 실패 이벤트 노출 시 문구 검증 필요.
+- 🟠 Daily Batch 화면 이력 불일치는 View 측 원인 아님 · Step Functions run mirror(2026-07-03) 반영 후 재검증 필요.
+
+### 📌 Follow-ups
+
+- [ ] DAILY_EXECUTION_FAILED formatter smoke 진행.
+- [ ] Daily Batch 화면이 OPS mirror `AWS_STEPFUNCTIONS` run 이력을 조회하도록 반영.
+- [ ] View 화면 7종 정기 smoke 회차 유지.
+
+### 🔐 Security
+
+- 🟢 Kiro 는 본 작업에서 문서만 수정. 실행 0건 · broker 주문 0건 · aws-live 작업 0건 · secret 원문 기록 0건.
+- 🟢 AWS CLI · psql · Spring Boot · Slack webhook · Step Functions · Lambda · ECS · SSM · KIS API 실행 0건.
+- 🟢 신규 민감정보 원문 기록 0건 · `[REDACTED*]` placeholder 정책 유지.
+
 ## 2026-07-02 (kiro-common-docs-readability · 8차 회차 · 6개 _common 문서 라인 밀도 완화)
 
 ### 🧭 Summary
@@ -204,6 +579,63 @@
 ### 🔐 Security
 
 문서만 수정, 실행 0건, broker 주문 0건, aws-live 작업 0건, secret 원문 기록 0건. AWS CLI · boto3 · psql · Spring Boot · Slack webhook · Step Functions · Lambda · ECS · KIS API 호출 0건. 새 `[REDACTED*]` placeholder 값 확장 없음(before/after count 동일).
+
+## 2026-07-01 (6월 실제 AWS 비용 분석 · VPC Endpoint 절감 정합)
+
+### 🧭 Summary
+
+6월 aws-paper 실제 비용 확인과 VPC Endpoint 절감 조치가 정리됐다.
+
+- 6월 세전 `135.40 USD` · 세금 `13.55 USD` · 세금 포함 약 `148.95 USD`.
+- 월말 `180 USD` 추정은 7월 full automation 기준 보수적이지만 합리적.
+- 핵심 cost driver 는 VPC Endpoint(전체 VPC 비용 `74.24 USD` 중 endpoint 부분 `70.69 USD`).
+- SSM endpoint 제거 완료 · `ecr.api` · `ecr.dkr` · `logs` · `secretsmanager` endpoint 는 2 AZ → 1 AZ 축소 완료.
+- 예상 월 절감액 약 `56.16 USD` · 추가 endpoint 삭제는 작동 리스크 대비 보류.
+
+### ✅ Completed
+
+1. 6월 실제 비용 확인
+   1) 총 비용 정합:완료
+       - 세전 `135.40 USD` · 세금 `13.55 USD` · 세금 포함 약 `148.95 USD`
+   2) 월말 추정 정합:확인
+       - 180 USD 는 7월 full automation 기준 보수적이지만 합리적 판정
+   3) Cost driver Top 정합:확인
+       - VPC 비용 `74.24 USD` 중 VPC Endpoint `70.69 USD`
+
+2. VPC Endpoint 절감 조치
+   1) SSM endpoint 제거:완료
+       - EC2 · Fargate 접근 경로에서 SSM endpoint 의존 최소화 후 제거 진행
+   2) 4종 endpoint 2 AZ → 1 AZ 축소:완료
+       - `ecr.api` · `ecr.dkr` · `logs` · `secretsmanager`
+   3) 예상 절감액 정합:확인
+       - 약 `56.16 USD` / 월
+   4) 추가 endpoint 삭제 보류:확인
+       - 작동 리스크 대비 절감 폭이 낮아 후속 유지
+
+### 🔵 Evidence
+
+- 🔵 상세 evidence 링크
+
+  | 문서 | 위치 |
+  | --- | --- |
+  | cost-simulation | `_common/cost-simulation.md` 6월 실측 · 절감 정합 |
+
+### ⚠️ Risks
+
+- 🟠 VPC Endpoint 추가 삭제 보류 · 필요 시 작동 리스크 재평가.
+- 🟠 7월 full automation 진입 후 실제 월 비용이 180 USD 추정과 얼마나 정합되는지 실측 회차 필요.
+
+### 📌 Follow-ups
+
+- [ ] 7월 실제 비용 확정 시 `cost-simulation.md` 실측 append.
+- [ ] `ecr.api` · `ecr.dkr` · `logs` · `secretsmanager` 1 AZ 축소 후 SSM · ECS · Lambda 정상 동작 정기 관찰.
+- [ ] 추가 endpoint 삭제 재평가 조건 정의(작동 리스크 vs 절감액).
+
+### 🔐 Security
+
+- 🟢 Kiro 는 본 작업에서 문서만 수정. 실행 0건 · broker 주문 0건 · aws-live 작업 0건 · secret 원문 기록 0건.
+- 🟢 AWS CLI · psql · Spring Boot · Slack webhook · Step Functions · Lambda · ECS · SSM · KIS API 실행 0건.
+- 🟢 실제 USD 총액 · endpoint 이름은 evidence 값으로만 기록 · 계좌번호 · payment method · billing account id 원문 기록 0건.
 
 ## 2026-07-01 (kiro-common-docs-readability spec 실행 · 6개 _common 문서 Dashboard-first 재구성)
 

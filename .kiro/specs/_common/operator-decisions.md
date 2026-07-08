@@ -161,6 +161,7 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
 | OD-DB-009 | DB | view_app의 execution 권한 | R-only 유지(write 필요성은 05 spec에서 재검토) | 🟡 잠정 | — (잠정) | [See details: OD-DB-009 Details](#od-db-009-details) |
 | OD-DB-010 | DB | 1차 적용 시 기존 객체 owner 일괄 이관 (REASSIGN OWNED) | 미실행(기존 table / sequence / index owner는 `portfolio_admin` 유지) | 🟢 확정 | — (확정) | [See details: OD-DB-010 Details](#od-db-010-details) |
 | OD-DB-011 | DB | `execution_app` 의 `decision` schema UPDATE 권한 (Step 9 SELL execution link) | `decision.strategy_daily_position_decision` 제한적 UPDATE 만 부여 | 🟢 확정 | — (확정) | [See details: OD-DB-011 Details](#od-db-011-details) |
+| OD-DB-012 | DB | `ops_recorder_app` 신규 role (Step Functions 실행 이력 OPS mirror 전용 · 2026-07-03) | 전용 최소 권한 role 신설. `ops` schema USAGE + `ops.strategy_daily_batch_run` · `ops.strategy_daily_batch_step_log` SELECT / INSERT / UPDATE + 관련 sequence USAGE / SELECT. DELETE 미부여. `view_app` 재사용 안 함 · `execution_app` 권한 확대 안 함. `chk_strategy_daily_batch_run_type` 에 `AWS_STEPFUNCTIONS` 값 추가(기존 `MANUAL` / `SCHEDULED` / `RETRY` / `MANUAL_PARTIAL` 유지) | 🟢 확정 | — (확정) | [See details: OD-DB-012 Details](#od-db-012-details) |
 
 ### 4. Compute / Service Placement Decisions
 
@@ -318,6 +319,7 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
 | OD-MS-035 | 장중 포지션 확인 3단계 구조 (Snapshot Refresh + Intraday Evaluate + Stop Sell Submit & Refresh) | 3단계 분리 + 신규 파일 + Submit 초기 수동·승인 후. See details: OD-MS-035 Details | 🟢 확정 | 03, 04, 05, 10 |
 | OD-MS-036 | Intraday Stop Sell Submit Workflow (장중 손절 주문 제출 전용 State Machine + 수동 승인 운영) | 별도 state machine `portfolio-paper-intraday-stop-sell-approval` + 수동 승인. See details: OD-MS-036 Details | 🟢 확정 | 03, 04, 05, 10 |
 | OD-MS-038 | Daily Brief Slack mini workflow 운영 방식 (Daily 주문 실행 경로와 분리) | 별도 mini Step Functions + Builder Lambda + Notifier Lambda + Scheduler 2개. See details: OD-MS-038 Details | 🟢 확정 | 04, 05, 10 |
+| OD-MS-039 | Step Functions 실행 이력 OPS mirror 운영 방식 (Recorder Lambda + 전용 최소 권한 role · 2026-07-03) | Recorder Lambda `portfolio-daily-batch-ops-recorder`(Python 3.12 / ap-northeast-2 / VPC Lambda / Secrets Manager `ops_recorder_app` secret 사용 / action `RECORD_START` · `RECORD_STEP` · `RECORD_SUCCESS` · `RECORD_FAILURE`) 를 Step Functions 실행 role 에 `lambda:InvokeFunction` 한정 부여 후 State Machine 이 `ops.strategy_daily_batch_run` + `ops.strategy_daily_batch_step_log` 에 run-level + 대표 workflow step 을 mirror 한다. 대상 State Machine 은 `portfolio-paper-daily-step1-17-approval` + `portfolio-paper-daily-step12-17-approval` 2종. 1차 범위는 전체 세부 step mirror 가 아니라 run-level + 대표 workflow step 중심. View 는 reader / controller 역할 유지. See details: OD-MS-039 Details | 🟢 확정 | 04, 05, 10 |
 
 | OD-MS-037 | View Local AWS Paper read-only 1차 scope 확정 + ECS / Fargate 진입 전 batch 2차 검증 선행 정책 | read-only 1차 scope 확정 + ECS 진입 전 batch 2차 검증 선행. See details: OD-MS-037 Details | 🟢 확정 | 04, 05, 10 |
 | OD-ENV-006 | Paper 환경 DB source of truth | AWS Paper RDS 단일 source of truth. `PORT_ENVIRONMENT=paper` 이면 로컬 실행에서도 AWS Paper RDS 사용 | 🟡 잠정 | 02, 03, 04, 05, 08, 09, 10 |
@@ -743,6 +745,46 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
   `portfolio-daily-brief-evening-slack-1550-kst`) + 알림 전용 IAM Role 2종.
 - 비용 상세: mini Step Functions transitions + Lambda 호출 + Scheduler 2개 invocations 모두 매우 작음(평일 2회 = 월 약 44 invocation).
 - 운영 리스크 상세: Daily Brief 알림 누락 / 중복 위험(R-AUTO-035 신규) / Slack webhook URL Lambda 환경변수 노출 위험(R-AUTO-024 정합) / DB password Lambda 환경변수 주입 위험은 Secrets Manager `valueFrom` 방식으로 완화.
+
+### OD-DB-012 Details <a id="od-db-012-details"></a>
+
+| 항목 | 값 |
+|---|---|
+| Decision ID | OD-DB-012 |
+| Selected | `ops_recorder_app` 전용 최소 권한 role 신설 (Step Functions 실행 이력 OPS mirror writer 한정) |
+| Status | 🟢 확정 |
+| 결정 일자 | 2026-07-03 |
+| 선택지 | (a) `view_app` 재사용 · (b) `execution_app` 권한 확대 · (c) 전용 `ops_recorder_app` 신설 |
+| 최종 선택 근거 | (c) 전용 role. Recorder 는 이력 writer 역할만 수행. View 는 reader / controller 역할 유지. 업무 테이블 write 권한 확대 없음. |
+| 부여 권한 | `ops` schema USAGE · `ops.strategy_daily_batch_run` SELECT / INSERT / UPDATE · `ops.strategy_daily_batch_step_log` SELECT / INSERT / UPDATE · 관련 sequence USAGE / SELECT |
+| 미부여 권한 | DELETE · TRUNCATE · 다른 schema 접근 · 업무 테이블(`strategy_execution_order` · `strategy_position_state` 등) write |
+| 제약 변경 | `chk_strategy_daily_batch_run_type` 에 `AWS_STEPFUNCTIONS` 값 추가. 기존 `MANUAL` · `SCHEDULED` · `RETRY` · `MANUAL_PARTIAL` 값 유지 |
+| 비용 영향 | 0 (신규 role · 신규 secret 1건 발생 가능 · Secrets Manager 비용 항목만 소폭) |
+| 운영 리스크 | R-AUTO-038 정합 — Recorder Lambda 실행 실패 시 mirror 누락. 실패는 Step Functions 흐름 자체를 중단시키지 않도록 fail-open 정책(업무 테이블 · Slack 은 정상 진행). |
+| 후속 spec 영향 | 02, 04, 05, 06 |
+| 근거 링크 | 2026-07-03 Change Log Details 참조 |
+
+### OD-MS-039 Details <a id="od-ms-039-details"></a>
+
+| 항목 | 값 |
+|---|---|
+| Decision ID | OD-MS-039 |
+| Selected | Step Functions 실행 이력 OPS mirror 를 Recorder Lambda + State Machine 연동으로 구현 |
+| Status | 🟢 확정 |
+| 결정 일자 | 2026-07-03 |
+| 배경 | 기존 Step Functions 실행은 업무 테이블 · Slack 은 갱신했지만 `ops.strategy_daily_batch_run` 에는 기록되지 않아 View Daily Batch 화면이 AWS Step Functions 실행 이력을 직접 보여주지 못했다(2026-07-02 View Daily Batch 이력 불일치 이슈 정합) |
+| Recorder Lambda | `portfolio-daily-batch-ops-recorder` (Python 3.12 · ap-northeast-2 · VPC Lambda · Secrets Manager `ops_recorder_app` secret 사용) |
+| 지원 action | `RECORD_START` · `RECORD_STEP` · `RECORD_SUCCESS` · `RECORD_FAILURE` |
+| 대상 State Machine | `portfolio-paper-daily-step1-17-approval` · `portfolio-paper-daily-step12-17-approval` |
+| 대상 테이블 | `ops.strategy_daily_batch_run` · `ops.strategy_daily_batch_step_log` |
+| 1차 범위 | 전체 세부 step mirror 가 아니라 **run-level + 대표 workflow step mirror 중심** (후속 phase 에서 세부 step 확장) |
+| Step Functions 실행 role 변경 | `lambda:InvokeFunction` 권한을 Recorder Lambda ARN 한정으로 부여. Resource wildcard 0건. Action wildcard 0건. |
+| 검증 요약 | RECORD_START 응답 `ok true` 확인 · RECORD_STEP 응답 `ok true` + `stepLogId` 생성 확인 · RECORD_SUCCESS 응답 `ok true` 확인 · commit smoke `batchRunId=53` 확인 · Step 12 approval-blocked smoke 후 `ops.strategy_daily_batch_run` + step log 기록 확인 |
+| 비용 영향 | Lambda 호출 · Secrets Manager `GetSecretValue` · DB INSERT/UPDATE 비용 모두 매우 작음. Step Functions transitions 비용은 무변화(기존 flow 안 mirror step 추가). |
+| 운영 리스크 | R-AUTO-038 정합 — Step Functions 이력 mirror 실패 시 View Daily Batch 화면이 다시 이력 불일치를 노출할 위험. Lambda fail-open + CloudWatch Logs 관찰 + 후속 phase 에서 CloudWatch Alarm 도입 후보. |
+| 보안 판단 | Recorder 는 writer 역할만 수행. View 는 reader / controller 역할 유지. 업무 테이블 write 권한 확대 없음. `execution_app` / `view_app` 권한 확대 0건. |
+| 후속 spec 영향 | 04, 05, 10 |
+| 후속 작업 | 전체 세부 step mirror 확장 · View Daily Batch 화면이 `AWS_STEPFUNCTIONS` run 이력을 렌더링하는지 실 실행 회차 확인 (followups-overview 2026-07-03 정합) |
 
 ---
 
@@ -1472,6 +1514,7 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
 | 2026-06-30 (오후) Slack | OD-MS-038 신규 + OD-MS-030/031 evidence 보강 (Slack 문구 개선 최종 완료) | [2026-06-30 (오후) Slack 1차](#change-log-details-2026-06-30------Slack-1) |
 | 2026-06-30 (오후) 장중 손절 Slack | OD-MS-030/035/036/038 evidence 보강 (`INTRADAY_STOP_LOSS` Slack 실제 이벤트 연동 완료) | [2026-06-30 (오후) 장중 손절 Slack 1차](#change-log-details-2026-06-30------------Slack-1) |
 | 2026-07-01 | OD-SAFE-001/002/003 + OD-MS-009/032/033 evidence 보강 (aws-paper Daily 자동화 1차 풀 ON) | [2026-07-01 1차](#change-log-details-2026-07-01-1) |
+| 2026-07-03 | OD-DB-012 · OD-MS-039 신규 (Step Functions 실행 이력 OPS mirror + `ops_recorder_app` 전용 role · Recorder Lambda) | [2026-07-03 1차](#change-log-details-2026-07-03-1) |
 
 ## Decision Change Log Details
 
@@ -3146,6 +3189,34 @@ AWS / EventBridge Scheduler / Lambda / Step Functions / SSM / EC2 / IAM / RDS / 
 AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건(운영자 직접 수행 영역 — Step 12~17 Scheduler ENABLE 전환 + Step 12~17 수동 실행 + DB after-check).
 
 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역). **신규 결정 0건** — 본 일자 추가 분은 OD-SAFE-001 / OD-SAFE-002 / OD-SAFE-003 / OD-MS-009 / OD-MS-032 / OD-MS-033 evidence 보강만 / Decision Summary 카운트 변경 없음(전체 97 / 확정 52 / 잠정 42 유지).
+
+
+### Change Log Details 2026-07-03 (1차) <a id="change-log-details-2026-07-03-1"></a>
+
+변경 요약: **OD-DB-012** · **OD-MS-039** 신규 (Step Functions 실행 이력 OPS mirror + 전용 최소 권한 role + Recorder Lambda). 2026-07-02 View Daily Batch 화면 이력 불일치 이슈(followups-overview `Done recently` 정합) 후속 조치로 진행. 대상 State Machine 은 `portfolio-paper-daily-step1-17-approval` + `portfolio-paper-daily-step12-17-approval` 2종.
+
+| 항목 | 값 |
+|---|---|
+| 반영 주제 | 2026-07-03 Step Functions 실행 이력 OPS mirror 기반 완료 |
+| 핵심 결론 | AWS_STEPFUNCTIONS run 이력을 `ops.strategy_daily_batch_run` + `ops.strategy_daily_batch_step_log` 에 남기는 기반 완료. View Daily Batch 화면이 AWS Step Functions 실행 이력을 볼 수 있는 기반 마련 |
+| 권한 설계 | `ops_recorder_app` 전용 최소 권한 role 신설 · `view_app` 재사용 안 함 · `execution_app` 권한 확대 안 함 · 업무 테이블 write 권한 확대 0건 |
+| 신규 role 권한 | `ops` schema USAGE · `strategy_daily_batch_run` · `strategy_daily_batch_step_log` SELECT / INSERT / UPDATE · 관련 sequence USAGE / SELECT · DELETE 미부여 |
+| 제약 변경 | `chk_strategy_daily_batch_run_type` 에 `AWS_STEPFUNCTIONS` 추가. 기존 `MANUAL` / `SCHEDULED` / `RETRY` / `MANUAL_PARTIAL` 값 유지 |
+| Recorder Lambda | `portfolio-daily-batch-ops-recorder` · Python 3.12 · ap-northeast-2 · VPC Lambda · Secrets Manager `ops_recorder_app` secret |
+| 지원 action | `RECORD_START` · `RECORD_STEP` · `RECORD_SUCCESS` · `RECORD_FAILURE` |
+| Step Functions 연동 | 실행 role 에 `lambda:InvokeFunction` 한정 부여 (Resource ARN 한정 · wildcard 0건) |
+| 1차 범위 | 전체 세부 step mirror 가 아니라 run-level + 대표 workflow step mirror 중심 |
+| 검증 요약 | RECORD_START 응답 `ok true` 확인 · RECORD_STEP 응답 `ok true` + `stepLogId` 생성 확인 · RECORD_SUCCESS 응답 `ok true` 확인 · commit smoke `batchRunId=53` 확인 · Step 12 approval-blocked smoke 후 `ops.strategy_daily_batch_run` + step log 기록 확인 |
+| 실행 | 본 문서 반영 중 실제 AWS / DB / Slack / crawler / broker / KIS API 호출 0건 (Kiro 문서 갱신만) |
+| 후속 | 전체 세부 step mirror 확장 · View Daily Batch 화면이 `AWS_STEPFUNCTIONS` run 이력을 렌더링하는지 실 실행 회차 확인 · CloudWatch Alarm 도입 후보 |
+
+관련 리스크: **R-AUTO-038 신규** (Step Functions 실행 이력 mirror 누락 → View Daily Batch 화면 이력 불일치 · Mitigated by OD-DB-012 + OD-MS-039). 상세는 `risk-register.md` 의 R-AUTO-038 항목 참조.
+
+secret · Secrets Manager value · Lambda 실제 ARN · Recorder invocation 응답 raw JSON · State Machine 실 executionName / 실행 role ARN 평문 인용 0건(R-DOCS-001 정합). 운영 식별자(role 이름 `ops_recorder_app` · Recorder Lambda 이름 · State Machine 이름 · 테이블 이름 · action 이름 · `batchRunId=53` · check constraint 이름) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+
+AWS / EventBridge Scheduler / Lambda / Step Functions / SSM / EC2 / IAM / RDS / KIS API 호출은 본 일자 Kiro 측 변경 0건 — Kiro 는 본 일자 `.kiro/specs/_common` 하위 문서 갱신만 수행 / AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 0건 / broker 주문 0건 / aws-live 작업 0건 / secret 원문 기록 0건.
+
+**신규 결정 2건** — OD-DB-012 · OD-MS-039 (모두 CONFIRMED). Decision Summary 카운트는 재집계 필요(Review Needed 이월 상태) — 본 회차에서는 원문 유지 원칙에 따라 상단 dashboard 숫자 갱신을 이월한다.
 
 ## Decision Update Rules
 
