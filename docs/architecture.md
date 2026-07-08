@@ -194,3 +194,21 @@ Daily Batch 흐름:
 5. Connector API 호출
 6. DB 상태/응답 갱신
 7. 전략 실행 계획 상세 화면으로 redirect
+
+## 배포 구조 (ECS Fargate)
+
+port-view는 ECS Fargate Service로 운영합니다. 컨테이너 이미지는 Docker로 빌드해 ECR로 push하고, ECS Task Definition revision을 등록한 뒤 ECS Service가 신규 revision으로 rollout하는 흐름을 사용합니다.
+
+Fargate 관점에서 View의 책임 경계:
+
+- View 컨테이너 안에서 Python subprocess로 Daily Batch를 직접 실행하지 않습니다.
+- Daily Batch 실행 책임은 AWS Step Functions, EventBridge Scheduler, ECS RunTask, SSM RunCommand, AWS Batch, Lambda 쪽에 있습니다.
+- port-view는 조회 / 승인 / 트리거 UI만 담당합니다.
+- `local-file` backend는 운영자 로컬 검증/복구용으로만 보존되며 Fargate에서는 사용하지 않습니다.
+
+Fargate 관점에서 View 컨테이너 안의 흐름은 기본 조회 흐름(Controller → Service → Repository → DTO → Thymeleaf)과 Step Functions `StartExecution` 트리거 흐름 두 가지로 요약됩니다. `StartExecution` 트리거 흐름은 `StepFunctionsDailyBatchExecutionService`가 AWS SDK v2 Step Functions client를 사용해 수행하며, 실제 Step 1~17 실행 결과는 Step Functions state machine + ECS RunTask + SSM RunCommand + AWS Batch가 담당합니다.
+
+ALB, 인증, 접근 제한 등의 세부 운영 항목은 저장소 밖의 AWS 운영 영역에서 관리하며, 본 저장소는 다음 원칙만 유지합니다.
+
+- 실제 계정 ID, 실제 IAM Role ARN, 실제 secret ARN, 실제 state machine ARN, ALB DNS 원문은 저장소에 기록하지 않습니다.
+- 필요한 경우 `[REDACTED]` / `<STATE_MACHINE_ARN>` / `<APPROVAL_STATE_MACHINE_ARN>` / `<ALB_ENDPOINT>` / `<ECR_IMAGE_URI>` placeholder를 사용합니다.

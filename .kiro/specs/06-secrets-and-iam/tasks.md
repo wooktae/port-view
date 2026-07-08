@@ -4,7 +4,14 @@
 
 각 task 는 02 spec tasks.md 형식의 체크박스 형태(`- [ ] N. ...`)로 작성하되, 본 spec 은 운영자 직접 작업 / 문서 정리 task 가 대부분이라 sub-bullet 으로 산출물 / 책임 / 입력 / 완료 기준을 짧게 명시한다.
 
-본 phase 에서는 `tasks.md` 한 개 파일만 생성한다. `runbook.md` / `validation-checklist.md` / `operation-notes.md` 는 후속 phase 책임이며 본 tasks 의 task 19 ~ 21 에서 생성 계획만 잡는다. 모든 산출물은 [`./design.md`](./design.md) §11 안전 제약을 따른다(실제 AWS 리소스 미생성, 8개 MS 코드 / docs 미수정, 실제 secret value / 계좌번호 / account-id / RDS endpoint hostname / 실제 secret ARN / access key 미기록).
+본 phase 에서는 `tasks.md` 한 개 파일만 생성한다.
+`runbook.md` / `validation-checklist.md` / `operation-notes.md` 는 후속 phase 책임이며,
+본 tasks 의 task 19 ~ 21 에서 생성 계획만 잡는다.
+모든 산출물은 [`./design.md`](./design.md) §11 안전 제약을 따른다.
+
+- 실제 AWS 리소스 미생성 · 미수정 · 미삭제
+- 8개 MS 코드 / docs 미수정
+- 실제 secret value / 계좌번호 / account-id / RDS endpoint hostname / 실제 secret ARN / access key 미기록
 
 ## 1. 문서 상태 확인
 
@@ -60,7 +67,10 @@
 - [ ] 8. Permission Policy 매트릭스 확정
   - 산출물: design.md §4.2 채택
   - 입력: design.md §4.2, requirements.md R4.2 / R4.3 / R4.6
-  - 완료 기준: SecretsManagerRead(`secretsmanager:GetSecretValue`, `DescribeSecret` + 정확한 secret ARN placeholder), SsmParameterRead(`ssm:GetParameter`/`GetParameters`/`GetParametersByPath` + `/portfolio/paper/marketconnector/*` prefix), KmsDecrypt(조건부) 세 statement 가 design 에 명시
+  - 완료 기준: 세 statement 가 design 에 명시
+    - `SecretsManagerRead` — `secretsmanager:GetSecretValue`, `DescribeSecret` + 정확한 secret ARN placeholder
+    - `SsmParameterRead` — `ssm:GetParameter` / `GetParameters` / `GetParametersByPath` + `/portfolio/paper/marketconnector/*` prefix
+    - `KmsDecrypt` (조건부)
   - _Requirements: R4.2, R4.3, R4.6_
 
 - [ ] 9. 금지 정책 매트릭스 확정
@@ -80,7 +90,10 @@
 - [ ] 11. EC2 내부 Access Key 미사용 원칙 락
   - 산출물: design.md §5 채택
   - 입력: design.md §5, requirements.md R5
-  - 완료 기준: `~/.aws/credentials` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / systemd Environment / EnvironmentFile / dotfile / `.env` 안 access key 저장 금지 + IMDSv2 + Instance Role 자격증명 만 사용 정책이 design 에 명시
+  - 완료 기준: 아래 정책이 design 에 명시
+    - access key 저장 금지 위치: `~/.aws/credentials` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
+      systemd Environment / EnvironmentFile / dotfile / `.env`
+    - IMDSv2 + Instance Role 자격증명 만 사용
   - _Requirements: R5.1, R5.2, R5.5_
 
 - [ ] 12. Access Key 검증 위치 확정(실제 검증은 후속 phase)
@@ -136,13 +149,18 @@
 - [ ] 19. runbook.md 생성 예정
   - 산출물 후보: [`./runbook.md`](./runbook.md) (별도 phase 에서 생성)
   - 입력: design.md §10, requirements.md R7
-  - 완료 기준(후속 phase): (a) Secrets Manager 등록 → (b) SSM Parameter 등록 → (c) Instance Role / Profile 생성 → (d) 정책 attach → (e) EC2 attach → (f) read 검증 → (g) Connector smoke test 단계가 [실행]/[확인]/[준비]/[복구] 라벨로 분해
+  - 완료 기준(후속 phase): 아래 단계가 [실행]/[확인]/[준비]/[복구] 라벨로 분해
+    - (a) Secrets Manager 등록 → (b) SSM Parameter 등록 → (c) Instance Role / Profile 생성
+    - (d) 정책 attach → (e) EC2 attach → (f) read 검증 → (g) Connector smoke test
   - _Requirements: R7.1, R7.2, R7.3, R7.4, R7.5, R7.6_
 
 - [ ] 20. validation-checklist.md 생성 예정
   - 산출물 후보: [`./validation-checklist.md`](./validation-checklist.md)
   - 입력: design.md §10, requirements.md R8
-  - 완료 기준(후속 phase): 4종 라벨 `[O]` / `[X]` / `[Kiro 후속 작업 필요]` / `[운영자 확인 필요]` 와 8개 점검 영역(Secrets 인벤토리 / Parameter 인벤토리 / Role / Profile 존재 / 정책 매트릭스 일치 / wildcard 0건 / access key 파일 미존재 / assumed-role ARN 일치 / Connector smoke test) 모두 포함
+  - 완료 기준(후속 phase): 4종 라벨 + 8개 점검 영역 모두 포함
+    - 라벨: `[O]` / `[X]` / `[Kiro 후속 작업 필요]` / `[운영자 확인 필요]`
+    - 점검 영역: Secrets 인벤토리 / Parameter 인벤토리 / Role · Profile 존재 / 정책 매트릭스 일치 /
+      wildcard 0건 / access key 파일 미존재 / assumed-role ARN 일치 / Connector smoke test
   - _Requirements: R8.1, R8.2, R8.3, R8.4, R8.5_
 
 - [ ] 21. operation-notes.md 생성 예정
@@ -156,7 +174,11 @@
 - [ ] 22. 06 최소 설계 문서상 닫기
   - 산출물: 본 spec 폴더의 requirements.md / README.md / design.md / tasks.md 4개 파일 상태 확인
   - 입력: 본 tasks 의 task 1 ~ 21
-  - 완료 기준: 4개 파일 존재. design.md §11 안전 제약과 task 22 가 일치. 실제 AWS 리소스 미생성 / 미수정 / 미삭제. 8개 MS 코드 / docs 미수정. 모든 산출물에 실제 secret value / 계좌번호 / account-id / RDS endpoint hostname / 실제 secret ARN / access key 미기록
+  - 완료 기준
+    - 4개 파일 존재. design.md §11 안전 제약과 task 22 가 일치.
+    - 실제 AWS 리소스 미생성 / 미수정 / 미삭제.
+    - 8개 MS 코드 / docs 미수정.
+    - 모든 산출물에 실제 secret value / 계좌번호 / account-id / RDS endpoint hostname / 실제 secret ARN / access key 미기록
   - _Requirements: R14.1, R14.2, R14.3, R14.4, R14.5, R14.6, R14.7_
 
 - [ ] 23. 03-marketconnector-ec2 후속 정리로 인계
@@ -172,7 +194,10 @@
 - 실제 IAM Role / Policy / Instance Profile 생성 / 변경 / 삭제 (동)
 - EC2 instance 의 Instance Profile attach 변경 (동)
 - KMS Key 생성 / 변경 (해당 시 운영자 직접 수행)
-- 8개 MS(`port-view`, `port-marketconnector`, `port-interest-crawler`, `port-interest-preprocessor`, `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research`) 의 README / AGENTS.md / CHANGELOG / docs / worklog / 소스 코드 수정
+- 아래 8개 MS 의 README / AGENTS.md / CHANGELOG / docs / worklog / 소스 코드 수정
+  - `port-view`, `port-marketconnector`
+  - `port-interest-crawler`, `port-interest-preprocessor`
+  - `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research`
 - 8개 MS entrypoint 실행, broker / KIS / Selenium / KRX / Naver / yfinance / RDS DDL/DML / 주문 / 체결 / Daily Batch / intraday monitor 호출
 - `secretsmanager:GetSecretValue` 실호출(운영자만 수행, Kiro 자동 검증은 `DescribeSecret` metadata 만)
 - live rotation 자동화 / GitHub Actions OIDC / 8개 MS full IAM 매트릭스 / aws-live IAM 작업

@@ -689,7 +689,12 @@ DROP ROLE IF EXISTS portfolio_owner;
 
 ## 8. 후속 갱신 후보 (2026-06-17 17-step E2E 보강)
 
-본 섹션은 2026-06-17 Daily AWS 17-step E2E 흐름 중 운영자가 발견 / 보정한 DB role 권한 / search_path 사실을 후속 갱신 후보로 누적한다. 운영자 직접 GRANT 보정 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-17 §1 ~ §4 / [`../_common/risk-register.md`](../_common/risk-register.md) R-DATA-005 [2026-06-17 보강] / R-DATA-011 신규 정합으로 사실 기록되어 있고, 본 spec 본문 §4 GRANT / §5 검증 SQL 의 정식 매트릭스 갱신은 후속 phase 책임이다.
+본 섹션은 2026-06-17 Daily AWS 17-step E2E 흐름 중 운영자가 발견 / 보정한 DB role 권한 / search_path 사실을 후속 갱신 후보로 누적한다.
+
+운영자 직접 GRANT 보정 결과는 아래에 사실 기록되어 있고, 본 spec 본문 §4 GRANT / §5 검증 SQL 의 정식 매트릭스 갱신은 후속 phase 책임이다.
+
+- [`./operation-notes.md`](./operation-notes.md) 2026-06-17 §1 ~ §4
+- [`../_common/risk-register.md`](../_common/risk-register.md) R-DATA-005 [2026-06-17 보강] / R-DATA-011 신규 정합
 
 ### 8.1. `execution_app` 의 `interest` schema 권한 정식 갱신 후보
 

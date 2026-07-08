@@ -11,7 +11,12 @@
 
 ## 2. env 주입 절차 정리
 
-- [x] 5. 임시 export 스크립트(`/tmp/inject-env.sh`) 패턴 정리 (§8.3) — [2026-06-17] v5 패턴(JSON SecretString 내부 key 추출 + `KIS_*` alias 동시 export) 보강 완료(operation-notes 2026-06-17 §1 / runbook §2 / design §8.2.2 정합). [2026-06-22 보강] EC2 stop / start 후 `/tmp` 휘발 대응 — Daily AWS Paper Wrapper 의 Step 1 / Step 12 / Step 13 / Step 17 이 `daily-aws-paper.functions.ps1` 공통 MarketConnector env bootstrap 함수를 통해 `/tmp/inject-env.sh` 를 step 실행 시점에 재생성하는 패턴으로 보강 완료(OD-MS-027 신규 / R-AUTO-021 신규 mitigation 1차 실증 / operation-notes 2026-06-22 §1 / runbook §2.1 정합)
+- [x] 5. 임시 export 스크립트(`/tmp/inject-env.sh`) 패턴 정리 (§8.3)
+  - [2026-06-17] v5 패턴(JSON SecretString 내부 key 추출 + `KIS_*` alias 동시 export) 보강 완료.
+    - operation-notes 2026-06-17 §1 / runbook §2 / design §8.2.2 정합
+  - [2026-06-22 보강] EC2 stop / start 후 `/tmp` 휘발 대응 — Daily AWS Paper Wrapper 의 Step 1 / Step 12 / Step 13 / Step 17 이 `daily-aws-paper.functions.ps1` 공통 MarketConnector env bootstrap 함수를 통해 `/tmp/inject-env.sh` 를 step 실행 시점에 재생성하는 패턴으로 보강 완료.
+    - OD-MS-027 신규 / R-AUTO-021 신규 mitigation 1차 실증
+    - operation-notes 2026-06-22 §1 / runbook §2.1 정합
 - [x] 6. 환경변수 매핑(KIS / RDS / CONNECTOR_*) 표 확정 (§8.2) — [2026-06-17] `APP_*` 호환 key + `KIS_*` alias 동시 export 정책으로 완료(design §8.2.1 정합). [2026-06-22 보강] Daily wrapper bootstrap 함수에서도 동일 매핑 유지 / secret value 평문 출력 0건 정책 회귀 0건
 - [ ] 7. 정상 운영 모드 전환(systemd / startup script)은 후속 task / 별도 phase 로 분리 (§7, §8.3) — [2026-06-22 보강] wrapper bootstrap 함수가 single source of truth 로 작동하는 동안 systemd unit + `EnvironmentFile` 정식 등록은 그대로 후속 task(26 / 27) 책임 유지 / Step Functions 전환 시점에 재검토(followups-overview 2026-06-22 §1 정합)
 
@@ -58,9 +63,17 @@
 
 본 섹션은 Daily AWS 17-step E2E 완료 시점의 후속 task 다. 본 노트 / operation-notes.md 2026-06-17 (Daily AWS 17-step E2E 완료) §1 ~ §5 정합. 본 일자에 운영자가 직접 패치 / 정식 배포한 `connector_strategy_order_execute.py` / `connector_order_check.py` 변경 사실은 operation-notes 에 사실로만 기록 / 본문 전체 인용 0건.
 
-- [ ] 29. `connector_order_check.py` summary fallback guard 테스트 케이스 추가(active 후보 0 / 1 / 2 / 다건 시 동작 / `output1 empty` + `output2 aggregate summary` 입력값 / `output1` 정상 row 입력값 / event · fill · status 변경 0건 검증 / KIS API 응답 fixture) — R-AUTO-018 mitigation 강화 후속
+- [ ] 29. `connector_order_check.py` summary fallback guard 테스트 케이스 추가.
+  - active 후보 0 / 1 / 2 / 다건 시 동작
+  - `output1 empty` + `output2 aggregate summary` 입력값 / `output1` 정상 row 입력값
+  - event · fill · status 변경 0건 검증 / KIS API 응답 fixture
+  - 근거: R-AUTO-018 mitigation 강화 후속
 - [ ] 30. `connector_strategy_order_execute.py` 의 `result_payload` 내 `source_daily_signal_id null` 보정 검토(OPTIONAL_COLUMNS 또는 fallback 패턴 / R-AUTO-009 [2026-06-17 보강] 정합) — paper 환경 한정 평일 / 안전 데이터 추가 검증 후속
-- [ ] 31. `connector_balance_snapshot` 최신성 검증 SQL 정리 — `created_at` 단독이 아닌 `as_of_ts` / `max(created_at)` 의미 구분(`as_of_ts` = broker 응답 기준 시점 / `created_at` = row insert 시점) — `connector_balance_snapshot` / `connector_position_snapshot` / `connector_api_call_log` 분리 점검 SQL 후보 정리(R-DOCS-001 [2026-06-17 보강] / [2026-06-17 보강(17-step E2E)] 정합)
+- [ ] 31. `connector_balance_snapshot` 최신성 검증 SQL 정리.
+  - `created_at` 단독이 아닌 `as_of_ts` / `max(created_at)` 의미 구분.
+  - `as_of_ts` = broker 응답 기준 시점 / `created_at` = row insert 시점.
+  - `connector_balance_snapshot` / `connector_position_snapshot` / `connector_api_call_log` 분리 점검 SQL 후보 정리.
+  - 근거: R-DOCS-001 [2026-06-17 보강] / [2026-06-17 보강(17-step E2E)] 정합.
 
 ## Task Dependency Graph (간단)
 
@@ -79,12 +92,42 @@
 
 ## 10. 신규 후속 task (2026-06-22 보강 — Daily AWS Paper 1~17 두 번째 실 완주 + 첫 실제 SELL E2E)
 
-본 섹션은 2026-06-22 Daily AWS Paper Wrapper 1 ~ 17 두 번째 실 운영 실행 결과의 후속 task 다. 자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1 ~ §6 / [`../_common/operator-decisions.md`](../_common/operator-decisions.md) Change Log 2026-06-22(OD-MS-027 / OD-DB-011 신규) / [`../_common/risk-register.md`](../_common/risk-register.md) R-AUTO-021 / R-DATA-013 신규 + R-DATA-005 [2026-06-22 보강] 참조.
+본 섹션은 2026-06-22 Daily AWS Paper Wrapper 1 ~ 17 두 번째 실 운영 실행 결과의 후속 task 다. 자세한 결과 참조:
 
-- [x] 32. MarketConnector Daily wrapper SSM steps(Step 1 / Step 12 / Step 13 / Step 17) 의 env bootstrap 재생성 패턴 반영 완료 — `daily-aws-paper.functions.ps1` 안 MarketConnector env bootstrap 함수 추가 / JSON SecretString 내부 key 추출 + `APP_*` / `KIS_*` alias 동시 export + chmod 700 + secret value 미출력 / Step 진입 직전 호출. PowerShell parser validation 통과 + Step 1 재실행 통과 1차 실증(OD-MS-027 신규 / R-AUTO-021 신규 mitigation 정합) ([`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1)
-- [x] 33. EC2 stop / start 후 `/tmp` 휘발 대응 완료 — wrapper bootstrap 함수가 step 실행 시점에 `/tmp/inject-env.sh` 를 재생성하므로 EC2 stop / start 직후에도 Step 1 / 12 / 13 / 17 진입 가능 / 운영자 수동 fallback 절차는 [`./runbook.md`](./runbook.md) §2.1 에 정리 ([`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1 / [`./runbook.md`](./runbook.md) §2 / §2.1)
-- [x] 34. Step 12 Paper SELL 주문 제출 검증 완료 — `088350` 한화생명 244주 MARKET 1건 / `SELL_HARD_STOP` 사유 / `-AllowPaperOrderExecute` 명시 실행 / `execution_order id 37` SUBMITTED / `connector_order_request id 46` ACCEPTED → FILLED / `connector_fill id 34` 생성(fill_qty 244 / fill_price 5,075.8607 / fill_amount 1,238,510.01) / broker_order_no · broker_branch_code 본 spec 산출물 평문 기록 0건. 03 spec 책임 Step(1 / 12 / 13 / 17) Daily wrapper 두 번째 실 완주 통과(R-AUTO-019 mitigation 정합) ([`./operation-notes.md`](./operation-notes.md) 2026-06-22 §2 ~ §4)
-- [x] 35. Step 17 BALANCE_REFRESH 결과 정합 검증 완료 — `connector.connector_position_snapshot` 최신 `created_at 2026-06-22 00:50:50 UTC` / 보유 5종목(`003490` 58주 / `004990` 69주 / `023530` 8주 / `042660` 11주 / `282330` 17주) / `088350` 한화생명 잔고 스냅샷에서 제거 확인 / R-DATA-011 mitigation 회귀 0건(`marketconnector_app` 의 `legacy.holdings` 권한 / database search_path 보정 그대로 유지) ([`./operation-notes.md`](./operation-notes.md) 2026-06-22 §4)
-- [ ] 36. systemd / startup script 정식 운영 모드 전환은 후속 유지 — wrapper bootstrap 함수가 single source of truth 로 작동하는 동안 task 7 / task 26 / task 27 후속 책임 유지 / Step Functions 전환 시 정식 systemd unit + `EnvironmentFile` 정식 등록과 함께 재검토(followups-overview 2026-06-22 §1 정합)
-- [ ] 37. Step 12 주문 전 DB preflight view 또는 wrapper summary 출력 보강 — `execution_plan` plan_status / ready · blocked 분포 / SELL 대상 종목 코드 · 수량 · 사유 / `position_state` quantity 일치 검증을 wrapper run summary 또는 별도 preflight view 로 노출(R-AUTO-019 mitigation 강화 후속 / 05 spec View Daily Batch 화면 연동과 결합 / followups-overview 2026-06-22 §3 정합)
-- [ ] 38. Step 13 connector_fill / order_request / execution_order 상태 자동 summary 출력 보강 — wrapper run summary 에 `active_order_count` / `single_check_success_count` / `fill_qty` / `fill_price` / `fill_amount` 라벨 자동 기록(R-AUTO-018 / R-AUTO-020 detection 보강 / 2026-06-18 두 번째 후속 메모와 결합 / followups-overview 2026-06-22 §4 정합)
+- [`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1 ~ §6
+- [`../_common/operator-decisions.md`](../_common/operator-decisions.md) Change Log 2026-06-22(OD-MS-027 / OD-DB-011 신규)
+- [`../_common/risk-register.md`](../_common/risk-register.md) R-AUTO-021 / R-DATA-013 신규 + R-DATA-005 [2026-06-22 보강]
+
+- [x] 32. MarketConnector Daily wrapper SSM steps(Step 1 / Step 12 / Step 13 / Step 17) 의 env bootstrap 재생성 패턴 반영 완료.
+  - `daily-aws-paper.functions.ps1` 안 MarketConnector env bootstrap 함수 추가.
+  - JSON SecretString 내부 key 추출 + `APP_*` / `KIS_*` alias 동시 export + chmod 700 + secret value 미출력 / Step 진입 직전 호출.
+  - PowerShell parser validation 통과 + Step 1 재실행 통과 1차 실증(OD-MS-027 신규 / R-AUTO-021 신규 mitigation 정합).
+  - 참조: [`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1
+- [x] 33. EC2 stop / start 후 `/tmp` 휘발 대응 완료.
+  - wrapper bootstrap 함수가 step 실행 시점에 `/tmp/inject-env.sh` 를 재생성하므로 EC2 stop / start 직후에도 Step 1 / 12 / 13 / 17 진입 가능.
+  - 운영자 수동 fallback 절차는 [`./runbook.md`](./runbook.md) §2.1 에 정리.
+  - 참조: [`./operation-notes.md`](./operation-notes.md) 2026-06-22 §1 / [`./runbook.md`](./runbook.md) §2 / §2.1
+- [x] 34. Step 12 Paper SELL 주문 제출 검증 완료.
+  - `088350` 한화생명 244주 MARKET 1건 / `SELL_HARD_STOP` 사유 / `-AllowPaperOrderExecute` 명시 실행.
+  - `execution_order id 37` SUBMITTED / `connector_order_request id 46` ACCEPTED → FILLED.
+  - `connector_fill id 34` 생성(fill_qty 244 / fill_price 5,075.8607 / fill_amount 1,238,510.01).
+  - broker_order_no · broker_branch_code 본 spec 산출물 평문 기록 0건.
+  - 03 spec 책임 Step(1 / 12 / 13 / 17) Daily wrapper 두 번째 실 완주 통과(R-AUTO-019 mitigation 정합).
+  - 참조: [`./operation-notes.md`](./operation-notes.md) 2026-06-22 §2 ~ §4
+- [x] 35. Step 17 BALANCE_REFRESH 결과 정합 검증 완료.
+  - `connector.connector_position_snapshot` 최신 `created_at 2026-06-22 00:50:50 UTC`.
+  - 보유 5종목(`003490` 58주 / `004990` 69주 / `023530` 8주 / `042660` 11주 / `282330` 17주).
+  - `088350` 한화생명 잔고 스냅샷에서 제거 확인.
+  - R-DATA-011 mitigation 회귀 0건(`marketconnector_app` 의 `legacy.holdings` 권한 / database search_path 보정 그대로 유지).
+  - 참조: [`./operation-notes.md`](./operation-notes.md) 2026-06-22 §4
+- [ ] 36. systemd / startup script 정식 운영 모드 전환은 후속 유지.
+  - wrapper bootstrap 함수가 single source of truth 로 작동하는 동안 task 7 / task 26 / task 27 후속 책임 유지.
+  - Step Functions 전환 시 정식 systemd unit + `EnvironmentFile` 정식 등록과 함께 재검토(followups-overview 2026-06-22 §1 정합).
+- [ ] 37. Step 12 주문 전 DB preflight view 또는 wrapper summary 출력 보강.
+  - `execution_plan` plan_status / ready · blocked 분포
+  - SELL 대상 종목 코드 · 수량 · 사유
+  - `position_state` quantity 일치 검증을 wrapper run summary 또는 별도 preflight view 로 노출
+  - 근거: R-AUTO-019 mitigation 강화 후속 / 05 spec View Daily Batch 화면 연동과 결합 / followups-overview 2026-06-22 §3 정합
+- [ ] 38. Step 13 connector_fill / order_request / execution_order 상태 자동 summary 출력 보강.
+  - wrapper run summary 에 `active_order_count` / `single_check_success_count` / `fill_qty` / `fill_price` / `fill_amount` 라벨 자동 기록.
+  - 근거: R-AUTO-018 / R-AUTO-020 detection 보강 / 2026-06-18 두 번째 후속 메모와 결합 / followups-overview 2026-06-22 §4 정합

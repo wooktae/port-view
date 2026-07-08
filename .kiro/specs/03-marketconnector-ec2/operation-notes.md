@@ -164,7 +164,9 @@
 
 ## 2026-06-13 SSM Port Forwarding 표준 경유지 역할 — psql 18 + pgAdmin4 보강
 
-본 섹션은 같은 일자 앞 섹션(`## 2026-06-13 SSM Port Forwarding 표준 경유지 역할 1차 검증`) §1 ~ §5 의 후속이며, 본 EC2 가 SSM Port Forwarding 표준 경유지 역할을 하는 동안 추가 client 2종(로컬 PostgreSQL 18 `psql.exe` + pgAdmin4) 으로도 AWS Paper RDS 접속이 1차 실증되었음을 누적 기록한다. 자세한 결과는 [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md) 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 보강(psql 18 client + pgAdmin4 접속 검증) 섹션 참조.
+본 섹션은 같은 일자 앞 섹션(`## 2026-06-13 SSM Port Forwarding 표준 경유지 역할 1차 검증`) §1 ~ §5 의 후속이다. 본 EC2 가 SSM Port Forwarding 표준 경유지 역할을 하는 동안 추가 client 2종(로컬 PostgreSQL 18 `psql.exe` + pgAdmin4) 으로도 AWS Paper RDS 접속이 1차 실증되었음을 누적 기록한다.
+
+자세한 결과는 [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md) 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 보강(psql 18 client + pgAdmin4 접속 검증) 섹션 참조.
 
 ### 1. 본 EC2 의 추가 client 호환 확인
 
@@ -258,7 +260,18 @@
 
 ## 2026-06-17 (Daily AWS 17-step E2E 완료)
 
-운영자가 같은 일자 첫 번째 세션(MarketConnector 조회성 dry-run 재검증) 후속으로 직접 수행한 Daily AWS 17-step E2E 흐름이 본 일자에 끝까지 연결됐다. 본 spec 범위에 해당하는 step 은 1번 `CONNECTOR_BALANCE`(첫 세션 결과 그대로 사용 / 본 노트 앞 섹션 §1 정합) / 12번 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` / 13번 `CONNECTOR_ORDER_CHECK` / 17번 `BALANCE_REFRESH` 4개. 나머지 step(2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 14 / 15 / 16) 은 04 / 08 / 09 spec operation-notes 의 2026-06-17 §1 ~ §6 / §1 ~ §3 누적 정합. Kiro 는 문서 작성 / 절차 정리만 수행. 실제 SSM RunCommand / KIS API / RDS 작업은 운영자 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. 실제 broker 호출은 KIS paper BUY 4건만 발생 / SELL · 취소 · 정정 호출 0건.
+운영자가 같은 일자 첫 번째 세션(MarketConnector 조회성 dry-run 재검증) 후속으로 직접 수행한 Daily AWS 17-step E2E 흐름이 본 일자에 끝까지 연결됐다.
+
+본 spec 범위에 해당하는 step 은 4개다.
+
+- 1번 `CONNECTOR_BALANCE`(첫 세션 결과 그대로 사용 / 본 노트 앞 섹션 §1 정합)
+- 12번 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE`
+- 13번 `CONNECTOR_ORDER_CHECK`
+- 17번 `BALANCE_REFRESH`
+
+나머지 step(2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 14 / 15 / 16) 은 04 / 08 / 09 spec operation-notes 의 2026-06-17 §1 ~ §6 / §1 ~ §3 누적 정합.
+
+Kiro 는 문서 작성 / 절차 정리만 수행. 실제 SSM RunCommand / KIS API / RDS 작업은 운영자 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. 실제 broker 호출은 KIS paper BUY 4건만 발생 / SELL · 취소 · 정정 호출 0건.
 
 ### 1. Step 1 `CONNECTOR_BALANCE` (첫 세션 결과 사용)
 
@@ -344,16 +357,55 @@
 ### 5. 안전 / 보안 점검 결과 (Daily AWS 17-step E2E)
 
 1. 본 일자 작업 범위에서 broker / KIS 호출은 KIS paper BUY 4건(Step 12) + balance / order check 조회성 호출(Step 1 / Step 13) 한정. SELL / 취소 / 정정 / 추가 `--execute` 호출 0건. SELL position `mark_position_sell_ordered()` 호출 0건(OD-MS-016 정합 — 본 일자 SELL 흐름 미발생). aws-live 작업 0건.
-2. RDS DDL 0건. DML 은 본 일자 17-step 정상 흐름 한정 — `connector.connector_order_request` insert 4건(`id 34 ~ 37`) / `connector.connector_order_event` insert(잘못 생성된 row 삭제 + 정상 row 재생성) / `connector.connector_fill` insert 4건(`id 26 ~ 29`) / `execution.strategy_execution_order` update(`id 26 ~ 29` SUBMITTED → FILLED) / `connector.connector_balance_snapshot` insert 1건 / `connector.connector_position_snapshot` insert 4건(`id 120 ~ 123`). `--execute` 영향 row 4건(KIS paper BUY) 모두 SUBMITTED → FILLED → position OPEN 정합 전이.
-3. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+2. RDS DDL 0건. DML 은 본 일자 17-step 정상 흐름 한정.
+   - `connector.connector_order_request` insert 4건(`id 34 ~ 37`)
+   - `connector.connector_order_event` insert(잘못 생성된 row 삭제 + 정상 row 재생성)
+   - `connector.connector_fill` insert 4건(`id 26 ~ 29`)
+   - `execution.strategy_execution_order` update(`id 26 ~ 29` SUBMITTED → FILLED)
+   - `connector.connector_balance_snapshot` insert 1건
+   - `connector.connector_position_snapshot` insert 4건(`id 120 ~ 123`)
+
+   `--execute` 영향 row 4건(KIS paper BUY) 모두 SUBMITTED → FILLED → position OPEN 정합 전이.
+3. 아래 민감정보는 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
+   - 실제 secret value / KIS app key / KIS app secret / token
+   - 계좌번호
+   - RDS password / RDS endpoint hostname
+   - account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id
+   - instance-id / EIP / image digest full sha256 / task ARN / job ARN
 4. KIS paper 4건의 `broker_order_no`(`0000035906` / `0000035912` / `0000035918` / `0000035932`) 는 broker 응답값으로 운영 식별자 — 실계좌 주문번호 아님 / 본 노트 사실 기록 정합(R-DOCS-001 [2026-06-17 보강(17-step E2E)] 정합).
 5. 운영자가 직접 패치 / 정식 배포한 `connector_strategy_order_execute.py` / `connector_order_check.py` 변경분은 본 노트에 사실로만 기록 — 본문 전체 인용 0건. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건.
-6. AWS / SSM / EC2 / RDS / Secrets Manager / SSM Parameter Store / KIS API 호출은 모두 운영자 직접 수행 — Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. AWS CLI 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / 운영자 PowerShell stdout 전문 평문 인용 0건.
-7. 운영 식별자(execution_plan_id `92` / execution_order id `26 ~ 29` / connector_order_request id `34 ~ 37` / broker_order_no 4종 / position_state_id `6 ~ 9` / connector_position_snapshot id `120 ~ 123` / 종목 코드 `282330` / `004990` / `003490` / `088350` / 종목명 / 수량 / avg_buy_price / total_qty `378` / total_target_amount `6908189.40` / data_date `2026-06-16` / signal_date · run_date `2026-06-17`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+6. AWS / SSM / EC2 / RDS / Secrets Manager / SSM Parameter Store / KIS API 호출은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행.
+   - AWS CLI 실행 0건
+   - AWS 리소스 생성 / 수정 / 삭제 0건
+   - `secretsmanager:GetSecretValue` 결과값 평문 기록 0건
+   - CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / 운영자 PowerShell stdout 전문 평문 인용 0건
+7. 아래 운영 식별자는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+   - execution_plan_id `92` / execution_order id `26 ~ 29`
+   - connector_order_request id `34 ~ 37` / broker_order_no 4종
+   - position_state_id `6 ~ 9` / connector_position_snapshot id `120 ~ 123`
+   - 종목 코드 `282330` / `004990` / `003490` / `088350` / 종목명 / 수량 / avg_buy_price
+   - total_qty `378` / total_target_amount `6908189.40`
+   - data_date `2026-06-16` / signal_date · run_date `2026-06-17`
 
 ## 2026-06-17 (Daily AWS PowerShell wrapper 구현)
 
-같은 일자 두 번째 세션(Daily AWS 17-step E2E 완료) 후속으로 운영자가 직접 수행한 Daily AWS 17-step 운영자용 Windows PowerShell wrapper 구현 결과를 누적 기록한다. 본 wrapper 작업은 03 spec(MarketConnector EC2) 단일 책임은 아니지만 (a) Step 12 PAPER_ORDER_GATE 가 03 spec 의 `connector_strategy_order_execute.py --execute` 를 직접 다루고, (b) Step 1 / Step 13 / Step 17 모두 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름과 직결되므로 03 spec operation-notes 에 cross-cutting 누적 기록 위치로 채택한다. 04 / 06 / 08 / 09 spec 은 followups-overview.md 2026-06-17 세 번째 후속 메모로만 참조하고 별도 누적하지 않는다(중복 누적 방지). 본 wrapper 작업 중 실제 broker / KIS / 신규 BUY · SELL · 취소 · 정정 / `--execute` 주문 제출 0건 / aws-live 작업 0건 / wrapper 기반 전체 1~17 실제 재실행 0건 / Step 12 `-AllowPaperOrderExecute` 사용 0건 / bundled wrapper 미생성. Kiro 는 문서 작성 / 절차 정리만 수행 / 실제 wrapper 코드 작성 / parser validation / DryRun / Step 1 SSM 실행 / Step 12 gate 검증은 모두 운영자 직접 진행.
+같은 일자 두 번째 세션(Daily AWS 17-step E2E 완료) 후속으로 운영자가 직접 수행한 Daily AWS 17-step 운영자용 Windows PowerShell wrapper 구현 결과를 누적 기록한다.
+
+본 wrapper 작업은 03 spec(MarketConnector EC2) 단일 책임은 아니지만 아래 이유로 03 spec operation-notes 에 cross-cutting 누적 기록 위치로 채택한다.
+
+- (a) Step 12 PAPER_ORDER_GATE 가 03 spec 의 `connector_strategy_order_execute.py --execute` 를 직접 다룬다.
+- (b) Step 1 / Step 13 / Step 17 모두 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름과 직결된다.
+- 04 / 06 / 08 / 09 spec 은 followups-overview.md 2026-06-17 세 번째 후속 메모로만 참조 / 별도 누적하지 않는다(중복 누적 방지).
+
+본 wrapper 작업 범위 안전 사실:
+
+- 실제 broker / KIS / 신규 BUY · SELL · 취소 · 정정 / `--execute` 주문 제출 0건
+- aws-live 작업 0건
+- wrapper 기반 전체 1~17 실제 재실행 0건
+- Step 12 `-AllowPaperOrderExecute` 사용 0건
+- bundled wrapper 미생성
+
+Kiro 는 문서 작성 / 절차 정리만 수행. 실제 wrapper 코드 작성 / parser validation / DryRun / Step 1 SSM 실행 / Step 12 gate 검증은 모두 운영자 직접 진행.
 
 ### 1. wrapper 산출물 인벤토리
 
@@ -372,7 +424,11 @@
    2) Step registry 관리
    3) SSM 실행 공통 함수(`AWS-RunShellScript` Linux 기본 + `AWS-RunPowerShellScript` Windows 지원 추가) — 실행 로그에 documentName 출력 추가
    4) ECS RunTask 공통 함수(`Invoke-DailyAwsPaperEcsTask` / Python patch script 로 UTF-8 no BOM JSON 생성 / `--overrides file://...` 패턴 / taskArn 수집 / `describe-tasks` polling / `STOPPED` 대기 / container exitCode 확인 / log group · stream prefix 보완 / `describe-log-streams` / `get-log-events` 기반 로그 저장)
-   5) AWS Batch SubmitJob 공통 함수(`Invoke-DailyAwsPaperBatchJob` / Python patch script / `aws batch submit-job` / jobId 수집 / `describe-jobs` polling / `SUCCEEDED` / `FAILED` 판정 / Batch CloudWatch log stream 확인 / `aws logs get-log-events` 기반 로그 저장 / 실패 시 jobId / status / statusReason / exitCode / cloudWatchLog 포함 throw)
+   5) AWS Batch SubmitJob 공통 함수(`Invoke-DailyAwsPaperBatchJob`)
+       - Python patch script + `aws batch submit-job`
+       - jobId 수집 / `describe-jobs` polling / `SUCCEEDED` · `FAILED` 판정
+       - Batch CloudWatch log stream 확인 / `aws logs get-log-events` 기반 로그 저장
+       - 실패 시 jobId / status / statusReason / exitCode / cloudWatchLog 포함 throw
    6) CloudWatch log 수집 / SSM stdout · stderr 저장 / summary 기록 / 성공·실패·blocker 판정 / PowerShell UTF-8 보정
 4. step files 17개: 완료
    1) `.kiro/scripts/steps/step-01-connector-balance.ps1` (MarketConnector EC2 SSM / `connector_balance.py`)
@@ -474,16 +530,51 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
 ### 6. 안전 / 보안 점검 결과 (Daily AWS PowerShell wrapper 구현)
 
 1. 본 일자 wrapper 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 변경 0건. `.kiro/scripts/` 신규 폴더 / 파일은 운영자 로컬 PC 도구 / Kiro spec 산출물 외부.
-2. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
-3. AWS / SSM / EC2 / ECS / Batch / IAM / Secrets Manager / SSM Parameter Store / RDS / KIS 호출은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. AWS CLI / boto3 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / 운영자 PowerShell stdout 전문 평문 인용 0건.
+2. 아래 민감정보는 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
+   - 실제 secret value / KIS app key / KIS app secret / token
+   - 계좌번호
+   - RDS password / RDS endpoint hostname
+   - account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id
+   - instance-id / EIP / image digest full sha256 / task ARN / job ARN
+3. AWS / SSM / EC2 / ECS / Batch / IAM / Secrets Manager / SSM Parameter Store / RDS / KIS 호출은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행.
+   - AWS CLI / boto3 실행 0건
+   - AWS 리소스 생성 / 수정 / 삭제 0건
+   - `secretsmanager:GetSecretValue` 결과값 평문 기록 0건
+   - CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / 운영자 PowerShell stdout 전문 평문 인용 0건
 4. wrapper summary / overrides JSON / SSM stdout · stderr 파일에 secret 평문 출력 0건(R-DOCS-001 [2026-06-17 wrapper 보강] mitigation 정합 / `/tmp/inject-env.sh` v5 env injection 만 사용 / value 평문 출력 0건 / key presence / length 만 점검).
-5. broker / KIS 호출 0건(본 wrapper 작업 중). 신규 BUY / SELL / 취소 / 정정 / `--execute` 0건. SELL position `mark_position_sell_ordered()` 호출 0건. fill · position sync 자동 재시도 0건. live 자동 BUY / SELL E2E 검증은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 wrapper 작업은 `aws-paper` 한정 / aws-live 작업 0건 / wrapper 환경 입력 자체가 `aws-paper` 만 허용.
-6. RDS DDL 0건. DML 은 Step 1 단독 SSM 1차 검증의 `connector.connector_balance_snapshot` insert 1건 / `connector.connector_position_snapshot` 보유종목 0건 처리 / `legacy.holdings` 저장은 03 spec Step 1 흐름 정합 한정. 그 외 17 step DryRun 은 ECS RunTask / Batch SubmitJob / SSM command 제출 0건이므로 RDS write 0건. wrapper 기반 전체 1~17 실제 재실행 0건 / Step 12 `-AllowPaperOrderExecute` 사용 0건 / Windows KRX crawler worker stopped 상태 시 Step 2 실제 실행 검증 0건(skip 동작 코드 존재 / 실제 시나리오 검증은 후속) / bundled wrapper 미생성.
-7. 운영 식별자(wrapper 파일명 / step 파일명 / cluster `portfolio-paper-cluster` / Task Definition family·revision / Job Queue · Job Definition family · revision / Log Group 이름 / `C:\Temp\portfolio-daily-aws-paper` 하위 run 폴더 / parser validation 20개 파일) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+5. broker / KIS 호출 0건(본 wrapper 작업 중). 신규 BUY / SELL / 취소 / 정정 / `--execute` 0건. SELL position `mark_position_sell_ordered()` 호출 0건. fill · position sync 자동 재시도 0건.
+   - live 자동 BUY / SELL E2E 검증은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지.
+   - 본 wrapper 작업은 `aws-paper` 한정 / aws-live 작업 0건 / wrapper 환경 입력 자체가 `aws-paper` 만 허용.
+6. RDS DDL 0건. DML 은 Step 1 단독 SSM 1차 검증 한정.
+   - `connector.connector_balance_snapshot` insert 1건
+   - `connector.connector_position_snapshot` 보유종목 0건 처리
+   - `legacy.holdings` 저장은 03 spec Step 1 흐름 정합 한정
+
+   그 외 17 step DryRun 은 ECS RunTask / Batch SubmitJob / SSM command 제출 0건이므로 RDS write 0건. 미실행 사항:
+   - wrapper 기반 전체 1~17 실제 재실행 0건
+   - Step 12 `-AllowPaperOrderExecute` 사용 0건
+   - Windows KRX crawler worker stopped 상태 시 Step 2 실제 실행 검증 0건(skip 동작 코드 존재 / 실제 시나리오 검증은 후속)
+   - bundled wrapper 미생성
+7. 아래 운영 식별자만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+   - wrapper 파일명 / step 파일명
+   - cluster `portfolio-paper-cluster`
+   - Task Definition family·revision
+   - Job Queue · Job Definition family · revision
+   - Log Group 이름
+   - `C:\Temp\portfolio-daily-aws-paper` 하위 run 폴더
+   - parser validation 20개 파일
 
 ## 2026-06-18 (Daily AWS Paper Wrapper 17단계 실운영 검증 — 03 spec 책임 step)
 
-같은 일자 운영자가 직접 수행한 Daily AWS Paper Wrapper(`.kiro/scripts/run-daily-aws-paper.ps1`) 의 Step 1 ~ Step 17 실 실행 중 03 spec(MarketConnector EC2) 책임 step 인 Step 1 / Step 12 / Step 13 / Step 17 결과를 누적 기록한다. Step 2 / Step 3 = 08 spec / Step 4 / Step 5 = 09 spec / Step 6 ~ Step 11 / Step 14 ~ Step 16 = 04 spec operation-notes 의 2026-06-18 섹션 정합. 환경 `aws-paper` / RunDate `2026-06-18` / region `ap-northeast-2` / Step 12 `-AllowPaperOrderExecute` 첫 사용. Kiro 는 문서 작성 / 절차 정리만 수행 / 실제 wrapper 실행 / SSM RunCommand / KIS API 호출 / 운영자 직접 patch / Docker rebuild / ECR push / ECS 재실행은 모두 운영자가 직접 진행했다. 실제 broker / KIS 호출은 KIS paper BUY 4건(Step 12) + balance · order check 조회성 한정 / SELL · 취소 · 정정 호출 0건 / aws-live 작업 0건.
+같은 일자 운영자가 직접 수행한 Daily AWS Paper Wrapper(`.kiro/scripts/run-daily-aws-paper.ps1`) 의 Step 1 ~ Step 17 실 실행 중 03 spec(MarketConnector EC2) 책임 step 인 Step 1 / Step 12 / Step 13 / Step 17 결과를 누적 기록한다.
+
+- Step 2 / Step 3 = 08 spec
+- Step 4 / Step 5 = 09 spec
+- Step 6 ~ Step 11 / Step 14 ~ Step 16 = 04 spec operation-notes 의 2026-06-18 섹션 정합
+
+환경 `aws-paper` / RunDate `2026-06-18` / region `ap-northeast-2` / Step 12 `-AllowPaperOrderExecute` 첫 사용.
+
+Kiro 는 문서 작성 / 절차 정리만 수행. 실제 wrapper 실행 / SSM RunCommand / KIS API 호출 / 운영자 직접 patch / Docker rebuild / ECR push / ECS 재실행은 모두 운영자가 직접 진행. 실제 broker / KIS 호출은 KIS paper BUY 4건(Step 12) + balance · order check 조회성 한정 / SELL · 취소 · 정정 호출 0건 / aws-live 작업 0건.
 
 ### 1. Step 1 `CONNECTOR_BALANCE`
 
@@ -581,16 +672,47 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
 ### 5. 안전 / 보안 점검 결과 (Daily AWS Paper Wrapper 17단계 실운영 검증)
 
 1. 본 일자 작업 범위에서 broker / KIS 호출은 KIS paper BUY 4건(Step 12 본 실행) + balance · order check 조회성 호출(Step 1 / Step 13 / Step 17) 한정. SELL / 취소 / 정정 / 추가 `--execute` 호출 0건. SELL position `mark_position_sell_ordered()` 호출 0건(OD-MS-016 정합 — 본 일자 SELL 흐름 미발생). aws-live 작업 0건.
-2. RDS DDL 0건. DML 은 본 일자 17-step 정상 흐름 한정 — `connector.connector_order_request` insert(id `38 ~ 41` FAILED + `42 ~ 45` ACCEPTED) / `connector.connector_order_event` insert(체결 4건) / `connector.connector_fill` insert(체결 4건) / `execution.strategy_execution_order` update(id `30 ~ 33` FAILED → REQUESTED → SUBMITTED → FILLED) / `connector.connector_balance_snapshot` insert / `connector.connector_position_snapshot` insert(row_count 36) / `legacy.holdings` insert(row_count 41). 운영자 직접 SQL 보정 — strategy_execution_order id `30 ~ 33` 의 FAILED → REQUESTED 복구(R-BROKER-004 mitigation 정합 / wrapper 우회 금지 / 운영자 직접 SQL 만 사용).
-3. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN / KIS paper login credential 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
+2. RDS DDL 0건. DML 은 본 일자 17-step 정상 흐름 한정.
+   - `connector.connector_order_request` insert(id `38 ~ 41` FAILED + `42 ~ 45` ACCEPTED)
+   - `connector.connector_order_event` insert(체결 4건)
+   - `connector.connector_fill` insert(체결 4건)
+   - `execution.strategy_execution_order` update(id `30 ~ 33` FAILED → REQUESTED → SUBMITTED → FILLED)
+   - `connector.connector_balance_snapshot` insert
+   - `connector.connector_position_snapshot` insert(row_count 36)
+   - `legacy.holdings` insert(row_count 41)
+
+   운영자 직접 SQL 보정 — strategy_execution_order id `30 ~ 33` 의 FAILED → REQUESTED 복구(R-BROKER-004 mitigation 정합 / wrapper 우회 금지 / 운영자 직접 SQL 만 사용).
+3. 아래 민감정보는 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
+   - 실제 secret value / KIS app key / KIS app secret / token / KIS paper login credential
+   - 계좌번호 / 계좌 비밀번호
+   - RDS password / RDS endpoint hostname
+   - account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id
+   - instance-id / EIP / image digest full sha256 / task ARN / job ARN
 4. KIS paper 4건의 `broker_order_no`(`0000025576` / `0000025740` / `0000025744` / `0000025747`) 는 broker 응답값으로 운영 식별자 — 실계좌 주문번호 아님 / 본 노트 사실 기록 정합. SSM commandId `66ec8831-74b9-469c-8410-6ccb11cb3400` 도 운영 식별자로 사실 기록.
 5. 운영자가 직접 patch / 정식 배포한 `port_strategy_execution/execution_sync_buy_position.py` 변경분은 04 spec operation-notes 에 사실로만 기록(본문 전체 인용 0건 / R-DOCS-001 정합). 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역).
-6. AWS / SSM / EC2 / ECS / Batch / IAM / Secrets Manager / SSM Parameter Store / RDS / GRANT / KIS / S3 / CloudWatch / Docker / ECR 호출은 모두 운영자 직접 수행 — Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. AWS CLI / boto3 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / Docker build · push 로그 / 운영자 PowerShell stdout 전문 평문 인용 0건.
-7. 운영 식별자(connector_order_request id `38 ~ 41`(FAILED) + `42 ~ 45`(ACCEPTED) / strategy_execution_order id `30 ~ 33` / broker_order_no 4종 / position_state_id `7` · `8` · `11` · `12` / SSM commandId / `connector.connector_position_snapshot` row_count `36` / `legacy.holdings` row_count `41` / 종목 코드 `004990` · `023530` · `003490` · `042660` · `088350` · `282330` / 종목명 / 수량 / entry_price / data_date `2026-06-17` / signal_date · run_date `2026-06-18`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+6. AWS / SSM / EC2 / ECS / Batch / IAM / Secrets Manager / SSM Parameter Store / RDS / GRANT / KIS / S3 / CloudWatch / Docker / ECR 호출은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행.
+   - AWS CLI / boto3 실행 0건
+   - AWS 리소스 생성 / 수정 / 삭제 0건
+   - `secretsmanager:GetSecretValue` 결과값 평문 기록 0건
+   - CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / Docker build · push 로그 / 운영자 PowerShell stdout 전문 평문 인용 0건
+7. 아래 운영 식별자는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+   - connector_order_request id `38 ~ 41`(FAILED) + `42 ~ 45`(ACCEPTED)
+   - strategy_execution_order id `30 ~ 33` / broker_order_no 4종
+   - position_state_id `7` · `8` · `11` · `12` / SSM commandId
+   - `connector.connector_position_snapshot` row_count `36` / `legacy.holdings` row_count `41`
+   - 종목 코드 `004990` · `023530` · `003490` · `042660` · `088350` · `282330` / 종목명 / 수량 / entry_price
+   - data_date `2026-06-17` / signal_date · run_date `2026-06-18`
 
 ## 2026-06-18 (Step 13 `connector_order_check.py` 단건 순차 조회 기본화 — 운영 안전성 강화)
 
-본 섹션은 2026-06-18 같은 일자 첫 번째 세션(Daily AWS Paper Wrapper 17단계 실운영 검증 완료) 후속으로 운영자가 직접 수행한 MarketConnector `connector_order_check.py` 기본 실행 모드 변경(broad 체결조회 일괄 → active 주문 단건 direct-only 순차 조회) 결과를 본 spec 운영 노트에 누적한다. 운영 실패가 아니라 운영 안전성 강화를 위한 설계 변경 — 첫 번째 세션의 broad 조회 `output1 empty` + `output2 summary-only` + active candidate 4건 응답 패턴(R-AUTO-018 [2026-06-18 보강] mitigation 1차 실증) 결과를 더 안전한 기본 동작으로 코드 레벨에 반영. 본 작업은 03 spec MarketConnector EC2 의 운영 안전성 강화 / 17-step Daily AWS Paper Wrapper 의 Step 13 단독 실행 책임 경계 명확화에 해당하며, OD-MS-025 신규 결정 락에 정합한다.
+본 섹션은 2026-06-18 같은 일자 첫 번째 세션(Daily AWS Paper Wrapper 17단계 실운영 검증 완료) 후속으로 운영자가 직접 수행한 MarketConnector `connector_order_check.py` 기본 실행 모드 변경(broad 체결조회 일괄 → active 주문 단건 direct-only 순차 조회) 결과를 본 spec 운영 노트에 누적한다.
+
+운영 실패가 아니라 운영 안전성 강화를 위한 설계 변경. 첫 번째 세션의 broad 조회 `output1 empty` + `output2 summary-only` + active candidate 4건 응답 패턴(R-AUTO-018 [2026-06-18 보강] mitigation 1차 실증) 결과를 더 안전한 기본 동작으로 코드 레벨에 반영.
+
+본 작업은 아래에 해당하며 OD-MS-025 신규 결정 락에 정합한다.
+
+- 03 spec MarketConnector EC2 의 운영 안전성 강화
+- 17-step Daily AWS Paper Wrapper 의 Step 13 단독 실행 책임 경계 명확화
 
 ### 1. 변경 대상 파일 + 기본 실행 모드 변경: 완료
 
@@ -649,17 +771,41 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
    3) OD-MS-023(Daily AWS wrapper 운영 정책) — wrapper ps1 의 책임은 orchestration 만 / 체결조회 방식 제어는 `connector_order_check.py` 내부 책임으로 명확화 / Status 기존 값 그대로 유지
 3. 신규 리스크: 0건
 4. 본문 변경 없는 리스크: detection / mitigation 메모 보강
-   1) R-AUTO-018(KIS `inquire-daily-ccld` summary-only fallback 오매핑) — [2026-06-18 추가 보강] 메모 추가 / 본 일자 첫 번째 세션의 wrapper 안 자동 skip 1차 실증에 더해 `connector_order_check.py` 자체의 기본 실행 모드가 active 주문 단건 순차 조회로 변경됨으로써 broad 체결조회 호출 빈도 자체가 줄고 다건 active 상태에서 summary fallback 노출 표면이 감소 / Status `Mitigated` 유지(verified on 2026-06-18 두 번째 세션)
+   1) R-AUTO-018(KIS `inquire-daily-ccld` summary-only fallback 오매핑) — [2026-06-18 추가 보강] 메모 추가.
+       - 본 일자 첫 번째 세션의 wrapper 안 자동 skip 1차 실증에 더해 `connector_order_check.py` 자체의 기본 실행 모드가 active 주문 단건 순차 조회로 변경.
+       - broad 체결조회 호출 빈도 자체가 줄고 다건 active 상태에서 summary fallback 노출 표면이 감소.
+       - Status `Mitigated` 유지(verified on 2026-06-18 두 번째 세션).
 
 ### 5. 안전 / 보안 점검 결과 (Step 13 `connector_order_check.py` 단건 순차 조회 기본화): 완료
 
 1. broker / KIS 호출 범위: 단건 direct-only 조회 1건(`004990` / `0000025576`) + wrapper Step 13 단독 실행(`-StartStep 13 -EndStep 13`) 1건 — 모두 조회성. 신규 BUY · SELL · 취소 · 정정 · `--execute` 호출 0건. SELL position `mark_position_sell_ordered()` 호출 0건. fill · position sync 자동 재시도 0건. aws-live 작업 0건.
 2. RDS DDL 0건. DML 은 Step 13 정상 흐름 한정 — `connector.connector_order_event` / `connector.connector_fill` 신규 row 는 단건 direct-only 조회 결과 정합.
-3. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / EIP / image digest full sha256 / task ARN / job ARN / KIS paper login credential 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
-4. AWS / SSM / EC2 / S3 / IAM / Secrets Manager / SSM Parameter Store / RDS / KIS 호출은 모두 운영자 직접 수행 — Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. AWS CLI / boto3 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / 운영자 PowerShell stdout 전문 평문 인용 0건.
+3. 아래 민감정보는 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
+   - 실제 secret value / KIS app key / KIS app secret / token / KIS paper login credential
+   - 계좌번호 / 계좌 비밀번호
+   - RDS password / RDS endpoint hostname
+   - account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id
+   - EIP / image digest full sha256 / task ARN / job ARN
+4. AWS / SSM / EC2 / S3 / IAM / Secrets Manager / SSM Parameter Store / RDS / KIS 호출은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행.
+   - AWS CLI / boto3 실행 0건
+   - AWS 리소스 생성 / 수정 / 삭제 0건
+   - `secretsmanager:GetSecretValue` 결과값 평문 기록 0건
+   - CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / 운영자 PowerShell stdout 전문 평문 인용 0건
 5. 운영자 직접 patch 한 `port-marketconnector/connector_order_check.py` 변경분은 본 노트에 사실로만 기록(본문 전체 인용 0건 / R-DOCS-001 정합). 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 두 번째 세션 작업으로 인한 변경 0건(spec 영역).
 6. wrapper 파라미터 `StartStep` / `EndStep` 사용(FromStep / ToStep 실수 시 default 1/17 진입 위험) — 본 일자 단독 실행은 `-StartStep 13 -EndStep 13` 으로 진행 / wrapper 파라미터 명시 정책 정합.
-7. 운영 식별자(commit `75cb804` / S3 bucket `portfolio-paper-migration-yukiever` / S3 key `deploy/marketconnector/connector_order_check.py` / 파일 크기 `39159 bytes` / EC2 instance id `i-0fce77927b7397b88` / EC2 backup 파일명 `connector_order_check.py.bak-20260618-step13-per-order` / SSM commandId `b344d404-07a4-4bb6-9d63-34151e648bab` / 종목 코드 `004990` / broker_order_no `0000025576` / wrapper 옵션 `--broad` · `--active-limit` · `--code` · `--order-no` · `--no-broad` / wrapper 파라미터 `StartStep` · `EndStep`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님. instance id 는 OD-NET-010 에 이미 사실 기록되어 있는 표준 SSM Port Forwarding 표준 경유지 식별자.
+7. 아래 운영 식별자는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+   - commit `75cb804`
+   - S3 bucket `portfolio-paper-migration-yukiever`
+   - S3 key `deploy/marketconnector/connector_order_check.py`
+   - 파일 크기 `39159 bytes`
+   - EC2 instance id `i-0fce77927b7397b88`
+   - EC2 backup 파일명 `connector_order_check.py.bak-20260618-step13-per-order`
+   - SSM commandId `b344d404-07a4-4bb6-9d63-34151e648bab`
+   - 종목 코드 `004990` / broker_order_no `0000025576`
+   - wrapper 옵션 `--broad` · `--active-limit` · `--code` · `--order-no` · `--no-broad`
+   - wrapper 파라미터 `StartStep` · `EndStep`
+
+   instance id 는 OD-NET-010 에 이미 사실 기록되어 있는 표준 SSM Port Forwarding 표준 경유지 식별자.
 
 ### 6. 후속 작업 (2026-06-18 두 번째 세션 이월): 예정
 
@@ -696,7 +842,19 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
 
 ## 2026-06-22 MarketConnector env bootstrap 재생성 + Paper SELL 주문 제출 검증
 
-운영자가 2026-06-22 직접 수행한 Daily AWS Paper Wrapper 1 ~ 17 두 번째 실 운영 실행 중 본 spec 책임 step(Step 1 / Step 12 / Step 13 / Step 17) 결과를 누적 기록한다. Step 1 최초 실패 원인 식별(`/tmp/inject-env.sh not found`) → `daily-aws-paper.functions.ps1` MarketConnector env bootstrap 함수 추가 후 Step 1 재실행 성공 → Step 12 한화생명 244주 SELL_HARD_STOP MARKET 제출 성공 → Step 13 체결조회 성공 → Step 17 BALANCE_REFRESH Success 흐름. 본 일자에 Kiro 는 문서 작성 / 절차 정리만 수행 / 실제 wrapper 실행 / EC2 / SSM / KIS / RDS / GRANT 작업은 모두 운영자가 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. 본 작업은 단순 dry-run 이 아니라 실제 Paper SELL 주문 제출 / KIS 접수 / 체결조회 / SELL fill sync / position CLOSED / balance refresh 까지 end-to-end 통과한 **첫 완주성 운영 결과**다.
+운영자가 2026-06-22 직접 수행한 Daily AWS Paper Wrapper 1 ~ 17 두 번째 실 운영 실행 중 본 spec 책임 step(Step 1 / Step 12 / Step 13 / Step 17) 결과를 누적 기록한다.
+
+흐름 요약:
+
+- Step 1 최초 실패 원인 식별(`/tmp/inject-env.sh not found`)
+- `daily-aws-paper.functions.ps1` MarketConnector env bootstrap 함수 추가 후 Step 1 재실행 성공
+- Step 12 한화생명 244주 SELL_HARD_STOP MARKET 제출 성공
+- Step 13 체결조회 성공
+- Step 17 BALANCE_REFRESH Success
+
+본 일자에 Kiro 는 문서 작성 / 절차 정리만 수행. 실제 wrapper 실행 / EC2 / SSM / KIS / RDS / GRANT 작업은 모두 운영자가 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건.
+
+본 작업은 단순 dry-run 이 아니라 실제 Paper SELL 주문 제출 / KIS 접수 / 체결조회 / SELL fill sync / position CLOSED / balance refresh 까지 end-to-end 통과한 **첫 완주성 운영 결과**다.
 
 ### 1. Step 1 `CONNECTOR_BALANCE` 최초 실패 원인 분석 + bootstrap 패치
 
@@ -717,7 +875,12 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
 ### 2. Step 12 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` Paper SELL 제출
 
 1. Step 12 진입 전 사전 점검(03 spec runbook / safety gate 정합): 완료
-   1) execution plan id `96` 생성 확인 — `plan_date 2026-06-22` / `strategy_name strategy_ai` / `market_signal DEFENSIVE` / `risk_regime DEFENSIVE` / `plan_status PARTIALLY_BLOCKED` / total_candidate 3 / ready 1 / blocked 2 / skipped 0 / total_target_amount `1,237,080` / available_cash `-62,763` / max_order_amount `-31,381.50`
+   1) execution plan id `96` 생성 확인.
+       - `plan_date 2026-06-22` / `strategy_name strategy_ai`
+       - `market_signal DEFENSIVE` / `risk_regime DEFENSIVE`
+       - `plan_status PARTIALLY_BLOCKED`
+       - total_candidate 3 / ready 1 / blocked 2 / skipped 0
+       - total_target_amount `1,237,080` / available_cash `-62,763` / max_order_amount `-31,381.50`
    2) Step 12 대상 = `088350` 한화생명 SELL 244주 MARKET 1건(BUY 2건은 현금 부족으로 BLOCKED 처리됨)
    3) 중복 주문 점검 — `connector.connector_order_request` 동일 strategy_execution_order 대상 row 0건
 2. 매도 사유(SELL_HARD_STOP) 정합 확인: 완료
@@ -773,14 +936,41 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
 
 1. broker / KIS 호출 = KIS paper SELL 1건(Step 12 본 실행) + balance · order check 조회성 한정. BUY / 취소 / 정정 / 추가 `--execute` 호출 0건. SELL position `mark_position_sell_ordered()` 호출은 MarketConnector executor SELL 성공 시점 책임(OD-MS-016 정합). fill · position sync 자동 재시도 0건. aws-live 작업 0건.
 2. RDS DDL 0건. DML 은 17-step 정상 흐름 한정 — `connector.connector_order_request` insert(`id 46` ACCEPTED → FILLED) / `connector.connector_order_event` / `connector.connector_fill` insert(`id 34`) / `connector.connector_balance_snapshot` insert / `connector.connector_position_snapshot` insert(보유 5종목).
-3. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN / broker_order_no 원문 / broker_branch_code 원문 / KIS paper login credential 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
-4. AWS / SSM / EC2 / RDS / Secrets Manager / SSM Parameter Store / KIS API 호출은 모두 운영자 직접 수행 — Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. AWS CLI / boto3 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / 운영자 PowerShell stdout 전문 평문 인용 0건.
+3. 아래 민감정보는 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
+   - 실제 secret value / KIS app key / KIS app secret / token / KIS paper login credential
+   - 계좌번호 / 계좌 비밀번호
+   - RDS password / RDS endpoint hostname
+   - account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id
+   - instance-id / EIP / image digest full sha256 / task ARN / job ARN
+   - broker_order_no 원문 / broker_branch_code 원문
+4. AWS / SSM / EC2 / RDS / Secrets Manager / SSM Parameter Store / KIS API 호출은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행.
+   - AWS CLI / boto3 실행 0건
+   - AWS 리소스 생성 / 수정 / 삭제 0건
+   - `secretsmanager:GetSecretValue` 결과값 평문 기록 0건
+   - CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / 운영자 PowerShell stdout 전문 평문 인용 0건
 5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역). 운영자 직접 patch 한 `daily-aws-paper.functions.ps1` MarketConnector env bootstrap 함수 변경분은 본 노트 § 1 에 사실로만 기록(본문 전체 인용 0건 / R-DOCS-001 정합 / `.kiro/scripts/` 영역).
-6. 운영 식별자(`execution_plan_id 96` / execution_order id `37` / connector_order_request id `46` / connector_fill id `34` / position_state_id `9` / 종목 코드 / 종목명 / 수량 · 가격 · 비율 / data_date / signal_date · run_date `2026-06-22` / `fill_ts 2026-06-22 00:46:58 UTC` / `created_at 2026-06-22 00:50:50 UTC`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+6. 아래 운영 식별자는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+   - `execution_plan_id 96` / execution_order id `37`
+   - connector_order_request id `46` / connector_fill id `34`
+   - position_state_id `9`
+   - 종목 코드 / 종목명 / 수량 · 가격 · 비율
+   - data_date / signal_date · run_date `2026-06-22`
+   - `fill_ts 2026-06-22 00:46:58 UTC` / `created_at 2026-06-22 00:50:50 UTC`
 
 ## 2026-06-23 Step 12 retry-normalizer 내장 + Step Functions approval true path Paper SELL E2E
 
-운영자가 2026-06-23 직접 수행한 (a) Daily AWS Paper Step Functions state machine `portfolio-paper-daily-step1-17-approval` 실전 검증 + (b) Step 12 `connector_strategy_order_execute.py` 전체 교체 + Step 12 시작부 retry-normalizer 내장 + (c) Step 12 ~ Step 17 `allowPaperOrderExecute=true` approval true path 첫 실 SELL E2E 통과 + (d) connector 측 DB 한글 저장 정상 확인 결과 중 본 spec 책임 step(Step 12 / Step 13 / Step 17) 결과를 누적 기록한다. 2026-06-17 첫 BUY 4건 완주(첫 실 BUY E2E) / 2026-06-22 SELL 1건 완주(첫 실 SELL E2E / wrapper 기반) 에 이어 본 일자는 Step Functions approval workflow 를 통한 첫 실 SELL E2E 회차로 분류된다. 본 일자에 Kiro 는 문서 작성 / 절차 정리만 수행 / 실제 Step Functions / EC2 / SSM / KIS / RDS / Secrets Manager / Step 12 entrypoint patch / EC2 정식 배포 작업은 모두 운영자가 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. 04 spec 측 step(Step 6 ~ Step 11 Strategy Decision · Execution / Step 14 ~ Step 16 fill sync · position sync) 의 상세 누적은 3차 작업 책임으로 분리 — 본 노트는 MarketConnector EC2 책임 영역(Step 12 / Step 13 / Step 17) 한정.
+운영자가 2026-06-23 직접 수행한 아래 4개 작업 중 본 spec 책임 step(Step 12 / Step 13 / Step 17) 결과를 누적 기록한다.
+
+- (a) Daily AWS Paper Step Functions state machine `portfolio-paper-daily-step1-17-approval` 실전 검증
+- (b) Step 12 `connector_strategy_order_execute.py` 전체 교체 + Step 12 시작부 retry-normalizer 내장
+- (c) Step 12 ~ Step 17 `allowPaperOrderExecute=true` approval true path 첫 실 SELL E2E 통과
+- (d) connector 측 DB 한글 저장 정상 확인
+
+2026-06-17 첫 BUY 4건 완주(첫 실 BUY E2E) / 2026-06-22 SELL 1건 완주(첫 실 SELL E2E / wrapper 기반) 에 이어 본 일자는 Step Functions approval workflow 를 통한 첫 실 SELL E2E 회차로 분류된다.
+
+본 일자에 Kiro 는 문서 작성 / 절차 정리만 수행. 실제 Step Functions / EC2 / SSM / KIS / RDS / Secrets Manager / Step 12 entrypoint patch / EC2 정식 배포 작업은 모두 운영자가 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건.
+
+04 spec 측 step(Step 6 ~ Step 11 Strategy Decision · Execution / Step 14 ~ Step 16 fill sync · position sync) 의 상세 누적은 3차 작업 책임으로 분리 — 본 노트는 MarketConnector EC2 책임 영역(Step 12 / Step 13 / Step 17) 한정.
 
 ### 1. Step 12 retry-normalizer 내장 (`connector_strategy_order_execute.py` 전체 교체 + EC2 정식 배포 + dry-run 통과)
 
@@ -792,7 +982,13 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
 2. 운영자 직접 patch: 완료
    1) 대상 파일 = `port-marketconnector/connector_strategy_order_execute.py` 전체 교체(`.kiro/scripts/` 외부 / port-marketconnector 영역 / 본 spec 소스 영역의 운영자 직접 patch — 본 노트는 사실 기록만 / 본문 전체 인용 0건 / R-DOCS-001 정합)
    2) 적용 위치 = Step 12(`MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE`) 시작부 — **별도 Step 11.5 분리 아님 / 기존 Step 12 내부 안전 보완**
-   3) 복구 조건 6종 모두 만족할 때만 적용 — `execution_mode = PAPER_STRATEGY` + `action_type IN (BUY, SELL)` + `execution_status IN (READY, FAILED)` + `connector_order_request_id IS NOT NULL` + linked `connector_order_request.request_status = REJECTED` + `rejection_code = 40580000` + `broker_order_no IS NULL` + `connector_fill` 없음
+   3) 복구 조건 6종 모두 만족할 때만 적용.
+       - `execution_mode = PAPER_STRATEGY`
+       - `action_type IN (BUY, SELL)`
+       - `execution_status IN (READY, FAILED)`
+       - `connector_order_request_id IS NOT NULL` + linked `connector_order_request.request_status = REJECTED`
+       - `rejection_code = 40580000`
+       - `broker_order_no IS NULL` + `connector_fill` 없음
    4) `broker_order_no IS NOT NULL` 이거나 `connector_fill` 이 이미 존재하는 경우는 복구 대상에서 제외 — R-BROKER-004 / R-AUTO-001 의 중복 주문 위험과 충돌하지 않도록 보장
    5) 복구 처리 — `execution_status = REQUESTED` + `connector_order_request_id = NULL` + `result_payload.retry_normalizer` 에 old request 이력(`old_connector_order_request_id` / `request_status` / `rejection_code` / `recovered_at` 등 사후 추적 가능 메타데이터) 저장
 3. EC2 정식 배포 + dry-run 통과: 완료
@@ -847,7 +1043,11 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
    3) `legacy.holdings` 결과 확인은 view_app 권한 부재로 운영자가 `portfolio_admin` 으로 우회 조회(R-DATA-005 [2026-06-22 보강] 정합 / 정식 GRANT 후속 유지)
 3. KIS 호출 측 이벤트: 식별
    1) EGW00123 token 만료 후 재발급 동작 통과 확인 — 본 일자 Step 17 흐름에서 token 자동 재발급 경로 정상 동작
-   2) EGW00215 rate limit 발생 사례 식별 — 본 일자 신규 R 부여 보류(R-AUTO-001 / R-AUTO-015 / OD-SAFE-004 정합 — 자동 재시도 정책은 idempotent step 한정 그대로 유지 / Step 17 BALANCE_REFRESH 는 idempotent 분류 / Step 17 wrapper · Step Functions Step 17 state 측 backoff · retry policy 결정은 followups-overview 2026-06-23 §1 후속 phase 책임으로 분리)
+   2) EGW00215 rate limit 발생 사례 식별 — 본 일자 신규 R 부여 보류.
+       - R-AUTO-001 / R-AUTO-015 / OD-SAFE-004 정합.
+       - 자동 재시도 정책은 idempotent step 한정 그대로 유지.
+       - Step 17 BALANCE_REFRESH 는 idempotent 분류.
+       - Step 17 wrapper · Step Functions Step 17 state 측 backoff · retry policy 결정은 followups-overview 2026-06-23 §1 후속 phase 책임으로 분리.
 
 ### 5. DB 한글 저장 정상 확인 (connector 측 책임 테이블 한정)
 
@@ -884,12 +1084,45 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
 
 ### 7. 안전 / 보안 점검 결과 (2026-06-23)
 
-1. broker / KIS 호출 = KIS paper SELL 1건(Step 12 Step Functions approval true path 본 실행) + balance · order check 조회성 한정. BUY / 취소 / 정정 / 추가 `--execute` 호출 0건. SELL position `mark_position_sell_ordered()` 호출은 MarketConnector executor SELL 성공 시점 책임(OD-MS-016 정합). fill · position sync 자동 재시도 0건. aws-live 작업 0건.
-2. RDS DDL 0건. DML 은 Step Functions approval true path 정상 흐름 한정 — `connector.connector_order_request` insert(`id 48` ACCEPTED → FILLED) / `connector.connector_order_event` / `connector.connector_fill` insert(상세 row id 누적은 04 spec 책임) / `connector.connector_balance_snapshot` insert / `connector.connector_position_snapshot` insert(보유 4종목). 본 일자 retry-normalizer 의 `execution.strategy_execution_order` UPDATE 적용 0건(현재 retry 후보 0건).
-3. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id 본문 외 평문 / EIP / image digest full sha256 / task ARN / job ARN / broker_order_no 외 broker 응답 전문 / KIS paper login credential / Administrator password / Step Functions execution ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
-4. AWS / SSM / EC2 / RDS / Secrets Manager / SSM Parameter Store / Step Functions / KIS API 호출은 모두 운영자 직접 수행 — Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. AWS CLI / boto3 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / Step Functions execution history 본문 / 운영자 PowerShell stdout 전문 평문 인용 0건. PGAdmin4 점검 SELECT 한정 / INSERT · UPDATE · DELETE · DDL 0건.
-5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역). 운영자 직접 patch 한 `port-marketconnector/connector_strategy_order_execute.py` 전체 교체 + Step 12 시작부 retry-normalizer 내장 변경분은 본 노트 §1 에 사실로만 기록(본문 전체 인용 0건 / 함수 시그니처 / SQL 본문 / patch diff 인용 0건 / R-DOCS-001 정합 / port-marketconnector 영역).
-6. 운영 식별자(Step Functions state machine `portfolio-paper-daily-step1-17-approval` / `execution.strategy_execution_order id 40` / `connector.connector_order_request id 48` / `broker_order_no 0000006143` / 종목 코드 `282330` / 종목명 BGF리테일 / 수량 17 / 매도 방식 MARKET / Step Functions approval gate 라벨 `allowPaperOrderExecute=false` · `allowPaperOrderExecute=true` / wrapper stdout 라벨 `PaperOrder: True` / EC2 instance id `i-0fce77927b7397b88`(OD-NET-010 정합 / 본 일자 이전 spec 산출물에 이미 사실 기록) / signal_date · run_date `2026-06-23` / `server_encoding` · `client_encoding` 값 `UTF8` / KIS error code `EGW00123` · `EGW00215`) 는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+1. broker / KIS 호출 = KIS paper SELL 1건(Step 12 Step Functions approval true path 본 실행) + balance · order check 조회성 한정.
+   - BUY / 취소 / 정정 / 추가 `--execute` 호출 0건.
+   - SELL position `mark_position_sell_ordered()` 호출은 MarketConnector executor SELL 성공 시점 책임(OD-MS-016 정합).
+   - fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
+2. RDS DDL 0건. DML 은 Step Functions approval true path 정상 흐름 한정.
+   - `connector.connector_order_request` insert(`id 48` ACCEPTED → FILLED)
+   - `connector.connector_order_event` / `connector.connector_fill` insert(상세 row id 누적은 04 spec 책임)
+   - `connector.connector_balance_snapshot` insert
+   - `connector.connector_position_snapshot` insert(보유 4종목)
+
+   본 일자 retry-normalizer 의 `execution.strategy_execution_order` UPDATE 적용 0건(현재 retry 후보 0건).
+3. 아래 민감정보는 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
+   - 실제 secret value / KIS app key / KIS app secret / token / KIS paper login credential
+   - 계좌번호 / 계좌 비밀번호
+   - RDS password / RDS endpoint hostname
+   - account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id
+   - instance-id 본문 외 평문 / EIP / image digest full sha256 / task ARN / job ARN
+   - broker_order_no 외 broker 응답 전문
+   - Administrator password / Step Functions execution ARN
+4. AWS / SSM / EC2 / RDS / Secrets Manager / SSM Parameter Store / Step Functions / KIS API 호출은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행.
+   - AWS CLI / boto3 실행 0건
+   - AWS 리소스 생성 / 수정 / 삭제 0건
+   - `secretsmanager:GetSecretValue` 결과값 평문 기록 0건
+   - CloudWatch Logs 본문 / SSM 응답 본문 / KIS API response body / Step Functions execution history 본문 / 운영자 PowerShell stdout 전문 평문 인용 0건
+   - PGAdmin4 점검 SELECT 한정 / INSERT · UPDATE · DELETE · DDL 0건
+5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역).
+   - 운영자 직접 patch 한 `port-marketconnector/connector_strategy_order_execute.py` 전체 교체 + Step 12 시작부 retry-normalizer 내장 변경분은 본 노트 §1 에 사실로만 기록.
+   - 본문 전체 인용 0건 / 함수 시그니처 / SQL 본문 / patch diff 인용 0건 / R-DOCS-001 정합 / port-marketconnector 영역.
+6. 아래 운영 식별자는 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+   - Step Functions state machine `portfolio-paper-daily-step1-17-approval`
+   - `execution.strategy_execution_order id 40` / `connector.connector_order_request id 48`
+   - `broker_order_no 0000006143`
+   - 종목 코드 `282330` / 종목명 BGF리테일 / 수량 17 / 매도 방식 MARKET
+   - Step Functions approval gate 라벨 `allowPaperOrderExecute=false` · `allowPaperOrderExecute=true`
+   - wrapper stdout 라벨 `PaperOrder: True`
+   - EC2 instance id `i-0fce77927b7397b88`(OD-NET-010 정합 / 본 일자 이전 spec 산출물에 이미 사실 기록)
+   - signal_date · run_date `2026-06-23`
+   - `server_encoding` · `client_encoding` 값 `UTF8`
+   - KIS error code `EGW00123` · `EGW00215`
 
 
 
@@ -996,5 +1229,16 @@ Step 13 / Step 17 은 03 spec 의 MarketConnector EC2 SSM RunCommand 흐름을 �
  2) 운영자 직접 수행 영역 = `connector_intraday_position_evaluate.py` 교체 배포 + 장중 runner 갱신 + EC2 IAM inline policy 부여 + EC2 invoke smoke + 1회 실제 runner 안전 검증
  3) AWS CLI / boto3 / psql / Lambda 실행 / Step Functions 실행 / SSM RunCommand / 외부 API 호출 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건
  4) `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / IAM Policy 전체 본문 / Lambda 코드 본문 / Step Functions ASL 본문 / SSM 응답 본문 / Slack 메시지 본문 / CloudWatch Logs 전문 평문 인용 0건(R-DOCS-001 정합)
- 5) 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 12자리 원문 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / 실제 state machine ARN / Slack webhook URL / DB password / Administrator password / EIP / public IP / broker_order_no 원문) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder
- 6) 운영 식별자(파일 경로 / 배포 SHA256 / 배포 버전 / CLI option 라벨 / runner SHA256 / runner backup 이름 / SSM commandId / IAM Role 이름 / inline policy 이름 / Lambda 이름 / state machine 이름 / Slack 이벤트 라벨 / 문구 라벨 / source_version 2종 / marker 이름 3종 / table count 라벨 5종 / balance snapshot id · as_of_date · as_of_ts · 금액 요약) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님
+ 5) 아래 민감정보는 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder
+       - secret value / KIS app key / KIS app secret / token
+       - 계좌번호 12자리 원문 / DB password / Administrator password
+       - RDS password / RDS endpoint hostname
+       - account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / 실제 state machine ARN
+       - Slack webhook URL / EIP / public IP / broker_order_no 원문
+ 6) 아래 운영 식별자만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님
+       - 파일 경로 / 배포 SHA256 / 배포 버전 / CLI option 라벨
+       - runner SHA256 / runner backup 이름 / SSM commandId
+       - IAM Role 이름 / inline policy 이름 / Lambda 이름 / state machine 이름
+       - Slack 이벤트 라벨 / 문구 라벨
+       - source_version 2종 / marker 이름 3종 / table count 라벨 5종
+       - balance snapshot id · as_of_date · as_of_ts · 금액 요약

@@ -235,3 +235,22 @@ SPRING_PROFILES_ACTIVE=local
 ```
 
 실제 값은 각 환경의 외부 설정으로 주입합니다.
+
+## Fargate 안전 기본값
+
+port-view를 ECS Fargate Service로 운영할 때 Daily Batch 관련 설정의 안전 기본값을 다음과 같이 권장합니다.
+
+- `portfolio.batch.execution-mode=aws-stepfunctions`: Fargate 기준 기본 backend
+- `portfolio.batch.local-file-execution-enabled=false`: Fargate에서는 로컬 subprocess 실행 미사용
+- `portfolio.batch.paper-order-enabled=false`: 주문성 gate 초기 차단
+- `portfolio.batch.full-pipeline-execution-enabled=false`: 전체 1~17 실행 초기 차단
+- `portfolio.batch.max-executable-step-order=11`: safe 범위 상한을 Step 11로 제한
+
+Step 12~17 주문성 구간은 approval workflow state machine과 별도 gate 뒤에서만 활성화됩니다. 운영자가 명시적으로 gate를 ENABLE하고 approval workflow ARN이 주입되어 있을 때만 승인 실행 endpoint가 활성화됩니다.
+
+State machine ARN은 환경변수로 주입하고 실제 값은 문서에 기록하지 않습니다. 필요한 경우 다음 placeholder를 사용합니다.
+
+- `<STATE_MACHINE_ARN>`: 일반 workflow(`portfolio-paper-daily-step1-17-approval`) ARN
+- `<APPROVAL_STATE_MACHINE_ARN>`: 승인형 workflow(`portfolio-paper-daily-step12-17-approval`) ARN
+
+Fargate 관점에서 datasource, Step Functions 설정, Snapshot Refresh gate, Daily Batch gate는 모두 container 환경변수로 주입합니다. secret 유형(값이 민감한 항목)은 secret manager 또는 배포 secret으로 주입하고, 저장소 문서에는 키 이름만 남깁니다.

@@ -193,3 +193,30 @@ Step 또는 run이 정상 완료된 상태입니다.
 - command timeout은 step 특성에 맞게 조정해야 합니다.
 - stdout/stderr는 tail만 저장하므로 전체 로그가 필요한 경우 외부 로그 정책이 필요합니다.
 - 계좌번호, webhook, DB password 등 민감정보는 환경변수 또는 local config로 분리해야 합니다.
+
+## AWS Step Functions backend와 View 트리거 UI
+
+Daily Batch 실행 backend는 `local-file`과 `aws-stepfunctions`로 분리됩니다. Fargate 기준 기본 backend는 `aws-stepfunctions`이며, `local-file` backend는 운영자 로컬 검증/복구용으로만 유지합니다.
+
+View의 트리거 UI는 두 endpoint로 분리되어 있습니다.
+
+- `POST /daily-batch/aws-stepfunctions/start-range`: Step 1~11 safe trigger 용도. 주문성 gate를 통과하지 않고 데이터 수집 / 판단 / 후처리 구간만 실행합니다.
+- `POST /daily-batch/aws-stepfunctions/start-approval-range`: Step 12~17 승인 실행 용도. 승인 workflow state machine ARN이 별도로 주입되어 있어야 하며, 서비스 레벨에서 approval ARN이 비어 있으면 승인 실행이 차단됩니다.
+
+일반 workflow와 approval workflow state machine ARN은 서로 다른 환경변수로 분리 주입합니다. 실제 ARN은 문서에 기록하지 않고 다음 placeholder를 사용합니다.
+
+- `<STATE_MACHINE_ARN>`: 일반 workflow ARN
+- `<APPROVAL_STATE_MACHINE_ARN>`: 승인형 workflow ARN
+
+`StartExecution` payload의 타입 정합:
+
+- `allowPaperOrderExecute` · `paperOrderEnabled`는 boolean JSON
+- `fromStepOrder` · `toStepOrder` · `startStep` · `endStep`는 numeric JSON
+- `runDate`는 Asia/Seoul 기준 `yyyy-MM-dd` 문자열
+- `environment` · `dbTarget` · `source` · `requestedBy` · `requestedFrom` · `fromStepCode` · `toStepCode`는 문자열
+
+`StartExecution` 성공 시 View는 `executionName`과 account-id 부분을 redaction한 `executionArn`을 flash message로 표시합니다. 실제 account-id 원문, state machine ARN 전체, 실행 시각 상세는 저장소 문서에 기록하지 않습니다.
+
+Daily Batch 실제 실행 책임은 View 컨테이너 안 subprocess가 아니라 AWS Step Functions state machine + ECS RunTask + SSM RunCommand + AWS Batch + Lambda 쪽에 있습니다. View는 조회 / 승인 / 트리거 UI 역할만 담당합니다.
+
+Fargate 관점의 안전 기본값(`local-file-execution-enabled=false`, `paper-order-enabled=false`, `full-pipeline-execution-enabled=false`, `max-executable-step-order=11`)과 그 의미는 [`configuration.md`](configuration.md)의 "Fargate 안전 기본값" 절을 참고합니다.

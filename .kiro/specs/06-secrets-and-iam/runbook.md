@@ -1,18 +1,24 @@
 # Runbook — 06-secrets-and-iam
 
-본 문서는 운영자가 AWS Console / EC2 shell에서 순서대로 직접 따라 할 수 있는 실행 절차서다. 1차 적용 환경은 `aws-paper`, region은 `ap-northeast-2`, 1차 적용 대상은 MarketConnector EC2다. `aws-live`는 [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook)(예정) 통합 책임.
+본 문서는 운영자가 AWS Console / EC2 shell에서 순서대로 직접 따라 할 수 있는 실행 절차서다.
+1차 적용 환경은 `aws-paper`, region은 `ap-northeast-2`, 1차 적용 대상은 MarketConnector EC2다.
+`aws-live` 는 [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook)(예정) 통합 책임.
 
 본 runbook은 실제 AWS 리소스를 자동으로 만들지 않는다. 운영자가 한 단계씩 직접 클릭 / 입력하고, 각 Step의 [확인]까지 통과한 다음 Step으로 진행한다.
 
 선행 입력
 
 - [`./requirements.md`](./requirements.md), [`./README.md`](./README.md), [`./design.md`](./design.md), [`./tasks.md`](./tasks.md)
-- [`../02-aws-network-and-rds/runbook.md`](../02-aws-network-and-rds/runbook.md), [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md)
+- [`../02-aws-network-and-rds/runbook.md`](../02-aws-network-and-rds/runbook.md)
+- [`../02-aws-network-and-rds/operation-notes.md`](../02-aws-network-and-rds/operation-notes.md)
 - [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/risk-register.md`](../_common/risk-register.md)
 
 보안 / 안전 원칙
 
-- 모든 secret value, KIS app key, KIS app secret, 계좌번호, RDS endpoint hostname, RDS password, account-id, 실제 secret ARN, IAM access key id, Slack webhook URL은 `[REDACTED]` 또는 placeholder만 사용한다. 본 문서 / 콘솔 화면 캡처 / 운영자 노트 어디에도 평문으로 적지 않는다.
+- 아래 항목은 `[REDACTED]` 또는 placeholder만 사용한다. 본 문서 / 콘솔 캡처 / 운영자 노트 어디에도 평문으로 적지 않는다.
+  - secret value / KIS app key / KIS app secret / 계좌번호
+  - RDS endpoint hostname / RDS password / account-id
+  - 실제 secret ARN / IAM access key id / Slack webhook URL
 - 8개 MS 소스 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 금지.
 - broker / KIS / Selenium / KRX / Naver / yfinance / RDS DDL/DML / 주문 / 체결 / Daily Batch / intraday monitor 호출 금지. 본 runbook은 조회성 smoke test까지만 진행한다.
 - `secretsmanager:GetSecretValue` 실호출은 운영자만. Kiro 자동 검증은 `secretsmanager:DescribeSecret` metadata만.
@@ -53,11 +59,15 @@ ls -la ~/.aws 2>/dev/null
 
 ### 1-4. 임시 운영 모드 인지 [준비]
 
-오전 검증에서 사용한 shell `export` 기반 환경변수 주입 방식은 임시 운영 모드다. 본 runbook 완료 후에는 정상 운영 모드(Secrets Manager / SSM Parameter Store 경유 주입)로 전환한다. 자세한 정의는 [`./design.md`](./design.md) §3.4 참조.
+오전 검증에서 사용한 shell `export` 기반 환경변수 주입 방식은 임시 운영 모드다.
+본 runbook 완료 후에는 정상 운영 모드(Secrets Manager / SSM Parameter Store 경유 주입)로 전환한다.
+자세한 정의는 [`./design.md`](./design.md) §3.4 참조.
 
 ## 2. Secrets Manager 등록
 
-비용 영향: secret 1건당 월 단가 발생(소액). 본 단계에서 4건 신규 등록 예정. KMS는 AWS managed default key(`aws/secretsmanager`) 사용 가정. CMK 사용 시 [`./design.md`](./design.md) §4.2 KmsDecrypt 조건 추가.
+비용 영향: secret 1건당 월 단가 발생(소액). 본 단계에서 4건 신규 등록 예정.
+KMS는 AWS managed default key(`aws/secretsmanager`) 사용 가정.
+CMK 사용 시 [`./design.md`](./design.md) §4.2 KmsDecrypt 조건 추가.
 
 ### 2-1. KIS app key secret 생성 [실행]
 
@@ -69,7 +79,8 @@ ls -la ~/.aws 2>/dev/null
 6. Description: `MarketConnector KIS app key (paper). Value redacted.`
 7. Tags(권고): `env=paper`, `service=marketconnector`, `kind=kis-app-key`, `project=portfolio`.
 8. Rotation: 본 spec 범위 밖. `Disable automatic rotation`.
-9. Review → Store. 결과 ARN은 placeholder(`arn:aws:secretsmanager:<region>:<account-id>:secret:/portfolio/paper/marketconnector/kis-app-key-XXXXXX`)로 운영자 노트에 기록.
+9. Review → Store. 결과 ARN 은 아래 placeholder 로 운영자 노트에 기록.
+   - `arn:aws:secretsmanager:<region>:<account-id>:secret:/portfolio/paper/marketconnector/kis-app-key-XXXXXX`
 
 ### 2-2. KIS app secret secret 생성 [실행]
 
@@ -302,7 +313,10 @@ aws ssm get-parameters-by-path \
 
 ### 6-1. 임시 환경변수 주입 스크립트 [실행]
 
-1. EC2의 운영자 home 또는 `/opt/portfolio/marketconnector/` 같은 디렉터리에 임시 export 스크립트(예: `/tmp/inject-env.sh`)를 만든다. 스크립트는 secret/parameter 값을 환경변수에 주입한다(파일에 secret 값을 평문으로 적지 않는다 — 아래 패턴은 메모리 export만 한다).
+1. EC2 의 운영자 home 또는 `/opt/portfolio/marketconnector/` 같은 디렉터리에
+   임시 export 스크립트(예: `/tmp/inject-env.sh`) 를 만든다.
+   스크립트는 secret/parameter 값을 환경변수에 주입한다
+   (파일에 secret 값을 평문으로 적지 않는다 — 아래 패턴은 메모리 export만 한다).
 2. 스크립트 패턴(placeholder만):
    ```bash
    #!/usr/bin/env bash
@@ -354,14 +368,22 @@ aws ssm get-parameters-by-path \
 
 ### 6-6. 정상 운영 모드 전환 [준비]
 
-- 임시 export 스크립트 검증이 끝나면, 정상 운영 모드(systemd unit + Instance Role 기반 startup script)로의 전환은 03 spec(MarketConnector EC2 운영) 책임으로 인계한다. 본 runbook은 임시 검증까지만.
+- 임시 export 스크립트 검증이 끝나면 정상 운영 모드로의 전환은 03 spec(MarketConnector EC2 운영) 책임으로 인계한다.
+  - 정상 운영 모드 = systemd unit + Instance Role 기반 startup script.
+  - 본 runbook 은 임시 검증까지만.
 
 ## 7. 실패 시 점검 / 복구
 
 ### 7-1. secret 이름 오타 [복구]
 
-- AccessDenied 또는 NotFound가 발생하면 secret 이름을 정확히 확인한다(`/portfolio/paper/marketconnector/kis-app-key` 형식). 4건 모두 [`./design.md`](./design.md) §2.4 표와 일치해야 한다.
-- 이름이 틀렸으면 secret을 삭제하지 말고 IAM policy의 Resource ARN을 일치시키거나 secret을 정확한 이름으로 재생성. 잘못된 이름 secret은 30일 복구 기간 후 자동 삭제 또는 운영자 명시적 삭제(`force-delete-without-recovery`는 사용하지 않는다).
+- AccessDenied 또는 NotFound 가 발생하면 secret 이름을 정확히 확인한다.
+  - 형식: `/portfolio/paper/marketconnector/kis-app-key`.
+  - 4건 모두 [`./design.md`](./design.md) §2.4 표와 일치해야 한다.
+- 이름이 틀렸으면 secret 을 삭제하지 말고 아래 중 하나로 처리한다.
+  - IAM policy 의 Resource ARN 을 일치시키거나
+  - secret 을 정확한 이름으로 재생성
+- 잘못된 이름 secret 은 30일 복구 기간 후 자동 삭제 또는 운영자 명시적 삭제로 처리한다
+  (`force-delete-without-recovery` 는 사용하지 않는다).
 
 ### 7-2. IAM policy Resource 범위 [복구]
 
@@ -397,7 +419,8 @@ test -f ~/.aws/config && grep -E "^aws_access_key_id|^aws_secret_access_key" ~/.
 
 ### 7-6. shell 환경변수 임시 방식 rollback [복구]
 
-- secret/parameter 주입이 실패하면, 오전에 사용한 shell `export` 직접 주입 방식(임시 운영 모드)으로 일시 복귀해 운영을 계속한다. 단 이는 임시 모드이며, 본 runbook 결함 해결 후 정상 운영 모드로 다시 전환한다. [`./design.md`](./design.md) §3.4 참조.
+- secret/parameter 주입이 실패하면 오전에 사용한 shell `export` 직접 주입 방식(임시 운영 모드)으로 일시 복귀해 운영을 계속한다.
+- 단 이는 임시 모드이며, 본 runbook 결함 해결 후 정상 운영 모드로 다시 전환한다. [`./design.md`](./design.md) §3.4 참조.
 
 ## 8. 완료 기준 [확인]
 
@@ -408,12 +431,26 @@ test -f ~/.aws/config && grep -E "^aws_access_key_id|^aws_secret_access_key" ~/.
 - [확인] SSM Parameter 6건(`kis-base-url` / `connector-host` / `connector-port` / `connector-debug` / `environment` / `broker-name`) Get 가능.
 - [확인] IAM policy의 Resource에 `*` 또는 다른 service prefix 0건. Action에 `secretsmanager:*` / `ssm:*` / `*` 0건.
 - [확인] Connector 조회성 smoke test 통과(`connector_balance.py`, `connector_order_check.py`, Flask 조회 endpoint). 신규 주문 / 매수 / 매도 / 취소 / 정정 호출 0건.
-- [확인] 본 runbook 어디에도 실제 secret value, KIS app key, KIS app secret, 계좌번호, RDS endpoint hostname, RDS password, account-id, 실제 secret ARN, IAM access key id, Slack webhook URL이 평문으로 기록되지 않음. 모두 `[REDACTED]` 또는 placeholder 사용.
+- [확인] 본 runbook 어디에도 아래 항목이 평문으로 기록되지 않음. 모두 `[REDACTED]` 또는 placeholder 사용.
+  - secret value / KIS app key / KIS app secret / 계좌번호
+  - RDS endpoint hostname / RDS password / account-id
+  - 실제 secret ARN / IAM access key id / Slack webhook URL
 
 ## 9. 후속 인계 [준비]
 
 - [`./validation-checklist.md`](./validation-checklist.md): 본 runbook의 [확인] 결과를 4종 라벨(`[O]` / `[X]` / `[Kiro 후속 작업 필요]` / `[운영자 확인 필요]`)로 점검 항목화.
-- [`./operation-notes.md`](./operation-notes.md): 본 runbook 수행 일자, secret/parameter 등록 결과(성공/실패만), IAM Role / Policy 변경 요약(전후 항목 요약)을 누적 기록. 실제 secret 값 / account-id / RDS endpoint / 실제 ARN은 미기록.
-- [`../03-marketconnector-ec2`](../03-marketconnector-ec2)(예정): SSM Session Manager 접속용 `AmazonSSMManagedInstanceCore` attach, CloudWatch Logs write 권한, systemd 기반 정상 운영 모드 전환은 03 spec 책임. 본 runbook의 Instance Role 정책을 그대로 입력으로 받는다.
-- [`../_common/operator-decisions.md`](../_common/operator-decisions.md): OD-SEC-001 / OD-OBS-004 갱신 후보 + 신규 OD-SEC-005 / OD-SEC-006 후보를 운영자 승인 시 반영. 자세한 후보값은 [`./design.md`](./design.md) §7.
-- [`../_common/risk-register.md`](../_common/risk-register.md): R-SEC 후보 4건(권한 과다 / EC2 secret 평문 노출 / EC2 access key 파일 / naming 불일치)을 운영자 승인 시 다음 가용 ID로 등록. 자세한 후보값은 [`./design.md`](./design.md) §8.
+- [`./operation-notes.md`](./operation-notes.md): 본 runbook 수행 일자를 누적 기록.
+  secret/parameter 등록 결과(성공/실패만), IAM Role / Policy 변경 요약(전후 항목 요약)만 남긴다.
+  실제 secret 값 / account-id / RDS endpoint / 실제 ARN은 미기록.
+- [`../03-marketconnector-ec2`](../03-marketconnector-ec2)(예정): 03 spec 책임 항목.
+  본 runbook 의 Instance Role 정책을 그대로 입력으로 받는다.
+  - SSM Session Manager 접속용 `AmazonSSMManagedInstanceCore` attach
+  - CloudWatch Logs write 권한
+  - systemd 기반 정상 운영 모드 전환
+- [`../_common/operator-decisions.md`](../_common/operator-decisions.md): 운영자 승인 시 반영.
+  자세한 후보값은 [`./design.md`](./design.md) §7.
+  - OD-SEC-001 / OD-OBS-004 갱신 후보
+  - 신규 OD-SEC-005 / OD-SEC-006 후보
+- [`../_common/risk-register.md`](../_common/risk-register.md): 운영자 승인 시 다음 가용 ID로 등록.
+  자세한 후보값은 [`./design.md`](./design.md) §8.
+  - R-SEC 후보 4건: 권한 과다 / EC2 secret 평문 노출 / EC2 access key 파일 / naming 불일치

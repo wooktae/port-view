@@ -5,11 +5,26 @@
 본 spec의 핵심은 한 줄로 요약한다. **MarketConnector EC2가 IAM Access Key를 EC2 안에 저장하지 않고, EC2 Instance Role 만으로 Secrets Manager / SSM Parameter Store 값을 최소 권한으로 read 하는 운영 구조를 1차 확정한다.**
 
 - 1차 적용 환경: `aws-paper`. region `ap-northeast-2`. 1차 적용 대상 워크로드: MarketConnector EC2.
-- 본 spec의 입력: [`./requirements.md`](./requirements.md) R1 ~ R14, [`./README.md`](./README.md), [`../02-aws-network-and-rds/`](../02-aws-network-and-rds/) 1차 적용 결과(VPC / Subnet / SG / VPC Endpoint 5종 / RDS PostgreSQL / DB role 7종).
-- 본 spec의 산출물: 본 phase 에서는 [`./design.md`](./design.md) 한 개. [`./tasks.md`](./tasks.md) / [`./runbook.md`](./runbook.md) / [`./validation-checklist.md`](./validation-checklist.md) / [`./operation-notes.md`](./operation-notes.md) 는 후속 phase. R14.7 근거.
-- 본 spec의 범위 밖(반드시 명시): live rotation 자동화(Lambda rotation, scheduled rotation), GitHub Actions OIDC / CI/CD Role(07 spec), 8개 MS 전체 full IAM 매트릭스(03 / 08 / 04 / 05 / 09 spec 분담), aws-live IAM(10 spec 통합), 실제 AWS 리소스 생성 / 수정 / 삭제. R14 근거.
+- 본 spec 의 입력
+  - [`./requirements.md`](./requirements.md) R1 ~ R14, [`./README.md`](./README.md)
+  - [`../02-aws-network-and-rds/`](../02-aws-network-and-rds/) 1차 적용 결과
+    (VPC / Subnet / SG / VPC Endpoint 5종 / RDS PostgreSQL / DB role 7종)
+- 본 spec 의 산출물: 본 phase 에서는 [`./design.md`](./design.md) 한 개. 후속 phase 4종. R14.7 근거.
+  - [`./tasks.md`](./tasks.md) / [`./runbook.md`](./runbook.md)
+  - [`./validation-checklist.md`](./validation-checklist.md) / [`./operation-notes.md`](./operation-notes.md)
+- 본 spec 의 범위 밖(반드시 명시). R14 근거.
+  - live rotation 자동화(Lambda rotation, scheduled rotation)
+  - GitHub Actions OIDC / CI/CD Role (07 spec)
+  - 8개 MS 전체 full IAM 매트릭스 (03 / 08 / 04 / 05 / 09 spec 분담)
+  - aws-live IAM (10 spec 통합)
+  - 실제 AWS 리소스 생성 / 수정 / 삭제
 
-본 문서에는 실제 secret value, KIS app key, KIS app secret, 계좌번호, RDS endpoint hostname, account-id, 실제 secret ARN, IAM access key id 를 적지 않는다. 모두 `[REDACTED]` 또는 placeholder(`<account-id>`, `<region>` 등)만 사용한다. R14.4 근거.
+본 문서에는 아래 항목을 적지 않는다. 모두 `[REDACTED]` 또는 placeholder(`<account-id>`, `<region>` 등) 만 사용한다.
+R14.4 근거.
+
+- 실제 secret value / KIS app key / KIS app secret / 계좌번호
+- RDS endpoint hostname / account-id
+- 실제 secret ARN / IAM access key id
 
 ## 1. Secret / Parameter 분류 기준
 
@@ -27,8 +42,12 @@
 | KIS app secret | `APP_SECRET` (동) | 노출 시 KIS API 호출 / 외부 인증 가능 | 동상 |
 | KIS paper 계좌번호 | `PAPER_ACNT` | 노출 시 broker 측 계좌 식별 노출 | 단독 secret 또는 JSON multi-key secret 권고. §2 매트릭스 참조 |
 | KIS 계좌상품코드 | `ACNT_PRDT_CD` | 계좌번호와 짝으로 broker 호출에 필요 | `PAPER_ACNT` 와 동일 secret(JSON multi-key) 권고 |
-| RDS `marketconnector_app` 접속정보 | `INTEREST_DB_HOST` / `INTEREST_DB_PORT` / `INTEREST_DB_NAME` / `INTEREST_DB_USER` / `INTEREST_DB_PASSWORD` | password 노출 시 RDS 접속 가능 | JSON multi-key secret 1개로 묶어 보관 권고 |
+| RDS `marketconnector_app` 접속정보 | `INTEREST_DB_*` 5종 (매핑 아래 참조) | password 노출 시 RDS 접속 가능 | JSON multi-key secret 1개로 묶어 보관 권고 |
 | RDS master 비밀번호(`portfolio_admin`) | (application 환경변수 없음, 운영자 전용) | 02 spec 에서 이미 등록된 secret. 호환 유지 | 기존 이름 `/portfolio/paper/rds/master` 그대로(§2.5) |
+
+#### Row Notes — RDS `marketconnector_app` 접속정보 환경변수 매핑
+
+- `INTEREST_DB_HOST` / `INTEREST_DB_PORT` / `INTEREST_DB_NAME` / `INTEREST_DB_USER` / `INTEREST_DB_PASSWORD`
 
 ### 1.2 SSM Parameter Store 보관 후보 (R1.3 근거)
 
@@ -50,7 +69,11 @@
 | Secrets Manager | rotation / audit / 환경별 KMS 정책 일관성 | secret 개당 월 단가(소액) | **권고(1순위)** |
 | SSM SecureString | 무료(KMS Key 사용 시 KMS 호출 단가만) | rotation API 표준이 약함, audit 형식이 Secrets Manager 와 다름 | 비용 절감 시 허용 가능한 절감안(2순위) |
 
-본 spec(06) 1차 락 결정값(잠정): **Secrets Manager 보관(권고)**. 비용 절감이 필요하면 SSM SecureString 으로 옮기는 변경 제안을 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-OBS-004 에 기록 후 승인 시 적용. 본 결정의 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 갱신 후보는 §7 참조.
+본 spec(06) 1차 락 결정값(잠정): **Secrets Manager 보관(권고)**.
+
+- 비용 절감이 필요하면 SSM SecureString 으로 옮기는 변경 제안을 아래에 기록 후 승인 시 적용.
+  - [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-OBS-004
+- 본 결정의 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 갱신 후보는 §7 참조.
 
 ### 1.4 옮겨도 되는 후보 vs 옮기면 안 되는 후보 (R1.7 근거)
 
@@ -107,11 +130,15 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 
 본 spec 도입 후에도 8개 MS 의 기존 환경변수 키 이름은 변경하지 않는다. 다음 키는 그대로 유지한다.
 
-`INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD`, `PORTFOLIO_DB_NAME`, `PORT_ACCOUNT_NO`, `PORT_BROKER_NAME`, `PORT_ENVIRONMENT`, `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION`, `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT`.
+- DB 접속 계열: `INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD`, `PORTFOLIO_DB_NAME`
+- 계좌 / 환경 계열: `PORT_ACCOUNT_NO`, `PORT_BROKER_NAME`, `PORT_ENVIRONMENT`
+- 전략 / 주문 계열: `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION`, `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT`
 
 ### 3.2 port-marketconnector `config.py` 외부화 (R3.2 근거)
 
-- `port-marketconnector` 의 `c:\Workspaces\port-marketconnector\config.py` 가 사용하는 KIS 관련 식별자(`APP_KEY`, `APP_SECRET`, `BASE_URL`, `PAPER_ACNT`, `ACNT_PRDT_CD`)는 코드 변경 없이 환경변수로 주입 가능하도록 외부화한다. 매핑은 §2.4 표 참조.
+- `port-marketconnector` 의 `c:\Workspaces\port-marketconnector\config.py` 가 사용하는 KIS 식별자를 외부화한다.
+  - 대상: `APP_KEY`, `APP_SECRET`, `BASE_URL`, `PAPER_ACNT`, `ACNT_PRDT_CD`
+  - 코드 변경 없이 환경변수로 주입 가능하도록 매핑한다. 매핑은 §2.4 표 참조.
 - 본 spec(06)은 `config.py` 수정 자체를 다루지 않는다(8개 MS 코드 미수정 정책, R14.1). 외부화는 환경변수 주입 형태로만 진행한다.
 
 ### 3.3 주입 시점 (R3.3 근거)
@@ -144,9 +171,23 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 
 | Statement | Effect | Action | Resource | 비고 |
 |-----------|--------|--------|----------|------|
-| `SecretsManagerRead` | Allow | `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret` | `arn:aws:secretsmanager:<region>:<account-id>:secret:/portfolio/paper/marketconnector/kis-app-key-*`, `...secret:/portfolio/paper/marketconnector/kis-app-secret-*`, `...secret:/portfolio/paper/marketconnector/paper-account-*`, `...secret:/portfolio/paper/rds/marketconnector-app-*` | 다른 service secret(`view` / `crawler` 등) 권한 부여 금지. 실제 ARN suffix(`-XXXXXX` 6자리) 는 운영자가 등록 시 기록 |
+| `SecretsManagerRead` | Allow | `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret` | 4건 secret ARN (KIS 3건 + RDS 1건). 상세 목록은 §2.4 참조 | 다른 service secret 권한 부여 금지. 실제 ARN suffix `-XXXXXX` 는 운영자 등록 시 기록 |
 | `SsmParameterRead` | Allow | `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` | `arn:aws:ssm:<region>:<account-id>:parameter/portfolio/paper/marketconnector/*` | prefix 만 한정. 다른 service prefix 포함 금지 |
-| `KmsDecrypt` (조건부) | Allow | `kms:Decrypt` | `arn:aws:kms:<region>:<account-id>:key/<kms-key-id>` (Secrets Manager CMK 또는 SSM SecureString 사용 시에만) | AWS managed `aws/secretsmanager` default key 만 사용하는 경우 본 statement 적용 외 |
+| `KmsDecrypt` (조건부) | Allow | `kms:Decrypt` | `arn:aws:kms:<region>:<account-id>:key/<kms-key-id>` | 상세 조건은 Row Notes 참조 |
+
+#### Row Notes — SecretsManagerRead Resource 상세
+
+- Resource 자리에 들어가는 4건 secret ARN 은 아래 secret 이름을 따른다.
+  - `/portfolio/paper/marketconnector/kis-app-key`
+  - `/portfolio/paper/marketconnector/kis-app-secret`
+  - `/portfolio/paper/marketconnector/paper-account`
+  - `/portfolio/paper/rds/marketconnector-app`
+- ARN 형태: `arn:aws:secretsmanager:<region>:<account-id>:secret:<name>-*`
+
+#### Row Notes — KmsDecrypt 조건
+
+- Secrets Manager CMK 또는 SSM SecureString 사용 시에만 본 statement 적용.
+- AWS managed `aws/secretsmanager` default key 만 사용하는 경우 본 statement 적용 외.
 
 본 매트릭스는 R4.5 근거에 따라 모든 ARN 자리를 placeholder 또는 `[REDACTED]` 로만 표기한다. 실제 account-id / 실제 secret ARN / 실제 KMS Key ARN 은 본 문서에 절대 기록하지 않는다.
 
@@ -172,7 +213,12 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 
 ### 4.5 문서 표기 규칙 (R4.5 근거)
 
-- 모든 ARN 은 placeholder(`arn:aws:iam::<account-id>:role/portfolio-paper-marketconnector-ec2-role`, `arn:aws:secretsmanager:<region>:<account-id>:secret:/portfolio/paper/...`, `arn:aws:ssm:<region>:<account-id>:parameter/portfolio/paper/...`, `arn:aws:kms:<region>:<account-id>:key/<kms-key-id>`) 또는 `[REDACTED]` 만 사용한다. 실제 account-id / 실제 secret ARN / 실제 KMS Key ARN 은 본 문서 / 후속 phase 산출물 에 절대 기록하지 않는다.
+- 모든 ARN 은 아래 placeholder 또는 `[REDACTED]` 만 사용한다.
+  - `arn:aws:iam::<account-id>:role/portfolio-paper-marketconnector-ec2-role`
+  - `arn:aws:secretsmanager:<region>:<account-id>:secret:/portfolio/paper/...`
+  - `arn:aws:ssm:<region>:<account-id>:parameter/portfolio/paper/...`
+  - `arn:aws:kms:<region>:<account-id>:key/<kms-key-id>`
+- 실제 account-id / 실제 secret ARN / 실제 KMS Key ARN 은 본 문서 / 후속 phase 산출물 에 절대 기록하지 않는다.
 
 ## 5. Access Key 미사용 원칙 (R5 근거)
 
@@ -193,8 +239,14 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 
 | 산출물 | 검증 항목 |
 |--------|-----------|
-| [`./runbook.md`](./runbook.md) (후속 phase) | EC2 안에서 `aws sts get-caller-identity` 실행 → assumed-role ARN 이 `arn:aws:sts::<account-id>:assumed-role/portfolio-paper-marketconnector-ec2-role/<instance-id>` 형태인지 확인. `aws configure list` 결과의 `access_key` source 가 `iam-role` 인지 확인 |
+| [`./runbook.md`](./runbook.md) (후속 phase) | 자격증명 검증 명령 (상세 아래) |
 | [`./validation-checklist.md`](./validation-checklist.md) (후속 phase) | `~/.aws/credentials` 미존재 점검, assumed-role ARN 일치 점검, `EnvironmentFile=` 안 access key 패턴 0건 점검 |
+
+#### Row Notes — runbook.md 자격증명 검증 명령
+
+- EC2 안에서 `aws sts get-caller-identity` 실행 → assumed-role ARN 확인.
+  - 기대 형태: `arn:aws:sts::<account-id>:assumed-role/portfolio-paper-marketconnector-ec2-role/<instance-id>`
+- `aws configure list` 결과의 `access_key` source 가 `iam-role` 인지 확인.
 
 실제 검증은 후속 phase 의 책임. 본 design 은 위치만 명시.
 
@@ -216,8 +268,14 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 
 | 이름 | 책임 | 권한 종류 | 사용 시점 |
 |------|------|----------|-----------|
-| Task Execution Role | ECR 이미지 pull, CloudWatch Logs write, Secrets Manager → 환경변수 주입(`secretsmanager:GetSecretValue` for ECS `secrets` 필드) | AWS managed `AmazonECSTaskExecutionRolePolicy` + Secrets Manager Resource ARN 한정 | Task 시작 시점, AWS Service(ECS Agent) 측이 사용 |
-| Task Role | 애플리케이션 런타임 secret / parameter read(`secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret`, `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath`) | 06 의 Instance Role 권한 매트릭스(§4.2)와 동일 골격 | 컨테이너 프로세스가 사용 |
+| Task Execution Role | ECR 이미지 pull, CloudWatch Logs write, Secrets Manager 환경변수 주입 | AWS managed `AmazonECSTaskExecutionRolePolicy` + Secrets Manager Resource ARN 한정 | Task 시작 시점, AWS Service(ECS Agent) 측이 사용 |
+| Task Role | 애플리케이션 런타임 secret / parameter read | 06 의 Instance Role 권한 매트릭스(§4.2) 와 동일 골격 | 컨테이너 프로세스가 사용 |
+
+#### Row Notes — Task Execution Role vs Task Role Action
+
+- Task Execution Role Action: `secretsmanager:GetSecretValue` (ECS `secrets` 필드 주입 목적).
+- Task Role Action: `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret`,
+  `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath`.
 
 ### 6.2 ECS `secrets` 필드 패턴 (R6.3 근거)
 
@@ -232,7 +290,7 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 | spec | 책임 | 본 spec 06 입력 활용 |
 |------|------|---------------------|
 | 03 marketconnector-ec2 | Instance Role 정식 운영, SSM Session Manager attach, CloudWatch Logs | 06 의 Instance Role 정책(§4.2)을 그대로 입력으로 받음 |
-| 08 interest-crawler-and-preprocessor-ecs | crawler / preprocessor 전용 Task Role 생성 | 06 의 Task Role 골격(§6.1, §6.2) + service prefix 만 변경(`/portfolio/paper/crawler/*`, `/portfolio/paper/preprocessor/*`) |
+| 08 interest-crawler-and-preprocessor-ecs | crawler / preprocessor 전용 Task Role 생성 | 06 의 Task Role 골격(§6.1, §6.2) + service prefix 만 변경 (`crawler` / `preprocessor`) |
 | 04 strategy-batch-stepfunctions | strategy decision / execution Task Role, Step Functions IAM | 06 의 Task Role 골격 사용 |
 | 05 port-view-ecs-and-runbook | port-view Task Role | 06 의 Task Role 골격 사용 |
 | 09 strategy-research-batch | research(AWS Batch + Step Functions) Task Role / Job Role | 06 의 Task Role 골격 사용 |
@@ -253,17 +311,30 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 
 | ID | 항목 | 본 spec 후보 결정값 | Status (영문 / 한글) |
 |----|------|--------------------|---------------------|
-| OD-SEC-001 | Secrets 보관 위치 | KIS app key / app secret / paper 계좌 / RDS 접속정보 / RDS master = **Secrets Manager**. KIS base URL / Connector host·port·debug / `PORT_ENVIRONMENT` / `PORT_BROKER_NAME` 등 일반 설정 = **SSM Parameter Store** | TENTATIVE 🟡 잠정 (운영자 승인 시 CONFIRMED 🟢 확정) |
+| OD-SEC-001 | Secrets 보관 위치 | Secrets Manager 항목과 SSM Parameter Store 항목 분리 (상세 아래) | TENTATIVE 🟡 잠정 (운영자 승인 시 CONFIRMED 🟢 확정) |
 | OD-OBS-004 | Slack webhook 보관 위치 | **Secrets Manager 권고**. 비용 절감 시 SSM SecureString 허용 | TENTATIVE 🟡 잠정 |
 | OD-SEC-005 (신규 후보) | MarketConnector EC2 / 8개 MS Access Key 미사용 원칙 | EC2 안에 access key 파일 / 환경변수 / dotfile 저장 금지. IMDSv2 + Instance Role 자격증명만 사용 | TENTATIVE 🟡 잠정 |
 | OD-SEC-006 (신규 후보) | EC2 / ECS IAM Role 기반 secret / parameter read 원칙 | 최소 권한(Action 화이트리스트). Resource wildcard 금지. Action wildcard 금지. service prefix 분리 | TENTATIVE 🟡 잠정 |
+
+#### Row Notes — OD-SEC-001 후보 결정값
+
+- Secrets Manager 보관
+  - KIS app key / app secret / paper 계좌 / RDS 접속정보 / RDS master
+- SSM Parameter Store 보관
+  - KIS base URL / Connector host·port·debug
+  - `PORT_ENVIRONMENT` / `PORT_BROKER_NAME` 등 일반 설정
 
 ### 7.2 기존 결정 정합성 (R10.5 근거)
 
 | ID | 항목 | 본 spec 결정과 정합성 | 본 spec 갱신 권고 |
 |----|------|----------------------|------------------|
 | OD-SEC-002 | RDS master password = Secrets Manager | 정합 | 상태 유지(TENTATIVE 🟡 → CONFIRMED 🟢 운영자 승인 시점에 락 가능) |
-| OD-SEC-003 | KIS access_token 보관 위치 = EC2 로컬 파일 + S3 backup 1순위 | 정합. paper 환경에서는 token 파일 유지(`access_token.txt`)는 03 spec 의 책임. token 자체를 Secrets Manager 로 보관하는 옵션은 후속 spec(03)에서 재검토 | 상태 유지(TENTATIVE 🟡) |
+| OD-SEC-003 | KIS access_token 보관 위치 = EC2 로컬 파일 + S3 backup 1순위 | 정합 (상세 아래) | 상태 유지(TENTATIVE 🟡) |
+
+#### Row Notes — OD-SEC-003 정합 상세
+
+- paper 환경에서는 token 파일 유지(`access_token.txt`) 는 03 spec 의 책임.
+- token 자체를 Secrets Manager 로 보관하는 옵션은 후속 spec(03) 에서 재검토.
 
 ### 7.3 Status 라벨 규칙 (R10.7 근거)
 
@@ -273,16 +344,50 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 
 ## 8. risk-register.md 갱신 후보 (실제 갱신은 tasks 단계)
 
-본 spec 락 후 [`../_common/risk-register.md`](../_common/risk-register.md) 에 반영할 후보. R12 근거. 실제 갱신은 본 spec 의 [`./tasks.md`](./tasks.md) 단계. ID 는 추가 시점에 risk-register 의 다음 번호를 부여한다(예: `R-SEC-004` ~ `R-SEC-007`). 본 design 에서는 자리만 잡고 최종 ID 는 tasks 단계에서 락한다.
+본 spec 락 후 [`../_common/risk-register.md`](../_common/risk-register.md) 에 반영할 후보. R12 근거.
 
-| ID (잠정) | Risk | Mitigation | Detection | Rollback |
-|-----------|------|------------|-----------|----------|
-| R-SEC-XXX | Resource wildcard 또는 다른 service secret 까지 read 가능한 IAM 정책 권한 과다 | Resource ARN 정확 한정(§4.2) + service prefix 화이트리스트 + Action 화이트리스트 | IAM Access Analyzer / 정책 정적 검사 / [`./validation-checklist.md`](./validation-checklist.md) Resource wildcard 0건 점검 | 정책 detach + 이전 정책 복구 |
-| R-SEC-XXX | EC2 환경변수 / process 로그 / systemd `EnvironmentFile` 에 secret value 평문 노출 | secret value 자체를 EnvironmentFile / log / dotfile 에 기록 금지. runtime read 만 허용. log mask 정책 | log grep 점검(`APP_SECRET=`, `PASSWORD=` 패턴 0건), `aws sts get-caller-identity` 흐름이 Instance Role 기반 인지 점검 | 노출된 secret 즉시 rotate(KIS app secret / RDS password / Slack webhook 등) |
-| R-SEC-XXX | EC2 안에 IAM access key id / secret access key 파일 저장 운영 실수 | `~/.aws/credentials` 미존재 강제 점검, IMDSv2 강제, dotfile / EnvironmentFile access key 패턴 0건 점검 | [`./validation-checklist.md`](./validation-checklist.md) 라벨 / 정기 점검 | 즉시 access key 폐기(IAM Console) + Instance Role 자격증명 만 사용 모드로 복귀 |
-| R-SEC-XXX | Parameter / Secret naming 불일치로 application 런타임 시 read 실패 또는 잘못된 환경값 read(예: `paper` 가 `live` parameter 를 read) | 본 spec naming 규칙(§2) 강제 + IaC / runbook / validation-checklist 에 명시 + `{env}` 분리 강제 | 컨테이너 / EC2 startup health check 실패 시 알림. 환경 식별자(`PORT_ENVIRONMENT`) 와 secret 경로 prefix 일치 점검 | 이름 정정 후 재배포. 잘못된 환경값으로 read 된 경우 즉시 process 정지 + secret rotation 검토 |
+- 실제 갱신은 본 spec 의 [`./tasks.md`](./tasks.md) 단계.
+- ID 는 추가 시점에 risk-register 의 다음 번호를 부여한다(예: `R-SEC-004` ~ `R-SEC-007`).
+- 본 design 에서는 자리만 잡고 최종 ID 는 tasks 단계에서 락한다.
 
-각 리스크는 [`../02-aws-network-and-rds/risk-register.md`](../_common/risk-register.md) 컬럼 형식(Area / Risk / Impact / Probability / Mitigation / Detection / Rollback / Affected Spec / Status)에 맞춰 tasks 단계에서 row 를 추가한다. R12.5 근거.
+| ID (잠정) | Risk 요약 |
+|-----------|-----------|
+| R-SEC-XXX-a | Resource wildcard 또는 다른 service secret 까지 read 가능한 IAM 정책 권한 과다 |
+| R-SEC-XXX-b | EC2 환경변수 / process 로그 / systemd `EnvironmentFile` 에 secret value 평문 노출 |
+| R-SEC-XXX-c | EC2 안에 IAM access key id / secret access key 파일 저장 운영 실수 |
+| R-SEC-XXX-d | Parameter / Secret naming 불일치로 application 런타임 시 read 실패 또는 잘못된 환경값 read |
+
+#### Details — R-SEC-XXX-a IAM 정책 권한 과다
+
+- Mitigation: Resource ARN 정확 한정(§4.2) + service prefix 화이트리스트 + Action 화이트리스트.
+- Detection: IAM Access Analyzer / 정책 정적 검사 / [`./validation-checklist.md`](./validation-checklist.md) Resource wildcard 0건 점검.
+- Rollback: 정책 detach + 이전 정책 복구.
+
+#### Details — R-SEC-XXX-b EC2 secret value 평문 노출
+
+- Mitigation: secret value 자체를 EnvironmentFile / log / dotfile 에 기록 금지. runtime read 만 허용. log mask 정책.
+- Detection: log grep 점검(`APP_SECRET=`, `PASSWORD=` 패턴 0건).
+  `aws sts get-caller-identity` 흐름이 Instance Role 기반 인지 점검.
+- Rollback: 노출된 secret 즉시 rotate (KIS app secret / RDS password / Slack webhook 등).
+
+#### Details — R-SEC-XXX-c EC2 access key 파일 저장 실수
+
+- Mitigation: `~/.aws/credentials` 미존재 강제 점검, IMDSv2 강제, dotfile / EnvironmentFile access key 패턴 0건 점검.
+- Detection: [`./validation-checklist.md`](./validation-checklist.md) 라벨 / 정기 점검.
+- Rollback: 즉시 access key 폐기(IAM Console) + Instance Role 자격증명 만 사용 모드로 복귀.
+
+#### Details — R-SEC-XXX-d naming 불일치
+
+- 예: `paper` 가 `live` parameter 를 read.
+- Mitigation: 본 spec naming 규칙(§2) 강제 + IaC / runbook / validation-checklist 에 명시 + `{env}` 분리 강제.
+- Detection: 컨테이너 / EC2 startup health check 실패 시 알림.
+  환경 식별자(`PORT_ENVIRONMENT`) 와 secret 경로 prefix 일치 점검.
+- Rollback: 이름 정정 후 재배포. 잘못된 환경값으로 read 된 경우 즉시 process 정지 + secret rotation 검토.
+
+각 리스크는 tasks 단계에서 아래 컬럼 형식에 맞춰 row 를 추가한다. R12.5 근거.
+
+- 참조: [`../02-aws-network-and-rds/risk-register.md`](../_common/risk-register.md) 컬럼 형식
+- 컬럼: Area / Risk / Impact / Probability / Mitigation / Detection / Rollback / Affected Spec / Status
 
 ## 9. followups-overview.md 갱신 후보 (실제 갱신은 tasks 단계)
 
@@ -313,12 +418,45 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 
 본 spec design 락 이후의 산출물 책임 분담. R7 / R8 / R9 근거.
 
-| 산출물 | 책임 | 본 spec 입력 |
-|--------|------|--------------|
-| [`./tasks.md`](./tasks.md) | 본 spec design 의 결정과 _common 갱신 후보(§7 / §8 / §9)를 task 단위로 분해 | §7 / §8 / §9 / [`./requirements.md`](./requirements.md) R10 / R11 / R12 |
-| [`./runbook.md`](./runbook.md) | 운영자 직접 작업 절차서. 단계: (a) Secrets Manager 등록 → (b) SSM Parameter Store 등록 → (c) Instance Role / Profile 생성 → (d) 정책 attach → (e) EC2 instance 에 Profile attach → (f) EC2 안 secret / parameter read 검증 → (g) Connector 재기동 후 KIS / RDS smoke test. 라벨 [실행] / [확인] / [준비] / [복구] | §1 / §2 / §4 / §5 / [`./requirements.md`](./requirements.md) R7 |
-| [`./validation-checklist.md`](./validation-checklist.md) | 4종 라벨 `[O]` / `[X]` / `[Kiro 후속 작업 필요]` / `[운영자 확인 필요]`. 8개 점검 영역: (1) Secrets Manager 등록 인벤토리 / (2) SSM Parameter Store 등록 인벤토리 / (3) Role / Instance Profile 존재 / attach 상태 / (4) 정책 매트릭스(§4.2) 일치 / (5) Resource wildcard 0건 / (6) EC2 access key 파일 미존재 / (7) `aws sts get-caller-identity` assumed-role ARN 일치 / (8) Connector smoke test 통과 | §4 / §5 / [`./requirements.md`](./requirements.md) R8 |
-| [`./operation-notes.md`](./operation-notes.md) | 일자별 누적 기록. secret value 미기록(성공 / 실패만 기록), IAM Role / Policy 변경 기록 템플릿(변경 일자 / 변경자 / 변경 사유 / 변경 전 / 후 항목 요약 / JSON 본문 전체 인용 금지) | §11 / [`./requirements.md`](./requirements.md) R9 |
+| 산출물 | 책임 (요약) | 본 spec 입력 |
+|--------|-------------|--------------|
+| [`./tasks.md`](./tasks.md) | design 결정과 _common 갱신 후보(§7 / §8 / §9) 를 task 단위로 분해 | §7 / §8 / §9 / [`./requirements.md`](./requirements.md) R10 / R11 / R12 |
+| [`./runbook.md`](./runbook.md) | 운영자 직접 작업 절차서 (상세 아래) | §1 / §2 / §4 / §5 / [`./requirements.md`](./requirements.md) R7 |
+| [`./validation-checklist.md`](./validation-checklist.md) | 4종 라벨 + 8개 점검 영역 체크리스트 (상세 아래) | §4 / §5 / [`./requirements.md`](./requirements.md) R8 |
+| [`./operation-notes.md`](./operation-notes.md) | 일자별 누적 기록 (상세 아래) | §11 / [`./requirements.md`](./requirements.md) R9 |
+
+#### Row Notes — runbook.md 단계
+
+- 라벨: [실행] / [확인] / [준비] / [복구]
+- 단계 순서
+  - (a) Secrets Manager 등록
+  - (b) SSM Parameter Store 등록
+  - (c) Instance Role / Profile 생성
+  - (d) 정책 attach
+  - (e) EC2 instance 에 Profile attach
+  - (f) EC2 안 secret / parameter read 검증
+  - (g) Connector 재기동 후 KIS / RDS smoke test
+
+#### Row Notes — validation-checklist.md 라벨 / 점검 영역
+
+- 4종 라벨: `[O]` / `[X]` / `[Kiro 후속 작업 필요]` / `[운영자 확인 필요]`
+- 8개 점검 영역
+  - (1) Secrets Manager 등록 인벤토리
+  - (2) SSM Parameter Store 등록 인벤토리
+  - (3) Role / Instance Profile 존재 / attach 상태
+  - (4) 정책 매트릭스(§4.2) 일치
+  - (5) Resource wildcard 0건
+  - (6) EC2 access key 파일 미존재
+  - (7) `aws sts get-caller-identity` assumed-role ARN 일치
+  - (8) Connector smoke test 통과
+
+#### Row Notes — operation-notes.md 기록 정책
+
+- 일자별 누적 기록.
+- secret value 미기록 — 성공 / 실패만 기록.
+- IAM Role / Policy 변경 기록 템플릿
+  - 변경 일자 / 변경자 / 변경 사유 / 변경 전 · 후 항목 요약
+  - JSON 본문 전체 인용 금지
 
 각 산출물은 02 spec 의 동일 산출물 컨벤션(라벨 4종, 일자별 `## YYYY-MM-DD ...` 누적 형식, secret `[REDACTED]` 정책)을 그대로 따른다.
 
@@ -326,10 +464,18 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 
 본 spec 의 모든 phase 에 적용. R14 근거.
 
-- 8개 MS(`port-view`, `port-marketconnector`, `port-interest-crawler`, `port-interest-preprocessor`, `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research`) 의 README / AGENTS.md / CHANGELOG / docs / worklog 와 소스 코드를 수정하지 않는다.
+- 아래 8개 MS 의 README / AGENTS.md / CHANGELOG / docs / worklog 와 소스 코드를 수정하지 않는다.
+  - `port-view`, `port-marketconnector`
+  - `port-interest-crawler`, `port-interest-preprocessor`
+  - `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research`
 - 실제 AWS 리소스(Secrets Manager secret, SSM Parameter, IAM Role, IAM Policy, IAM Instance Profile, EC2 Instance Profile attach 변경, KMS Key 등) 를 만들거나 변경 / 삭제하지 않는다. 모든 실제 생성 / 수정 / 삭제는 운영자가 직접 수행한다.
 - 8개 MS entrypoint 실행 금지. broker / KIS / Selenium / KRX / Naver / yfinance / RDS DDL/DML / 주문 / 체결 / Daily Batch / intraday monitor 호출 금지.
-- 본 spec 산출물(design / tasks / runbook / validation-checklist / operation-notes) 어디에도 실제 secret value, KIS app key, KIS app secret, 계좌번호, RDS password, RDS endpoint hostname, account-id, 실제 secret ARN, 실제 KMS Key ARN, IAM access key id, secret access key, Slack webhook URL 을 적지 않는다. 모두 `[REDACTED]` 또는 placeholder(`<account-id>`, `<region>`, `<kms-key-id>`) 만 사용.
+- 본 spec 산출물(design / tasks / runbook / validation-checklist / operation-notes) 어디에도 아래 항목을 적지 않는다.
+  - 실제 secret value / KIS app key / KIS app secret / 계좌번호
+  - RDS password / RDS endpoint hostname / account-id
+  - 실제 secret ARN / 실제 KMS Key ARN
+  - IAM access key id / secret access key / Slack webhook URL
+- 모두 `[REDACTED]` 또는 placeholder(`<account-id>`, `<region>`, `<kms-key-id>`) 만 사용.
 - `secretsmanager:GetSecretValue` 호출은 운영자만 수행한다. Kiro 자동 검증은 `secretsmanager:DescribeSecret` metadata 만 사용한다. R14.5 근거.
 - live rotation 자동화 / CI/CD OIDC / full IAM 매트릭스 / aws-live 환경 IAM 은 본 spec 범위 밖. 후속 spec(07 / 03 / 08 / 04 / 05 / 09 / 10) 분담. R14.6 근거.
 
@@ -340,4 +486,8 @@ Slack webhook 의 이름은 §1.3 결정에 따라 `/portfolio/paper/ops/slack-w
 본 spec 의 검증은 다음 두 형태로만 수행된다.
 
 - 정책 정적 검사: 정책 JSON 의 Action / Resource 가 §4.2 매트릭스와 일치하는지(wildcard 사용 0건 포함) 점검. [`./validation-checklist.md`](./validation-checklist.md) (후속 phase) 책임.
-- smoke test: EC2 안 `aws sts get-caller-identity` / `aws secretsmanager describe-secret` / `aws ssm get-parameter` 메타데이터 호출 결과 점검 + Connector 재기동 후 KIS / RDS 호출 통과 여부 점검. [`./runbook.md`](./runbook.md) / [`./validation-checklist.md`](./validation-checklist.md) (후속 phase) 책임. `secretsmanager:GetSecretValue` 호출은 운영자만 수행한다.
+- smoke test: 아래 두 축으로 점검.
+  - EC2 안 metadata 호출 결과 점검: `aws sts get-caller-identity` / `aws secretsmanager describe-secret` / `aws ssm get-parameter`
+  - Connector 재기동 후 KIS / RDS 호출 통과 여부 점검
+- 책임: [`./runbook.md`](./runbook.md) / [`./validation-checklist.md`](./validation-checklist.md) (후속 phase).
+- `secretsmanager:GetSecretValue` 호출은 운영자만 수행한다.

@@ -40,6 +40,28 @@ Spring MVC 기반 Portfolio View 모듈입니다. 포트폴리오 현황, 잔고
   - Local File 기반 Step 1~17 실행 gate를 화면에서 확인할 수 있고, 수동 실행/재실행/Slack 테스트 액션을 제공합니다.
   - 전체 1~17 또는 Step 10/11/12 포함 범위는 AWS Paper 주문 제출 가능성이 있으므로, 운영자는 실행 버튼 클릭 전 실행 범위와 gate를 반드시 확인해야 합니다.
 
+## View 책임 경계
+
+port-view는 조회, 승인, 트리거 UI를 담당하는 View 마이크로서비스입니다. 실제 Daily Batch 실행 책임은 View 컨테이너 안 subprocess가 아니라 AWS Step Functions, EventBridge Scheduler, ECS RunTask, SSM RunCommand, AWS Batch, Lambda 쪽에 있습니다.
+
+View가 담당하는 범위:
+
+- Dashboard / Balance / Positions / Orders / Strategy Execution / Strategy Daily / Strategy Report / Daily Batch 화면 제공
+- 운영자가 AWS Paper 상태를 조회하고 필요한 경우 Step Functions 실행을 트리거하는 UI
+- Step 1~11 safe trigger와 Step 12~17 approval trigger 분리 제공
+- 실행 결과와 상태 화면 표시
+
+View가 직접 책임지지 않는 범위:
+
+- 실제 broker 주문 제출 로직
+- 장중 포지션 판단 로직
+- 데이터 수집 / 전처리 / 리서치 / 전략 판단 실행
+- Step Functions 내부 orchestration 흐름
+- EventBridge Scheduler 자동 실행
+- MarketConnector EC2 내부 명령 수행
+
+Fargate 기준 기본 운영 backend는 `aws-stepfunctions`입니다. `local-file` backend는 운영자 로컬 검증/복구용으로만 보존되며 Fargate에서는 사용하지 않습니다.
+
 ## 패키지 구조 요약
 
 - `controller`: Spring MVC Controller. 요청 파라미터를 해석하고 service 결과를 Model에 담아 Thymeleaf view를 반환합니다.
@@ -101,6 +123,59 @@ Windows PowerShell:
 ```powershell
 .\mvnw.cmd clean package
 ```
+
+## ECS Fargate 배포 관점
+
+port-view는 ECS Fargate Service로 운영합니다. 컴퓨트 서비스 결정은 저장소 밖의 AWS Migration spec에서 관리하며, port-view 저장소 관점에서는 다음 흐름을 따릅니다.
+
+1. `Dockerfile`로 컨테이너 이미지 build
+2. ECR repository로 push
+3. ECS Task Definition 신규 revision 등록 (환경변수, secret 주입 설정 포함)
+4. ECS Service가 신규 revision으로 rollout
+
+민감정보 또는 환경 종속 정보는 저장소에 직접 기록하지 않습니다. 필요한 경우 다음 placeholder를 사용합니다.
+
+- account-id 12자리 원문 대신 `[REDACTED]`
+- 실제 IAM Role ARN 대신 `[REDACTED_ARN]`
+- 실제 secret ARN 대신 `[REDACTED_SECRET_ARN]`
+- ECR image URI 원문 대신 `<ECR_IMAGE_URI>`
+- ALB DNS 또는 공개 endpoint 원문 대신 `<ALB_ENDPOINT>`
+- 실제 state machine ARN 전체 대신 `<STATE_MACHINE_ARN>` / `<APPROVAL_STATE_MACHINE_ARN>`
+
+### Fargate 운영 안전 기본값
+
+Fargate에서 Daily Batch 관련 설정의 안전 기본값은 다음과 같습니다.
+
+- `portfolio.batch.execution-mode=aws-stepfunctions`
+- `portfolio.batch.local-file-execution-enabled=false`
+- `portfolio.batch.paper-order-enabled=false`
+- `portfolio.batch.full-pipeline-execution-enabled=false`
+- `portfolio.batch.max-executable-step-order=11`
+
+Step 12~17 주문성 구간은 approval workflow state machine과 별도 gate 뒤에서만 활성화됩니다. 운영자가 명시적으로 gate를 ENABLE하고 approval workflow ARN이 주입되어 있을 때만 승인 실행 endpoint가 활성화됩니다.
+
+### container 환경변수 주입
+
+Fargate task에는 다음 유형의 환경변수를 주입합니다. 실제 값은 secret manager 또는 배포 설정으로 관리하고 저장소 문서에는 키 이름만 남깁니다.
+
+- `aws-paper` profile 활성화 (`SPRING_PROFILES_ACTIVE=aws-paper`)
+- RDS 접속정보 (`INTEREST_DB_*`) — password는 secret 주입
+- Step Functions region / 일반 state machine ARN / approval state machine ARN / execution-name prefix / start-enabled / step-start-enabled
+- Daily Batch gate (`portfolio.batch.*`)
+- Snapshot Refresh gate (`portfolio.snapshot-refresh.*`)
+- 기본 계좌번호 env (`PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO`, `PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO`) — 값은 원문 기록 금지
+
+### ALB 노출 방식
+
+port-view는 ALB 뒤에서 접근되는 View UI로 운영합니다. 세부 인증, 접근 제한, source IP allowlist 등의 구성은 저장소 밖의 AWS 운영 영역이며 본 README는 다음 원칙만 명시합니다.
+
+- 초기 노출은 source IP 제한 또는 최소 인증 게이트 뒤에서만 허용합니다.
+- 공개 접근 URL, 실제 ALB DNS, 보안그룹 상세값은 문서에 원문으로 기록하지 않습니다.
+- 필요한 경우 `<ALB_ENDPOINT>` placeholder를 사용합니다.
+
+### 로컬 절대 경로 의존
+
+Fargate에서는 로컬 절대 경로(예: `C:/Workspaces/port-marketconnector`)와 local subprocess 의존을 운영 경로로 사용하지 않습니다. 이러한 경로는 `local-file` backend를 사용하는 운영자 로컬 검증/복구용 wrapper에서만 유효합니다.
 
 ## 외부 의존 모듈
 

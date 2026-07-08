@@ -1,6 +1,84 @@
 # AWS 월 비용 시뮬레이션 — PORT-STRATEGY-AI AWS Migration
 
-본 문서는 PORT-STRATEGY-AI 8개 MS의 AWS Migration 전체 비용 판단 참고 문서다. `01-aws-migration-foundation`에서 정의한 목표 구조를 출발점으로 dev / paper / live 3개 환경의 **월 예상 비용**을 산정하고, 후속 spec(02 ~ 10)에서도 비용 결정 자료로 공통 참조한다. 실제 결제가 아니라 의사결정 보조용 추정이며, 실제 AWS 리소스 생성, IaC 생성, 8개 MS 코드 / 문서 수정은 본 작업 범위가 아니다.
+## Purpose
+
+본 문서는 PORT-STRATEGY-AI 8개 MS 의 AWS Migration 전체 비용 판단 참고 문서다. `01-aws-migration-foundation` 에서 정의한 목표 구조를 출발점으로 `local-dev` · `aws-paper` · `aws-live` 3개 환경의 **월 예상 비용** 을 산정한다. 후속 spec(02 ~ 10) 에서도 비용 결정 자료로 공통 참조한다.
+
+실제 결제가 아니라 의사결정 보조용 추정이며, 실제 AWS 리소스 생성 · IaC 생성 · 8개 MS 코드 · 문서 수정은 본 작업 범위가 아니다. 모든 수치는 서울 `ap-northeast-2` 기준 근사치이며 **AWS Pricing Calculator 확인 필요** 단서가 붙는다. 본 9차 회차는 큰 구조 변경 · 신규 비용 수치 추가를 회피하는 최소 변경 회차다.
+
+## Cost Dashboard
+
+운영자 매일 조회용 월 비용 요약. 모든 수치는 서울 `ap-northeast-2` 기준 근사치 · **AWS Pricing Calculator 확인 필요**. 상세 단가 · 자원 가정 · 시나리오 비교는 아래 chapter 2 ~ 6 참조.
+
+### paper 월 예상 비용 (realistic 시나리오)
+
+**약 212 USD/월** (chapter 4.2 realistic 합계). AWS Pricing Calculator 확인 필요.
+
+주요 구성(USD/월 근사치):
+
+| 카테고리 | 항목 | 금액 |
+|---|---|---|
+| Compute | EC2 marketconnector | 15 |
+| Compute | ECS Fargate port-view | 23 |
+| Compute | Fargate execution + intraday | 25 |
+| Compute | AWS Batch research | 6 |
+| Database | RDS db.t4g.small single-AZ | 26 |
+| Database | RDS storage | 7 |
+| Network | NAT Gateway | 43 |
+| Network | NAT 데이터 처리 | 5 |
+| Network | VPC Endpoints | 16 |
+| Observability | CloudWatch Logs | 16 |
+| Security | Secrets Manager | 5 |
+
+절감 옵션: NAT-off 시 realistic 대비 ~$48/월 절감 (chapter 5.2 · chapter 6.1 권고안 A · 약 $130~$170/월).
+
+### live 월 예상 비용 (realistic 시나리오)
+
+**약 492 USD/월** (chapter 4.3 realistic 합계). AWS Pricing Calculator 확인 필요.
+
+주요 구성(USD/월 근사치):
+
+| 카테고리 | 항목 | 금액 |
+|---|---|---|
+| Compute | EC2 marketconnector `t3.medium` | 38 |
+| Compute | ECS Fargate port-view | 45 |
+| Compute | Fargate execution + intraday | 35 |
+| Database | RDS db.t4g.medium multi-AZ | 104 |
+| Database | RDS storage | 26 |
+| Database | RDS backup | 8 |
+| Network | NAT Gateway multi-AZ | 86 |
+| Network | NAT 데이터 처리 | 12 |
+| Network | ALB internal | 17 |
+| Network | VPC Endpoints multi-AZ | 24 |
+| Observability | CloudWatch Logs | 40 |
+
+`db.m6g.large` multi-AZ 상향 시 합계 ~$650~$830/월 (chapter 4.3 비고 참조).
+
+### 3환경 합산 (dev + paper + live) — realistic
+
+**약 800 USD/월** (chapter 4.4 realistic 합계). low 651 · high 1,095.
+
+### 주요 cost driver Top 5
+
+| 순위 | Driver | 근거 |
+|---|---|---|
+| 1 | NAT Gateway (data processing 포함) | live realistic $86 + $12 · chapter 5 서두 "가장 큰 고정비 항목 중 하나" |
+| 2 | RDS multi-AZ (`db.t4g.medium` / `db.m6g.large` + storage) | live realistic $104 + $26 · chapter 4.3 비고 "비용을 끌어올린다" |
+| 3 | Fargate 24/7 상시 컴퓨트 (port-view + execution) | live realistic $45 + $35 · paper $23 + $25 |
+| 4 | ALB internal (live) | live realistic $17 + LCU |
+| 5 | VPC Endpoints (multi-AZ interface) | live realistic $24 · paper $16 |
+
+### 비용 절감 결정 Top 5
+
+| 순위 | 절감 결정 | 근거 |
+|---|---|---|
+| 1 | NAT-off (dev · paper 옵션 D/E) | dev 비고 · paper NAT 미사용 → ~$48/월 절감 |
+| 2 | ALB-off (dev · paper) | dev · paper ECS Service Discovery 로 대체 · 권고안 A |
+| 3 | `assignPublicIp=ENABLED` (Fargate public subnet + NAT 미사용) | dev 비고 · 권고안 A · port-view 1차 포팅 실증 |
+| 4 | Fargate Task desiredCount 0/1 수동 운영 (port-view 실증) | 2026-06-30 (오후) port-view ECS Fargate 1차 포팅 실증 메모 · desiredCount 0 종료 정책 |
+| 5 | EIP attach 유지 (detach / stop 회피) | attach + running 무료 vs detach/stop ~$3.6/월 |
+
+> **안전 안내** — 본 Dashboard 의 수치는 모두 공개 가격 기준 근사치. 실제 청구 금액은 인터넷 데이터 전송량 · 거래일 수 · 장애 재실행 빈도에 따라 변동한다. IaC 작성 시 AWS Pricing Calculator 로 재검증 필요.
 
 ## 1. 가정과 단서
 
@@ -81,7 +159,14 @@ dev / paper / live 환경별로 사용량 가정을 다르게 둔다. 모든 시
   - dev: 0.25 vCPU / 0.5 GB, 일 8시간 실행 가정
   - paper: 0.5 vCPU / 1 GB, 24/7
   - live: 1 vCPU / 2 GB, 24/7
-  - **[2026-06-30 (오후) ECS Fargate 1차 포팅 실증 메모]** — 본 일자 운영자 직접 수행한 ECS Fargate Public IP 1차 포팅에서 실제 운영된 task 사양은 launch type `FARGATE` / awsvpc / cpu 512 / memory 1024 / Spring profile `aws-paper` / Tomcat 8080 / container port 8080(0.5 vCPU / 1 GB 가정 정합). 다만 **본 일자 운영 방식은 24/7 상시 desiredCount 1 이 아니라 검증 시점만 desiredCount 1, 검증 후 desiredCount 0 종료 정책**(R-AUTO-033 [2026-06-30 오후 보강] / OD-MS-002 evidence). 본 1차 포팅 단계에서는 24/7 상시 운영 가정(`paper: 0.5 vCPU / 1 GB, 24/7`) 보다 실제 사용량은 더 낮을 수 있으며(예: 일 1~2시간 운영 + 검증 시점만 활성), 정식 24/7 운영 진입 전까지는 본 가정을 보수적 상한으로 유지. **추가 비용 항목 1차 실증** — (a) ALB 미사용 + NAT Gateway 미사용으로 4.2 paper 표의 `ALB(선택)` 행과 `NAT Gateway` 행 항목은 본 1차 포팅 단계에서 0 으로 산정 가능, (b) **Public IPv4 비용 추가** — Fargate task 가 `assignPublicIp=ENABLED` 로 public subnet 에 직접 배치되므로 `$0.005/IPv4-시간` 단가가 desiredCount 1 유지 시간에 비례해 부과됨 / 본 일자 검증 시점만 desiredCount 1 가정 시 누적 시간 미미, (c) CloudWatch Logs retention 7일 / 본 1차 포팅 단계 log 발생량은 4.2 paper 표의 CloudWatch Logs 가정(20 GB) 보다 훨씬 낮음. **본 1차 포팅 단계 후속 — AWS Pricing Calculator 재확인** — 4.2 paper 표의 port-view 24/7 가정(0.5 vCPU / 1 GB) 은 그대로 유지하되 desiredCount 0/1 수동 운영 운영 회차가 누적된 후 실측 시간 가중으로 재산정 / 24/7 정식 상시 운영 진입 시점에 본 표 갱신 / ALB / HTTPS / Route53 / Cloudflare Tunnel 도입 시점에 4.2 paper 표 `ALB(선택)` 행에 실측 반영 / multi-AZ / Auto Scaling / Blue/Green 도입 시점에 4.3 live 표에 cross-spec audit. 본 단계 비용 평문 인용(실제 영수증 / Billing dashboard 본문) 0건 / 운영자가 AWS Pricing Calculator 로 재산정 시점에 본 표 surgical edit.
+  - **[2026-06-30 (오후) ECS Fargate 1차 포팅 실증 메모]** — 본 일자 운영자 직접 수행한 ECS Fargate Public IP 1차 포팅에서 실제 운영된 task 사양은 launch type `FARGATE` / awsvpc / cpu 512 / memory 1024 / Spring profile `aws-paper` / Tomcat 8080 / container port 8080(0.5 vCPU / 1 GB 가정 정합).
+  - 본 일자 운영 방식은 24/7 상시 desiredCount 1 이 아니라 **검증 시점만 desiredCount 1, 검증 후 desiredCount 0 종료 정책**(R-AUTO-033 [2026-06-30 오후 보강] / OD-MS-002 evidence). 1차 포팅 단계는 24/7 가정보다 실제 사용량이 낮을 수 있어 정식 상시 운영 진입 전까지 본 가정을 보수적 상한으로 유지.
+  - 추가 비용 항목 1차 실증:
+    - (a) ALB · NAT Gateway 미사용으로 4.2 paper 표의 해당 행은 0 산정 가능
+    - (b) **Public IPv4 비용 추가** — `assignPublicIp=ENABLED` 시 `$0.005/IPv4-시간` 단가가 desiredCount 1 유지 시간에 비례해 부과 (검증 시점만 활성 시 누적 시간 미미)
+    - (c) CloudWatch Logs retention 7일 / 1차 포팅 단계 log 발생량은 4.2 paper 가정(20 GB) 보다 훨씬 낮음
+  - 본 1차 포팅 단계 후속: **AWS Pricing Calculator 재확인 필요**. 24/7 정식 상시 진입 시점에 본 표 갱신 / ALB · HTTPS · Route53 · Cloudflare Tunnel 도입 시점에 4.2 paper 표 `ALB(선택)` 행 반영 / multi-AZ · Auto Scaling · Blue/Green 도입 시점에 4.3 live 표 cross-spec audit.
+  - 본 단계 비용 평문 인용(실제 영수증 / Billing dashboard 본문) 0건 / 운영자가 AWS Pricing Calculator 로 재산정 시점에 본 표 surgical edit.
 - `port-interest-crawler` (ECS Fargate Task, 스케줄)
   - dev: 0.5 vCPU / 1 GB × 30분 / 일 → 월 ~15시간
   - paper: 0.5 vCPU / 1 GB × 60분 / 일 → 월 ~30시간
@@ -128,8 +213,25 @@ dev / paper / live 환경별로 사용량 가정을 다르게 둔다. 모든 시
 - Step Functions: paper/live 일 ~10 step × 거래일 21일 → 월 ~250 transitions.
 - EventBridge Scheduler: 월 invocations 1,000~10,000 수준 → 무료 한도 안.
 - Lambda: 인프라 알람 fan-out 용도만 가정. 무료 한도 안.
-- **[2026-06-30 (오후) 장중 손절 Slack 실 연동 비용 메모]** — 같은 일자 오후 추가 작업분으로 장중 손절 Slack 실 연동이 완료되었으나 비용 관점에서 신규 상시 자원 추가는 없음. (a) Notifier Lambda `portfolio-event-notifier` 의 호출 진입점이 MarketConnector EC2 runner 까지 확대되었지만 Lambda 자체는 기존(2026-06-23 Slack notifier 1차 검증 시점) 그대로 사용 / Lambda 호출 횟수는 hard stop 조건 충족 회차 한정으로 매우 저빈도(평일 장중 10분 간격 evaluate × 평일 21일 = 월 약 2,520 호출 / Lambda free tier 안). (b) Step Functions 측 transitions 변경 없음 — `portfolio-paper-intraday-stop-sell-approval` 자체는 본 일자에도 변경 없음. (c) EventBridge Scheduler 변경 없음 — 기존 10분 Snapshot Refresh Scheduler(OD-MS-035 정합) 재사용. (d) EC2 MarketConnector 는 기존 EC2 + EIP 재사용 / 추가 EC2 / EBS / EIP 0건. (e) IAM Role inline policy 추가는 무료. (f) Slack webhook outbound 데이터 매우 작음(1건당 수 KB 한정). 합계로 본 일자 오후 추가 작업분의 월 비용 영향은 **AWS free tier 안 또는 1달러 미만**으로 사실상 0에 수렴. ALB / NAT Gateway / RDS multi-AZ / VPC Endpoints / Fargate 비용과 무관 / port-marketconnector EC2 비용 / Daily Batch state machine 비용 / EC2 lifecycle Scheduler 비용 모두 그대로 유지. 정확한 금액은 AWS Pricing Calculator 재확인 필요(본 문서 2장 단가 가정 기반 추정).
-- **[2026-06-30 (오후) Daily Brief Slack 자동화 비용 메모]** — Daily Brief Slack 알림은 Lambda 2개(Builder `portfolio-daily-brief-slack-summary-builder` + Notifier `portfolio-event-notifier` / 후자는 기존 Approval / Daily Execution Slack 알림과 공유) + mini Step Functions 1개(`portfolio-daily-brief-slack-notification` / 구조 `BuildDailyBriefPayload → SendSlackNotifier` / Standard transitions 매우 작음 / 2 state × 평일 2회 = 월 약 88 transitions / Standard 단가 ~$0.025 / 1,000 transitions 기준 월 비용 약 $0.002) + EventBridge Scheduler 2개(`portfolio-daily-brief-morning-slack-0750-kst` + `portfolio-daily-brief-evening-slack-1550-kst` / 평일 2회 = 월 약 44 invocations / 14M 무료 한도 안 / 추가 비용 0) + IAM Role 2개(무료) + Secrets Manager `GetSecretValue` 호출(평일 2회 = 월 약 44회 / 단가 $0.05/10,000 calls / 비용 0에 가까움) + Slack webhook outbound 데이터(메시지 1건 수 KB / 누적 매우 작음). 합계로 Daily Brief Slack 자동화 자체의 월 비용은 모두 **AWS free tier 한도 안 또는 1달러 미만**으로 사실상 0에 수렴. Fargate · ALB · NAT Gateway · RDS multi-AZ · VPC Endpoints 비용과 무관한 **lightweight automation** 이며, port-view ECS Fargate Service 비용 / Daily Batch state machine 비용 / EC2 lifecycle Scheduler 비용을 모두 그대로 유지(OD-MS-038 신규 / R-AUTO-035 신규 mitigation 정합). 정확한 금액은 AWS Pricing Calculator 재확인 필요(본 문서 2장 단가 가정 기반 추정).
+- **[2026-06-30 (오후) 장중 손절 Slack 실 연동 비용 메모]** — 같은 일자 오후 추가 작업분으로 장중 손절 Slack 실 연동이 완료되었으나 비용 관점에서 **신규 상시 자원 추가 없음**.
+  - (a) Notifier Lambda `portfolio-event-notifier` 의 호출 진입점이 MarketConnector EC2 runner 까지 확대되었지만 Lambda 자체는 기존 사용 / Lambda 호출 횟수는 hard stop 조건 충족 회차 한정 저빈도(평일 장중 10분 간격 evaluate × 평일 21일 = 월 약 2,520 호출 / Lambda free tier 안).
+  - (b) Step Functions transitions 변경 없음 — `portfolio-paper-intraday-stop-sell-approval` 본 일자 변경 없음.
+  - (c) EventBridge Scheduler 변경 없음 — 기존 10분 Snapshot Refresh Scheduler(OD-MS-035 정합) 재사용.
+  - (d) EC2 MarketConnector 는 기존 EC2 + EIP 재사용 / 추가 EC2 · EBS · EIP 0건 / (e) IAM Role inline policy 추가는 무료 / (f) Slack webhook outbound 데이터 매우 작음(1건당 수 KB).
+  - 합계로 본 일자 오후 추가 작업분의 월 비용 영향은 **AWS free tier 안 또는 1달러 미만**으로 사실상 0에 수렴. ALB · NAT Gateway · RDS multi-AZ · VPC Endpoints · Fargate 비용과 무관 / port-marketconnector EC2 비용 · Daily Batch state machine 비용 · EC2 lifecycle Scheduler 비용 모두 유지. **AWS Pricing Calculator 확인 필요**.
+- **[2026-06-30 (오후) Daily Brief Slack 자동화 비용 메모]** — Daily Brief Slack 알림 자동화의 자원 및 월 비용 요약. 자세한 결정은 OD-MS-038 신규 / R-AUTO-035 신규 mitigation 참조.
+  - Lambda 2개 — Builder `portfolio-daily-brief-slack-summary-builder` + Notifier `portfolio-event-notifier`(후자는 기존 Approval / Daily Execution Slack 알림과 공유).
+  - mini Step Functions 1개 — `portfolio-daily-brief-slack-notification` / 구조 `BuildDailyBriefPayload → SendSlackNotifier` / 2 state × 평일 2회 = 월 약 88 transitions / Standard 단가 ~$0.025 / 1,000 transitions 기준 월 비용 약 $0.002.
+  - EventBridge Scheduler 2개(장전 `portfolio-daily-brief-morning-slack-0750-kst` + 장후 `portfolio-daily-brief-evening-slack-1550-kst`) — 평일 2회 = 월 약 44 invocations / 14M 무료 한도 안 / 추가 비용 0.
+  - IAM Role 2개(무료) + Secrets Manager `GetSecretValue` 호출(평일 2회 = 월 약 44회 / 단가 $0.05/10,000 calls / 비용 거의 0) + Slack webhook outbound 데이터(메시지 1건 수 KB / 누적 매우 작음).
+  - 합계: Daily Brief Slack 자동화의 월 비용은 **AWS free tier 안 또는 1달러 미만** (사실상 0). Fargate · ALB · NAT Gateway · RDS multi-AZ · VPC Endpoints 비용과 무관한 **lightweight automation**. **AWS Pricing Calculator 확인 필요**.
+- **[2026-07-01 Step 12~17 Scheduler DISABLED → ENABLED 비용 메모]** — 본 일자 aws-paper Step 12~17 Scheduler `portfolio-paper-daily-step12-17-order-0901-kst` DISABLED → ENABLED 전환으로 인한 **신규 상시 컴퓨트 비용 없음**.
+  - (a) EventBridge Scheduler invocation — 09:01 평일 1회 = 월 약 22회 추가 / 기존 14M 무료 한도 안 / 추가 비용 0.
+  - (b) Step Functions Standard transitions — 후보 없는 날 NO_TARGET 안전 종료 시 2~3 transitions / 후보 있는 날 Step 12~17 전 구간 20~30 transitions / 평일 22회 최대 660 transitions 기준 월 비용 약 $0.02 미만.
+  - (c) Dispatcher Lambda `portfolio-paper-daily-scheduler-dispatcher` invocation — 기존 08:00 approval 1회 + 09:01 order 1회 = 평일 2회 / free tier 안.
+  - (d) RDS · EC2 · Fargate · NAT Gateway · ALB · VPC Endpoints 비용 변경 없음 — 기존 MarketConnector EC2 + port_strategy_execution ECS Fargate Task + RDS 그대로 재사용 / 신규 자원 0건.
+  - (e) Slack outbound(`APPROVAL_REQUIRED` + `DAILY_EXECUTION_SUCCESS` 또는 `DAILY_EXECUTION_FAILED` 등) 메시지 1건 수 KB / 누적 매우 작음.
+  - 합계 — 본 일자 Scheduler ENABLE 전환의 월 비용 영향은 모두 **AWS free tier 한도 안 또는 사실상 0**에 수렴 / 4.2 paper · 4.3 live 표 값 변경 없음. 후보 있는 날 실 실행 회차 누적 후 실측 기반 재산정 가능 / **AWS Pricing Calculator 확인 필요**.
 - S3: access_token 백업 + research report + 일반 dump 합산 dev 1 GB / paper 5 GB / live 20 GB 가정.
 
 ## 4. 환경별 월 비용 시나리오
@@ -296,7 +398,9 @@ paper 환경 합계 추정: 약 $130~$170 / 월 (NAT 제거로 realistic 대비 
 - Fargate Task가 public subnet에서 동작 → 보안 그룹 / IAM 검증을 더 엄격하게 해야 한다.
 - NAT 미사용이므로 인터넷 outbound 필요 워크로드를 명시적으로 식별해야 한다(크롤러, 마켓커넥터).
 - live 안정성과는 별개 권고이므로 권고안 B로 cutover 전 최소 N영업일 검증 필요.
-- KRX Windows worker(paper, 2026-06-12 ~ 2026-06-16 도입) 비용 메모: Autologon / Windows Scheduled Task / SSM RunCommand 자체 비용은 사실상 0이다. 실제 비용 영향은 Windows EC2 running 시간 + EIP(필요 시) + EBS storage + CloudWatch Logs 저장량으로 발생한다. KRX program / shortsell daily 수집은 영업일 단위 짧은 실행이므로 EC2 running 시간을 줄이려면 작업 완료 후 stop 절차(08 spec task 59 후속)로 idle 시간을 최소화한다. EC2 stop 후에도 EIP는 분 단위 과금이 발생할 수 있어 운영자 결정으로 detach 여부 검토 가능. Autologon은 paper 전용 보안 예외(OD-MS-022 / R-SEC-009)로 운영하며, 추후 전용 local user 전환 / 또는 aws-live 단계 도입 시 별도 결정 책임.
+- KRX Windows worker(paper, 2026-06-12 ~ 2026-06-16 도입) 비용 메모 — Autologon · Windows Scheduled Task · SSM RunCommand 자체 비용은 사실상 0.
+  - 실제 비용 영향은 Windows EC2 running 시간 + EIP(필요 시) + EBS storage + CloudWatch Logs 저장량으로 발생. KRX program / shortsell daily 수집은 영업일 단위 짧은 실행이므로 stop 절차(08 spec task 59 후속)로 idle 시간 최소화.
+  - EC2 stop 후에도 EIP 는 분 단위 과금 발생 가능 → 운영자 결정으로 detach 여부 검토 가능. Autologon 은 paper 전용 보안 예외(OD-MS-022 / R-SEC-009) 로 운영하며, 추후 전용 local user 전환 또는 aws-live 도입 시 별도 결정 책임.
 
 적용 대상 stage: design.md 로드맵의 Stage 2~4(파일럿 + 마켓커넥터 + 전략 paper).
 
@@ -335,7 +439,7 @@ paper 환경 합계 추정: 약 $130~$170 / 월 (NAT 제거로 realistic 대비 
 - Reserved Instance / Savings Plans 검토는 live 안정 운영 3개월 이후 실데이터 기반으로 진행한다.
 - 본 spec 안의 모든 추정은 공개 가격 기준 근사치다. 실제 청구 금액은 인터넷 데이터 전송량, 거래일 수, 장애 재실행 빈도에 따라 변동한다.
 
-## 8. 안전 제약
+## Security Notes
 
 - 본 작업은 문서 작성만 수행한다. 실제 AWS 리소스 생성 / IaC 생성 / 8개 MS 코드 / README / AGENTS.md / docs / CHANGELOG / worklog 수정은 하지 않는다.
 - 실제 secret 값은 본 문서에 포함하지 않는다. 모두 `[REDACTED]`로 표기한다.

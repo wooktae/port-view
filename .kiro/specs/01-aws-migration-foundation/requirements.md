@@ -15,7 +15,10 @@
 - `port_strategy_research` (Python, backtest run / analysis / 텍스트 리포트 생성)
 - `port_strategy_execution` (Python, execution order 생성, connector 주문 호출, fill/position sync, intraday monitor)
 
-8개 MS는 모두 단일 PostgreSQL `portfolio` 데이터베이스를 공유하며, 도메인별 schema(`reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`, `public`)와 MS별 `search_path` 우선순위로 동작한다. 각 MS는 `INTEREST_DB_*` 환경변수와 broker / Slack / 외부 API credential을 사용한다.
+8개 MS는 모두 단일 PostgreSQL `portfolio` 데이터베이스를 공유하며, 도메인별 schema 와 MS별 `search_path` 우선순위로 동작한다.
+
+- 도메인 schema: `reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`, `public`
+- 각 MS는 `INTEREST_DB_*` 환경변수와 broker / Slack / 외부 API credential을 사용한다.
 
 이번 spec은 다음을 산출물로 한다.
 
@@ -43,7 +46,10 @@
 1. WHEN 본 spec이 완료되면 THEN design.md SHALL 8개 MS 각각에 대해 최소 2개 AWS 컴퓨트 후보(예: EC2 / ECS Fargate / AWS Batch / Lambda / Elastic Beanstalk / App Runner / Step Functions + EventBridge Scheduler)를 비교한 표와 권고를 포함해야 한다.
 2. WHEN `port-marketconnector` MS를 평가하는 경우 THEN design.md SHALL KIS broker 세션, 단일 access token 파일, 고정 outbound IP 가능성을 근거로 EC2 후보를 1순위 후보 중 하나로 평가해야 한다.
 3. WHEN `port-view` MS를 평가하는 경우 THEN design.md SHALL Elastic Beanstalk, ECS Fargate, App Runner를 후보로 비교하고 Daily Batch가 외부 MS Python 경로를 직접 호출하는 현 구조의 영향을 명시해야 한다.
-4. WHEN `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research` MS를 평가하는 경우 THEN design.md SHALL ECS Fargate Task, AWS Batch, Step Functions + EventBridge Scheduler 후보를 비교하고 daily / intraday / backtest의 실행 빈도와 지속 시간을 근거로 권고를 명시해야 한다.
+4. WHEN `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research` MS를 평가하는 경우 THEN design.md SHALL 아래 후보를 비교하고 daily / intraday / backtest의 실행 빈도와 지속 시간을 근거로 권고를 명시해야 한다.
+   - ECS Fargate Task
+   - AWS Batch
+   - Step Functions + EventBridge Scheduler
 5. WHEN `port-interest-crawler` MS를 평가하는 경우 THEN design.md SHALL Lambda, ECS Task, EC2 후보를 비교하고 Selenium/Chrome 의존성과 KRX 로그인 흐름을 근거로 Lambda 사용 한계를 명시해야 한다.
 6. WHEN `port-interest-preprocessor` MS를 평가하는 경우 THEN design.md SHALL Lambda, ECS Task 후보를 비교하고 holiday API 호출 및 long-running upsert 가능성을 근거로 권고를 명시해야 한다.
 7. WHEN `port_strategy_common` MS를 평가하는 경우 THEN design.md SHALL 순수 라이브러리 특성과 별도 컴퓨트 배포 대상이 아니라는 결론, 그리고 다른 MS 컨테이너 이미지에 포함시키는 packaging 권고를 명시해야 한다.
@@ -74,7 +80,11 @@
 3. WHEN PostgreSQL 접속 password를 다루는 경우 THEN design.md SHALL Secrets Manager에 저장하고 자동 rotation 가능성을 권고로 표시해야 한다.
 4. WHEN Slack webhook URL을 다루는 경우 THEN design.md SHALL Secrets Manager 또는 SSM Parameter Store SecureString 사용 권고를 포함해야 한다.
 5. WHEN Naver API client id/secret, Chrome / ChromeDriver 경로 같은 환경 의존 값을 다루는 경우 THEN design.md SHALL SSM Parameter Store 사용 권고를 포함해야 한다.
-6. WHEN 기존 환경변수 키 호환성을 다루는 경우 THEN design.md SHALL `INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD`, `PORTFOLIO_DB_NAME`, `PORT_ACCOUNT_NO`, `PORT_BROKER_NAME`, `PORT_ENVIRONMENT`, `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION`, `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT` 키 이름을 그대로 유지하는 정책을 명시해야 한다.
+6. WHEN 기존 환경변수 키 호환성을 다루는 경우 THEN design.md SHALL 아래 키 이름을 그대로 유지하는 정책을 명시해야 한다.
+   - RDS: `INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD`, `PORTFOLIO_DB_NAME`
+   - 브로커 / 계정: `PORT_ACCOUNT_NO`, `PORT_BROKER_NAME`
+   - 환경: `PORT_ENVIRONMENT`
+   - 전략: `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION`, `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT`
 7. WHEN 문서에 secret을 인용해야 하는 경우 THEN design.md와 tasks.md SHALL 모든 secret 자리에 `[REDACTED]`만 사용하고 실제 값을 절대 적지 않아야 한다.
 8. WHEN `access_token.txt`를 다루는 경우 THEN design.md SHALL 단일 파일 토큰을 EFS, S3, 또는 Secrets Manager 중 어디에 보관할지 비교하고 broker 세션 단일성 제약을 근거로 1순위 권고를 명시해야 한다.
 

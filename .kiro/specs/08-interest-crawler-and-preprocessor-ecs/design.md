@@ -10,6 +10,25 @@
 
 본 문서는 실제 secret value, account-id, RDS endpoint hostname, image digest, 실제 ARN, instance-id, IAM access key id 를 평문 기록하지 않는다. 모두 `[REDACTED]` 또는 placeholder(`<account-id>`, `<region>`, `<ecr-repo-uri>`, `<image-tag>`, `<task-arn>`, `<rds-endpoint>`, `<cluster-name>`) 만 사용한다(R10.4 정합).
 
+## Runtime Role Split at a Glance
+
+Hybrid execution model 의 runtime 경계는 GUI 요구 여부로 결정된다. 자세한 근거는 §12(hybrid 분류) / §13(SSM 자동화) / §15(rev7 non-GUI 운영 경로 + Autologon) / §17(Step 2 성공판정 강화) 참조.
+
+| Workload | Runtime | 진입점 / trigger | 성공 판정 |
+|---|---|---|---|
+| Preprocessor MS | ECS Fargate Task (single-run) | `aws ecs run-task` 1회 | exit code 0 / CloudWatch Logs `PREPROCESSOR PIPELINE END` / feature `updated_at` 갱신 |
+| non-GUI crawler | ECS Fargate Task (`portfolio-paper-interest-crawler:7`, daily 운영용) | `aws ecs run-task` 1회 (wrapper Step 2 안에서) | exit code 0 / 8종 non-GUI step SUCCESS / raw table `max(trade_date)` 정합 |
+| KRX GUI crawler | Windows EC2 worker (Autologon → Administrator console → Scheduled Task) | SSM RunCommand → `schtasks /Run /TN Portfolio-KRX-Worker-Daily` | Running→Ready 복귀 + Last Result 0 + latest log tail + KRX raw DB validation exit code 0 |
+| ECS Task Definition rev6 (참조 이력) | ECS Fargate (smoke 전용) | 운영 진입점 아님 | 2026-06-13 §5 통과 시점 상태 유지 / 운영 대상 아님 |
+
+**진입점 원칙**
+
+- SSM direct Python / wrapper 실행은 SYSTEM Session 0 부적합. 채택 거부(§13.2 / §15.5).
+- SSM RunCommand 는 `schtasks /Run` trigger 역할만 담당.
+- Scheduled Task trigger 성공 ≠ Step 2 SUCCESS. 6개 성공 조건(§17.1) 모두 통과 필요.
+- Headless / 비대화형 KRX 수집은 로컬 검증상 운영 방식에서 제외(§15.6).
+- Autologon 은 paper 전용 Windows worker 한정 보안 예외(R-SEC-009 / §12 · §15.4).
+
 ## 1. 범위 / 범위 밖 (R1)
 
 ### 1.1 범위 안 / 범위 밖
@@ -475,88 +494,20 @@ revision 6 의 RunTask smoke 결과(2026-06-13)는 다음을 1차 검증한다.
 - §14 는 §12 의 hybrid execution model 분류와 §13 의 1차 자동화 완성 판단 위에 표현 보정 / 본 일자 상태 갱신 / non-GUI 운영 미도달 명시 / raw 최신성 부족 영향 명시만 추가한다.
 - non-GUI crawler 의 실제 운영용 Task Definition 분리, raw 최신성 회복 작업, preprocessor 재실행, raw / feature 최신성 검증 SQL 자동화는 모두 후속 spec / 후속 phase 책임이다(task 72 / 73 / 74 / 77 / 78 / 58 정합).
 
-
-## 15. 2026-06-16 운영자 검증 결과 / Hybrid execution model 갱신
-
-본 섹션은 2026-06-16 운영자가 직접 수행한 (a) Crawler 데이터 미수집 원인 해소, (b) non-GUI Interest Crawler 운영용 ECS / Fargate Task Definition revision 7 신규 등록 및 RunTask 성공, (c) raw 최신성 회복, (d) Windows EC2 worker Autologon bootstrap + Administrator console interactive session 실증, (e) SSM RunCommand → `schtasks /Run` → Scheduled Task 흐름 재검증 결과를 반영한 보강 섹션이다. §12 Hybrid execution model 분류 / §13 1차 자동화 완성 판단 / §14 표현 보정 자체는 변경하지 않고, 본 일자 1차 자동화 진입점 보강과 non-GUI ECS / Fargate 운영 경로 신규 생성을 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-16 §1 ~ §6 / 본 일자 결정 락은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-022(신규) + OD-MS-011 / OD-MS-015 / OD-MS-020 1차 실증 메모 보강 참조.
-
-### 15.1 Hybrid execution model 워크로드 별 본 일자 상태 (2026-06-16)
-
-§12.1 / §14.2 의 hybrid execution model 분류 표를 본 일자 상태로 갱신한다(분류 자체는 변경 없음).
-
-| 워크로드 | runtime | 본 일자 상태 | 비고 |
-|---------|---------|-------------|------|
-| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task | 본 일자 신규 작업 없음 / **raw 입력 데이터 회복 후 ECS 재실행 가능 상태** | 재실행은 task 77 후속 분리. "재실행 가능 상태" 까지만 본 일자 기록(완료 표기 보류) |
-| non-GUI crawler (Naver / yfinance / KRX 비-GUI 경로) | ECS Fargate Task | **운영 경로 생성 + RunTask 성공** | Task Definition `portfolio-paper-interest-crawler:7` 신규 등록 / image `paper-20260616-nongui` / RunTask exitCode 0 / 약 9분 51초 / 8종 step SUCCESS / raw 7종 + macro 직전 거래일 적재 |
-| KRX GUI 의존 crawler (KRX program / KRX shortsell, Selenium / Chrome) | Windows EC2 worker + Autologon + Administrator interactive session + Scheduled Task + SSM trigger | **자동 로그인 기반 운영 방식 1차 실증** | Autologon bootstrap / `query user` Administrator console session Active / SSM RunCommand → `schtasks /Run` → Scheduled Task → Administrator interactive session 흐름 / KRX login + program + shortsell 2026-06-15 적재 |
-
-### 15.2 ECS Task Definition revision 분리 정책 (rev6 ↔ rev7)
-
-| revision | 용도 | image | command | 운영 위치 |
-|----------|------|-------|---------|----------|
-| 6 | Selenium / Chrome / outbound **smoke 검증 전용** | `portfolio-interest-crawler:paper-20260611` | Selenium Chrome smoke command(2026-06-13 §13.3 정합) | log stream prefix `ecs-selenium-chrome-smoke` |
-| 7 | non-GUI **daily 운영용** | `portfolio-interest-crawler:paper-20260616-nongui` | `python interest_crawler_daily_nongui.py` (KRX GUI 3종 제외 / non-GUI 8종 포함) | log stream prefix `ecs-crawler-nongui-daily` |
-
-본 분리는 OD-MS-011 / OD-MS-020 정합으로 다음을 명시한다.
-
-- revision 6 = ECS / Fargate / Chromium runtime 가용성 smoke 보증 한정
-- revision 7 = 실제 daily raw 수집 운영용 — 8종 step SUCCESS 가 raw 최신성 회복 1차 검증 근거
-- 두 revision 의 RunTask 결과를 혼동해 "ECS / Fargate crawler smoke 통과 = daily raw 최신성 통과" 로 해석하지 않는다(R-DATA-009 mitigation 정합)
-
-### 15.3 KRX GUI 경로 — SSM 직접 실행 운영 방식 제외 / Headless · 비대화형 수집 제외
-
-본 일자 보강으로 다음 두 가지를 운영 방식 제외 결정으로 명시한다(OD-MS-022 신규 정합).
-
-- SSM direct Python / wrapper 실행 — SSM RunCommand 가 wrapper 또는 Python 을 SYSTEM Session 0 / 비대화형 세션에서 직접 실행하는 방식은 KRX GUI 로그인 / nos_setup / 키보드보안 / iframe / Chrome download 폴더 의존성으로 부적합(2026-06-13 §13.2 그대로). 본 일자 검증에서도 직접 실행 방식은 채택하지 않음
-- Headless / 비대화형 KRX 수집 — 로컬 검증상 KRX headless / 비대화형 수집은 불가능한 방향으로 판단되어 운영 방식에서 제외(이전 "장기 후보" 표현은 본 일자에 "로컬 검증상 제외 / 운영 방식에서 제외" 로 보정)
-
-따라서 KRX GUI 경로의 운영 방식은 다음 5단계 흐름만 채택한다.
-
-```
-SSM RunCommand
-  → schtasks /Run /TN "Portfolio-KRX-Worker-Daily"
-  → Windows Scheduled Task (Logon Mode = Interactive only / Run As = Administrator)
-  → Administrator console interactive session  ← Autologon bootstrap 으로 EC2 부팅 후 자동 생성
-  → powershell.exe -ExecutionPolicy Bypass -File C:\portfolio\run_krx_worker_daily.ps1
-        → python interest_krx_login_new.py
-        → python interest_program.py
-        → python interest_shortsell.py
-```
-
-### 15.4 Autologon 보안 예외 명시 (paper 전용)
-
-| 항목 | 본 일자 결정 |
-|------|-------------|
-| 사용 도구 | Microsoft Sysinternals Autologon |
-| 적용 대상 | paper 전용 Windows worker(`portfolio-paper-crawler-worker`) 한정 |
-| 자동 로그인 사용자 | Administrator |
-| 자격 증명 보관 | Sysinternals Autologon 으로 주입 — DefaultUserName / DefaultPassword 본 spec / operation-notes / 운영자 노트 평문 기록 금지(R-SEC-009 / R-DOCS-001 정합) |
-| 검증 방식 | EC2 재부팅 후 SSM managed instance Online 확인 / `query user` 결과 Administrator console session Active 확인(SESSIONNAME `console` / ID `1` / STATE `Active`) / `whoami` SYSTEM 출력은 SSM 자체 SYSTEM 실행이므로 정상 |
-| 보안 예외 분류 | paper 전용 worker 에 한정한 자동 로그인 — 일반 운영 환경 standard 가 아닌 예외(R-SEC-009 신규 / 후속 전용 local user 검토 후보) |
-| 후속 보강 | RDP inbound 제한 / EC2 stop 절차 / 추후 전용 local user 검토 / Administrator password 미기록 정책 유지 |
-
-### 15.5 Backend AWS E2E dry-run 진입 정합 (2026-06-16 시점)
-
-§14.5 표를 본 일자 상태로 갱신한다(자세한 표는 [`./operation-notes.md`](./operation-notes.md) 2026-06-16 §3 / §4 / §5).
-
-| 분류 | 본 일자 상태 |
-|------|-------------|
-| 완료 | 1번 `CONNECTOR_BALANCE`(2026-06-15 §2 그대로) / 2번 `INTEREST_CRAWLER`(2026-06-16 §2 ~ §4 / non-GUI rev7 RunTask + raw 최신성 회복 + KRX worker 자동화 trigger 1차 실증) |
-| 미진행 / 후속 재개 | 3번 `PREPROCESSOR`(재실행 가능 상태 도달 / 재실행은 task 77 후속) / 4 ~ 7번(`BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL`) |
-| 미진행 / dry-run skip 예정 | 8 ~ 17번(BUY · SELL · AUTO · MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE · CONNECTOR_ORDER_CHECK · fill·position sync · BALANCE_REFRESH) — 안전 기준(OD-MS-021 / OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011) 그대로 유지 |
-
-본 표는 OD-MS-021 결정 락의 입력으로 사용된다. 실제 BUY / SELL / `--execute` / fill·position sync 자동 재시도 / aws-live 작업은 모두 0건이다.
-
-### 15.6 본 섹션 갱신 원칙
-
-- 기존 §1 ~ §14 결정값은 변경하지 않는다.
-- §15 는 §12 hybrid execution model 분류와 §13 1차 자동화 완성 판단과 §14 표현 보정 위에 (a) Crawler 데이터 미수집 해결 완료, (b) non-GUI ECS / Fargate Task Definition revision 7 운영 경로 신규 생성 + RunTask 성공, (c) raw 최신성 회복, (d) KRX GUI 경로의 자동 로그인 기반 운영 방식 1차 실증, (e) SSM direct Python / 비대화형 실행 / Headless KRX 수집 운영 방식 제외 결정만 추가로 명시한다.
-- Preprocessor ECS 재실행 / Backend AWS E2E dry-run 재개 / View 구현은 후속 spec / 후속 phase 책임으로 유지한다(§11 / §14.6 그대로 유지).
-
-
 ## 15. 2026-06-16 운영자 검증 결과 / Hybrid execution model 갱신 (Crawler 데이터 미수집 해결 + KRX EC2 자동화 성공)
 
-본 섹션은 2026-06-16 운영자가 직접 수행한 (a) Crawler 데이터 미수집 원인 해소(non-GUI 전용 orchestration / Task Definition 부재 식별), (b) `interest_crawler_daily_nongui.py` 신규 + Docker rebuild + ECR push + ECS Task Definition revision 7 등록 + RunTask exitCode 0, (c) non-GUI raw 6종 + KRX raw 2종 + news / agency 2026-06-16 적재 회복, (d) Windows EC2 worker Autologon bootstrap + Administrator console session Active 확인 + SSM RunCommand → `schtasks /Run` → Scheduled Task 흐름 재검증 결과를 반영한 보강 섹션이다. §1 ~ §14 결정값은 변경하지 않고 hybrid execution model 의 운영 상태 표현 / non-GUI rev7 의미 / KRX GUI 자동 로그인 운영 방식 1차 실증 / SSM direct Python · wrapper 실행 부적합 / Headless · 비대화형 KRX 수집 운영 방식 제외 결정만 보강한다. 자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-16 §1 ~ §5 / 본 일자 결정 락은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-022 + OD-MS-011 / OD-MS-015 / OD-MS-020 1차 실증 메모 참조.
+본 섹션은 2026-06-16 운영자 직접 수행 결과를 반영한 보강 섹션이다. §1 ~ §14 결정값은 변경하지 않고 아래만 보강한다.
+
+작업 범위:
+
+- (a) Crawler 데이터 미수집 원인 해소(non-GUI 전용 orchestration / Task Definition 부재 식별)
+- (b) `interest_crawler_daily_nongui.py` 신규 + Docker rebuild + ECR push + ECS Task Definition revision 7 등록 + RunTask exitCode 0
+- (c) non-GUI raw 6종 + KRX raw 2종 + news / agency 2026-06-16 적재 회복
+- (d) Windows EC2 worker Autologon bootstrap + Administrator console session Active 확인 + SSM RunCommand → `schtasks /Run` → Scheduled Task 흐름 재검증
+
+보강 대상: hybrid execution model 의 운영 상태 표현 / non-GUI rev7 의미 / KRX GUI 자동 로그인 운영 방식 1차 실증 / SSM direct Python · wrapper 실행 부적합 / Headless · 비대화형 KRX 수집 운영 방식 제외 결정.
+
+참조: [`./operation-notes.md`](./operation-notes.md) 2026-06-16 §1 ~ §5 / 결정 락 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-022 + OD-MS-011 / OD-MS-015 / OD-MS-020.
 
 ### 15.1 표현 보정 (OD-MS-020 / OD-MS-022 정합)
 
@@ -645,56 +596,6 @@ KRX 사이트의 동작 특성(KRX 로그인 / nos_setup / 키보드보안 / ifr
 - §15 는 §12 / §13 / §14 위에 본 일자 1차 실증 결과(non-GUI rev7 운영 경로 생성 + RunTask 성공 + raw 최신성 회복 + KRX EC2 자동 로그인 기반 운영 방식 실증)를 반영한 표현 갱신과 결정 락(OD-MS-022)만 추가한다.
 - Preprocessor ECS 재실행 / Backend AWS E2E dry-run 재개(`BACKTEST_RESEARCH` → `BACKTEST_REPORT` → `DAILY_BUY_SIGNAL` → `DAILY_POSITION_SIGNAL` 순서) / `interest_foreignindex_raw` HANGSENG · NIKKEI225 · SHANGHAI NULL Data 후속 점검 / EventBridge Scheduler 정기 trigger / Step Functions hybrid orchestration / wrapper 내 DB 검증 출력 자동 추가 / EC2 worker stop 절차 / Chrome process 정리 옵션 / View 구현은 모두 후속 spec / 후속 phase 책임이다.
 
-
-## 15. 2026-06-16 운영자 검증 결과 / Hybrid execution model 완료
-
-본 섹션은 2026-06-16 운영자가 직접 수행한 (a) Crawler 데이터 미수집 원인 진단, (b) `interest_crawler_daily_nongui.py` 신규 생성 + ECS Task Definition `portfolio-paper-interest-crawler:7` 등록 + RunTask exitCode 0, (c) raw 최신성 회복, (d) Windows EC2 worker Autologon + Administrator console session + Scheduled Task + SSM trigger 자동화 재검증 결과를 반영한 보강 섹션이다. §12 ~ §14 결정값은 변경하지 않고, Hybrid execution model 의 본 일자 상태와 revision 6 / revision 7 의 의미 분리, SSM direct 실행 부적합 / Headless · 비대화형 KRX 수집 운영 방식 제외만 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-16 §1 ~ §5 / 본 일자 결정 락은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-022 / OD-MS-011 · OD-MS-015 · OD-MS-020 1차 실증 메모 참조.
-
-### 15.1 Hybrid execution model 완료 (2026-06-16)
-
-§12.1 hybrid execution model 분류 표를 본 일자 상태로 갱신한다(분류 자체는 변경 없음).
-
-| 워크로드 | runtime | 본 일자 상태 | 비고 |
-|---------|---------|-------------|------|
-| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task | **raw 최신성 회복 후 재실행 가능 상태 도달** | §7 그대로 유지 / 실제 재실행은 후속(task 77) |
-| non-GUI crawler (Naver / yfinance / KRX 비-GUI 경로) | ECS Fargate Task | **운영 경로 생성 + RunTask 성공** — Task Definition `portfolio-paper-interest-crawler:7`(image `paper-20260616-nongui` / command `["python", "interest_crawler_daily_nongui.py"]` / log stream prefix `ecs-crawler-nongui-daily`) / RunTask exitCode 0 / 약 9분 51초 / 전체 step SUCCESS | task 83 / task 84 |
-| KRX GUI 의존 crawler (KRX program / KRX shortsell, Selenium / Chrome) | Windows EC2 worker | **Autologon + Administrator interactive session + Scheduled Task + SSM trigger 성공** — KRX login(elapsed 92.83s) / `interest_program` 2026-06-15 / `interest_shortsell` 2026-06-15 349 Company / wrapper `DONE :: KRX worker daily` | task 86 ~ task 89 |
-
-본 시점에 Crawler 데이터 미수집 해결: 완료 / Interest Crawler hybrid 구조 완료 상태에 도달한다. 표현 보정(OD-MS-020 정합) — 이전 "hybrid 1차 구현 부분 완료" 표현은 "hybrid 구조 완료(non-GUI rev7 운영 경로 생성 + RunTask 성공 + raw 최신성 회복 + KRX GUI = Windows EC2 worker + Autologon + Scheduled Task + SSM trigger)" 로 갱신한다. "완료" 표기 원칙(실제 데이터 적재 / 최신성 검증까지 확인된 경우에만 사용)은 유지한다.
-
-### 15.2 revision 6 / revision 7 의미 분리
-
-| 항목 | revision 6 | revision 7 |
-|------|-----------|-----------|
-| family | `portfolio-paper-interest-crawler` | `portfolio-paper-interest-crawler` |
-| image | `portfolio-interest-crawler:paper-20260611` | `portfolio-interest-crawler:paper-20260616-nongui` |
-| command 의미 | Selenium / Chrome / outbound smoke 검증용(2026-06-13 §13.3 정합) | non-GUI daily 운영용(`["python", "interest_crawler_daily_nongui.py"]`) |
-| log stream prefix | `ecs-selenium-chrome-smoke` | `ecs-crawler-nongui-daily` |
-| 실제 daily raw 수집 | 미수행(smoke 한정) | 8종 step SUCCESS(`interest_news` / `interest_agency` / `interest_foreignindex` / `interest_commodity` / `interest_macroeconomic` / `interest_price` / `interest_investorflow` / `interest_marketbreadth`) |
-
-revision 6 은 ECS / Fargate / Chromium runtime 가용성 보증으로만 해석한다(2026-06-13 §13.3 정합). revision 7 은 본 일자 1차 검증을 통과한 non-GUI daily 운영 경로다. KRX GUI 의존 파일(`interest_krx_login_new` / `interest_program` / `interest_shortsell`) 은 revision 7 의 import / command 에서 명시적으로 제외되며, Windows EC2 worker 경로(§15.3) 로 분리된다.
-
-### 15.3 SSM direct Python · wrapper 실행 부적합 / Headless · 비대화형 KRX 수집 제외
-
-| 항목 | 결정 |
-|------|------|
-| SSM direct Python · wrapper 실행 | **운영 방식에서 제외**. SSM RunCommand 가 wrapper 또는 Python 을 SYSTEM Session 0 / 비대화형 세션에서 직접 실행하는 방식은 Chrome GUI 가 Administrator RDP / console 화면에 표시되지 않아 KRX 로그인 단계가 실패한다(2026-06-13 §13.2 정합). 본 일자에 Autologon bootstrap + Administrator console session Active 확인 + Scheduled Task trigger 흐름이 1차 실증으로 통과(R-AUTO-008 mitigation 보강) |
-| Headless / 비대화형 KRX 수집 | **운영 방식에서 제외 / 로컬 검증상 제외**. KRX 로그인 / nos_setup / 키보드보안 / iframe 제약으로 headless 또는 비대화형 수집은 안정성 미달 판단. 장기 후보로만 유지하지 않으며, 현재 결정은 "Windows Autologon + Administrator interactive session + Scheduled Task + SSM trigger" 구조 사용(OD-MS-022 신규) |
-| KRX GUI 수집 운영 방식 | SSM RunCommand → `schtasks /Run /TN "Portfolio-KRX-Worker-Daily"` → Windows Scheduled Task → Administrator console interactive session → `powershell.exe -ExecutionPolicy Bypass -File C:\portfolio\run_krx_worker_daily.ps1` → KRX login → program → shortsell 흐름. RDP 매일 수동 접속이 아니라 Autologon 기반 Administrator interactive session 자동 생성 방식 |
-
-### 15.4 raw 최신성 회복 후 Preprocessor 재실행 가능 상태
-
-본 일자 raw 최신성 회복 결과(operation-notes 2026-06-16 §3) 로 Preprocessor 가 stale raw data 가 아닌 직전 거래일 입력 데이터로 ECS 재실행 가능한 상태에 도달한다(R-DATA-010 mitigation 1차 실증). Preprocessor 의 실제 재실행 / feature table max date / `updated_at` / 신규 feature date 생성 여부 확인은 task 77 후속 분리이며, 본 §15 시점에는 "재실행 가능 상태 도달" 까지만 기록한다("완료" 표기는 사용하지 않는다 / OD-MS-020 정합).
-
-`interest_foreignindex_raw` HANGSENG / NIKKEI225 / SHANGHAI 일부 NULL Data 는 본 일자 Preprocessor blocker 가 아닌 non-blocker 후보로 분리한다(별도 일정에 점검).
-
-### 15.5 본 섹션 갱신 원칙
-
-- 기존 §1 ~ §14 결정값은 변경하지 않는다.
-- §15 는 §12 의 hybrid execution model 분류와 §13 의 1차 자동화 완성 판단, §14 의 표현 보정 위에 본 일자 결과로 hybrid 구조 완료 / revision 6 / revision 7 의미 분리 / SSM direct 실행 부적합 / Headless · 비대화형 KRX 수집 운영 방식 제외 / Preprocessor 재실행 가능 상태 도달만 추가한다.
-- Preprocessor 재실행 / Backend AWS E2E dry-run 재개 / EventBridge Scheduler 정기 trigger / Step Functions hybrid orchestration / non-GUI crawler 인벤토리 추가 점검 / wrapper 내 DB 검증 출력 자동 추가 / EC2 worker stop 절차 / Chrome process 정리 옵션 / View 구현은 모두 후속 spec / 후속 phase 책임이다.
-
-
 ## 16. 2026-06-20 운영자 검증 결과 / Daily AWS Paper Wrapper 최종 점검 + EC2 lifecycle 후속 필요성
 
 본 섹션은 2026-06-20 운영자 직접 수행한 (a) Daily AWS Paper Wrapper 구조 / 안전 기준 / EC2 기동 기준 최종 점검, (b) RunDate `2026-06-18` / Step 1 ~ Step 11 범위 wrapper 재실행 시도 안전 중단, (c) 6/19 KRX raw 최신성 복구 상태 점검 결과를 반영한 보강 섹션이다. §12 ~ §15 결정값은 변경하지 않고, EC2 lifecycle 후속 필요성과 Step 2 wrapper 성공판정 강화 진입 근거만 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-20 §1 ~ §5 참조.
@@ -723,7 +624,18 @@ revision 6 은 ECS / Fargate / Chromium runtime 가용성 보증으로만 해석
 
 ## 17. 2026-06-21 운영자 검증 결과 / Step 2 INTEREST_CRAWLER 성공판정 강화 (OD-MS-026 신규)
 
-본 섹션은 2026-06-21 운영자 직접 수행한 (a) `step-02-interest-crawler.ps1` 성공판정 강화, (b) non-GUI ECS crawler env 보강, (c) `interest_krx_raw_validate_daily.py` 신규 생성 + EC2 배포 + EC2 단독 검증, (d) `step-02-interest-crawler.ps1` DB validation 연동, (e) crawler worker stopped fail-closed 처리, (f) Step 2 단독 실행 검증 결과를 반영한 보강 섹션이다. §12 ~ §16 결정값은 변경하지 않고, Step 2 성공 조건과 worker stopped fail-closed 설계 변경 / KRX raw validation script 의 Step 2 guard 역할만 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-21 §1 ~ §8 참조. 본 일자 결정 락 OD-MS-026 신규 / R-AUTO-020 신규 mitigation 1차 실증 / R-AUTO-007 / R-AUTO-016 / R-AUTO-017 보강.
+본 섹션은 2026-06-21 운영자 직접 수행 결과를 반영한 보강 섹션이다. §12 ~ §16 결정값은 변경하지 않고, Step 2 성공 조건과 worker stopped fail-closed 설계 변경 / KRX raw validation script 의 Step 2 guard 역할만 추가로 명시한다.
+
+작업 범위:
+
+- (a) `step-02-interest-crawler.ps1` 성공판정 강화
+- (b) non-GUI ECS crawler env 보강
+- (c) `interest_krx_raw_validate_daily.py` 신규 생성 + EC2 배포 + EC2 단독 검증
+- (d) `step-02-interest-crawler.ps1` DB validation 연동
+- (e) crawler worker stopped fail-closed 처리
+- (f) Step 2 단독 실행 검증
+
+참조: [`./operation-notes.md`](./operation-notes.md) 2026-06-21 §1 ~ §8 / 결정 락 OD-MS-026 신규 / R-AUTO-020 신규 mitigation 1차 실증 / R-AUTO-007 / R-AUTO-016 / R-AUTO-017 보강.
 
 ### 17.1 Step 2 성공 조건 (강화)
 

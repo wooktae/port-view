@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## 2026-07-01
+
+### Added
+
+- README에 "View 책임 경계" 섹션을 추가했습니다. port-view가 조회 / 승인 / 트리거 UI를 담당하고, 실제 Daily Batch 실행 책임은 AWS Step Functions / EventBridge Scheduler / ECS RunTask / SSM RunCommand / AWS Batch / Lambda 쪽에 있다는 책임 경계를 명시했습니다.
+- README에 "ECS Fargate 배포 관점" 섹션을 추가했습니다. Docker image build → ECR push → ECS Task Definition revision → ECS Service rollout 흐름 요약, Fargate 운영 안전 기본값(`execution-mode=aws-stepfunctions`, `local-file-execution-enabled=false`, `paper-order-enabled=false`, `full-pipeline-execution-enabled=false`, `max-executable-step-order=11`), container 환경변수 주입 유형, ALB 노출 원칙, 로컬 절대 경로 의존이 Fargate 운영 경로가 아니라는 점을 정리했습니다.
+- `docs/architecture.md`에 배포 구조(ECS Fargate) 요약 섹션을 추가했습니다. View 책임 경계, 컨테이너 안의 흐름 두 가지(조회 흐름 + Step Functions `StartExecution` 트리거 흐름), 저장소에 원문 기록하지 않는 값과 placeholder 정책을 정리했습니다.
+- `docs/configuration.md`에 "Fargate 안전 기본값" subsection을 추가했습니다. Daily Batch 안전 기본값 5종과 state machine ARN placeholder(`<STATE_MACHINE_ARN>`, `<APPROVAL_STATE_MACHINE_ARN>`)을 정리했습니다.
+- `docs/daily-batch.md`에 "AWS Step Functions backend와 View 트리거 UI" subsection을 추가했습니다. safe/approval endpoint 분리, 일반 workflow와 approval workflow ARN 분리, `StartExecution` payload boolean/numeric/string 타입 정합, View는 조회/승인/트리거 UI만 담당한다는 책임 경계를 정리했습니다.
+- `docs/worklog/2026-07-01.md`를 신규 작성했습니다.
+
+### Changed
+
+- 없음. 코드 / properties / template / Java 파일 변경 없음.
+
+### Notes
+
+- 본 CHANGELOG entry는 port-view MS 저장소 문서 최신화만 다룹니다. MarketConnector, StrategyExecution, StrategyDecision, StrategyResearch, Preprocessor, Crawler, EventBridge Scheduler, Lambda, Step Functions 내부 orchestration의 세부 운영 내용은 port-view 책임 경계 밖이며 본 저장소 문서에는 반영하지 않았습니다. cross-service 세부 이력은 `.kiro/` 하위 AWS Migration spec에서 관리됩니다.
+- ECS Fargate 포팅 실행, Docker image build, ECR push, ECS Task Definition / Service 생성 · 갱신, ALB 구성, Daily Batch 실행, Slack Webhook 테스트, 외부 투자/주문 API 호출, DB DDL/DML, AWS CLI / boto3 / Spring Boot 실행은 본 문서 업데이트 작업에서 수행하지 않았습니다.
+- commit/add/reset/checkout/stash는 실행하지 않았습니다.
+- DB password, API key, token, Slack webhook URL, 계좌번호 전체, account-id 12자리 원문, 실제 secret ARN, 실제 IAM Role ARN, 실제 state machine ARN 전체, ALB DNS 또는 공개 endpoint 원문, command id, 일회성 실행 로그는 본 변경 문서에 기록하지 않았습니다. 필요 시 `[REDACTED]` / `<STATE_MACHINE_ARN>` / `<APPROVAL_STATE_MACHINE_ARN>` / `<ALB_ENDPOINT>` / `<ECR_IMAGE_URI>` placeholder로 표기했습니다.
+
 ## 2026-06-29 (3)
 
 ### Added
@@ -26,7 +48,7 @@
 ### Notes
 
 - 본 변경의 코드 수정 사실은 commit `e72de6f`(`feat(view): add Step Functions daily batch trigger`) 후속의 추가 commit (변경 파일 = `DailyBatchProperties.java` · `StepFunctionsDailyBatchExecutionService.java` · `application-aws-paper.properties` · `DailyBatchController.java` · `daily_batch.html`) 및 운영자 로컬 도구 폴더 wrapper 4종 변경을 참조합니다. 본 저장소 범위 밖의 wrapper 본체는 기록하지 않습니다.
-- AWS Step Functions `portfolio-paper-daily-step12-17-approval` 검증 결과: executionName `port-view-step12-17-step12-17-20260629-194314-ba5edaf8` / status `SUCCEEDED` / start `2026-06-29T19:43:15.673+09:00` / stop `2026-06-29T19:46:06.546+09:00`. DB 후검증 통과(운영 marker `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS` / 오늘 신규 `connector_order_request` 0건 / 신규 broker 주문 0건).
+- AWS Step Functions `portfolio-paper-daily-step12-17-approval` 검증 결과: 승인 실행이 정상 종료되고 DB 후검증에서 신규 `connector_order_request` 및 broker 주문이 발생하지 않은 상태로 확인했습니다. 구체 executionName, executionArn, 실행 시각, 일회성 검증 marker 원문은 저장소 문서에 기록하지 않습니다.
 - 본 문서 업데이트 작업에서는 Daily Batch 실행, Slack Webhook 테스트, 외부 투자/주문 API 호출, DB DDL/DML, AWS CLI / boto3 / Spring Boot 실행을 추가로 수행하지 않았습니다.
 - commit/add/reset/checkout/stash 는 실행하지 않았습니다.
 - secret value, KIS app key, KIS app secret, token, RDS password, account-id 12자리 원문, 계좌번호 전체값, 실제 secret ARN, 실제 IAM Role ARN, 실제 state machine ARN, Slack webhook URL 은 본 변경 문서에 기록하지 않았습니다. 필요 시 `[REDACTED]` 로 표기했습니다.

@@ -207,7 +207,12 @@ aws-live 환경별 월 합계 추정.
 
 ## MS별 AWS 서비스 후보 비교 참조
 
-본 decision-matrix는 NAT / RDS / VPC Endpoint / ALB / backup / cutover 같은 인프라 옵션 결정에 집중한다. 각 MS별 컴퓨트 / orchestration 후보 비교(EC2 / ECS Fargate / ECS on EC2 / AWS Batch / Lambda / EKS / Elastic Beanstalk / App Runner / Step Functions / EventBridge Scheduler 등)와 포트폴리오 어필 관점 보강안은 루트 공통 문서 [ms-aws-service-decision-matrix.md](../_common/ms-aws-service-decision-matrix.md)에 별도로 정리되어 있다.
+본 decision-matrix는 NAT / RDS / VPC Endpoint / ALB / backup / cutover 같은 인프라 옵션 결정에 집중한다.
+
+각 MS별 컴퓨트 / orchestration 후보 비교와 포트폴리오 어필 관점 보강안은 루트 공통 문서 [ms-aws-service-decision-matrix.md](../_common/ms-aws-service-decision-matrix.md)에 별도로 정리되어 있다. 비교 대상:
+
+- 컴퓨트: EC2 / ECS Fargate / ECS on EC2 / AWS Batch / Lambda / EKS / Elastic Beanstalk / App Runner
+- Orchestration: Step Functions / EventBridge Scheduler 등
 
 8개 MS 컴퓨트 1순위 결정(OD-MS-001 ~ OD-MS-010)은 루트 공통 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 9장에 락 상태로 기록되어 있다. 본 decision-matrix는 그 결정을 변경하지 않고, 네트워크 / RDS 옵션 선택에만 집중한다.
 

@@ -1,6 +1,9 @@
 # Runbook — 05-port-view-ecs-and-runbook
 
-본 문서는 port-view ECS Fargate Public IP 1차 포팅 운영 절차를 정리한 runbook 이다. 정식 운영 procedure 의 1차 기준 문서로 본 spec 의 `operation-notes.md` 의 2026-06-30 (오후) 본문(`3. ECS Fargate 포팅: 완료`) 사실 기록을 단일 기준으로 한다. 본 runbook 은 운영자가 직접 수행하는 절차이고, Kiro 는 본 spec 작업공간에서 실제 명령을 실행하지 않는다.
+본 문서는 port-view ECS Fargate Public IP 1차 포팅 운영 절차를 정리한 runbook 이다.
+
+- 단일 기준 = 본 spec `operation-notes.md` 의 2026-06-30 (오후) 본문(`3. ECS Fargate 포팅: 완료`) 사실 기록.
+- 실행 주체 = 운영자 직접 수행 / Kiro 는 본 spec 작업공간에서 실제 명령을 실행하지 않는다.
 
 ## 적용 범위
 
@@ -16,10 +19,22 @@
 - Fargate task 재기동 시 public IP 가 변경되므로, 운영자는 매 기동 직후 public IP 를 자동 조회 후 브라우저 URL 을 갱신한다.
 - Security Group `sgroup-port-view-ecs` inbound 는 TCP 8080 / source 운영자 공인 IP/32 만 허용한다. 0.0.0.0/0 전체 오픈 금지.
 - 본 runbook 의 모든 AWS CLI 명령 예시는 `.kiro/AGENTS.md` 의 "운영 명령 작성 규칙(추가)" 3종(`list/describe → 변수 추출 → 후속 검증` / `information_schema.columns` 사전 확인 / 실패 명령 뒤 SUCCESS marker 금지) 정합으로 작성한다.
-- 모든 명령 예시에서 실제 ARN / account-id / public IP / image digest full sha256 / task ARN / ENI ID / RDS endpoint hostname / Slack webhook URL / 계좌번호 / KIS credential / DB password / 실제 state machine ARN 은 평문 기록하지 않는다(`[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]`).
+- 모든 명령 예시에서 아래 값은 평문 기록하지 않는다:
+  - 실제 ARN / account-id / public IP / image digest full sha256 / task ARN / ENI ID.
+  - RDS endpoint hostname / Slack webhook URL / 계좌번호 / KIS credential / DB password / 실제 state machine ARN.
+- 사용 placeholder = `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]`.
 - 본 runbook 은 ECS RunTask / SubmitJob / KIS API / Slack Webhook / Daily Batch 자동 trigger 를 직접 실행하지 않는다. 모든 실 실행은 운영자 책임.
 
 ## 절차 1. ECS View 기동(desiredCount 1)
+
+**목적** — 검증 / 운영 시점에 ECS Fargate task 를 기동하고 브라우저 접속 URL 을 확보한다.
+
+**전제**:
+
+- ECS cluster `portfolio-paper-cluster` / ECS service `portfolio-view-service` / task definition `portfolio-view:2` 등록 상태.
+- Security Group `sgroup-port-view-ecs` inbound = TCP 8080 / 운영자 IP/32 설정 완료.
+
+**실행 / 검증**:
 
  1) ECS service desiredCount 1 전환
    (1) 명령 패턴
@@ -49,6 +64,12 @@
 
 ## 절차 2. ECS View 종료(desiredCount 0)
 
+**목적** — 검증 완료 후 Fargate task 를 종료해 Fargate 시간 단가 + public IPv4 비용 누적을 차단한다.
+
+**전제** — ECS service `portfolio-view-service` 가 desiredCount 1 상태에서 RUNNING 중.
+
+**실행 / 검증**:
+
  1) ECS service desiredCount 0 전환
    (1) 명령 패턴
        - `aws ecs update-service --cluster portfolio-paper-cluster --service portfolio-view-service --desired-count 0`
@@ -63,6 +84,16 @@
        - `sgroup-port-view-ecs` 의 운영자 IP/32 inbound 는 그대로 유지(절차 4 참조).
 
 ## 절차 3. ECS View 에서 AWS Step Functions Step 12~17 승인 실행
+
+**목적** — ECS View 안 Daily Batch 화면에서 Step 12~17 approval workflow 를 승인 실행하고 후검증까지 완료한다.
+
+**전제**:
+
+- 절차 1 로 ECS View 기동 완료 / public IP 접속 성공 / RDS connection 성공.
+- `paperOrderEnabled=true` + approval range gate 통과 상태.
+- preflight 4종 0건 조건 유지 (아래 실행 순서 참조).
+
+**실행 / 검증 / rollback**:
 
  1) 진입 전 DB preflight
    (1) DB 컬럼명 확인(규칙 2 정합)
@@ -140,3 +171,166 @@
 - 검증 체크리스트: [`./validation-checklist.md`](./validation-checklist.md)
 - 결정 / 리스크: [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-002 / OD-MS-009 / OD-MS-037 / [`../_common/risk-register.md`](../_common/risk-register.md) R-AUTO-033 / R-AUTO-034
 - 운영 명령 작성 규칙: [`../../AGENTS.md`](../../AGENTS.md) "운영 명령 작성 규칙(추가)" 3종
+
+## Step 12~17 Scheduler enable/disable 운영 절차 (2026-07-01 추가)
+
+**목적** — aws-paper Step 12~17 Scheduler `portfolio-paper-daily-step12-17-order-0901-kst` 의 ENABLED / DISABLED 전환 절차.
+
+**전제**:
+
+- 2026-07-01 부터 본 Scheduler 는 ENABLED 상태로 평일 09:01 KST 자동 실행을 담당한다.
+- **본 변경은 aws-paper 에 한정** — aws-live 자동 BUY / SELL 정책은 변경하지 않으며 live 는 후보 + 수동 승인 우선 정책 유지 (OD-SAFE-002 / OD-SAFE-003 정합).
+
+### 사전 원칙
+
+- AWS CLI 명령은 `list/describe → 변수 추출 → 후속 검증` 패턴을 따른다(AGENTS.md 운영 명령 작성 규칙 1).
+- 실제 ARN / account-id 12자리 원문 / Lambda ARN / state machine ARN / Slack webhook URL / secret 평문은 본 문서 · 운영자 노트 · git commit message 에 기록하지 않는다(R-DOCS-001 정합 / 필요 시 `[REDACTED]` 계열 placeholder).
+- 실패한 SQL / 명령 뒤에 SUCCESS marker 를 출력하지 않는다(AGENTS.md 운영 명령 작성 규칙 3).
+- Scheduler 이름 · cron · Asia/Seoul · Target Input · state machine 이름 · Dispatcher Lambda 이름 등 운영 식별자는 secret 이 아니므로 본 문서에 사실로 기록한다.
+
+### 1) 현재 상태 확인 (list-schedules → get-schedule)
+
+Scheduler 이름은 사전에 결정되어 있다 (`portfolio-paper-daily-step12-17-order-0901-kst`). 먼저 `list-schedules` 로 존재 여부를 확인한 뒤, `get-schedule` 로 State · cron · Timezone · FlexibleTimeWindow · Target Lambda · Target Input 정합을 확인한다.
+
+```powershell
+$Region      = 'ap-northeast-2'
+$SchedName   = 'portfolio-paper-daily-step12-17-order-0901-kst'
+
+# (a) 목록에서 이름 존재 확인
+aws scheduler list-schedules `
+  --region $Region `
+  --name-prefix $SchedName `
+  --query "Schedules[?Name=='$SchedName'].{Name:Name,State:State,GroupName:GroupName}" `
+  --output table
+
+# (b) 상세 정보(cron · Asia/Seoul · Flexible OFF · Target Lambda · Target Input)
+aws scheduler get-schedule `
+  --region $Region `
+  --name $SchedName `
+  --query "{State:State,Group:GroupName,Cron:ScheduleExpression,TZ:ScheduleExpressionTimezone,Flexible:FlexibleTimeWindow.Mode,TargetArnPresent:contains(@,'Target'),Input:Target.Input}" `
+  --output json
+```
+
+- 응답 예시(2026-07-01 ENABLE 전환 후) — `State=ENABLED` / `Cron=cron(1 9 ? * MON-FRI *)` / `TZ=Asia/Seoul` / `Flexible=OFF` / `Input={"scheduleType":"STEP12_17_ORDER","dryRun":false}`.
+- Target Lambda ARN 은 응답에 그대로 노출되므로 화면 캡처 · 노트 공유 시 `[REDACTED_ARN]` 마스킹 필요.
+
+### 2) Target.Input 정합 확인
+
+`Target.Input` JSON 안에 `scheduleType=STEP12_17_ORDER` + `dryRun=false` 정합 확인. Target.Input 이 변경된 경우 Dispatcher Lambda 가 잘못된 state machine 을 트리거할 수 있으므로 ENABLE 전환 전에 반드시 재확인한다.
+
+- `scheduleType=STEP12_17_ORDER` 이어야 Dispatcher Lambda 가 `portfolio-paper-daily-step12-17-approval` state machine 을 트리거한다(OD-MS-032 정합).
+- `dryRun=false` 여야 실제 broker 주문 흐름까지 진행 가능. `dryRun=true` 상태에서는 자동 실행이 dry-run 수준까지만 진행(broker 주문 제출 없음).
+- `scheduleType=STEP1_11_APPROVAL` 또는 다른 값이 들어있으면 Dispatcher Lambda 가 잘못된 state machine 을 트리거할 수 있으므로 즉시 원복.
+
+### 3) DISABLED → ENABLED 전환
+
+ENABLED 전환은 `update-schedule` 로 `--state ENABLED` 를 명시한다. `update-schedule` 은 기존 필드를 유지하지 않고 새로 지정된 값으로 replace 하므로 반드시 `get-schedule` 로 기존 값 백업 후 동일 필드 재지정한다.
+
+```powershell
+# (a) 기존 정의 백업(운영자 로컬 임시 파일 / 파일 안에 실제 ARN 이 포함되므로 secret 정책 정합 관리)
+aws scheduler get-schedule `
+  --region $Region `
+  --name $SchedName `
+  --output json | Out-File -Encoding utf8 "$env:TEMP\schedule-$SchedName-before-enable.json"
+
+# (b) ENABLED 로 전환
+$RoleArn = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.RoleArn' --output text)
+$TargetArn = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.Arn' --output text)
+$TargetInput = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.Input' --output text)
+
+aws scheduler update-schedule `
+  --region $Region `
+  --name $SchedName `
+  --state ENABLED `
+  --schedule-expression 'cron(1 9 ? * MON-FRI *)' `
+  --schedule-expression-timezone 'Asia/Seoul' `
+  --flexible-time-window '{"Mode":"OFF"}' `
+  --target "{\"Arn\":\"$TargetArn\",\"RoleArn\":\"$RoleArn\",\"Input\":\"$TargetInput\"}"
+
+# (c) State ENABLED 재확인
+aws scheduler get-schedule `
+  --region $Region `
+  --name $SchedName `
+  --query "{State:State,Cron:ScheduleExpression,TZ:ScheduleExpressionTimezone,Input:Target.Input}" `
+  --output table
+```
+
+- 2026-07-01 본 절차 적용 후 응답 정합 = `State=ENABLED` / LastModificationDate `2026-07-01T13:53:57.160+09:00`.
+- **새 start-execution 중복 생성 주의**:
+  - ENABLED 전환 직후 수동 `start-execution` 을 함께 발사하면 09:01 KST 자동 실행과 중복될 수 있다.
+  - 수동 검증이 필요한 경우 09:01 자동 실행과 시간이 겹치지 않는 시간대에 실행하거나 09:01 회차 완료 후 실행한다.
+  - 중복 broker 주문 위험 = R-AUTO-001 / R-BROKER-004 정합.
+
+### 4) ENABLED → DISABLED rollback
+
+잘못된 상태에서 자동 실행이 진행 중이거나 안전 감지 실패 시 즉시 DISABLED 로 전환한다.
+
+```powershell
+# (a) 기존 정의 백업
+aws scheduler get-schedule `
+  --region $Region `
+  --name $SchedName `
+  --output json | Out-File -Encoding utf8 "$env:TEMP\schedule-$SchedName-before-disable.json"
+
+# (b) DISABLED 로 전환
+$RoleArn = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.RoleArn' --output text)
+$TargetArn = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.Arn' --output text)
+$TargetInput = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.Input' --output text)
+
+aws scheduler update-schedule `
+  --region $Region `
+  --name $SchedName `
+  --state DISABLED `
+  --schedule-expression 'cron(1 9 ? * MON-FRI *)' `
+  --schedule-expression-timezone 'Asia/Seoul' `
+  --flexible-time-window '{"Mode":"OFF"}' `
+  --target "{\"Arn\":\"$TargetArn\",\"RoleArn\":\"$RoleArn\",\"Input\":\"$TargetInput\"}"
+
+# (c) State DISABLED 재확인
+aws scheduler get-schedule `
+  --region $Region `
+  --name $SchedName `
+  --query "{State:State,Cron:ScheduleExpression,TZ:ScheduleExpressionTimezone,Input:Target.Input}" `
+  --output table
+```
+
+- DISABLED 전환 후 진행 중인 Step Functions execution 은 즉시 stop 하지 않고 계속 진행된다. 진행 중 execution 을 중단하려면 별도로 `aws stepfunctions stop-execution` 을 호출한다(R-AUTO-037 rollback 정합).
+- rollback 후 port-view 안 Daily Batch AWS Step 12~17 승인 실행 버튼 또는 Local View wrapper 로 수동 재실행 fallback 가능.
+
+### 5) 전체 Daily 라인업 7종 상태 확인
+
+2026-07-01 이후 aws-paper Daily 자동화 라인업 7종을 한 번에 확인한다. 하나라도 State 가 예상과 다르면 즉시 원인 audit.
+
+```powershell
+$Region = 'ap-northeast-2'
+$Names = @(
+  'portfolio-paper-ec2-start-0750-kst',
+  'portfolio-daily-brief-morning-slack-0750-kst',
+  'portfolio-paper-daily-step1-11-approval-0800-kst',
+  'portfolio-paper-daily-step12-17-order-0901-kst',
+  'portfolio-paper-intraday-snapshot-evaluate-10min-kst',
+  'portfolio-daily-brief-evening-slack-1550-kst',
+  'portfolio-paper-marketconnector-stop-1550-kst'
+)
+
+foreach ($n in $Names) {
+  aws scheduler get-schedule `
+    --region $Region `
+    --name $n `
+    --query "{Name:'$n',State:State,Cron:ScheduleExpression,TZ:ScheduleExpressionTimezone}" `
+    --output json
+}
+```
+
+- 2026-07-01 통과 시점의 예상 결과 = 7종 모두 `State=ENABLED` / `Timezone=Asia/Seoul` / `FlexibleTimeWindow=OFF` / cron 은 각 Scheduler 정의값 그대로.
+- 7종 라인업 중 어느 하나라도 `State=DISABLED` 또는 응답 실패 시 즉시 원인 audit — Dispatcher Lambda IAM Role · Scheduler Group · CloudWatch Logs · Step Functions state machine ACTIVE 여부 · Target Input JSON 정합.
+
+### 6) 안전 제약
+
+- 본 절차는 aws-paper 한정 — aws-live cutover phase(10 spec 후속 phase) 진입 전까지 aws-live 자동 BUY / SELL 정책 변경 없음(OD-SAFE-002 / OD-SAFE-003 정합).
+- ENABLED / DISABLED 전환 시 실제 ARN / account-id 12자리 원문 / Lambda ARN / state machine ARN / Slack webhook URL / secret 평문은 본 문서 · 운영자 노트 · git commit message 에 기록하지 않는다.
+- ENABLED 전환 후 첫 09:01 KST 자동 실행 회차는 다음 영업일 실전 관찰:
+  - Scheduler invocation log / Dispatcher Lambda CloudWatch Logs.
+  - Step Functions execution 생성 / Slack 수신 / DB after-check 정합 audit.
+  - followups-overview 2026-07-01 후속 메모 정합.
+- 자동 재시도 금지 정책(OD-SAFE-004 / R-AUTO-001) 은 그대로 유지 — Step 12~17 Scheduler ENABLED 후에도 Step Functions state machine 안 BUY / SELL / fill sync / position 변경 계열 state 의 Retry block 부재 정책 유지.

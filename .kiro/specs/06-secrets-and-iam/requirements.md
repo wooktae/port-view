@@ -2,28 +2,77 @@
 
 ## Introduction
 
-이 spec은 PORT-STRATEGY-AI AWS Migration의 6번째 단계로, EC2 / ECS Task가 KIS 모의투자 API와 RDS `portfolio` DB에 접속할 때 사용하는 secret / parameter의 보관 위치, IAM Role / Policy 기반 최소 권한 read 정책, 그리고 운영자 절차 / 검증 / 운영 노트의 작성 기준을 확정한다.
+본 spec 핵심
 
-선행 spec `02-aws-network-and-rds`의 1차 적용은 완료된 상태다. VPC / Subnet / SG / VPC Endpoint(Secrets Manager / SSM / CloudWatch Logs / ECR / S3) / RDS PostgreSQL / 7개 DB role(`marketconnector_app`, `view_app`, `crawler_app`, `preprocessor_app`, `decision_app`, `research_app`, `execution_app`)이 운영자 직접 작업으로 적용되어 있다. MarketConnector EC2(Amazon Linux 2023, public subnet, EIP attach)도 이미 생성되어 있고, 본 spec 작업 시점 오전에 운영자는 shell 환경변수 기반으로 KIS paper API 조회 / RDS `marketconnector_app` 접속 / `connector_balance.py`, `connector_order_check.py` 실행 / Flask 조회성 endpoint smoke test를 통과시켰다.
+- PORT-STRATEGY-AI AWS Migration 의 6번째 단계.
+- 대상: EC2 / ECS Task 가 KIS 모의투자 API 와 RDS `portfolio` DB 에 접속할 때 사용하는 secret / parameter.
+- 확정 범위 3종
+  - secret / parameter 의 보관 위치
+  - IAM Role / Policy 기반 최소 권한 read 정책
+  - 운영자 절차 / 검증 / 운영 노트의 작성 기준
 
-본 spec의 1차 적용 환경은 `aws-paper`다. 본 spec이 다루는 핵심은 다음 한 가지로 좁힌다.
+선행 spec 상태
 
-- MarketConnector EC2가 Access Key를 저장하지 않고, EC2 Instance Role 만으로 Secrets Manager / SSM Parameter Store에서 KIS / RDS / 일반 설정값을 read 하도록 보관 위치 / 권한 / 절차를 1차 확정한다.
-- 03-marketconnector-ec2 / 08-interest-crawler-and-preprocessor-ecs가 이후 ECS Fargate Task Role로 동일 secret / parameter 패턴을 재사용 가능하도록 최소 골격만 남긴다.
+- `02-aws-network-and-rds` 1차 적용 완료 (운영자 직접 작업).
+  - VPC / Subnet / SG / VPC Endpoint 5종 (Secrets Manager / SSM / CloudWatch Logs / ECR / S3)
+  - RDS PostgreSQL
+  - 7개 DB role: `marketconnector_app`, `view_app`, `crawler_app`, `preprocessor_app`,
+    `decision_app`, `research_app`, `execution_app`
+- MarketConnector EC2(Amazon Linux 2023, public subnet, EIP attach) 이미 생성됨.
+- 본 spec 작업 시점 오전에 운영자가 shell 환경변수 기반으로 아래 흐름 통과.
+  - KIS paper API 조회
+  - RDS `marketconnector_app` 접속
+  - `connector_balance.py` / `connector_order_check.py` 실행
+  - Flask 조회성 endpoint smoke test
 
-본 spec은 다음을 포함하지 않는다(범위 외).
+1차 적용 환경 = `aws-paper`. 본 spec 이 다루는 핵심은 다음 한 가지로 좁힌다.
 
-- live rotation 자동화(Lambda rotation, scheduled rotation).
-- CI/CD OIDC role(GitHub Actions OIDC) 설계 — 07 spec.
-- 8개 MS 전체에 대한 full IAM 매트릭스 — 08 / 04 / 05 / 09 spec에서 패턴 재사용 형태로 진행.
-- aws-live 환경의 secret 보관 / IAM 매트릭스 — 10-cutover-and-validation-runbook(예정)에서 통합.
-- 8개 MS 소스 코드, README, AGENTS.md, CHANGELOG, docs, worklog 수정.
+- MarketConnector EC2 가 Access Key 를 저장하지 않고, EC2 Instance Role 만으로
+  Secrets Manager / SSM Parameter Store 에서 KIS / RDS / 일반 설정값을 read 하도록
+  보관 위치 / 권한 / 절차를 1차 확정한다.
+- 03-marketconnector-ec2 / 08-interest-crawler-and-preprocessor-ecs 가 이후 ECS Fargate Task Role 로
+  동일 secret / parameter 패턴을 재사용 가능하도록 최소 골격만 남긴다.
 
-본 spec(06 폴더) 안 산출물은 [`requirements.md`](./requirements.md), [`design.md`](./design.md), [`tasks.md`](./tasks.md), [`runbook.md`](./runbook.md), [`validation-checklist.md`](./validation-checklist.md), [`operation-notes.md`](./operation-notes.md)와 보조 문서(필요 시 `traceability-matrix.md`)를 포함한다. 본 phase에서는 `requirements.md`만 작성하고, 나머지 문서는 후속 phase에서 만든다. 루트 공통 참조 / 갱신 후보 문서는 [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/followups-overview.md`](../_common/followups-overview.md), [`../_common/risk-register.md`](../_common/risk-register.md), [`../_common/aws-resource-glossary.md`](../_common/aws-resource-glossary.md)이며 실제 갱신은 본 spec의 tasks 단계에서 수행한다.
+포함하지 않는 것 (범위 외)
 
-선행 spec: [`../01-aws-migration-foundation`](../01-aws-migration-foundation), [`../02-aws-network-and-rds`](../02-aws-network-and-rds). 본 spec의 결정은 [`../03-marketconnector-ec2`](../03-marketconnector-ec2)(예정), [`../08-interest-crawler-and-preprocessor-ecs`](../08-interest-crawler-and-preprocessor-ecs)(예정), [`../04-strategy-batch-stepfunctions`](../04-strategy-batch-stepfunctions)(예정), [`../05-port-view-ecs-and-runbook`](../05-port-view-ecs-and-runbook)(예정), [`../09-strategy-research-batch`](../09-strategy-research-batch)(예정), [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook)(예정)의 입력으로 사용된다.
+| 범위 외 항목 | 이관 spec |
+| --- | --- |
+| live rotation 자동화 (Lambda rotation / scheduled rotation) | (본 spec 이후) |
+| CI/CD OIDC role (GitHub Actions OIDC) 설계 | 07 |
+| 8개 MS 전체 full IAM 매트릭스 | 08 / 04 / 05 / 09 (패턴 재사용) |
+| aws-live 환경 secret 보관 / IAM 매트릭스 | 10-cutover-and-validation-runbook (예정) |
+| 8개 MS 소스 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 | (수정 금지) |
 
-본 문서에는 실제 secret / password / token / KIS app key / KIS app secret / 계좌번호 / webhook URL / access key / DB endpoint hostname / account-id 값을 적지 않는다. 모두 `[REDACTED]` 또는 placeholder만 사용한다.
+본 spec(06 폴더) 산출물
+
+- `requirements.md`, `design.md`, `tasks.md`, `runbook.md`, `validation-checklist.md`, `operation-notes.md`
+- 보조 문서(필요 시): `traceability-matrix.md`
+- 본 phase 에서는 `requirements.md` 만 작성. 나머지 문서는 후속 phase 에서 만든다.
+
+루트 공통 참조 / 갱신 후보 (실제 갱신은 본 spec 의 tasks 단계에서 수행)
+
+- [`../_common/operator-decisions.md`](../_common/operator-decisions.md)
+- [`../_common/followups-overview.md`](../_common/followups-overview.md)
+- [`../_common/risk-register.md`](../_common/risk-register.md)
+- [`../_common/aws-resource-glossary.md`](../_common/aws-resource-glossary.md)
+
+선행 / 후속 spec
+
+- 선행: [`../01-aws-migration-foundation`](../01-aws-migration-foundation),
+  [`../02-aws-network-and-rds`](../02-aws-network-and-rds)
+- 본 spec 의 결정이 입력으로 사용되는 후속 spec (모두 예정)
+  - [`../03-marketconnector-ec2`](../03-marketconnector-ec2)
+  - [`../08-interest-crawler-and-preprocessor-ecs`](../08-interest-crawler-and-preprocessor-ecs)
+  - [`../04-strategy-batch-stepfunctions`](../04-strategy-batch-stepfunctions)
+  - [`../05-port-view-ecs-and-runbook`](../05-port-view-ecs-and-runbook)
+  - [`../09-strategy-research-batch`](../09-strategy-research-batch)
+  - [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook)
+
+본 문서에는 아래 항목을 적지 않는다. 모두 `[REDACTED]` 또는 placeholder 만 사용한다.
+
+- 실제 secret / password / token / KIS app key / KIS app secret
+- 계좌번호 / webhook URL / access key
+- DB endpoint hostname / account-id
 
 ## Glossary
 
@@ -48,7 +97,10 @@
 
 1. WHEN design.md가 작성되면, THE design.md SHALL Secrets Manager 보관 후보 목록에 KIS app key, KIS app secret, KIS paper 계좌번호 관련 값(`PAPER_ACNT`, `ACNT_PRDT_CD`)을 포함해야 한다.
 2. WHEN design.md가 작성되면, THE design.md SHALL Secrets Manager 보관 후보 목록에 RDS `marketconnector_app` 접속정보(host, port, db name, user, password)를 포함하고, RDS master(`portfolio_admin`) 비밀번호도 별도 항목으로 명시해야 한다.
-3. WHEN design.md가 작성되면, THE design.md SHALL SSM Parameter Store 보관 후보 목록에 KIS base URL(`BASE_URL` / `https://openapivts.koreainvestment.com:29443` 같은 환경별 endpoint), Connector Flask host / port / debug, `PORT_ENVIRONMENT`, `PORT_BROKER_NAME`, `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION` 같은 일반 설정 항목을 포함해야 한다.
+3. WHEN design.md가 작성되면, THE design.md SHALL SSM Parameter Store 보관 후보 목록에
+   KIS base URL(`BASE_URL` / `https://openapivts.koreainvestment.com:29443` 같은 환경별 endpoint),
+   Connector Flask host / port / debug, `PORT_ENVIRONMENT`, `PORT_BROKER_NAME`,
+   `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION` 같은 일반 설정 항목을 포함해야 한다.
 4. WHEN Slack webhook 보관 위치를 다루는 경우, THE design.md SHALL Secrets Manager(권고)와 SSM SecureString(절감안) 두 후보를 비교하고, OD-OBS-004 결정과 본 spec에서 최종 락할 결정값을 한 곳에서 명시해야 한다.
 5. WHEN 분류 기준을 다루는 경우, THE design.md SHALL "비밀이 노출되면 외부 발신 / 외부 인증 / 외부 자금 이동이 가능한 값"은 Secrets Manager로 보낸다는 1차 분류 기준을 명문화해야 한다.
 6. WHEN 분류 기준을 다루는 경우, THE design.md SHALL "노출되어도 외부 행위는 직접 일으키지 않지만 환경에 따라 값이 달라지는 일반 설정값"은 SSM Parameter Store로 보낸다는 1차 분류 기준을 명문화해야 한다.
@@ -60,8 +112,14 @@
 
 #### Acceptance Criteria
 
-1. WHEN design.md가 작성되면, THE design.md SHALL Secrets Manager 이름 규칙 `/portfolio/{env}/{service}/{item}` 형식을 1차 권고로 명시해야 한다(예: `/portfolio/paper/marketconnector/kis-app-key`, `/portfolio/paper/marketconnector/kis-app-secret`, `/portfolio/paper/rds/master`, `/portfolio/paper/rds/marketconnector-app`).
-2. WHEN design.md가 작성되면, THE design.md SHALL SSM Parameter Store 이름 규칙 `/portfolio/{env}/{service}/{item}` 형식을 1차 권고로 명시해야 한다(예: `/portfolio/paper/marketconnector/kis-base-url`, `/portfolio/paper/marketconnector/connector-host`, `/portfolio/paper/marketconnector/connector-port`).
+1. WHEN design.md가 작성되면, THE design.md SHALL Secrets Manager 이름 규칙
+   `/portfolio/{env}/{service}/{item}` 형식을 1차 권고로 명시해야 한다
+   (예: `/portfolio/paper/marketconnector/kis-app-key`, `/portfolio/paper/marketconnector/kis-app-secret`,
+   `/portfolio/paper/rds/master`, `/portfolio/paper/rds/marketconnector-app`).
+2. WHEN design.md가 작성되면, THE design.md SHALL SSM Parameter Store 이름 규칙
+   `/portfolio/{env}/{service}/{item}` 형식을 1차 권고로 명시해야 한다
+   (예: `/portfolio/paper/marketconnector/kis-base-url`, `/portfolio/paper/marketconnector/connector-host`,
+   `/portfolio/paper/marketconnector/connector-port`).
 3. WHEN env 표기를 다루는 경우, THE design.md SHALL `paper` / `live` 두 값을 사용하고 `dev` / `test` 같은 추가 env는 본 spec 범위 밖으로 명시해야 한다(OD-ENV-001 / OD-ENV-003 입력).
 4. WHEN service 표기를 다루는 경우, THE design.md SHALL 본 spec 시점에서 `marketconnector`, `rds`, `view`, `strategy`, `crawler`, `preprocessor`, `research`, `ops` 명칭을 service prefix 후보로 명시하고 본 spec(06)이 1차 확정 대상으로 보는 것은 `marketconnector` 와 `rds` 두 개로 한정해야 한다.
 5. IF 기존 02 spec / `operation-notes.md`에 이미 등록된 secret 이름이 본 규칙과 다른 경우, THEN THE design.md SHALL 기존 이름(예: `/portfolio/paper/rds/master`)을 그대로 유지하고 본 규칙은 신규 항목부터 적용한다는 호환 정책을 명시해야 한다.
@@ -73,7 +131,10 @@
 
 #### Acceptance Criteria
 
-1. WHEN design.md가 작성되면, THE design.md SHALL 다음 환경변수 키가 그대로 유지된다는 정책을 명시해야 한다: `INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD`, `PORTFOLIO_DB_NAME`, `PORT_ACCOUNT_NO`, `PORT_BROKER_NAME`, `PORT_ENVIRONMENT`, `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION`, `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT`.
+1. WHEN design.md가 작성되면, THE design.md SHALL 다음 환경변수 키가 그대로 유지된다는 정책을 명시해야 한다:
+   `INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD`,
+   `PORTFOLIO_DB_NAME`, `PORT_ACCOUNT_NO`, `PORT_BROKER_NAME`, `PORT_ENVIRONMENT`,
+   `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION`, `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT`.
 2. WHEN design.md가 작성되면, THE design.md SHALL `port-marketconnector` 의 `config.py`가 사용하는 KIS 관련 식별자(`APP_KEY`, `APP_SECRET`, `BASE_URL`, `PAPER_ACNT`, `ACNT_PRDT_CD`)에 대해, 코드 변경 없이 환경변수로 주입 가능하도록 외부화 후보 키 이름과 매핑 표를 1차 권고로 명시해야 한다.
 3. WHEN design.md가 작성되면, THE design.md SHALL secret / parameter 값이 EC2 / ECS 컨테이너의 환경변수로 주입되는 시점이 process 시작 시점 이라는 점, 런타임 중 자동 rotation 반영은 본 spec 범위 외라는 점을 명시해야 한다.
 4. IF 운영자가 본 spec 시점 이후에도 shell 환경변수에 KIS app key / app secret / 계좌번호를 직접 export 한 채 운영하길 원하는 경우, THEN THE design.md SHALL 이를 임시 운영 모드로 분류하고 정상 운영에서는 Secrets Manager 경유 주입을 표준으로 한다는 정책을 명시해야 한다.
@@ -85,7 +146,12 @@
 #### Acceptance Criteria
 
 1. WHEN design.md가 작성되면, THE design.md SHALL MarketConnector EC2 Instance Role 이름 후보(예: `portfolio-paper-marketconnector-ec2-role`)와 그에 attach되는 Instance Profile 이름 후보를 명시해야 한다.
-2. WHEN Instance Role의 Secrets Manager 권한을 다루는 경우, THE design.md SHALL Action을 `secretsmanager:GetSecretValue` 와 `secretsmanager:DescribeSecret` 두 개로만 한정하고, Resource 절은 다음 secret ARN 만 포함해야 한다: KIS app key, KIS app secret, KIS paper 계좌번호 관련(`PAPER_ACNT` / `ACNT_PRDT_CD` 가 secret으로 분류된 경우), RDS `marketconnector_app` 접속정보 secret. 다른 secret(다른 MS의 DB role 비밀번호 등)에 대한 권한은 부여하지 않는다.
+2. WHEN Instance Role의 Secrets Manager 권한을 다루는 경우, THE design.md SHALL
+   Action을 `secretsmanager:GetSecretValue` 와 `secretsmanager:DescribeSecret` 두 개로만 한정하고,
+   Resource 절은 다음 secret ARN 만 포함해야 한다:
+   KIS app key, KIS app secret, KIS paper 계좌번호 관련(`PAPER_ACNT` / `ACNT_PRDT_CD` 가 secret으로 분류된 경우),
+   RDS `marketconnector_app` 접속정보 secret.
+   다른 secret(다른 MS의 DB role 비밀번호 등)에 대한 권한은 부여하지 않는다.
 3. WHEN Instance Role의 SSM Parameter Store 권한을 다루는 경우, THE design.md SHALL Action을 `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` 만으로 한정하고, Resource 절은 `/portfolio/paper/marketconnector/*` 경로 prefix만 포함하도록 명시해야 한다.
 4. WHEN Resource 절을 다루는 경우, THE design.md SHALL `Resource: "*"` 형태의 wildcard 정책을 절대 사용하지 않는다는 정책을 명문화해야 한다.
 5. WHEN 문서에 IAM Role / Policy ARN이 등장하는 경우, THE design.md SHALL ARN 자리를 placeholder(`arn:aws:iam::<account-id>:role/portfolio-paper-marketconnector-ec2-role`) 또는 `[REDACTED]`로만 표기해야 하고, 실제 account-id / 실제 secret ARN을 그대로 적지 않아야 한다.
@@ -106,7 +172,11 @@
 
 ### Requirement 6: ECS Task Role 재사용 패턴 (Connector / Crawler / Preprocessor / Strategy / View / Research 공통)
 
-**Objective**: As 운영자, I want 03-marketconnector-ec2 / 08-interest-crawler-and-preprocessor-ecs / 04-strategy-batch-stepfunctions / 05-port-view-ecs-and-runbook / 09-strategy-research-batch가 동일 패턴(Task Role 기반 secret / parameter read)을 재사용하도록 골격을 받기, so that 후속 spec에서 IAM 매트릭스 설계를 처음부터 다시 하지 않아도 된다.
+**Objective**: As 운영자,
+I want 03-marketconnector-ec2 / 08-interest-crawler-and-preprocessor-ecs / 04-strategy-batch-stepfunctions /
+05-port-view-ecs-and-runbook / 09-strategy-research-batch가 동일 패턴(Task Role 기반 secret / parameter read)을
+재사용하도록 골격을 받기,
+so that 후속 spec에서 IAM 매트릭스 설계를 처음부터 다시 하지 않아도 된다.
 
 #### Acceptance Criteria
 
@@ -123,7 +193,14 @@
 #### Acceptance Criteria
 
 1. WHEN 본 spec의 후속 phase가 진행되면, THE 후속 phase SHALL `runbook.md` 산출물을 본 spec 폴더 안에 생성해야 한다.
-2. WHEN runbook.md가 작성되면, THE runbook.md SHALL 다음 단계를 단계별로 분해해야 한다: (a) Secrets Manager에 KIS / RDS secret 등록, (b) SSM Parameter Store에 KIS base URL / Connector 일반 설정 등록, (c) MarketConnector EC2 Instance Role / Instance Profile 생성, (d) Instance Role에 최소 권한 정책 attach, (e) EC2 instance에 Instance Profile attach, (f) EC2 안에서 secret / parameter read 검증, (g) Connector 재기동 후 KIS / RDS smoke test.
+2. WHEN runbook.md가 작성되면, THE runbook.md SHALL 다음 단계를 단계별로 분해해야 한다:
+   (a) Secrets Manager에 KIS / RDS secret 등록,
+   (b) SSM Parameter Store에 KIS base URL / Connector 일반 설정 등록,
+   (c) MarketConnector EC2 Instance Role / Instance Profile 생성,
+   (d) Instance Role에 최소 권한 정책 attach,
+   (e) EC2 instance에 Instance Profile attach,
+   (f) EC2 안에서 secret / parameter read 검증,
+   (g) Connector 재기동 후 KIS / RDS smoke test.
 3. WHEN runbook.md의 각 단계를 다루는 경우, THE runbook.md SHALL 각 단계에 [실행] / [확인] / [준비] / [복구] 라벨을 붙이고, 운영자가 AWS Console에서 누를 항목, 입력값(민감정보는 `[REDACTED]`), 검증 방법, 실패 시 조치를 포함해야 한다.
 4. WHEN runbook.md가 secret 등록 단계를 다루는 경우, THE runbook.md SHALL 실제 KIS app key / app secret / 계좌번호 / DB password 값을 본 문서에 적지 않고 운영자가 Console에 직접 입력하도록 안내해야 한다.
 5. WHEN runbook.md가 비용 영향이 있는 단계(Secrets Manager 항목 추가, KMS CMK 도입 등)를 다루는 경우, THE runbook.md SHALL 해당 단계에 "approval required" 표시와 비용 영향 한 줄 요약을 추가해야 한다.
@@ -137,7 +214,15 @@
 
 1. WHEN 본 spec의 후속 phase가 진행되면, THE 후속 phase SHALL `validation-checklist.md` 산출물을 본 spec 폴더 안에 생성해야 한다.
 2. WHEN validation-checklist.md가 작성되면, THE validation-checklist.md SHALL 다음 4종 라벨만 사용해야 한다: `[O]`, `[X]`, `[Kiro 후속 작업 필요]`, `[운영자 확인 필요]`. 그 외 라벨(예: `[확인 필요]`)은 사용하지 않는다.
-3. WHEN validation-checklist.md가 점검 항목을 다루는 경우, THE validation-checklist.md SHALL 다음 영역을 모두 포함해야 한다: (a) Secrets Manager 등록 인벤토리(이름 / KMS / metadata, 값은 절대 조회 금지), (b) SSM Parameter Store 등록 인벤토리, (c) MarketConnector EC2 Instance Role / Instance Profile 존재 / attach 상태, (d) Instance Role 정책의 Action / Resource 가 본 spec design 매트릭스와 일치하는지, (e) Resource wildcard 사용 0건 검증, (f) EC2 안 access key 파일(`~/.aws/credentials`, `~/.aws/config` 의 access key) 미존재 검증, (g) `aws sts get-caller-identity` 결과가 Instance Role assumed-role ARN 인지 검증, (h) Connector smoke test 통과 여부.
+3. WHEN validation-checklist.md가 점검 항목을 다루는 경우, THE validation-checklist.md SHALL 다음 영역을 모두 포함해야 한다:
+   (a) Secrets Manager 등록 인벤토리(이름 / KMS / metadata, 값은 절대 조회 금지),
+   (b) SSM Parameter Store 등록 인벤토리,
+   (c) MarketConnector EC2 Instance Role / Instance Profile 존재 / attach 상태,
+   (d) Instance Role 정책의 Action / Resource 가 본 spec design 매트릭스와 일치하는지,
+   (e) Resource wildcard 사용 0건 검증,
+   (f) EC2 안 access key 파일(`~/.aws/credentials`, `~/.aws/config` 의 access key) 미존재 검증,
+   (g) `aws sts get-caller-identity` 결과가 Instance Role assumed-role ARN 인지 검증,
+   (h) Connector smoke test 통과 여부.
 4. WHEN validation-checklist.md가 secret 항목을 다루는 경우, THE validation-checklist.md SHALL `secretsmanager:GetSecretValue` 호출은 운영자만 수행하고 Kiro 자동 검증은 `secretsmanager:DescribeSecret` metadata 만 사용한다는 점을 명시해야 한다.
 5. WHEN validation-checklist.md가 IAM 점검 항목을 다루는 경우, THE validation-checklist.md SHALL 본 spec design 의 Action / Resource 매트릭스와 실제 정책 JSON을 비교 가능한 형태로 항목을 분리해야 한다.
 
@@ -174,7 +259,10 @@
 
 #### Acceptance Criteria
 
-1. WHEN design.md가 작성되면, THE design.md SHALL [`../_common/followups-overview.md`](../_common/followups-overview.md) 의 06-secrets-and-iam 섹션에 본 spec의 1차 적용 환경(`aws-paper`), 1차 범위(MarketConnector EC2 Instance Role + Secrets Manager / SSM 등록), 범위 외(live rotation 자동화, OIDC, full IAM 매트릭스)를 추가하는 갱신 후보를 명시해야 한다.
+1. WHEN design.md가 작성되면, THE design.md SHALL [`../_common/followups-overview.md`](../_common/followups-overview.md)
+   의 06-secrets-and-iam 섹션에 본 spec의 1차 적용 환경(`aws-paper`),
+   1차 범위(MarketConnector EC2 Instance Role + Secrets Manager / SSM 등록),
+   범위 외(live rotation 자동화, OIDC, full IAM 매트릭스)를 추가하는 갱신 후보를 명시해야 한다.
 2. WHEN design.md가 작성되면, THE design.md SHALL 본 spec 결정이 03 / 08 / 04 / 05 / 09 spec의 입력으로 사용되는 항목(Task Role 패턴, secret naming 규칙, Resource wildcard 금지 정책)을 followups-overview.md 갱신 후보로 명시해야 한다.
 3. WHEN tasks.md가 후속 phase에서 작성되면, THE tasks.md SHALL [`../_common/followups-overview.md`](../_common/followups-overview.md) 갱신 작업을 별도 task로 분리해야 한다.
 4. WHEN followups-overview.md 갱신 후보를 다루는 경우, THE design.md SHALL 06이 03 와 어떤 순서로 묶이는지(06이 먼저 락된 secret / parameter / IAM 골격을 03 EC2 본격 운영이 입력으로 받음)를 한 줄로 명시해야 한다.

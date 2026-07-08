@@ -1,8 +1,43 @@
 # MS × AWS Service Decision Matrix — AWS Migration
 
-본 문서는 PORT-STRATEGY-AI 8개 MS 각각에 대해 사용 가능한 AWS 서비스 후보를 넓게 비교하고, 운영 안정성 / 비용 / 포트폴리오 어필 관점의 최종 판단을 정리한 AWS Migration 전체의 8개 MS 서비스 선택 기준표다. `01-aws-migration-foundation`과 후속 spec(02 ~ 10)이 공통으로 참조하며, 각 spec의 design.md / decision-matrix.md는 ECS Fargate / EC2 / AWS Batch 중심 권고를 담고 있는데, 이 문서는 그 결정을 유지하면서도 Lambda / EKS / Elastic Beanstalk / App Runner / ECS on EC2 등 다른 후보가 왜 1순위가 아닌지를 명확히 한다.
+## Purpose
 
-본 문서는 문서일 뿐이며 실제 AWS 리소스 생성, IaC 작성, 8개 MS 코드 / README / AGENTS.md / docs / CHANGELOG / worklog 수정은 본 작업 범위가 아니다. 모든 secret은 `[REDACTED]`로만 표기한다. 단가는 서울 ap-northeast-2 기준 근사치이고 정확 값은 "AWS Pricing Calculator 확인 필요" 단서가 붙는다. 환경 모델은 local-dev / aws-paper / aws-live 3개를 따른다.
+본 문서는 PORT-STRATEGY-AI 8개 MS 각각에 대해 사용 가능한 AWS 서비스 후보를 넓게 비교하고, 운영 안정성 · 비용 · 포트폴리오 어필 관점의 최종 판단을 정리한 AWS Migration 전체의 서비스 선택 단일 진실원(source of truth) 이다.
+
+`01-aws-migration-foundation` 과 후속 spec(02 ~ 10) 이 공통으로 참조한다. 각 spec 의 `design.md` · `decision-matrix.md` 는 ECS Fargate / EC2 / AWS Batch 중심 권고를 담고 있다.
+
+**본 9차 회차는 서비스 선택 결론 변경 금지 회차다.** MS별 1순위 서비스 결정 문자열(`EC2 + EIP` · `ECS Fargate` · `AWS Batch on Fargate` · `Windows EC2` · `Not applicable`) 은 임의로 바꾸지 않는다. 본 회차는 문서 구조 재편만 수행하며, 결정 변경이 필요한 근거가 발견되면 편집을 중단하고 완료 보고에 사유만 기록한다.
+
+문서 흐름: **Purpose → Final Recommendation Summary → MS Decision Cards → Rejected/Deferred Services → Portfolio Appeal Notes → Appendix → Security Notes**. 상세 비교 · Overview · Evaluation Criteria · AWS Service Candidate Glossary · Evidence Details 는 `Appendix` 로 이동된다.
+
+Lambda · EKS · Elastic Beanstalk · App Runner · ECS on EC2 비권고 사유는 `Rejected/Deferred Services` 로 통합한다.
+
+단가는 서울 `ap-northeast-2` 기준 근사치이고 정확 값은 "AWS Pricing Calculator 확인 필요" 단서가 붙는다. 환경 모델은 `local-dev` · `aws-paper` · `aws-live` 3개를 따른다. 본 문서는 문서일 뿐이며 실제 AWS 리소스 생성 · IaC 작성 · 8개 MS 코드 · README · AGENTS.md · docs · CHANGELOG · worklog 수정은 본 작업 범위가 아니다.
+
+민감정보 원문(secret · password · token · KIS app key · KIS app secret · Slack webhook URL · 계좌번호 · account-id · 실제 ARN · public IP · broker_order_no) 은 어디에도 기록하지 않고 `[REDACTED]` · `[REDACTED_ACCOUNT_NO]` · `[REDACTED_PUBLIC_IP]` · `[REDACTED_ARN]` · `[REDACTED_TASK_ARN]` · `[REDACTED_SECRET_ARN]` · `[REDACTED_BROKER_ORDER_NO]` placeholder 계열만 사용한다.
+
+## Final Recommendation Summary
+
+운영자 매일 조회용 8개 MS × AWS 서비스 1순위/2순위 요약. 8개 MS 고정 순서(원문 chapter 5 정합): `port-marketconnector` → `port-view` → `port-interest-crawler` → `port-interest-preprocessor` → `port_strategy_common` → `port_strategy_decision` → `port_strategy_execution` → `port_strategy_research`. 상세 비교 · 채택 근거 · 비권고 사유는 아래 chapter 3 ~ 10 및 Appendix 참조.
+
+| MS | 1순위 서비스 | 2순위/보류 서비스 | 채택 이유 (1줄) | 비용/운영 리스크 (1줄) |
+|---|---|---|---|---|
+| `port-marketconnector` | EC2 + EIP | ECS Fargate (broker IP 정책 변경 시) | broker IP 등록 + 단일 access_token + 단일 세션 · NAT-free EIP 고정 가능 | EC2 24/7 + EIP + EBS + broker IP 등록 정책 변경 시 EIP 재부여 부담 |
+| `port-view` | ECS Fargate Service | Elastic Beanstalk | Spring Boot 24/7 + Daily Batch orchestration · 컨테이너 표준 + Step Functions 자연스러운 결합 | Fargate 상시 vCPU · public IPv4 사용 시 IPv4 비용 · Fargate Task Role `states:StartExecution` 광역 부여 위험 |
+| `port-interest-crawler` | ECS Fargate Task (NAT-free public) + Windows EC2 worker (KRX GUI 한정) | ECS on EC2 (Selenium 안정성 미달 시) · AWS Batch (history backfill) | Selenium/Chrome + KRX 로그인 hybrid · non-GUI = Fargate · GUI = Windows EC2 worker | Windows EC2 running 시간 · Autologon 보안 예외 · Scheduled Task 성공 판정 필요 |
+| `port-interest-preprocessor` | ECS Fargate Task | Lambda (짧은 step만) · AWS Batch (backfill) | long upsert + idempotent · Fargate Task 가장 단순 | Fargate Task 실행 시간 · NAT-free public subnet outbound 필요 |
+| `port_strategy_common` | 별도 컴퓨트 없음 (git submodule packaging) | wheel + CodeArtifact (성숙기) | 순수 Python 라이브러리 · 컴퓨트 대상 아님 | 각 MS 이미지 빌드 시점 동기화 필요 · 정식 package 관리 후속 |
+| `port_strategy_decision` | ECS Fargate Task + EventBridge Scheduler (+ Step Functions in 04) | AWS Batch (다수 day 재처리) | daily idempotent batch · cron + 컨테이너로 충분 (OD-MS-013 Task Definition 2개 분리) | Fargate 실행 시간 · `decision_app` schema 권한 매트릭스 정식화 후속 |
+| `port_strategy_execution` | ECS Fargate Task + Step Functions + EventBridge Scheduler | ECS Fargate Service (intraday 상시) | live 자동 재시도 금지 정책 step 별 인프라 강제 · OD-MS-017 단일 Task Definition + command override | Step Functions transitions + Fargate 실행 시간 · retry 정책 오설정 시 broker 중복 주문 위험 (R-AUTO-001) |
+| `port_strategy_research` | AWS Batch + S3 (Step Functions 보조) | ECS Fargate Task | 장시간 backtest + report · Batch vCPU/메모리 자유도 + 동시 실행 (2026-06-15 1차 실증) | Batch 사용량 기반 + S3 storage 누적 · R-AUTO-015 heavy job 오실행 mitigation 유지 |
+
+### 비권고 서비스 (chapter 5 정합)
+
+- **Lambda** — 8개 MS 주 compute 아님. 15분 timeout / cold start / Selenium 부적합 / broker 자동 재시도 금지 정책 강제 어려움. 보조 계층(Dispatcher / Notifier / lifecycle)으로만 사용 (OD-MS-009 / OD-MS-030 / OD-MS-032 / OD-MS-034 정합).
+- **EKS** — 단일 운영자 + 단일 region 조건에 과함. control plane ~$73/월. 후속 optional track (Appendix chapter 7 참조).
+- **Elastic Beanstalk** — port-view 대안으로만 비교 유지. Daily Batch orchestration 결합 어색 (Appendix chapter 9 참조).
+- **App Runner** — VPC 내부 자원 접근 제약 · 운영 자유도 낮음 (Appendix chapter 9 참조).
+- **ECS on EC2** — port-interest-crawler Selenium 안정성 미달 시 2순위 후보. 다른 MS 는 비권고.
 
 ## 1. Overview
 
@@ -118,7 +153,7 @@
 
 KIS broker 연동 / Flask API / 단일 access_token.txt / broker outbound IP 등록 가능성. stateful 성격이 강하다.
 
-> **2026-06-30 (오후) 장중 손절 Slack 실제 이벤트 연동 1차 실증 메모(OD-MS-001 / OD-MS-016 / OD-MS-035 / OD-MS-036 본문 변경 없이 evidence 보강 / R-AUTO-035 [2026-06-30 오후 추가 보강] / R-AUTO-036 신규)** — 본 표의 1순위(EC2+EIP) 결정값은 변경하지 않는다. port-marketconnector 의 운영 안정성 1순위는 **EC2+EIP** 그대로 유지. **MarketConnector EC2 runner 책임 확장 1차 실증** — 본 일자 오후 운영자가 직접 수행한 장중 손절 Slack 실 연동에서 MarketConnector EC2 가 (a) 장중 snapshot refresh + (b) position evaluate + (c) `INTRADAY_STOP_SELL` `READY` 생성(broker 미제출) + (d) Notifier Lambda `portfolio-event-notifier` invoke 까지 4단계를 모두 수행한다 / broker 주문 제출은 본 EC2 / 본 entrypoint 에서 여전히 불가능 / 실제 broker 주문은 `portfolio-paper-intraday-stop-sell-approval` Step Functions approval gate 통과 후에만 가능(OD-MS-035 / OD-MS-036 정합 / OD-MS-016 의 Strategy Execution / MarketConnector 책임 분리 정합 유지). **MarketConnector EC2 → Lambda invoke 권한 분리 1차 실증** — EC2 Instance Role `portfolio-paper-marketconnector-ec2-role` 에 inline policy `portfolio-paper-marketconnector-event-notifier-invoke`(`lambda:InvokeFunction` / Resource `portfolio-event-notifier` 한정 / Resource · Action wildcard 0건) 부여 / EC2 측에서 Notifier Lambda invoke smoke 통과(OD-SEC-005 / OD-SEC-006 정합 / 06 spec 후속 phase 책임). **evaluate 교체 배포** — `/home/ec2-user/apps/port-marketconnector/src/connector_intraday_position_evaluate.py` 교체 배포(버전 `connector-intraday-position-evaluate-1.1.1-slack-notify` / SHA256 `5ec6914853ab34e200682f256de53693f972b3e5d337a5bd8ab8ebf5296230ed` / 신규 CLI option `--notify-slack` · `--slack-function-name` · `--slack-region`) / `.venv/bin/python` 기준 `py_compile` + `--help` 검증 통과. **장중 runner 갱신** — `/home/ec2-user/apps/port-marketconnector/scripts/run_intraday_snapshot_and_evaluate.sh`(SHA256 `8fe7657a75b5d7637ec645b6d8a55bf75c993d46c1c71e8a5e88bded29baa8a0` / backup `run_intraday_snapshot_and_evaluate.sh.bak.20260630T112255Z.create-order-notify-slack`) 가 기존 evaluate 호출에 `--create-order` + `--notify-slack` 추가. **실제 runner 1회 안전 검증** — SSM commandId `5b19d5da-5e2e-4b35-821b-c3cf2b36d131` / snapshot refresh 성공 / evaluate 실행 성공 / source_version `connector-intraday-position-evaluate-1.1.1-slack-notify` / `create_order=True` / `notify_slack=True` / `open_position_count=0` / `EMPTY_NORMAL` / `INTRADAY_SNAPSHOT_AND_EVALUATE=SUCCESS` / runner exit code 0 / OPEN position 0건 상태라 check / order / slack 없이 정상 종료. **DB after-check** — `STEP19C_INTRADAY_STOP_FINAL_DB_AFTER_CHECK=SUCCESS` marker + 5종 count 모두 0(`TODAY_INTRADAY_CHECKS` · `TODAY_INTRADAY_STOP_EXECUTION_ORDERS` · `ACTIVE_INTRADAY_STOP_EXECUTION_ORDERS` · `TODAY_INTRADAY_STOP_CONNECTOR_ORDERS` · `TODAY_INTRADAY_STOP_CONNECTOR_ORDER_ROWS`) + 최신 `connector_balance_snapshot id=281` / `as_of_date=2026-06-30` / `as_of_ts=2026-06-30 11:23:34.973842+00` / `total_eval_amount=8,706,505` / `cash_balance=8,706,505` / `source_version=connector-intraday-snapshot-refresh-1.0.0` / PSQL exit code 0 / 컬럼명은 `information_schema.columns` 사전 확인 후 작성(추정 컬럼명 사용 0건 / `.kiro/AGENTS.md` "운영 명령 작성 규칙(추가)" 규칙 2 · 4 정합). **본 표의 결정 영향 없음** — port-marketconnector 컴퓨트 1순위(EC2+EIP) / EIP 운영 / SSM Session Manager / broker IP 등록 정책 / `access_token.txt` 보관 정책(03 spec) 모두 변경 없음. 본 일자 추가 작업분은 MarketConnector EC2 의 **장중 책임 확장** 측 evidence 만 보강 / 본 Lambda 호출은 운영 이벤트 알림 보조 계층(`portfolio-event-notifier` / OD-MS-030 정합) 사용 / Lambda 는 본 표의 주 compute 1순위가 아니며 보조 역할 유지. 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log `2026-06-30 (오후) 장중 손절 Slack` 항목 / [`./risk-register.md`](./risk-register.md) R-AUTO-035 [2026-06-30 오후 추가 보강] + R-AUTO-036 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-30 (오후) 장중 손절 Slack 후속 메모 / [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md) 본 일자 추가 append / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) approval gate cross-reference / [`../06-secrets-and-iam/operation-notes.md`](../06-secrets-and-iam/operation-notes.md) MarketConnector EC2 role + inline policy 분리 검증 참조. Lambda 코드 본문 / `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / Step Functions ASL 본문 / Slack 메시지 본문 / SSM 응답 본문 / CloudWatch Logs 전문 / IAM Policy 전체 본문 평문 인용 0건(R-DOCS-001 정합).
+> 2026-06-30 (오후) 장중 손절 Slack 실제 이벤트 연동 1차 실증 메모(OD-MS-001 / OD-MS-016 / OD-MS-035 / OD-MS-036 본문 변경 없이 evidence 보강 / R-AUTO-035 [2026-06-30 오후 추가 보강] / R-AUTO-036 신규) See Evidence Details [4.1 · #1](#evidence-4.1-1).
 
 | AWS Service Option | 가능 여부 | 비용 | 운영 난이도 | 장점 | 단점 | 장애 / 보안 리스크 | 어필도 | 최종 판단 |
 |--------------------|-----------|------|-------------|------|------|-------------------|--------|-----------|
@@ -135,13 +170,15 @@ KIS broker 연동 / Flask API / 단일 access_token.txt / broker outbound IP 등
 
 Spring Boot / Thymeleaf 통합 운영 콘솔. 24/7. Daily Batch orchestration 호출 주체. SlackNotificationService 보유. JVM 메모리 일정 수준 필요.
 
-> **2026-06-29 (2) port-view aws-stepfunctions Daily Batch trigger 구현 + 로컬 Step 1~11 StartExecution 검증 통과 메모(OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 보강 / R-AUTO-033 [2026-06-29 보강 (2)] / R-AUTO-034 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. port-view 의 운영 안정성 1순위는 **ECS Fargate Service** 그대로 유지 / Elastic Beanstalk 2순위 (참고) / App Runner · EC2 · ECS on EC2 · EKS · Lambda 비권고 판단 유지. 본 일자 보강 사실 — (a) port-view 가 Daily Batch 실행 backend 를 `local-file` / `aws-stepfunctions` 로 분리한 첫 구현 통과(commit `e72de6f` / `feat(view): add Step Functions daily batch trigger` / 변경 파일 6종 = `pom.xml` · `DailyBatchProperties.java` · `DailyBatchController.java` · `StepFunctionsDailyBatchExecutionService.java` · `application-aws-paper.properties` · `daily_batch.html` / 본 메모 평문 인용 0건 / R-DOCS-001 정합). (b) `aws-stepfunctions` mode 에서는 View 가 Python subprocess · `C:/Workspaces` 로컬 source 직접 실행 없이 AWS SDK v2 Step Functions client 로 `StartExecution` 만 수행 — 즉 **Batch 실행 책임이 View 내부 subprocess 가 아니라 Step Functions 로 이관됨**(OD-MS-009 정합 / `Step Functions + EventBridge Scheduler + Dispatcher Lambda + EC2 lifecycle Lambda + ECS RunTask + SSM RunCommand + AWS Batch` 의 6계층 조합에 **View 의 운영자 수동 trigger 경로** 가 추가되어 7계층 조합으로 운영 — 다만 자동 trigger 는 기존 EventBridge Scheduler 한정 그대로 유지). (c) **로컬 1차 실증 통과** — `aws-paper` profile + `aws-stepfunctions` backend → `/daily-batch` 화면 AWS Step 1~11 safe trigger → `StartExecution` 성공 → Step 1~11 workflow → `StopCrawlerEc2AfterStep11Success`(runDate 누락 보완 후 통과) → `SendApprovalRequiredSlack` → Slack `APPROVAL_REQUIRED` 수신 end-to-end / Step 12~17 차단 유지 / broker 주문 제출 0건 / 신규 `connector_order_request` 0건. (d) **runDate 보완** — Asia/Seoul 기준 yyyy-MM-dd `runDate` 를 View `StartExecution` input 에 포함하도록 보완(ASL 의 `runDate.$=$.runDate` 참조 정합 / 04 spec 후속 갱신 책임). (e) `local-file` backend 는 로컬 운영자 검증 도구로 유지(OD-MS-037 정합) / **Fargate 에서는 `portfolio.batch.local-file-execution-enabled=false` 기본값** / Step 12 이상 주문성 구간은 별도 approval / preflight / paper-order gate 뒤에서만 허용 — View 내부 subprocess 실행 없이 Step Functions `StartExecution` 만 사용하는 정책이 Fargate 운영 안정성 / 컨테이너 표준 / IAM 권한 최소화 관점에서 정합. (f) **신규 R-AUTO-034 분리** — Fargate Task Role `states:StartExecution` 권한 과다 부여 + Step 12 gate 우회 위험 / Status `Open` / Task Role 특정 state machine ARN 한정 + Fargate 안전 기본값(`paper-order-enabled=false` · `full-pipeline-execution-enabled=false` · `max-executable-step-order=11`) + 서비스 레벨 안전 gate + executionArn redaction + Step 12~17 승인형 / preflight / paper-order gate 분리 mitigation. 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-29 (2) 항목(OD-MS-002 / OD-MS-009 / OD-MS-037 / OD-SAFE-001 ~ OD-SAFE-004 본문 변경 없이 1차 실증 메모 보강) / [`./risk-register.md`](./risk-register.md) R-AUTO-033 [2026-06-29 보강 (2)] + R-AUTO-034 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-29 (2) 후속 메모 / [`../05-port-view-ecs-and-runbook/operation-notes.md`](../05-port-view-ecs-and-runbook/operation-notes.md) 6 · 7 섹션 / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-29 외부 caller 검증 / [`../06-secrets-and-iam/operation-notes.md`](../06-secrets-and-iam/operation-notes.md) 2026-06-29 Task Role · env 주입 후속 참조. 다음 단계 — Dockerfile 작성 / ECR repository · image push / ECS Task Definition 등록 / ECS Service 조회-only smoke test / Fargate Step 1~11 `StartExecution` 검증 / Step 12~17 승인형 trigger / preflight / paper-order gate 후속 구현 / Fargate Task Role `states:StartExecution` 최소 권한(특정 state machine ARN 한정) 부여 / 10 spec `cutover-and-validation-runbook` 폴더 신규 생성 후속.
+> 2026-06-29 (2) port-view aws-stepfunctions Daily Batch trigger 구현 + 로컬 Step 1~11 StartExecution 검증 통과 메모(OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 보강 / R-AUTO-033 [2026-06-29 보강 (2)] / R-AUTO-034 신규) See Evidence Details [4.2 · #2](#evidence-4.2-2).
 
-> **2026-06-29 (3) port-view Step 12~17 승인형 검증 완료 + Approval state machine ARN 분리 + Local View wrapper 정리 메모(OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 보강 / R-AUTO-033 [2026-06-29 보강 (3)] / R-AUTO-034 [2026-06-29 보강])** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. port-view 의 운영 안정성 1순위는 **ECS Fargate Service** 그대로 유지. **Step 12~17 approval workflow ARN 분리** — Local View 측에서 Step Functions `StartExecution` 호출 대상이 일반 workflow ARN(`portfolio-paper-daily-step1-17-approval`) 과 approval workflow ARN(`portfolio-paper-daily-step12-17-approval`) 으로 분리됨 / `application.properties` 에 `portfolio.batch.aws-stepfunctions-approval-state-machine-arn` 키 + 환경변수 `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_APPROVAL_STATE_MACHINE_ARN` 추가 / `StepFunctionsDailyBatchExecutionService` 의 `startSafeRange` 는 일반 ARN · `startApprovalRange` 는 approval 전용 ARN 사용 / approval ARN 비어 있으면 승인형 실행을 서비스 레벨에서 차단(`canStartAwsStepfunctions` 와 같은 계열 gate). **payload 타입 정합** — `Step12_CheckApproval` Choice `BooleanEquals` 조건과 맞도록 외부 caller payload 의 `allowPaperOrderExecute` · `paperOrderEnabled` 는 boolean JSON / `fromStepOrder` · `toStepOrder` · `startStep` · `endStep` 는 numeric JSON 으로 전달 / Fargate Task Definition `environment` 블록 작성 시점에도 동일 정책. **Local View wrapper 2종 정리** — Local-file 구동 wrapper(`Start-PortfolioViewAwsPaperLocalFile.ps1` + env loader) 와 AWS Step Functions 구동 wrapper(`Start-PortfolioViewAwsPaperStepFunctions.ps1` + env loader) 분리 / 두 wrapper 모두 `aws-paper` profile + Step 1~17 전체 실행 가능 gate / safe-only gate 잔존 문제 해소. **검증 식별자** — executionName `port-view-step12-17-step12-17-20260629-194314-ba5edaf8` / status `SUCCEEDED` / 운영 marker `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS` / DB 신규 broker 주문 0건. **Fargate Task Role 후속 (06 spec 책임)** — Task Role 의 `states:StartExecution` Resource 패턴은 일반 ARN + approval ARN 2종 모두 한정 부여 / Resource · Action wildcard 0건 유지. 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-29 (3) 항목(OD-MS-002 / OD-MS-009 / OD-MS-037 / OD-SAFE-001 ~ OD-SAFE-004 본문 변경 없이 1차 실증 보강) / [`./risk-register.md`](./risk-register.md) R-AUTO-033 [2026-06-29 보강 (3)] + R-AUTO-034 [2026-06-29 보강] / [`./followups-overview.md`](./followups-overview.md) 2026-06-29 (3) 후속 메모 / [`../05-port-view-ecs-and-runbook/operation-notes.md`](../05-port-view-ecs-and-runbook/operation-notes.md) 4) Step 12~17 승인형 검증 완료 + 5) wrapper 정리 완료 + 결론 / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-29 (3) approval phase 외부 caller 검증 참조.
+> 2026-06-29 (3) port-view Step 12~17 승인형 검증 완료 + Approval state machine ARN 분리 + Local View wrapper 정리 메모(OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 보강 / R-AUTO-033 [2026-06-29 보강 (3)] / R-AUTO-034 [2026-06-29 보강]) See Evidence Details [4.2 · #3](#evidence-4.2-3).
 
-> **2026-06-30 (오후) port-view ECS Fargate Public IP 1차 포팅 완료 + ECS View → AWS Step Functions Step 12~17 승인 실행 1차 실증 + desiredCount 0 수동 운영 메모(OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 보강 / R-AUTO-033 [2026-06-30 오후 보강] / R-AUTO-034 [2026-06-30 오후 보강])** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. port-view 의 운영 안정성 1순위는 **ECS Fargate Service** 그대로 유지 / Elastic Beanstalk 2순위 (참고) / App Runner · EC2 · ECS on EC2 · EKS · Lambda 비권고 판단 유지. **1차 포팅 방식 1차 실증 완료** — ALB 미사용 + public subnet + `assignPublicIp=ENABLED` + 운영자 IP/32 SG inbound TCP 8080 + CloudWatch Logs retention 7일 / ECR repository `portfolio-view` + image push / ECS task definition `portfolio-view:1` → `portfolio-view:2`(기본 계좌번호 env 보정 한정 = `PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO` + `PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO`) / ECS service `portfolio-view-service` RUNNING / launch type `FARGATE` / awsvpc / cpu 512 / memory 1024 / container port 8080 / Spring profile `aws-paper` / Tomcat 8080 / RDS PostgreSQL + HikariPool + default schema `ops` 정합 / Dashboard · Balance · Positions · Orders · Reports · Daily 6종 화면 조회 통과. **ECS View → Step Functions Step 12~17 승인 실행 1차 실증** — executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / state machine `portfolio-paper-daily-step12-17-approval` / status `SUCCEEDED` / start `2026-06-30T14:15:42.899+09:00` / stop `2026-06-30T14:18:48.358+09:00` / Slack `DAILY_EXECUTION_SUCCESS` 수신 / NO_TARGET 안전 종료 / DB after-check 통과(`connector_balance_snapshot id=281` / `as_of_date=2026-06-30` / `total_eval_amount=8,706,505` / `cash_balance=8,706,505`). **desiredCount 0/1 수동 운영 메모** — ECS service desiredCount 는 운영 시점에만 1, 검증 후 비용 절감을 위해 0 으로 종료 / 검증 후 본 일자 desiredCount 0 종료 완료 / 다음 기동 시 새 public IP 발급 전제 / Security Group inbound 운영자 IP/32 유지 / Fargate 시간 단가 + public IPv4 비용 누적 차단. **보류 항목 유지** — ALB / HTTPS / Route53 / Cloudflare Tunnel / 인증 · 인가 고도화 / Slack 문구 개선 / property 구조 재정리 / application-ecs.yml 신규 분리 / ECS Auto Scaling / Blue/Green / multi-AZ 1차 포팅 이후 보류 / 외부 노출 정식화 시점 별도 phase 진입(05 · 06 · 07 · 10 spec 후속 phase 책임). **Fargate Task Role 후속 (06 spec 책임)** — Task Role(`portfolio-paper-view-task-role`) 의 `states:StartExecution` Resource 패턴은 일반 ARN + approval ARN 2종 모두 한정 부여 / Action / Resource wildcard 0건 / Task Role 과 Task Execution Role(`portfolio-paper-ecs-task-execution-role`) 분리 / 본 일자 ECS View → Step 12~17 approval 1차 실증 통과는 R-AUTO-034 mitigation 의 (a) ~ (g) 1차 실증 evidence 로 사용 / Status `Open` 유지(외부 노출 정식화 + audit 통과 시점에 `Mitigated` 승격 후보). **신규 후속 위험 메모** — Public IP 직접 접근 시 SG inbound 오픈 실수 위험(운영자 IP/32 한정 정책 정합) / desiredCount 1 유지 비용 위험(검증 후 0 종료 정책 정합) / task 재시작 후 public IP 변경 위험(매 기동 시 재조회 정책) / 과거 stale `connector_order_request` 6건 식별(2026-04-27 ACCEPTED 잔여 / preflight count 오염 후보 / 후속 cleanup 결정). 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-30 (오후) 항목 / [`./risk-register.md`](./risk-register.md) R-AUTO-033 [2026-06-30 오후 보강] + R-AUTO-034 [2026-06-30 오후 보강] / [`./followups-overview.md`](./followups-overview.md) 2026-06-30 (오후) 후속 메모 / [`../05-port-view-ecs-and-runbook/operation-notes.md`](../05-port-view-ecs-and-runbook/operation-notes.md) 의 "3. ECS Fargate 포팅: 완료" block / [`../05-port-view-ecs-and-runbook/runbook.md`](../05-port-view-ecs-and-runbook/runbook.md) / [`../05-port-view-ecs-and-runbook/validation-checklist.md`](../05-port-view-ecs-and-runbook/validation-checklist.md) / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-30 (오후) cross-reference / [`../06-secrets-and-iam/operation-notes.md`](../06-secrets-and-iam/operation-notes.md) 2026-06-30 (오후) Task Role · Execution Role 분리 검증 참조. 본 메모 평문 인용 / 실제 ARN · account-id · public IP · image digest full sha256 · task ARN · ENI ID · Slack 메시지 본문 · CloudWatch Logs 전문 · Step Functions execution history 본문 · task definition JSON 전체 본문 평문 인용 0건(R-DOCS-001 정합).
+> 2026-06-30 (오후) port-view ECS Fargate Public IP 1차 포팅 완료 + ECS View → AWS Step Functions Step 12~17 승인 실행 1차 실증 + desiredCount 0 수동 운영 메모(OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 보강 / R-AUTO-033 [2026-06-30 오후 보강] / R-AUTO-034 [2026-06-30 오후 보강]) See Evidence Details [4.2 · #4](#evidence-4.2-4).
 
-> **2026-06-30 (오후) Slack 문구 개선 최종 완료 메모(OD-MS-002 / OD-MS-009 / OD-MS-030 / OD-MS-031 / OD-MS-037 본문 변경 없이 1차 실증 보강 / OD-MS-038 신규 / R-AUTO-035 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. port-view 의 운영 안정성 1순위는 **ECS Fargate Service** 그대로 유지. Daily Batch orchestration 자체는 **Step Functions + EventBridge Scheduler + ECS RunTask**(OD-MS-009) 결정 그대로 유지. **Daily Brief Slack 알림은 Daily 본 실행 경로와 결합하지 않는 별도 mini Step Functions 로 분리** 운영(OD-MS-038 신규 / 🟢 확정 / 영향 spec 04 · 05 · 10) — mini state machine `portfolio-daily-brief-slack-notification`(ACTIVE / 구조 `BuildDailyBriefPayload → SendSlackNotifier`) + Builder Lambda `portfolio-daily-brief-slack-summary-builder`(Python 3.12 + `pg8000` + Secrets Manager `valueFrom` / `psycopg2` 미사용) + Notifier Lambda `portfolio-event-notifier`(`MORNING_BRIEF → PRE_MARKET_STATUS` / `EVENING_BRIEF → POST_MARKET_STATUS` alias + nested adapter + 음수 `🔵` / 양수 `🔴` / 0 `⚪` prefix) + IAM Role 2종(`portfolio-daily-brief-sfn-role` / `portfolio-daily-brief-scheduler-role`) + Scheduler 2개 ENABLED(장전 `portfolio-daily-brief-morning-slack-0750-kst` cron `cron(50 7 ? * MON-FRI *)` / 장후 `portfolio-daily-brief-evening-slack-1550-kst` cron `cron(50 15 ? * MON-FRI *)` / Asia/Seoul / Flexible OFF). **Approval Required Slack 측은 별도 Builder `portfolio-approval-slack-summary-builder` + `portfolio-paper-daily-step1-17-approval` ASL 의 `BuildApprovalSlackPayload → SendApprovalRequiredSlack` 흐름 반영**(revisionId `da8642c6-8409-41b6-ad57-e066ff672332`) — Daily 본 실행 state machine 안 알림 builder 만 추가 / 본 실행 흐름의 ASL 큰 변경 없음. **공통 운영 알림 보조 계층** — Slack notifier Lambda + Summary Builder Lambda 2종(Approval / Daily Brief) + mini Step Functions 1개(Daily Brief) + 알림 전용 IAM Role 2종 + 알림 전용 Scheduler 2개 가 port-view / 04 strategy-batch-stepfunctions / 05 port-view-ecs-and-runbook / 10 cutover-and-validation-runbook 의 운영 알림 책임 분리 계층으로 운영 / port-view `SlackNotificationService` 는 제거되지 않고 유지(View Daily Batch 수동 실행 결과 알림 책임). **smoke 통과** — Approval Required Builder output → Notifier Slack smoke 성공(`marketStatusCode=BLOCK` / 매수·매도 후보 없음 표시) + mini Step Functions morning smoke `daily-brief-morning-smoke-safe-20260630-193255-68f50aeb` + evening smoke `daily-brief-evening-smoke-safe-20260630-193300-aa2b9a12` 모두 `SUCCEEDED` / Slack 장전 · 장후 수신 확인(`🌅 [장 전] 6/30 (화)` / `🌅 [장 후] 6/30 (화)` / 누적 수익률 `🔵 -12.94%` / 평가손익 `🔵 -1,293,495원` / 어제 대비 `⚪ 0원`). **DB password 주입** — Builder Lambda 는 `DB_PASSWORD_SECRET_VALUE_FROM` 환경변수에 Secrets Manager `valueFrom` / Lambda 코드 안 `get_secret_value` runtime 조회. 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log `2026-06-30 (오후) Slack` 항목 / OD-MS-038 신규 / [`./risk-register.md`](./risk-register.md) R-AUTO-035 신규 / [`./aws-resource-glossary.md`](./aws-resource-glossary.md) Lambda · Step Functions · EventBridge Scheduler · Secrets Manager 항목 / [`./cost-simulation.md`](./cost-simulation.md) Daily Brief 비용 메모 / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) Approval Required Builder 연동 / [`../05-port-view-ecs-and-runbook/operation-notes.md`](../05-port-view-ecs-and-runbook/operation-notes.md) Daily Brief 독립 운영 cross-reference / [`../06-secrets-and-iam/operation-notes.md`](../06-secrets-and-iam/operation-notes.md) Builder Lambda Secrets Manager valueFrom 참조. Lambda 코드 본문 / Step Functions ASL 본문 / Scheduler target JSON 본문 / Slack 메시지 본문 / Builder output 전문 / Notifier input 전문 / CloudWatch Logs 전문 / IAM Policy 전체 본문 / Secrets Manager secret value 평문 인용 0건(R-DOCS-001 정합 / 운영 식별자 = Lambda 이름 / state machine 이름 / IAM Role 이름 / Scheduler 이름 / cron 표현식 / Asia/Seoul / eventType 라벨 / Lambda runtime `Python 3.12` / DB driver `pg8000` / DB password 주입 방식 `DB_PASSWORD_SECRET_VALUE_FROM` / Slack webhook 환경변수명 `SLACK_WEBHOOK_URL` / 손익 prefix 라벨 / revisionId / smoke execution name 만 사실 기록 — secret 아님). Decision Summary 카운트 갱신(전체 96 → 97 / 확정 51 → 52 / 잠정 42 유지).
+> 2026-07-01 paper Daily 자동화 1차 풀 ON + Step 12~17 Scheduler ENABLED evidence 보강 메모(OD-SAFE-001 / OD-SAFE-002 / OD-SAFE-003 / OD-MS-009 / OD-MS-032 / OD-MS-033 본문 변경 없이 evidence 보강 / R-AUTO-001 [2026-07-01 보강] / R-AUTO-025 [2026-07-01 자동 ENABLE 진입] / R-AUTO-037 신규) See Evidence Details [4.2 · #5](#evidence-4.2-5).
+
+> 2026-06-30 (오후) Slack 문구 개선 최종 완료 메모(OD-MS-002 / OD-MS-009 / OD-MS-030 / OD-MS-031 / OD-MS-037 본문 변경 없이 1차 실증 보강 / OD-MS-038 신규 / R-AUTO-035 신규) See Evidence Details [4.2 · #6](#evidence-4.2-6).
 
 | AWS Service Option | 가능 여부 | 비용 | 운영 난이도 | 장점 | 단점 | 장애 / 보안 리스크 | 어필도 | 최종 판단 |
 |--------------------|-----------|------|-------------|------|------|-------------------|--------|-----------|
@@ -157,30 +194,30 @@ Spring Boot / Thymeleaf 통합 운영 콘솔. 24/7. Daily Batch orchestration �
 
 Naver / yfinance / KRX 수집. KRX는 Selenium / Chrome 의존. KRX 로그인은 stateful. 일부 backfill은 long-running.
 
-> **2026-06-16 hybrid 구조 완료 메모(OD-MS-011 / OD-MS-022 정합)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. 운영 분류만 정리: (a) **non-GUI crawler = ECS Fargate Task**(Naver / yfinance / KRX 비-GUI 경로 / Public Subnet + `assignPublicIp=ENABLED` / NAT-free) — `portfolio-paper-interest-crawler:7`(image `paper-20260616-nongui` / command `["python", "interest_crawler_daily_nongui.py"]` / log stream prefix `ecs-crawler-nongui-daily`) 1차 RunTask 통과(exitCode 0 / 약 9분 51초 / 8 step SUCCESS). (b) **KRX GUI crawler = Windows EC2 worker**(Selenium / Chrome / KRX OTP / Chrome download stateful) — Windows Autologon + Administrator console interactive session + Windows Scheduled Task `Portfolio-KRX-Worker-Daily` + SSM RunCommand → `schtasks /Run` trigger. KRX GUI 는 **headless / Lambda / ECS · Fargate 단독 / SSM direct Python · wrapper 실행 모두 부적합** — Lambda 는 Chrome / 15분 timeout / KRX 세션 stateful 로 비권고(본 표 그대로). ECS · Fargate 단독은 GUI / Display / Chrome download 폴더 미지원으로 KRX OTP 흐름과 호환 부담. SSM direct 실행은 SYSTEM Session 0 / 비대화형 GUI 한계로 KRX 로그인 단계 실패. Headless / 비대화형 KRX 수집은 nos_setup / 키보드보안 / iframe 제약으로 안정성 미달(로컬 검증상 운영 방식에서 제외). 따라서 KRX GUI 경로는 Windows EC2 worker(Sysinternals Autologon 기반 자동 로그인 + Scheduled Task + SSM trigger) 흐름을 운영 방식으로 확정. (c) Preprocessor MS = ECS Fargate Task 유지(4.4). 자세한 결과는 [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-16 §1 ~ §5 참조.
+> 2026-06-16 hybrid 구조 완료 메모(OD-MS-011 / OD-MS-022 정합) See Evidence Details [4.3 · #7](#evidence-4.3-7).
 >
-> **2026-06-21 Step 2 성공판정 강화 메모(OD-MS-026 정합 / R-AUTO-020 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. wrapper / Step Functions 후보 orchestration 은 ECS RunTask + SSM RunCommand 혼합으로 유지하되, Step 2(`INTEREST_CRAWLER`) 의 운영 성공 기준은 다음 6개를 모두 통과해야 한다 — (1) non-GUI ECS crawler exitCode 0, (2) Crawler Worker EC2 `running`(stopped 시 즉시 fail-closed / 이전 자동 skip 동작 폐지), (3) Windows Scheduled Task `Running` → `Ready` 복귀 wait + `sawRunning` 로그, (4) Last Result 0 또는 0x0(Scheduled Task trigger 성공만으로 SUCCESS 처리 금지), (5) latest worker log path · last write time · size · tail 출력, (6) KRX raw DB validation 통과(`interest_krx_raw_validate_daily.py` SSM step `INTEREST_CRAWLER_KRX_DB_VALIDATE` / `interest_program_raw` · `interest_shortsell_raw` `ExpectedKrxRawDate` 기준 row_count + `max(trade_date)` / 실패 시 exit code 30 / Step 2 fail). non-GUI ECS RunTask 는 worker 상태와 무관하게 진행하되 `containerOverrides.environment` 로 `TEMP=/tmp` · `TMP=/tmp` · `PYTHONUTF8=1` · `PYTHONIOENCODING=utf-8` 주입(Windows / Linux 인코딩 차이 완화 / 임시 파일 경로 의존성 명시화). 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) OD-MS-026 신규 / [`./risk-register.md`](./risk-register.md) R-AUTO-020 신규 + R-AUTO-007 / R-AUTO-016 / R-AUTO-017 보강 / [`./followups-overview.md`](./followups-overview.md) 2026-06-21 후속 메모 / [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-21 §1 ~ §8 참조.
+> 2026-06-21 Step 2 성공판정 강화 메모(OD-MS-026 정합 / R-AUTO-020 신규) See Evidence Details [4.3 · #8](#evidence-4.3-8).
 >
-> **2026-06-22 Daily AWS Paper 1~17 두 번째 실 완주 메모(OD-MS-027 / OD-DB-011 신규 / R-AUTO-021 / R-DATA-013 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값(MarketConnector EC2 + EIP / Strategy Decision · Execution ECS Fargate Task / Interest Crawler hybrid / Preprocessor ECS Fargate Task / Research AWS Batch / port-view ECS Fargate Service 후속) 은 변경하지 않는다. 현재 검증은 PowerShell wrapper + ECS RunTask + AWS Batch + SSM RunCommand 조합의 **E2E 리허설 2회차 성공**(2026-06-18 BUY 4건 / 2026-06-22 SELL 1건 한정 / 단순 dry-run 이 아니라 첫 실제 SELL E2E 완주). Step Functions / EventBridge Scheduler 정기 트리거 / View backend orchestration 은 **후속 orchestration target** 으로 유지. 본 일자 보강 사실 — (a) MarketConnector EC2 stop / start 후 `/tmp` 휘발 대응을 wrapper(`daily-aws-paper.functions.ps1`) 안 공통 env bootstrap 함수 호출로 1차 차단(OD-MS-027 신규 / R-AUTO-021 신규 mitigation 1차 실증 — Step 1 / 12 / 13 / 17 4종). (b) Strategy Decision · Execution(Step 9 `DAILY_SELL_EXECUTION`) 의 `execution_app` 권한 매트릭스에 `decision.strategy_daily_position_decision` 제한적 UPDATE 권한 추가(OD-DB-011 신규 / R-DATA-013 신규 mitigation 1차 실증 / 02 spec `db-roles-and-grants` 정식 매트릭스 갱신 후속). (c) Interest Crawler / Preprocessor / Strategy Research 행은 본 일자에도 회귀 0건(OD-MS-026 / OD-MS-019 / R-AUTO-015 / R-AUTO-020 정합). (d) 8개 MS 컴퓨트 1순위 / 2순위 / 비권고 결정값 변경 없음 / Lambda 비권고 정책 유지 / NAT-free 정책 유지 / aws-live cutover 는 10 spec 후속. 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-22(OD-MS-027 / OD-DB-011 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-021 / R-DATA-013 신규 + R-DATA-005 [2026-06-22 보강] / [`./followups-overview.md`](./followups-overview.md) 2026-06-22 후속 메모 / [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md) 2026-06-22 §1 ~ §6 / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-22 §1 ~ §6 / [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-22 §1 ~ §4 / [`../09-strategy-research-batch/operation-notes.md`](../09-strategy-research-batch/operation-notes.md) 2026-06-22 §1 ~ §5 참조.
+> 2026-06-22 Daily AWS Paper 1~17 두 번째 실 완주 메모(OD-MS-027 / OD-DB-011 신규 / R-AUTO-021 / R-DATA-013 신규) See Evidence Details [4.3 · #9](#evidence-4.3-9).
 >
-> **2026-06-23 Step Functions approval workflow + Step 12 retry-normalizer 실전 검증 메모(OD-MS-028 / OD-MS-029 신규 / R-AUTO-022 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. **Step Functions approval workflow false / true path 실전 검증 완료** — 운영자가 직접 Step Functions state machine `portfolio-paper-daily-step1-17-approval` 의 `allowPaperOrderExecute=false` approval blocked path 로 Step 1~17 사전 검증을 수행한 뒤 `allowPaperOrderExecute=true` approval true path 로 Step 12~17 승인 실행해 첫 실 SELL 1건 통과(BGF리테일 `282330` 17주 MARKET / `connector_order_request id 48` FILLED / `strategy_execution_order id 40` FILLED / `broker_order_no 0000006143` / Step 17 balance refresh 후 최신 보유 4종목 정상 반영). MarketConnector EC2 + SSM + Step Functions 조합으로 Step 12~17 true path 완료 / Strategy Execution / MarketConnector 간 `REQUESTED → broker submit → fill sync → balance refresh` 경로 확인. **retry-normalizer 는 Step 12 내부 안전 보완으로 반영** — `port-marketconnector/connector_strategy_order_execute.py` 전체 교체 + Step 12(`MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE`) 시작부에서 retry-normalizer 동작 / 별도 Step 11.5 분리 아님 / 복구 조건 6종(`rejection_code = 40580000` + `broker_order_no IS NULL` + `connector_fill` 없음 등) 모두 만족 시에만 적용(OD-MS-028 신규 / R-AUTO-022 신규 mitigation 1차 실증). Step Functions 자체 구현은 본 일자 운영자 실증 단계 진입 / **Step Functions 는 여전히 후속 orchestration target 표현 유지**(state machine 정의 / state-by-state input · output / EventBridge Scheduler 정기 트리거 / View backend orchestration 매핑 등 운영 자동화 전체 격상은 04 / 05 / 10 spec 후속 phase 책임). 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-23(OD-MS-028 / OD-MS-029 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-022 신규 + R-AUTO-021 [2026-06-23 보강] / [`./followups-overview.md`](./followups-overview.md) 2026-06-23 후속 메모 참조. 03 / 04 spec operation-notes 의 2026-06-23 상세 누적은 후속(2차 / 3차) 책임으로 분리.
+> 2026-06-23 Step Functions approval workflow + Step 12 retry-normalizer 실전 검증 메모(OD-MS-028 / OD-MS-029 신규 / R-AUTO-022 신규) See Evidence Details [4.3 · #10](#evidence-4.3-10).
 >
-> **2026-06-23 AWS 공통 Slack notifier 구현 + Step Functions 3종 Slack 검증 메모(OD-MS-030 / OD-MS-031 신규 / R-AUTO-023 / R-AUTO-024 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. 특히 **Lambda 는 본 표의 8개 MS 주 compute 1순위가 아니라 운영 이벤트 알림 보조 서비스로만 사용** — Lambda 비권고 정책(15분 timeout / cold start / 세션 stateful / Selenium 부적합 / VPC connection 영향)은 그대로 유지하며, AWS 공통 Slack notifier Lambda `portfolio-event-notifier`(Python 3.12 / IAM Role `portfolio-event-notifier-lambda-role`) 는 PORT-STRATEGY-AI 전체 운영 이벤트 알림의 단일 진입점으로만 추가된다. **Step Functions + EventBridge Scheduler + Lambda notifier 조합은 운영 관측성 / 포트폴리오 어필 보강 관점으로 기록** — `EventBridge Scheduler → Step Functions state machine → ECS RunTask + SSM RunCommand + AWS Batch` 의 기존 orchestration 결정값(OD-MS-009)에 `Step Functions Catch · Choice → Lambda notifier → Slack webhook` 의 알림 보조 계층이 추가되어 운영자가 Slack 으로 approval gate / 성공 / 실패를 즉시 인지할 수 있는 흐름이 1차 검증되었다. **Daily Batch orchestration 의 1차 Slack 범위는 3종 한정**(OD-MS-031 신규 / 🟢 확정) — (1) `APPROVAL_REQUIRED`(Step 1~11 완료 후 approval gate 진입), (2) `DAILY_EXECUTION_SUCCESS`(Step 17 완료 후 전체 성공), (3) `DAILY_EXECUTION_FAILED`(Step Functions 실행 중 실패 / Catch 경로 / 12~17 test-only 실패 + 1~17 full workflow test-only 실패 수신 검증 완료 / 실제 broker 주문 실패 유발 0건). 장 전 잔고 · 장 후 잔고 · 장중 손절 알림은 후속 분리. **port-view MS 측 SlackNotificationService 는 그대로 유지** — View Daily Batch 수동 실행 결과 알림 책임은 변경 없음(OD-MS-010 본문 변경 없음 / 향후 공통 notifier 이전 가능성만 기록). **Slack webhook URL 은 secret 취급** — 현재 Lambda 환경변수 `SLACK_WEBHOOK_URL` 로 1차 검증 / 운영 안정화 후 Secrets Manager 또는 SSM Parameter Store(SecureString) 이전 예정(R-AUTO-024 신규 / Status `Accepted` / 06 spec 후속). 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-23 두 번째 항목(OD-MS-030 / OD-MS-031 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-023 / R-AUTO-024 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-23 두 번째 후속 메모 / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-23 §9(Slack notifier 검증) 참조. **6. Slack 구현: 완료 / 7. EventBridge 자동화는 다음 단계**.
+> 2026-06-23 AWS 공통 Slack notifier 구현 + Step Functions 3종 Slack 검증 메모(OD-MS-030 / OD-MS-031 신규 / R-AUTO-023 / R-AUTO-024 신규) See Evidence Details [4.3 · #11](#evidence-4.3-11).
 >
-> **2026-06-23 EventBridge Scheduler + Dispatcher Lambda 기반 Daily 자동화 구현 완료 메모(OD-MS-032 신규 / R-AUTO-025 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. 기존 ECS / EC2 / Batch 중심 MS compute 1순위 결정값 변경 없음 / Lambda 비권고 정책 그대로 유지. **Daily Batch orchestration 설명 보강** — `OD-MS-009` 본문의 `Step Functions + EventBridge Scheduler + ECS RunTask` 조합에 `Dispatcher Lambda` 계층을 추가해 **Step Functions + EventBridge Scheduler + Dispatcher Lambda + ECS RunTask + SSM RunCommand + AWS Batch** 의 5계층 조합으로 운영. Lambda 는 8개 MS 주 compute 가 아니라 **orchestration input 보정 / 휴장일 guard / StartExecution dispatcher** 역할을 담당(OD-MS-032 신규 / 🟢 확정 / Dispatcher Lambda `portfolio-paper-daily-scheduler-dispatcher` / Python 3.12 / Handler `lambda_function.lambda_handler` / Timeout 30s / Memory 256MB / IAM Role `portfolio-paper-daily-scheduler-dispatcher-role` / 환경변수 `TIMEZONE=Asia/Seoul` · `HOLIDAY_COUNTRY=KR` · `FAIL_CLOSED_ON_HOLIDAY_ERROR=true` · Step Functions ARN 2종 / ARN 평문 기록 0건). **EventBridge Scheduler 2개 분리 + 단계적 활성화** — (a) `portfolio-paper-daily-step1-11-approval-0800-kst`(cron `cron(0 8 ? * MON-FRI *)` / Asia/Seoul / **ENABLED** / Target input `{"scheduleType":"STEP1_11_APPROVAL","dryRun":false}` / `allowPaperOrderExecute=false` / Step 12 approval gate 차단 / 주문 제출 없음). (b) `portfolio-paper-daily-step12-17-order-0901-kst`(cron `cron(1 9 ? * MON-FRI *)` / Asia/Seoul / **DISABLED** / Target input `{"scheduleType":"STEP12_17_ORDER","dryRun":false}` / `allowPaperOrderExecute=true` / 주문 자동화 ENABLE 전 최종 안전 점검 후 별도 판단). 대상 Step Functions 2개 모두 ACTIVE 확인 — `portfolio-paper-daily-step1-17-approval` + `portfolio-paper-daily-step12-17-approval` / OD-MS-029 의 `allowPaperOrderExecute` 분기 의미는 그대로 유지 / OD-MS-032 의 schedule + state machine 2개 분리는 EventBridge 자동화 운영 안전성(주문 자동화 단계 분리) 관점. **Scheduler · Dispatcher Lambda · Step Functions 연결 사슬 실패 위험은 R-AUTO-025 신규 mitigation 으로 1차 차단**(simulate-principal-policy / Lambda dryRun / Scheduler `get-schedule` 상태 확인 / 단계적 활성화). 실제 `StartExecution`(`dryRun=false`) 은 본 일자 미검증 / 내일 08:00 schedule 실행 시 첫 검증 예정. **Lambda 가 Step Functions 완료까지 대기하지 않음** — 장시간 batch 실행은 Step Functions + ECS RunTask + SSM RunCommand + AWS Batch 가 담당 / Dispatcher Lambda 는 `StartExecution` 호출 후 즉시 종료(OD-MS-032 정합 / Lambda 비권고 정책의 15분 timeout 우회 정합). 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-23 세 번째 항목(OD-MS-032 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-025 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-23 세 번째 후속 메모 참조. **7. EventBridge 자동화 구현: 완료** — 08:00 approval 검증 자동화 준비 완료 / 09:01 주문 자동화는 비활성 유지 / 내일 08:00 schedule 실행 결과 확인이 다음 단계.
+> 2026-06-23 EventBridge Scheduler + Dispatcher Lambda 기반 Daily 자동화 구현 완료 메모(OD-MS-032 신규 / R-AUTO-025 신규) See Evidence Details [4.3 · #12](#evidence-4.3-12).
 >
-> **2026-06-24 08:00 Scheduler 실 실행 + Step 12 retry-normalizer `EGW00201` 확장 + Step 12~17 수동 실행 4건 FILLED 메모(OD-MS-033 신규 / R-AUTO-025 [2026-06-24 보강] / R-AUTO-026 / R-AUTO-027 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. 기존 ECS / EC2 / Batch 중심 MS compute 1순위 결정값 변경 없음 / Lambda 비권고 정책 그대로 유지(Lambda 는 주 compute 가 아니라 운영 orchestration dispatcher / notifier 보조 계층). **Daily Batch orchestration 5계층 조합 1차 실증** — (a) **Step Functions + EventBridge Scheduler + Dispatcher Lambda 조합으로 08:00 Step 1~11 approval-required 자동 실행이 실제 검증**(08:00 schedule `portfolio-paper-daily-step1-11-approval-0800-kst` 실 호출 → Dispatcher Lambda → Step Functions `portfolio-paper-daily-step1-17-approval` execution → Step 1~11 수행 후 approval-required 흐름으로 완료 / `APPROVAL_REQUIRED` Slack 수신 / Step 12 이후 주문 차단 / 신규 주문 0건). (b) **Step 12~17 은 자동 Scheduler ENABLE 전 수동 Dispatcher invoke 로 검증**(Dispatcher Lambda 로 `STEP12_17_ORDER` 수동 invoke → Step Functions `portfolio-paper-daily-step12-17-approval` execution → 4건 새 `connector_order_request` 생성 + `broker_order_no` 생성 + 최종 체결 / `042660` 한화오션 FILLED / `004990` 롯데지주 FILLED / `003490` 대한항공 FILLED / `023530` 롯데쇼핑 FILLED / `004990` 단건 order-check 재조회 후 `tot_ccld_qty=69` 전량체결 / `DAILY_EXECUTION_SUCCESS` Slack 수신). (c) **Step 12 retry-normalizer + KIS rate-limit backoff 보완 후 4건 주문 재처리 및 최종 FILLED 확인** — retry-normalizer 재시도 대상을 `40580000` 단독에서 `40580000` + `EGW00201`(KIS gateway rate limit) 로 확장 + 주문 사이 기본 sleep + `EGW00201` 발생 시 backoff retry 적용 / 운영자 직접 `port-marketconnector/connector_strategy_order_execute.py` 전체 교체 / S3 업로드 + EC2 정식 배포 + `py_compile` + 운영 마커 확인 통과 / dry-run `candidate_count=4`(`40580000` 2건 + `EGW00201` 2건 모두 후보 인식)(OD-MS-033 신규 / R-AUTO-026 mitigation 1차 실증). (d) **`APPROVAL_REQUIRED` Slack summary 0/0 표시 후속(R-AUTO-027 신규 / Status `Accepted`)** — Step Functions approval state 의 input 에 실제 Step · DB 요약(BUY/SELL 후보 수 / 종목 / 사유 / 예상 수량) 반영하는 Slack approval payload builder 정식 개선은 04 / 05 spec 후속 phase 책임 / 단기적으로는 운영자가 Step Functions execution history + DB 직접 점검으로 사후 검증 보완 / 09:01 schedule 자동 ENABLE 별도 운영자 승인 보류 정책의 안전 게이트 역할로 활용. **9:01 schedule 은 본 일자에도 `DISABLED` 유지** — Step 12~17 수동 검증 성공 이후에도 자동 ENABLE 은 별도 운영자 승인 보류(OD-MS-033 정합 / `APPROVAL_REQUIRED` Slack summary 개선 + Dispatcher Lambda application log 보강 후속 완료 + 운영 회차 누적 결과 점검 후 최종 판단). **Lambda 는 주 compute 가 아니라 운영 orchestration dispatcher / notifier 보조 계층으로 사용한다는 기존 판단 유지** — Dispatcher Lambda(`portfolio-paper-daily-scheduler-dispatcher`) 의 운영 자동화 dispatcher 역할 + Slack notifier Lambda(`portfolio-event-notifier`) 의 운영 이벤트 알림 보조 계층 역할 모두 본 표의 Lambda 비권고 정책(15분 timeout / cold start / 세션 stateful / Selenium 부적합 / VPC connection 영향) 안에서 동작(Dispatcher Lambda 는 `StartExecution` 후 즉시 종료 / Slack notifier Lambda 는 단순 webhook POST 후 즉시 종료). 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-24(OD-MS-033 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-025 [2026-06-24 보강] + R-AUTO-026 / R-AUTO-027 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-24 후속 메모 참조.
+> 2026-06-24 08:00 Scheduler 실 실행 + Step 12 retry-normalizer `EGW00201` 확장 + Step 12~17 수동 실행 4건 FILLED 메모(OD-MS-033 신규 / R-AUTO-025 [2026-06-24 보강] / R-AUTO-026 / R-AUTO-027 신규) See Evidence Details [4.3 · #13](#evidence-4.3-13).
 >
-> **2026-06-24 EC2 lifecycle 자동 실행 구현 완료 메모(OD-MS-034 신규 / R-AUTO-025 [2026-06-24 두 번째 보강] / R-AUTO-028 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. 기존 ECS / EC2 / Batch 중심 MS compute 1순위 결정값(MarketConnector EC2 + EIP / Crawler hybrid / Decision · Execution ECS Fargate Task / Research AWS Batch / Preprocessor ECS Fargate / port-view ECS Fargate Service 후속)은 변경하지 않는다. Crawler / Preprocessor / Decision / Execution / Research 의 기존 compute 1순위 결정도 변경하지 않는다. **Daily Batch orchestration 설명 보강** — 기존 `Step Functions + EventBridge Scheduler + Dispatcher Lambda + ECS RunTask + SSM RunCommand + AWS Batch` 의 5계층 조합에 **EC2 lifecycle Lambda(`portfolio-paper-ec2-lifecycle-dispatcher`)** 계층이 추가되어 6계층 조합으로 운영. Lambda 는 주 compute 가 아니라 **orchestration dispatcher / notifier / lifecycle 보조 계층**(OD-MS-034 신규 / 🟢 확정 / 영향 spec 03 · 04 · 05 · 08 · 10). **Daily Batch 주 orchestration 은 Step Functions + EventBridge Scheduler 그대로 유지** — EC2 lifecycle 은 EventBridge Scheduler + Lambda 보조 계층으로 분리 / Lambda 는 주 compute 가 아니라 dispatcher · notifier · lifecycle 보조 역할 / Crawler · Preprocessor · Decision · Execution · Research 의 기존 compute 1순위 결정 변경 없음. **MarketConnector / Crawler 운영 메모 갱신** — (a) **MarketConnector EC2**: 07:50 KST start(영업일 / Scheduler `portfolio-paper-ec2-start-0750-kst` ENABLED) / 15:50 KST stop(영업일 / Scheduler `portfolio-paper-marketconnector-stop-1550-kst` ENABLED / 휴일 체크 미적용) / EIP attach 상태 유지 / KIS broker 측 IP 등록 변경 0건 / R-BROKER-001 mitigation 회귀 0건. (b) **Crawler EC2**: 07:50 KST start(MarketConnector 와 동시 / `target=BOTH`) / Step Functions Step 1~11 성공 시 stop(`StopCrawlerEc2AfterStep11Success` task state) / Step 1~11 실패 시 디버깅 위해 유지(stop 하지 않음 / `SendDailyExecutionFailedSlack` 경로로 운영자 알림). **Lambda 역할 3분리 완료** — (1) `portfolio-paper-daily-scheduler-dispatcher`(08:00 / 09:01 Step Functions schedule dispatcher), (2) `portfolio-paper-ec2-lifecycle-dispatcher`(07:50 / 15:50 EC2 start · stop dispatcher / Step Functions Step 1~11 성공 시 Crawler stop 책임), (3) `portfolio-event-notifier`(Slack 알림 전담). 모두 본 표의 Lambda 비권고 정책(15분 timeout / cold start / 세션 stateful / Selenium 부적합) 안에서 동작. **EC2 lifecycle Lambda 환경변수** — `TIMEZONE=Asia/Seoul` · `HOLIDAY_COUNTRY=KR` · `FAIL_CLOSED_ON_HOLIDAY_ERROR=true` / 휴일 API 장애 시 fail-closed / start 요청에만 휴일 체크 / stop 요청에는 휴일 체크 미적용. **검증 통과** — Lambda source + `py_compile` + IAM Role + EC2 start · stop 권한 + Scheduler invoke Role + Lambda invoke 권한 + Lambda create + dryRun 3종(`start BOTH` + `stop CRAWLER` + `stop MARKETCONNECTOR`) + 주말 skip(`runDate=2026-06-27`) + 두 Scheduler `get-schedule` 응답 정합(State ENABLED + Flexible OFF + Target Lambda · Target input) + Step Functions ASL 백업 후 update + RevisionId `edd92cc9-1d94-4752-9a43-b7eb5b2f3c2c` + `ACTIVE` 확인. **실제 영업일 07:50 start / Step 1~11 성공 후 Crawler stop / 15:50 stop 의 실 실행은 다음 영업일 첫 검증 예정**(R-AUTO-028 신규 mitigation 정합). 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-24 두 번째 항목(OD-MS-034 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-025 [2026-06-24 두 번째 보강] + R-AUTO-028 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-24 두 번째 후속 메모 참조.
+> 2026-06-24 EC2 lifecycle 자동 실행 구현 완료 메모(OD-MS-034 신규 / R-AUTO-025 [2026-06-24 두 번째 보강] / R-AUTO-028 신규) See Evidence Details [4.3 · #14](#evidence-4.3-14).
 >
-> **2026-06-24 장중 포지션 확인 3단계 구조 최종안 확정 메모(OD-MS-035 신규 / R-DATA-014 · R-AUTO-029 · R-DATA-015 · R-DATA-016 · R-AUTO-030 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. 기존 ECS / EC2 / Batch 중심 MS compute 1순위 결정값 변경 없음 / Lambda 비권고 정책 그대로 유지(Lambda 는 주 compute 가 아니라 Scheduler / lifecycle / notifier / orchestration helper 역할). **Crawler · Preprocessor · Decision · Execution · Research 의 기존 compute 1순위 결정도 변경하지 않는다**. **Daily Batch orchestration 에 "장중 포지션 확인" 추가** — 기존 Daily Step 1~17(08:00 approval + 09:01 order) + EC2 lifecycle 자동화(07:50 · 15:50) 와 분리된 **장중 전용 경로** 가 본 결정으로 추가 / Daily Batch orchestration 의 5계층 + EC2 lifecycle 6계층 구조 위에 장중 포지션 확인 3단계 경로가 별도 분리되어 운영. **MarketConnector** — 10분 Snapshot Refresh 는 MarketConnector EC2 + SSM 중심 (EventBridge Scheduler → Lambda dispatcher → SSM RunCommand → MarketConnector EC2 의 venv python snapshot refresh entrypoint / `connector_balance_snapshot` + `connector_position_snapshot` 갱신 / 판단 · 주문 0건 / idempotent / OD-MS-001 본문 변경 없음). **StrategyExecution** — Intraday Evaluate 는 신규 파일 기반 SSM 실행 후보 (`daily_intraday_position_monitor_run.py` 수정 없이 신규 evaluate 파일 작성 / 1단계 직후 SSM 으로 MarketConnector EC2 의 venv python 으로 실행 / `strategy_intraday_position_check` 저장 / stop candidate + `INTRADAY_STOP_SELL` `READY` order **생성까지만** 수행 / broker 주문 제출 0건 / OD-MS-007 / OD-MS-016 본문 변경 없음 / OD-SAFE-004 정합 — Step Functions Retry 정책에서 자동 주문 제출과 연결되지 않도록 ASL 정의 시 명시). **Step Functions** — Intraday Stop Sell Submit & Refresh 는 **별도 Step Functions state machine 후보** / Daily Step 1~17 state machine 과 분리 / `source_type=INTRADAY_STOP_SELL` 전용 필터로 Daily BUY/SELL 흐름과 분리 / 초기 자동 ENABLE 보류 + 수동 · 승인 후 실행(OD-MS-033 의 09:01 보류 패턴과 동일한 안전 게이트 / R-AUTO-030 신규 Status `Open` / 정식 구현 + 검증 통과 후 `Mitigated` 승격 후보). **Lambda** — 주 compute 가 아니라 Scheduler dispatcher / EC2 lifecycle dispatcher / Slack notifier / orchestration helper 역할 유지(OD-MS-009 / OD-MS-030 / OD-MS-032 / OD-MS-034 본문 변경 없음 / 1단계 신규 Dispatcher Lambda 도 동일 정책 적용 / Lambda 비권고 정책의 15분 timeout / cold start / 세션 stateful / VPC connection 영향 안에서 동작). **장중 안전장치 4종** — stale snapshot · duplicate order · `sellable_qty` · `current_price` 검증 / 모두 2단계 신규 evaluate 파일 안에서 평가 / `READY` order 생성 단계에서 차단 / 3단계 broker 제출 전 추가 사후 검증 가능. **본 결정은 최종 설계안 확정 / 문서 반영 단계** — 실제 AWS / Lambda / SSM / Step Functions / RDS / KIS API 실행 0건 / AWS 리소스 생성 · 수정 · 삭제 0건 / 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역) / `daily_intraday_position_monitor_run.py` 수정 0건. 1단계 + 2단계 구현은 다음 영업일 후속 phase / 3단계 정식 자동화 ENABLE 은 후속 phase + 운영자 별도 승인 후 진입. 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-24 세 번째 항목(OD-MS-035 신규) / [`./risk-register.md`](./risk-register.md) R-DATA-014 · R-AUTO-029 · R-DATA-015 · R-DATA-016 · R-AUTO-030 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-24 세 번째 후속 메모 참조.
+> 2026-06-24 장중 포지션 확인 3단계 구조 최종안 확정 메모(OD-MS-035 신규 / R-DATA-014 · R-AUTO-029 · R-DATA-015 · R-DATA-016 · R-AUTO-030 신규) See Evidence Details [4.3 · #15](#evidence-4.3-15).
 >
-> **2026-06-25 장중 포지션 Step Function 구현 완료 메모(OD-MS-036 신규 / R-AUTO-030 [2026-06-25 보강] / R-AUTO-031 · R-AUTO-032 · R-BROKER-005 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. 기존 ECS / EC2 / Batch 중심 MS compute 1순위 결정값 변경 없음 / Lambda 비권고 정책 그대로 유지 / Crawler · Preprocessor · Decision · Execution · Research 의 기존 compute 1순위 결정도 변경하지 않는다. **2026-06-24 세 번째 메모의 장중 포지션 확인 3단계 구조 최종안 확정 결과를 운영자가 직접 1단계 + 2단계 + 3단계 일부 구현 단계로 진척** — 본 메모는 운영자가 수행한 결과를 문서화한 것이며 Kiro 가 AWS 리소스를 직접 생성 · 수정 · 삭제하지 않았다. **MarketConnector(1단계 + 3단계 일부)** — 운영자가 신규 entrypoint `connector_intraday_snapshot_refresh.py`(source_version `connector-intraday-snapshot-refresh-1.0.0` / sha256 `99f7d1394fcd28dc5e070c072a9cdd244244df6afd9def09e62cd08b829b2269`)를 추가 + MarketConnector EC2 venv 에 배포 + KIS 잔고 · 포지션 snapshot 갱신 / broker 주문 제출 0건 / idempotent 성격 유지(OD-MS-001 / OD-MS-035 본문 변경 없음). 3단계 일부로 `connector_strategy_order_execute.py` 의 실행 정책에 `signal_type=INTRADAY_STOP_SELL` 전용 필터를 적용한 patch(sha256 `379895709A7FD1AF6E95D41CF85009FF913A5D60D40788C20630F28730A5F5AE`)를 동일 EC2 에 배포(R-AUTO-032 신규 mitigation 1차 실증 / OD-MS-028 / OD-MS-033 본문 변경 없음 / patch 본문 평문 인용 0건 / 03 spec operation-notes 후속 갱신 책임). 본 표의 MarketConnector EC2 1순위 결정값(EC2 + EIP 단일 노드) 변경 없음. **StrategyExecution(2단계)** — 운영자가 신규 entrypoint `connector_intraday_position_evaluate.py`(source_version `connector-intraday-position-evaluate-1.1.0` / sha256 `B56C35753C47D6FC72D83DE892D7AC6534CDBF93F2628D9B047F5FBC30CD50A1`)를 추가 + MarketConnector EC2 의 venv python 으로 SSM 실행 / 안전장치 4종(stale snapshot · duplicate order · `sellable_qty` · `current_price`) 검증 / `strategy_intraday_position_check` 저장 + `INTRADAY_STOP_SELL` `READY` order 생성까지만 수행 / broker 주문 제출 0건 / `daily_intraday_position_monitor_run.py` 수정 0건(OD-MS-035 정합). 본 표의 StrategyExecution ECS Fargate Task 1순위 결정값(Decision / Execution 모두 ECS Fargate) 변경 없음 — 장중 evaluate 는 MarketConnector EC2 의 venv python 으로 운영자가 SSM 호출한 보조 실행 경로. **Step Functions(3단계)** — 운영자가 별도 State Machine `portfolio-paper-intraday-stop-sell-approval`(STANDARD / ACTIVE / 18-state / 2026-06-25T14:58:45+09:00) 신규 생성 + Daily Step 1~17 state machine 과 완전 분리 + approval gate(`CheckIntradayStopApproval` → `BlockedByIntradayStopApprovalGate` 분기) 도입 + true-path 9개 state(`RunIntradayStopOrderExecute` · `GetIntradayStopOrderExecuteInvocation` · `RunConnectorOrderCheck` · `GetConnectorOrderCheckInvocation` · `RunSyncSellFill` · `RunConnectorBalanceRefresh` · `GetConnectorBalanceRefreshInvocation` · `IntradayStopWorkflowSucceeded` · `IntradayStopWorkflowFailed`) 정의(R-AUTO-031 신규 mitigation 1차 실증). 운영자 직접 검증 통과 — blocked gate 안전 테스트(execution name `intraday-stop-blocked-gate-20260625-145928` / `allowIntradayStopOrderExecute=false` / SUCCEEDED) 및 true-path no-target 안전 테스트(execution name `intraday-stop-truepath-notarget-20260625-150146` / `allowIntradayStopOrderExecute=true` / SUCCEEDED) 모두 신규 `connector_order_request` 0건 / broker 주문 제출 0건 / `max_connector_order_request_id=56` 변동 없음(R-AUTO-030 [2026-06-25 보강] — State Machine 생성 + 두 안전 테스트 통과 / Status `Open` 유지 / 자동 ENABLE 진입 차단 정책 유지). **EventBridge Scheduler** — 운영자가 1단계 + 2단계 자동 tick 용 Scheduler `portfolio-paper-intraday-snapshot-evaluate-10min-kst`(`cron(10/10 9-15 ? * MON-FRI *)` / Asia/Seoul) 신규 ENABLED + 평일 장중 10분 간격 자동 tick 검증 통과(주 compute 변경 없음 / OD-MS-009 / OD-MS-032 / OD-MS-034 본문 변경 없음). **Lambda** — 본 표의 비권고 정책 안에서 dispatcher 역할만 수행 / 1단계 + 2단계 Lambda 는 SSM RunCommand 호출 + 즉시 종료 보조 계층 / 3단계 State Machine 의 task state 도 ECS RunTask.sync + SSM RunCommand 의 조합으로 broker 호출 책임을 MarketConnector EC2 에 위임 / Lambda 가 broker 호출을 직접 수행하지 않는 원칙 그대로 유지(OD-MS-030 / OD-MS-032 / OD-MS-034 본문 변경 없음). **본 메모는 운영자 직접 실행 결과의 사실 기록** — Kiro 의 AWS CLI / boto3 / Step Functions / SSM / Lambda / EC2 / RDS / S3 / KIS API 실행 0건 / AWS 리소스 생성 · 수정 · 삭제 0건 / 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog 본 일자 작업으로 인한 변경 0건(spec 영역) / 운영자 직접 patch · 배포한 entrypoint 변경분은 03 spec operation-notes 후속 갱신 책임. **실제 1주 `INTRADAY_STOP_SELL` 주문 테스트 보류** — 보유 종목 0건 / `sellable_qty=0` 으로 broker 호출 직전 사전 검증 단계에서 운영자가 중단 / 없는 포지션 매도 주문 생성 0건 / 다음 보유 포지션 발생 후 재개(R-BROKER-005 신규 mitigation 1차 실증). 본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-25 항목(OD-MS-036 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-030 [2026-06-25 보강] + R-AUTO-031 · R-AUTO-032 · R-BROKER-005 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-25 후속 메모 참조.
+> 2026-06-25 장중 포지션 Step Function 구현 완료 메모(OD-MS-036 신규 / R-AUTO-030 [2026-06-25 보강] / R-AUTO-031 · R-AUTO-032 · R-BROKER-005 신규) See Evidence Details [4.3 · #16](#evidence-4.3-16).
 
 | AWS Service Option | 가능 여부 | 비용 | 운영 난이도 | 장점 | 단점 | 장애 / 보안 리스크 | 어필도 | 최종 판단 |
 |--------------------|-----------|------|-------------|------|------|-------------------|--------|-----------|
-| [ECS](./aws-resource-glossary.md#ecs-elastic-container-service) [Fargate](./aws-resource-glossary.md#fargate-ecs-launch-type) Task ([Public Subnet](./aws-resource-glossary.md#public-subnet), NAT-free) | Yes | Low | Low | 외부 outbound 가능 / cron 트리거 / 컨테이너 안정 / Step Functions와 결합 쉬움 | public subnet SG 통제 필요 | SG 실수 시 외부 inbound 위험 | High | **1순위 (non-GUI crawler 한정 / 2026-06-16 rev7 1차 실증 통과)** |
-| Windows EC2 worker (KRX GUI 한정) + Sysinternals Autologon + Scheduled Task + SSM RunCommand trigger | Yes | Medium | Medium | Chrome GUI / Display / Chrome download 폴더 / KRX OTP 세션 / debug attach 모두 지원. RDP 미접속 상태에서도 SSM trigger 로 자동 실행 | EC2 running 비용 + Autologon 보안 예외(R-SEC-009) + Administrator interactive session 의존(R-AUTO-016) + Chrome process 잔존 가능(R-AUTO-017) | Autologon 자격 증명 노출 / RDP inbound 노출 / Chrome 메모리 누수 | High | **1순위 (KRX GUI crawler 한정 / 2026-06-16 1차 실증 통과 / OD-MS-022)** |
+| ECS Fargate Task (Public Subnet, NAT-free) | Yes | Low | Low | 외부 outbound · cron 트리거 · 컨테이너 안정 · Step Functions 결합 | public subnet SG 통제 필요 | SG 실수 시 외부 inbound 위험 | High | **1순위 (non-GUI crawler 한정)** |
+| Windows EC2 worker + Sysinternals Autologon + Scheduled Task + SSM RunCommand | Yes | Medium | Medium | Chrome GUI / KRX OTP 세션 / SSM 자동 trigger 지원 | EC2 running 비용 · Autologon 보안 예외 · Chrome process 잔존 | R-SEC-009 · R-AUTO-016 · R-AUTO-017 | High | **1순위 (KRX GUI crawler / OD-MS-022)** |
 | [ECS](./aws-resource-glossary.md#ecs-elastic-container-service) on [EC2](./aws-resource-glossary.md#ec2-elastic-compute-cloud) (crawler 전용 EC2) | Yes | Medium | Medium | Chrome / 큰 디스크 / 캐시 / 헤드리스 안정성 | EC2 운영 부담 / Linux 환경에서 KRX 로그인 안정성 미검증 | EC2 패치 / 모니터링 추가 | Medium | 2순위 (Selenium 안정성 미달 시 / Linux 환경 검증 후 승격 / KRX GUI 경로는 Windows EC2 worker 우선) |
 | [EC2](./aws-resource-glossary.md#ec2-elastic-compute-cloud) (단일 인스턴스) | Yes | Medium | Medium | 컨테이너 없이 직접 운영 / 디버깅 쉬움 | 24/7 비용 / 컨테이너 표준 미적용 | EC2 SPOF | Low | 비권고 (KRX GUI 한정 Windows EC2 worker 와는 별개) |
 | [AWS Batch](./aws-resource-glossary.md#aws-batch) ([Fargate](./aws-resource-glossary.md#fargate-ecs-launch-type)) | Conditional | Low | Medium | 동시 다수 backfill 잘 맞음 | 일일 단일 실행에는 과함. Selenium 컨테이너는 동일하지만 Batch state 관리 추가 학습 필요 | Batch 큐 모니터링 추가 | High | 2순위 (history backfill용 / non-GUI crawler 한정) |
@@ -234,7 +271,7 @@ execution order 생성 / connector 주문 호출 / fill sync / position sync / i
 
 | AWS Service Option | 가능 여부 | 비용 | 운영 난이도 | 장점 | 단점 | 장애 / 보안 리스크 | 어필도 | 최종 판단 |
 |--------------------|-----------|------|-------------|------|------|-------------------|--------|-----------|
-| [ECS](./aws-resource-glossary.md#ecs-elastic-container-service) [Fargate](./aws-resource-glossary.md#fargate-ecs-launch-type) Task + [EventBridge Scheduler](./aws-resource-glossary.md#eventbridge-scheduler) + [Step Functions](./aws-resource-glossary.md#step-functions) | Yes | Low~Medium | Medium | 일일 + 장중 step을 state machine으로 분리. retry 정책을 step별로 다르게 줄 수 있어 BUY/SELL은 무재시도, fill sync 일부는 idempotent 재시도 가능 | Step Functions 학습 / state 설계 부담 | live 자동 재시도 금지를 인프라 레벨에서 강제 | High | **1순위** |
+| ECS Fargate Task + EventBridge Scheduler + Step Functions | Yes | Low~Medium | Medium | 일일 + 장중 step 을 state machine 분리. step별 retry 정책 차등 | Step Functions 학습 / state 설계 부담 | live 자동 재시도 금지 인프라 강제 | High | **1순위** |
 | [ECS](./aws-resource-glossary.md#ecs-elastic-container-service) [Fargate](./aws-resource-glossary.md#fargate-ecs-launch-type) Service (intraday 상시) | Conditional | Medium | Medium | 장중 polling을 상시 서비스로 운영 | 거래시간 외 idle 비용 | 상시 떠 있어 비용 + 모니터링 | Medium | 2순위 |
 | [AWS Batch](./aws-resource-glossary.md#aws-batch) | Conditional | Low | Medium | 다수 backfill / order 재처리 | 일일 / 장중 단발 step에는 과함 | Batch 큐 모니터링 | Medium | 비권고 |
 | [Lambda](./aws-resource-glossary.md#lambda) | No | n/a | n/a | broker 호출 / fill sync는 Lambda 환경에 부적합 (15분 timeout / connection 안정성) | 자동 재시도 정책 강제 어려움 | live 환경에서 자동 재시도 사고 위험 | Low | 비권고 |
@@ -245,7 +282,7 @@ execution order 생성 / connector 주문 호출 / fill sync / position sync / i
 
 backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리면 길어질 수 있다(수십 분~수 시간).
 
-> [2026-06-15 보강] 본 일자에 운영자가 직접 수행한 (a) AWS Batch Compute Environment / Job Queue / Job Definition revision 1 / 3 + CloudWatch Log Group + Secrets Manager + IAM Execution / Job Role 신규 생성, (b) py_compile smoke + DB smoke SubmitJob 1차 검증, (c) BACKTEST_RESEARCH full + BACKTEST_REPORT 본 phase 단건 SubmitJob `SUCCEEDED` / exitCode 0 검증(`run_id a39b0b0c-...` / `total_return 4.55930879` / `mdd -0.08941942` / `sharpe 2.65561307` / `trade_count 308`), (d) BACKTEST_REPORT 산출물의 S3 prefix 한정 보존 검증으로 본 절의 1순위(AWS Batch + S3) 권고가 1차 실증되었다. View Daily Batch 기준 AWS Batch 포팅 대상은 `BACKTEST_RESEARCH` + `BACKTEST_REPORT` 2종으로 한정되었고(OD-MS-019), `run_extended_analysis.py` 는 `BACKTEST_RESEARCH` 내부에서 이미 수행되어 별도 AWS Batch 포팅 대상에서 제외되었다. `block_watch_*` / `block_exception_buy_*` 4종은 heavy 분류로서 운영자 수동 보조 도구로만 분류된다. 1순위 / 2순위 / 비권고 표 자체의 권고는 변경하지 않는다. 자세한 결과는 [`../09-strategy-research-batch/operation-notes.md`](../09-strategy-research-batch/operation-notes.md) 2026-06-15 3개 섹션 참조.
+> [2026-06-15 보강] 본 일자에 운영자가 직접 수행한 (a) AWS Batch Compute Environment / Job Queue / Job Definition revision 1 / 3 + CloudWatch Log Group + Secrets Manager + IAM Execution / Job Role 신규 생성, (b) py_compil See Evidence Details [4.8 · #17](#evidence-4.8-17).
 
 | AWS Service Option | 가능 여부 | 비용 | 운영 난이도 | 장점 | 단점 | 장애 / 보안 리스크 | 어필도 | 최종 판단 |
 |--------------------|-----------|------|-------------|------|------|-------------------|--------|-----------|
@@ -256,7 +293,11 @@ backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리�
 | [Lambda](./aws-resource-glossary.md#lambda) | No | n/a | n/a | 장시간 / 큰 메모리 부적합 | 15분 timeout | n/a | Low | 비권고 |
 | EKS | Conditional | High | High | k8s job 표준화 | 1인 운영 과함 | etcd / addon | High | 비권고 (appendix 7장) |
 
-## 5. MS별 최종 권고안 (운영 안정성 / 비용 / 워크로드 적합성 기준)
+## MS Decision Cards
+
+MS별 1순위 서비스 결정과 채택 근거를 카드 형식으로 정리한다. 8개 MS 고정 순서를 유지한다. 원본 chapter 5 "MS별 최종 권고안" 내용을 본 섹션으로 통합한다.
+
+### MS별 최종 권고안 (운영 안정성 · 비용 · 워크로드 적합성 기준)
 
 | MS | 1순위 | 2순위 | 비권고 | 핵심 사유 |
 |----|-------|-------|--------|----------|
@@ -265,9 +306,9 @@ backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리�
 | port-interest-crawler | ECS Fargate Task (NAT-free public) | ECS on EC2 (Selenium 안정성 미달 시) | Lambda / Beanstalk / App Runner | Selenium/Chrome + KRX 로그인 + cron. Fargate Task가 워크로드와 가장 정합. Lambda는 Selenium / 15분 timeout 부적합 |
 | port-interest-preprocessor | ECS Fargate Task | Lambda(짧은 step만) / AWS Batch(backfill) | EC2 / EKS / Beanstalk / App Runner | long upsert + idempotent. Fargate Task가 가장 단순 |
 | port_strategy_common | 별도 컴퓨트 없음 (git submodule packaging) | wheel + CodeArtifact (성숙기) | ECS / EC2 / Lambda / EKS | 순수 라이브러리. 컴퓨트 대상 아님 |
-| port_strategy_decision | ECS Fargate Task + EventBridge Scheduler (+ Step Functions in 04) | AWS Batch (다수 day 재처리) | Lambda / EC2 / EKS / Beanstalk / App Runner | daily idempotent batch. cron + 컨테이너로 충분. [2026-06-13 보강] OD-MS-013(Strategy Decision Task Definition 분리 정책 = buy-signal / position-signal 별도 Task Definition 2개 분리) 1차 실증 통과. [2026-06-16 보강] safe step 단건 ECS / Fargate 재실행 1차 실증 통과 — `portfolio-paper-strategy-decision-buy-signal:1` exitCode 0 + `decision.strategy_daily_signal` row 4건 `READY` + signal_date `2026-06-16` + data_date `2026-06-15` + rank `1 ~ 4` / `portfolio-paper-strategy-decision-position-signal:1` exitCode 0 + positions 0 정상 skip + `decision.strategy_daily_position_decision` 신규 row 미생성(보유 포지션 0건 정상 케이스 / max_decision_date `2026-05-29` 유지). 04 spec operation-notes 2026-06-16 §1 ~ §7 정합. ECS Fargate Task + EventBridge Scheduler 1순위 변경 없음 |
+| port_strategy_decision | ECS Fargate Task + EventBridge Scheduler (+ Step Functions in 04) | AWS Batch (다수 day 재처리) | Lambda / EC2 / EKS / Beanstalk / App Runner | daily idempotent batch. cron + 컨테이너로 충분. 04 spec 1차 실증 evidence: [Evidence Details](#evidence-details) 참조 |
 | port_strategy_execution | ECS Fargate Task + EventBridge Scheduler + Step Functions | ECS Fargate Service (intraday 상시) | Lambda / EC2 / EKS / Beanstalk / App Runner | live 자동 재시도 금지 정책을 step별로 인프라 레벨에서 강제하기 위해 Step Functions 1순위 |
-| port_strategy_research | AWS Batch + S3 (Step Functions 보조) | ECS Fargate Task | Lambda / EC2 / EKS / Beanstalk / App Runner | 장시간 backtest + report 산출. Batch가 vCPU/메모리 자유도 + 동시 실행 모두 우수. [2026-06-15 보강] AWS Batch Compute Environment `portfolio-paper-strategy-research-ce`(MANAGED / FARGATE / maxvCpus 4) + Job Queue `portfolio-paper-strategy-research-queue`(priority 10) + Job Definition revision 1 / 3 등록 후 BACKTEST_RESEARCH full + BACKTEST_REPORT 본 phase 단건 SubmitJob `SUCCEEDED` / exitCode 0 으로 1순위 1차 실증 통과(`run_id a39b0b0c-...` / `total_return 4.55930879` / `mdd -0.08941942` / `sharpe 2.65561307` / `trade_count 308`). report artifact 는 S3 prefix `strategy-research/reports/{YYYYMMDD}/{AWS_BATCH_JOB_ID}/`(OD-MS-019 정합) 한정 보존. AWS Batch 1순위 / ECS Fargate Task 2순위 / Lambda 비권고 권고 변경 없음. [2026-06-16 보강] safe subset 재실행 1차 실증 — `portfolio-paper-strategy-research:5` SubmitJob `SUCCEEDED` + exitCode 0 + 최신 run_id `439d78e7-41fd-4bb7-b455-18564ddff758` + backtest_end_date `2026-06-15` + total_return `4.66534417` + sharpe `2.68071466` + trade_count `310`. BACKTEST_REPORT 정식 Job Definition `portfolio-paper-strategy-report:3`(`python -m port_strategy_research.aws_batch_backtest_report_wrapper` module 호출 방식) SubmitJob `SUCCEEDED` + S3 prefix `strategy-research/reports/20260616/67522706-9b5f-4770-a312-ceb1987c4655/` 안 4개 객체 존재 확인(private 유지 / public read 0건). rev1 / rev2 wrapper command 경로 불일치 사례는 closed 성격의 교정 이력으로만 기록(R-AUTO-015 detection 보강 정합). 09 spec operation-notes 2026-06-16 §1 ~ §8 정합. AWS Batch 1순위 / ECS Fargate Task 2순위 / Lambda 비권고 권고 변경 없음 |
+| port_strategy_research | AWS Batch + S3 (Step Functions 보조) | ECS Fargate Task | Lambda / EC2 / EKS / Beanstalk / App Runner | 장시간 backtest + report 산출. Batch가 vCPU/메모리 자유도 + 동시 실행 모두 우수. 09 spec 1차 실증 evidence: [Evidence Details](#evidence-details) 참조 |
 
 권고가 ECS Fargate에 집중되는 사유는 다음과 같다.
 
@@ -277,7 +318,9 @@ backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리�
 
 
 
-## 6. 포트폴리오 어필 관점의 보강안
+## Portfolio Appeal Notes
+
+원본 chapter 6 "포트폴리오 어필 관점의 보강안" 내용을 본 섹션으로 rename 한다.
 
 5장 권고를 그대로 두면 ECS 중심으로 보일 수 있다. 운영 안정성을 해치지 않는 한도에서 다음과 같이 AWS 서비스 다양성을 자연스럽게 더한다. 모든 항목은 본 spec 또는 후속 spec(03~10) 안에서 합리적인 위치를 갖는다.
 
@@ -291,7 +334,7 @@ backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리�
 | infra alarm | CloudWatch Alarm | + SNS + Lambda + Slack webhook fan-out | 05 / 10 | 무료 한도 안 | 낮음 |
 | research artifact | AWS Batch | + S3 (report 보관) + S3 lifecycle | 09 | S3 storage ~$0.025/GB-월 | 낮음 |
 
-> [2026-06-15 보강] research artifact 행은 본 일자에 1차 실증되었다. 기존 S3 bucket `portfolio-paper-migration-yukiever` 재사용 / Job Role 의 `s3:PutObject` Resource 는 `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` 한정 / public read 0건 / wildcard 0건. report wrapper 의 `REPORT_S3_BUCKET` 미설정 시 업로드 skip / 설정 시 `REPORT_S3_PREFIX=strategy-research/reports` 기본값 + `AWS_BATCH_JOB_ID` 기준 하위 경로 분리 / `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` 기본값 유지(Fargate ephemeral 영역 정합). S3 lifecycle 정책은 본 일자 미설정 — 후속 분리(R-COST-003 / 06 후속 phase 책임). KMS encryption 도 후속 spec 결정. 본 매트릭스의 권고(AWS Batch 1순위 + S3 보관 + S3 lifecycle 후속) 자체는 변경하지 않는다.
+> [2026-06-15 보강] research artifact 행은 본 일자에 1차 실증되었다 See Evidence Details [6.1 · #18](#evidence-6.1-18).
 | secrets | Secrets Manager | + SSM Parameter Store SecureString(저민감) | 06 | secret 개당 $0.40/월 | 06에서 결정 |
 | container registry | (자동 사용) | ECR + lifecycle policy + image scanning | 07 | storage ~$0.10/GB-월 | 낮음 |
 | optional future | (없음) | EKS optional track / CodePipeline appendix | 7장 + 별도 spec | 추가 시 큼 | 본 spec 범위 밖 |
@@ -312,7 +355,11 @@ backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리�
 - 비용 영향이 있는 항목(ALB, NAT GW, EFS, EKS)은 본 spec의 NAT-free / aws-paper 절감 결정에 정합되도록 옵션으로만 두고, 운영자가 명시적으로 켜는 task가 있어야 한다.
 - 포트폴리오 어필이 운영 사고로 이어지면 안 된다. 특히 live 자동 재시도 금지 정책은 어필을 위해 절대 풀지 않는다.
 
-## 7. EKS 검토 섹션 (현재 비권고, 후속 optional track)
+## Rejected/Deferred Services
+
+Lambda · EKS · Elastic Beanstalk · App Runner · ECS on EC2 비권고/보류 사유를 본 섹션에 통합한다. 각 서비스는 H3 로 정리하며, 원본 chapter 7 · 8 · 9 를 여기로 이관한다. 서비스 선택 결론은 본 회차에서 변경하지 않는다.
+
+### EKS (현재 비권고, 후속 optional track)
 
 ### 7.1 왜 이 프로젝트에 EKS는 과한가
 
@@ -359,7 +406,7 @@ backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리�
 
 권고: 본 spec 시리즈 1차 cutover 동안에는 EKS를 도입하지 않는다. 시리즈 완료 후 별도 optional spec으로 검토.
 
-## 8. Lambda 검토 섹션 (핵심 batch에는 제한적, 보조에는 적합)
+### Lambda (핵심 batch 비권고, 보조 적합)
 
 ### 8.1 핵심 batch에 제한적인 사유
 
@@ -385,7 +432,7 @@ backtest 실행 / analysis / 텍스트 report 생성. 비정기. 한 번 돌리�
 
 권고: Lambda는 본 spec에서 인프라 알람 fan-out과 짧은 보조 용도로만 사용한다. 핵심 batch는 ECS Fargate Task / AWS Batch를 사용한다.
 
-## 9. Elastic Beanstalk / App Runner 검토 섹션 (port-view 기준)
+### Elastic Beanstalk / App Runner (port-view 기준 비권고)
 
 ### 9.1 비교표
 
@@ -411,7 +458,13 @@ port-view는 Spring Boot 운영 콘솔 + Daily Batch orchestration 호출 주체
 
 권고: port-view는 ECS Fargate Service 1순위 유지. Elastic Beanstalk은 본 문서 안에 비교 결과로만 기록(어필 보강). App Runner는 비권고.
 
-## 10. 최종 결론
+## Appendix
+
+원본 chapter 1 · 2 · 3 · 4 · 10 및 Evidence Details 는 본 Appendix 하위 참고 자료로 유지된다. 매일 조회 대상은 상단 `Final Recommendation Summary` · `MS Decision Cards` · `Rejected/Deferred Services` · `Portfolio Appeal Notes` 이며, 상세 배경 · 평가 기준 · AWS 서비스 후보 소개 · 8개 MS 후보 비교표 원본은 본 섹션의 하위 anchor 에서 참조한다.
+
+원본 chapter 1 ~ 4 는 문서 상단(Final Recommendation Summary 뒤) 위치에 그대로 남아 있고, Appendix 는 chapter 10 최종 결론 · Evidence Details 를 논리적으로 감싸는 역할을 한다.
+
+### 최종 결론
 
 ### 10.1 운영 안정성 / 비용 우선 결론 (1차 cutover 권고)
 
@@ -456,3 +509,592 @@ port-view는 Spring Boot 운영 콘솔 + Daily Batch orchestration 호출 주체
 - 실제 secret 출력 금지(모두 `[REDACTED]`).
 - 정확 가격은 AWS Pricing Calculator 확인 필요. 본 문서 단가는 모두 근사치.
 - 06-secrets-and-iam은 본 작업 시점에 작성하지 않는다.
+
+
+### Evidence Details
+
+본 섹션은 §4 각 MS 후보 비교의 아래에 있던 긴 blockquote evidence 메모의 원본 내용을 차수별로 보관한다. §4 의 아래에는 compact one-line pointer 만 남기고 상세는 여기에서 확인한다.
+
+### Evidence Details 4.1 · #1 <a id="evidence-4.1-1"></a>
+
+**2026-06-30 (오후) 장중 손절 Slack 실제 이벤트 연동 1차 실증 메모(OD-MS-001 / OD-MS-016 / OD-MS-035 / OD-MS-036 본문 변경 없이 evidence 보강 / R-AUTO-035 [2026-06-30 오후 추가 보강] / R-AUTO-036 신규)** — 본 표의 1순위(EC2+EIP) 결정값은 변경하지 않는다. port-marketconnector 의 운영 안정성 1순위는 **EC2+EIP** 그대로 유지.
+
+**MarketConnector EC2 runner 책임 확장 1차 실증** — 장중 손절 Slack 실 연동에서 MarketConnector EC2 4단계 수행:
+
+- (a) 장중 snapshot refresh
+- (b) position evaluate
+- (c) `INTRADAY_STOP_SELL` `READY` 생성 (broker 미제출)
+- (d) Notifier Lambda `portfolio-event-notifier` invoke
+
+broker 주문 제출은 본 EC2 / entrypoint 에서 여전히 불가능. 실제 broker 주문은 `portfolio-paper-intraday-stop-sell-approval` Step Functions approval gate 통과 후에만 가능 (OD-MS-035 / OD-MS-036 / OD-MS-016 책임 분리 정합).
+
+**MarketConnector EC2 → Lambda invoke 권한 분리 1차 실증** — EC2 Instance Role `portfolio-paper-marketconnector-ec2-role` 에 inline policy `portfolio-paper-marketconnector-event-notifier-invoke`(`lambda:InvokeFunction` / Resource `portfolio-event-notifier` 한정 / Resource · Action wildcard 0건) 부여 / EC2 측에서 Notifier Lambda invoke smoke 통과(OD-SEC-005 / OD-SEC-006 정합 / 06 spec 후속 phase 책임).
+
+**evaluate 교체 배포** — `/home/ec2-user/apps/port-marketconnector/src/connector_intraday_position_evaluate.py` 교체 배포(버전 `connector-intraday-position-evaluate-1.1.1-slack-notify` / SHA256 `5ec6914853ab34e200682f256de53693f972b3e5d337a5bd8ab8ebf5296230ed` / 신규 CLI option `--notify-slack` · `--slack-function-name` · `--slack-region`) / `.venv/bin/python` 기준 `py_compile` + `--help` 검증 통과.
+
+**장중 runner 갱신** — `/home/ec2-user/apps/port-marketconnector/scripts/run_intraday_snapshot_and_evaluate.sh`(SHA256 `8fe7657a75b5d7637ec645b6d8a55bf75c993d46c1c71e8a5e88bded29baa8a0` / backup `run_intraday_snapshot_and_evaluate.sh.bak.20260630T112255Z.create-order-notify-slack`) 가 기존 evaluate 호출에 `--create-order` + `--notify-slack` 추가.
+
+**실제 runner 1회 안전 검증**:
+
+- SSM commandId `5b19d5da-5e2e-4b35-821b-c3cf2b36d131`
+- snapshot refresh 성공 / evaluate 실행 성공
+- source_version `connector-intraday-position-evaluate-1.1.1-slack-notify`
+- `create_order=True` / `notify_slack=True` / `open_position_count=0`
+- 상태: `EMPTY_NORMAL` / `INTRADAY_SNAPSHOT_AND_EVALUATE=SUCCESS` / runner exit code 0
+- OPEN position 0건 상태라 check / order / slack 없이 정상 종료
+
+**DB after-check**:
+
+- marker `STEP19C_INTRADAY_STOP_FINAL_DB_AFTER_CHECK=SUCCESS`
+- 5종 count 모두 0 (`TODAY_INTRADAY_CHECKS` · `TODAY_INTRADAY_STOP_EXECUTION_ORDERS` · `ACTIVE_INTRADAY_STOP_EXECUTION_ORDERS` · `TODAY_INTRADAY_STOP_CONNECTOR_ORDERS` · `TODAY_INTRADAY_STOP_CONNECTOR_ORDER_ROWS`)
+- 최신 `connector_balance_snapshot id=281` / `as_of_date=2026-06-30` / `total_eval_amount=8,706,505` / `cash_balance=8,706,505`
+- `source_version=connector-intraday-snapshot-refresh-1.0.0` / PSQL exit code 0
+- 컬럼명은 `information_schema.columns` 사전 확인 후 작성 (추정 컬럼명 사용 0건 / AGENTS.md 규칙 2 · 4 정합)
+
+**본 표의 결정 영향 없음** — port-marketconnector 컴퓨트 1순위(EC2+EIP) / EIP 운영 / SSM Session Manager / broker IP 등록 정책 / `access_token.txt` 보관 정책(03 spec) 모두 변경 없음.
+
+본 일자 추가 작업분은 MarketConnector EC2 의 **장중 책임 확장** 측 evidence 만 보강 / 본 Lambda 호출은 운영 이벤트 알림 보조 계층(`portfolio-event-notifier` / OD-MS-030 정합) 사용 / Lambda 는 본 표의 주 compute 1순위가 아니며 보조 역할 유지.
+
+본 메모 관련 링크:
+
+- [operator-decisions.md](./operator-decisions.md) Change Log `2026-06-30 (오후) 장중 손절 Slack` 항목
+- [risk-register.md](./risk-register.md) R-AUTO-035 [2026-06-30 오후 추가 보강] + R-AUTO-036 신규
+- [followups-overview.md](./followups-overview.md) 2026-06-30 (오후) 장중 손절 Slack 후속 메모
+- [03 operation-notes](../03-marketconnector-ec2/operation-notes.md) 본 일자 추가 append
+- [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md) approval gate cross-reference
+- [06 operation-notes](../06-secrets-and-iam/operation-notes.md) MarketConnector EC2 role + inline policy 분리 검증
+
+Lambda 코드 본문 / `connector_intraday_position_evaluate.py` 본문 / runner ps1 본문 / Step Functions ASL 본문 / Slack 메시지 본문 / SSM 응답 본문 / CloudWatch Logs 전문 / IAM Policy 전체 본문 평문 인용 0건(R-DOCS-001 정합).
+
+
+### Evidence Details 4.2 · #2 <a id="evidence-4.2-2"></a>
+
+**2026-06-29 (2) port-view aws-stepfunctions Daily Batch trigger 구현 + 로컬 Step 1~11 StartExecution 검증 통과 메모(OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 보강 / R-AUTO-033 [2026-06-29 보강 (2)] / R-AUTO-034 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+port-view 의 운영 안정성 1순위는 **ECS Fargate Service** 그대로 유지 / Elastic Beanstalk 2순위 (참고) / App Runner · EC2 · ECS on EC2 · EKS · Lambda 비권고 판단 유지.
+
+본 일자 보강 사실:
+
+(a) port-view 가 Daily Batch 실행 backend 를 `local-file` / `aws-stepfunctions` 로 분리한 첫 구현 통과:
+
+- commit `e72de6f` / `feat(view): add Step Functions daily batch trigger`
+- 변경 파일 6종: `pom.xml` · `DailyBatchProperties.java` · `DailyBatchController.java` · `StepFunctionsDailyBatchExecutionService.java` · `application-aws-paper.properties` · `daily_batch.html`
+- 본 메모 평문 인용 0건 / R-DOCS-001 정합
+
+(b) `aws-stepfunctions` mode 에서는 View 가 subprocess · 로컬 source 실행 없이 AWS SDK v2 Step Functions client 로 `StartExecution` 만 수행:
+
+- Batch 실행 책임이 View 내부 subprocess 에서 Step Functions 로 이관됨(OD-MS-009 정합)
+- 기존 6계층 조합(Step Functions + EventBridge Scheduler + Dispatcher Lambda + EC2 lifecycle Lambda + ECS RunTask + SSM RunCommand + AWS Batch) 에 View 운영자 수동 trigger 경로 추가 → 7계층 조합
+- 자동 trigger 는 기존 EventBridge Scheduler 한정
+
+(c) **로컬 1차 실증 통과** — `aws-paper` profile + `aws-stepfunctions` backend → `/daily-batch` 화면 AWS Step 1~11 safe trigger → `StartExecution` 성공 → Step 1~11 workflow → `StopCrawlerEc2AfterStep11Success`(runDate 누락 보완 후 통과) → `SendApprovalRequiredSlack` → Slack `APPROVAL_REQUIRED` 수신 end-to-end / Step 12~17 차단 유지 / broker 주문 제출 0건 / 신규 `connector_order_request` 0건.
+
+(d) **runDate 보완** — Asia/Seoul 기준 yyyy-MM-dd `runDate` 를 View `StartExecution` input 에 포함하도록 보완(ASL 의 `runDate.$=$.runDate` 참조 정합 / 04 spec 후속 갱신 책임).
+
+(e) `local-file` backend 는 로컬 운영자 검증 도구로 유지(OD-MS-037 정합) / **Fargate 에서는 `portfolio.batch.local-file-execution-enabled=false` 기본값** / Step 12 이상 주문성 구간은 별도 approval / preflight / paper-order gate 뒤에서만 허용 — View 내부 subprocess 실행 없이 Step Functions `StartExecution` 만 사용하는 정책이 Fargate 운영 안정성 / 컨테이너 표준 / IAM 권한 최소화 관점에서 정합.
+
+(f) **신규 R-AUTO-034 분리** — Fargate Task Role `states:StartExecution` 권한 과다 부여 + Step 12 gate 우회 위험 / Status `Open` / Task Role 특정 state machine ARN 한정 + Fargate 안전 기본값(`paper-order-enabled=false` · `full-pipeline-execution-enabled=false` · `max-executable-step-order=11`) + 서비스 레벨 안전 gate + executionArn redaction + Step 12~17 승인형 / preflight / paper-order gate 분리 mitigation.
+
+본 메모 관련 링크:
+
+- [operator-decisions.md](./operator-decisions.md) Change Log 2026-06-29 (2) 항목
+- [risk-register.md](./risk-register.md) R-AUTO-033 [2026-06-29 보강 (2)] + R-AUTO-034 신규
+- [followups-overview.md](./followups-overview.md) 2026-06-29 (2) 후속 메모
+- [05 operation-notes](../05-port-view-ecs-and-runbook/operation-notes.md) 6 · 7 섹션
+- [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-29 외부 caller 검증
+- [06 operation-notes](../06-secrets-and-iam/operation-notes.md) 2026-06-29 Task Role · env 주입 후속
+
+다음 단계 — Dockerfile 작성 / ECR repository · image push / ECS Task Definition 등록 / ECS Service 조회-only smoke test / Fargate Step 1~11 `StartExecution` 검증 / Step 12~17 승인형 trigger / preflight / paper-order gate 후속 구현 / Fargate Task Role `states:StartExecution` 최소 권한(특정 state machine ARN 한정) 부여 / 10 spec `cutover-and-validation-runbook` 폴더 신규 생성 후속.
+
+
+### Evidence Details 4.2 · #3 <a id="evidence-4.2-3"></a>
+
+**2026-06-29 (3) port-view Step 12~17 승인형 검증 완료 + Approval state machine ARN 분리 + Local View wrapper 정리 메모(OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 보강 / R-AUTO-033 [2026-06-29 보강 (3)] / R-AUTO-034 [2026-06-29 보강])** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+port-view 의 운영 안정성 1순위는 **ECS Fargate Service** 그대로 유지.
+
+**Step 12~17 approval workflow ARN 분리**:
+
+- Local View 측에서 Step Functions `StartExecution` 호출 대상이 일반 workflow ARN(`portfolio-paper-daily-step1-17-approval`) 과 approval workflow ARN(`portfolio-paper-daily-step12-17-approval`) 으로 분리
+- `application.properties` 에 `portfolio.batch.aws-stepfunctions-approval-state-machine-arn` 키 + 환경변수 `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_APPROVAL_STATE_MACHINE_ARN` 추가
+- `StepFunctionsDailyBatchExecutionService` 의 `startSafeRange` 는 일반 ARN · `startApprovalRange` 는 approval 전용 ARN 사용
+- approval ARN 비어 있으면 승인형 실행 서비스 레벨 차단
+
+**payload 타입 정합** — `Step12_CheckApproval` Choice `BooleanEquals` 조건과 맞도록 외부 caller payload 의 `allowPaperOrderExecute` · `paperOrderEnabled` 는 boolean JSON / `fromStepOrder` · `toStepOrder` · `startStep` · `endStep` 는 numeric JSON 으로 전달 / Fargate Task Definition `environment` 블록 작성 시점에도 동일 정책.
+
+**Local View wrapper 2종 정리** — Local-file 구동 wrapper(`Start-PortfolioViewAwsPaperLocalFile.ps1` + env loader) 와 AWS Step Functions 구동 wrapper(`Start-PortfolioViewAwsPaperStepFunctions.ps1` + env loader) 분리 / 두 wrapper 모두 `aws-paper` profile + Step 1~17 전체 실행 가능 gate / safe-only gate 잔존 문제 해소.
+
+**검증 식별자** — executionName `port-view-step12-17-step12-17-20260629-194314-ba5edaf8` / status `SUCCEEDED` / 운영 marker `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS` / DB 신규 broker 주문 0건.
+
+**Fargate Task Role 후속 (06 spec 책임)** — Task Role 의 `states:StartExecution` Resource 패턴은 일반 ARN + approval ARN 2종 모두 한정 부여 / Resource · Action wildcard 0건 유지.
+
+본 메모 관련 링크:
+
+- [operator-decisions.md](./operator-decisions.md) Change Log 2026-06-29 (3) 항목
+- [risk-register.md](./risk-register.md) R-AUTO-033 [2026-06-29 보강 (3)] + R-AUTO-034 [2026-06-29 보강]
+- [followups-overview.md](./followups-overview.md) 2026-06-29 (3) 후속 메모
+- [05 operation-notes](../05-port-view-ecs-and-runbook/operation-notes.md) 4) Step 12~17 승인형 검증 완료 + 5) wrapper 정리 완료
+- [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-29 (3) approval phase 외부 caller 검증
+
+
+### Evidence Details 4.2 · #4 <a id="evidence-4.2-4"></a>
+
+**2026-06-30 (오후) port-view ECS Fargate Public IP 1차 포팅 완료 + ECS View → AWS Step Functions Step 12~17 승인 실행 1차 실증 + desiredCount 0 수동 운영 메모(OD-MS-002 / OD-MS-009 / OD-MS-037 본문 변경 없이 1차 실증 보강 / R-AUTO-033 [2026-06-30 오후 보강] / R-AUTO-034 [2026-06-30 오후 보강])** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+port-view 의 운영 안정성 1순위는 **ECS Fargate Service** 그대로 유지 / Elastic Beanstalk 2순위 (참고) / App Runner · EC2 · ECS on EC2 · EKS · Lambda 비권고 판단 유지.
+
+**1차 포팅 방식 1차 실증 완료**:
+
+- ALB 미사용 + public subnet + `assignPublicIp=ENABLED` + 운영자 IP/32 SG inbound TCP 8080 + CloudWatch Logs retention 7일
+- ECR repository `portfolio-view` + image push
+- ECS task definition `portfolio-view:1` → `portfolio-view:2` (env 보정 = `PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO` + `PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO`)
+- ECS service `portfolio-view-service` RUNNING / FARGATE / awsvpc / cpu 512 / memory 1024 / container port 8080
+- Spring profile `aws-paper` / Tomcat 8080 / RDS PostgreSQL + HikariPool + default schema `ops`
+- Dashboard · Balance · Positions · Orders · Reports · Daily 6종 화면 조회 통과
+
+**ECS View → Step Functions Step 12~17 승인 실행 1차 실증**:
+
+- executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8`
+- state machine `portfolio-paper-daily-step12-17-approval` / status `SUCCEEDED`
+- start `2026-06-30T14:15:42.899+09:00` / stop `2026-06-30T14:18:48.358+09:00`
+- Slack `DAILY_EXECUTION_SUCCESS` 수신 / NO_TARGET 안전 종료
+- DB after-check 통과 — `connector_balance_snapshot id=281` / `as_of_date=2026-06-30` / `total_eval_amount=8,706,505` / `cash_balance=8,706,505`
+
+**desiredCount 0/1 수동 운영 메모** — ECS service desiredCount 는 운영 시점에만 1, 검증 후 비용 절감을 위해 0 으로 종료 / 검증 후 본 일자 desiredCount 0 종료 완료 / 다음 기동 시 새 public IP 발급 전제 / Security Group inbound 운영자 IP/32 유지 / Fargate 시간 단가 + public IPv4 비용 누적 차단.
+
+**보류 항목 유지** — ALB / HTTPS / Route53 / Cloudflare Tunnel / 인증 · 인가 고도화 / Slack 문구 개선 / property 구조 재정리 / application-ecs.yml 신규 분리 / ECS Auto Scaling / Blue/Green / multi-AZ 1차 포팅 이후 보류 / 외부 노출 정식화 시점 별도 phase 진입(05 · 06 · 07 · 10 spec 후속 phase 책임).
+
+**Fargate Task Role 후속 (06 spec 책임)**:
+
+- Task Role(`portfolio-paper-view-task-role`) 의 `states:StartExecution` Resource 패턴은 일반 ARN + approval ARN 2종 모두 한정 부여
+- Action / Resource wildcard 0건 / Task Role 과 Task Execution Role(`portfolio-paper-ecs-task-execution-role`) 분리
+- 본 일자 ECS View → Step 12~17 approval 1차 실증 통과는 R-AUTO-034 mitigation (a) ~ (g) 1차 실증 evidence 로 사용
+- Status `Open` 유지 — 외부 노출 정식화 + audit 통과 시점에 `Mitigated` 승격 후보
+
+**신규 후속 위험 메모** — Public IP 직접 접근 시 SG inbound 오픈 실수 위험(운영자 IP/32 한정 정책 정합) / desiredCount 1 유지 비용 위험(검증 후 0 종료 정책 정합) / task 재시작 후 public IP 변경 위험(매 기동 시 재조회 정책) / 과거 stale `connector_order_request` 6건 식별(2026-04-27 ACCEPTED 잔여 / preflight count 오염 후보 / 후속 cleanup 결정).
+
+본 메모 관련 링크:
+
+- [operator-decisions.md](./operator-decisions.md) Change Log 2026-06-30 (오후) 항목
+- [risk-register.md](./risk-register.md) R-AUTO-033/034 [2026-06-30 오후 보강]
+- [followups-overview.md](./followups-overview.md) 2026-06-30 (오후) 후속 메모
+- [05 operation-notes](../05-port-view-ecs-and-runbook/operation-notes.md) "3. ECS Fargate 포팅: 완료" block
+- [05 runbook](../05-port-view-ecs-and-runbook/runbook.md) 및 [05 validation-checklist](../05-port-view-ecs-and-runbook/validation-checklist.md)
+- [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-30 (오후) cross-reference
+- [06 operation-notes](../06-secrets-and-iam/operation-notes.md) 2026-06-30 (오후) Task Role · Execution Role 분리 검증
+
+본 메모 평문 인용 / 실제 ARN · account-id · public IP · image digest full sha256 · task ARN · ENI ID · Slack 메시지 본문 · CloudWatch Logs 전문 · Step Functions execution history 본문 · task definition JSON 전체 본문 평문 인용 0건(R-DOCS-001 정합).
+
+
+### Evidence Details 4.2 · #5 <a id="evidence-4.2-5"></a>
+
+**2026-07-01 paper Daily 자동화 1차 풀 ON + Step 12~17 Scheduler ENABLED evidence 보강 메모(OD-SAFE-001 / OD-SAFE-002 / OD-SAFE-003 / OD-MS-009 / OD-MS-032 / OD-MS-033 본문 변경 없이 evidence 보강 / R-AUTO-001 [2026-07-01 보강] / R-AUTO-025 [2026-07-01 자동 ENABLE 진입] / R-AUTO-037 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+port-view 의 운영 안정성 1순위는 **ECS Fargate Service** 그대로 유지 / `port_strategy_execution` 컴퓨트 1순위는 **ECS Fargate Task + EventBridge Scheduler + Step Functions**(OD-MS-007 / OD-MS-017 / OD-MS-009 정합) 그대로 유지.
+
+**paper Step 1~11 Scheduler + Step 12~17 Scheduler 모두 ENABLED**:
+
+- `portfolio-paper-daily-step1-11-approval-0800-kst` (08:00 KST / Step 1~11 approval)
+- `portfolio-paper-daily-step12-17-order-0901-kst` (09:01 KST / Step 12~17 approval / **2026-07-01 DISABLED → ENABLED 전환 완료**)
+- cron `cron(1 9 ? * MON-FRI *)` / Asia/Seoul / FlexibleTimeWindow OFF
+- Target Lambda `portfolio-paper-daily-scheduler-dispatcher` / Target Input `{"scheduleType":"STEP12_17_ORDER","dryRun":false}`
+
+**Step 12~17 수동 실행 검증 SUCCEEDED**:
+
+- executionName `port-manual-daily-step12-17-20260701-043747`
+- state machine `portfolio-paper-daily-step12-17-approval` / status `SUCCEEDED`
+- start `2026-07-01T13:37:47.856+09:00` / stop `2026-07-01T13:40:41.212+09:00`
+- Slack 3종 수신 (07:50 장전 · 08:24 승인 필요 · Step 12~17 성공) / NO_TARGET 안전 종료
+- DB after-check 통과: 최신 `connector_balance_snapshot id=321` · `as_of_date=2026-07-01` · `strategy_execution_order` 0건 · active `connector_order_request` 0건
+
+**Scheduler 기반 자동 실행 라인업 확인 완료** — Daily 본 실행 Scheduler 2개 + EC2 lifecycle Scheduler 2개(07:50 start / 15:50 stop / OD-MS-034 정합) + Daily Brief Slack Scheduler 2개(07:50 장전 / 15:50 장후 / OD-MS-038 정합) + 10분 장중 손절 Scheduler 1개(09:10~15:50 / OD-MS-035 정합) 총 7종 모두 ENABLED.
+
+**서비스 선택 자체 변경 없음** — 본 결정은 OD-MS-007(Strategy Execution ECS Fargate + Step Functions + EventBridge Scheduler) / OD-MS-009(Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) 결정값과 정합 / 컴퓨트 · orchestration · Scheduler 조합 변경 0건 / 본 일자 추가 사실은 09:01 Scheduler `State=ENABLED` 전환 + 수동 실행 통과 evidence 로만 반영.
+
+**본 변경은 aws-paper 에 한정된다. aws-live 자동 BUY / SELL 정책은 변경하지 않으며, live 는 후보 + 수동 승인 우선 정책을 유지한다.**(OD-SAFE-002 / OD-SAFE-003 정합).
+
+본 메모 관련 링크:
+
+- [operator-decisions.md](./operator-decisions.md) Change Log 2026-07-01 항목
+- [risk-register.md](./risk-register.md) R-AUTO-001 · R-AUTO-025 [2026-07-01 보강] + R-AUTO-037 신규
+- [followups-overview.md](./followups-overview.md) 2026-07-01 후속 메모
+- [cost-simulation.md](./cost-simulation.md) 2026-07-01 비용 메모
+- [aws-resource-glossary.md](./aws-resource-glossary.md) EventBridge Scheduler 항목 2026-07-01 운영 예시
+- [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-07-01 섹션
+- [05 operation-notes](../05-port-view-ecs-and-runbook/operation-notes.md) 2026-07-01 보강
+- [05 runbook](../05-port-view-ecs-and-runbook/runbook.md) Step 12~17 Scheduler enable/disable 절차
+- [05 validation-checklist](../05-port-view-ecs-and-runbook/validation-checklist.md) 2026-07-01 결과
+- [06 operation-notes](../06-secrets-and-iam/operation-notes.md) 2026-07-01 보강
+
+Lambda 코드 본문 / Step Functions ASL 본문 / Scheduler target JSON 본문 / Slack 메시지 본문 / CloudWatch Logs 전문 / IAM Policy 전체 본문 / DB after-check raw output 전문 평문 인용 0건(R-DOCS-001 정합 / 운영 식별자 = Scheduler 이름 · cron · Asia/Seoul · Target Input · Dispatcher Lambda 이름 · state machine 이름 · executionName · status · start · stop timestamp · Slack 이벤트 라벨 · balance snapshot id · as_of_date · 금액 · count · 라인업 7종 이름 만 사실 기록 — secret 아님).
+
+Decision Summary 카운트 변경 없음(전체 97 / 확정 52 / 잠정 42 유지).
+
+
+### Evidence Details 4.2 · #6 <a id="evidence-4.2-6"></a>
+
+**2026-06-30 (오후) Slack 문구 개선 최종 완료 메모(OD-MS-002 / OD-MS-009 / OD-MS-030 / OD-MS-031 / OD-MS-037 본문 변경 없이 1차 실증 보강 / OD-MS-038 신규 / R-AUTO-035 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. port-view 의 운영 안정성 1순위는 **ECS Fargate Service** 그대로 유지.
+
+Daily Batch orchestration 자체는 **Step Functions + EventBridge Scheduler + ECS RunTask**(OD-MS-009) 결정 그대로 유지.
+
+**Daily Brief Slack 알림은 별도 mini Step Functions 로 분리** 운영(OD-MS-038 신규 / 🟢 확정 / 영향 spec 04 · 05 · 10):
+
+- mini state machine `portfolio-daily-brief-slack-notification` (ACTIVE / 구조 `BuildDailyBriefPayload → SendSlackNotifier`)
+- Builder Lambda `portfolio-daily-brief-slack-summary-builder` (Python 3.12 + `pg8000` + Secrets Manager `valueFrom`)
+- Notifier Lambda `portfolio-event-notifier` (`MORNING_BRIEF → PRE_MARKET_STATUS` / `EVENING_BRIEF → POST_MARKET_STATUS` alias + nested adapter + 음수/양수/0 prefix)
+- IAM Role 2종 (`portfolio-daily-brief-sfn-role` / `portfolio-daily-brief-scheduler-role`)
+- Scheduler 2개 ENABLED (장전 `portfolio-daily-brief-morning-slack-0750-kst` / 장후 `portfolio-daily-brief-evening-slack-1550-kst` / Asia/Seoul / Flexible OFF)
+
+**Approval Required Slack 측은 별도 Builder `portfolio-approval-slack-summary-builder` + `portfolio-paper-daily-step1-17-approval` ASL 의 `BuildApprovalSlackPayload → SendApprovalRequiredSlack` 흐름 반영**(revisionId `da8642c6-8409-41b6-ad57-e066ff672332`) — Daily 본 실행 state machine 안 알림 builder 만 추가 / 본 실행 흐름의 ASL 큰 변경 없음.
+
+**공통 운영 알림 보조 계층**:
+
+- Slack notifier Lambda + Summary Builder Lambda 2종(Approval / Daily Brief)
+- mini Step Functions 1개(Daily Brief) + 알림 전용 IAM Role 2종 + 알림 전용 Scheduler 2개
+- 운영 책임 분리 대상 spec: port-view / 04 strategy-batch-stepfunctions / 05 port-view-ecs-and-runbook / 10 cutover-and-validation-runbook
+- port-view `SlackNotificationService` 는 제거되지 않고 유지(View Daily Batch 수동 실행 결과 알림 책임)
+
+**smoke 통과**:
+
+- Approval Required Builder output → Notifier Slack smoke 성공(`marketStatusCode=BLOCK` / 매수·매도 후보 없음 표시)
+- mini Step Functions morning smoke `daily-brief-morning-smoke-safe-20260630-193255-68f50aeb` `SUCCEEDED`
+- evening smoke `daily-brief-evening-smoke-safe-20260630-193300-aa2b9a12` `SUCCEEDED`
+- Slack 장전 · 장후 수신 확인(`🌅 [장 전] 6/30 (화)` / `🌅 [장 후] 6/30 (화)`)
+- 누적 수익률 `🔵 -12.94%` / 평가손익 `🔵 -1,293,495원` / 어제 대비 `⚪ 0원`
+
+**DB password 주입** — Builder Lambda 는 `DB_PASSWORD_SECRET_VALUE_FROM` 환경변수에 Secrets Manager `valueFrom` / Lambda 코드 안 `get_secret_value` runtime 조회.
+
+본 메모 관련 링크:
+
+- [operator-decisions.md](./operator-decisions.md) Change Log `2026-06-30 (오후) Slack` 항목 / OD-MS-038 신규
+- [risk-register.md](./risk-register.md) R-AUTO-035 신규
+- [aws-resource-glossary.md](./aws-resource-glossary.md) Lambda · Step Functions · EventBridge Scheduler · Secrets Manager 항목
+- [cost-simulation.md](./cost-simulation.md) Daily Brief 비용 메모
+- [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md) Approval Required Builder 연동
+- [05 operation-notes](../05-port-view-ecs-and-runbook/operation-notes.md) Daily Brief 독립 운영 cross-reference
+- [06 operation-notes](../06-secrets-and-iam/operation-notes.md) Builder Lambda Secrets Manager valueFrom
+
+Lambda 코드 본문 · Step Functions ASL · Scheduler target JSON · Slack 메시지 · Builder output · Notifier input · CloudWatch Logs · IAM Policy · Secrets Manager secret value 평문 인용 0건 (R-DOCS-001 정합).
+
+운영 식별자만 사실 기록 (secret 아님):
+
+- Lambda / state machine / IAM Role / Scheduler 이름
+- cron / Asia/Seoul / eventType 라벨
+- Lambda runtime / DB driver / DB password 주입 환경변수명 / Slack webhook 환경변수명
+- 손익 prefix · revisionId · smoke execution name
+
+Decision Summary 카운트 갱신(전체 96 → 97 / 확정 51 → 52 / 잠정 42 유지).
+
+
+### Evidence Details 4.3 · #7 <a id="evidence-4.3-7"></a>
+
+**2026-06-16 hybrid 구조 완료 메모(OD-MS-011 / OD-MS-022 정합)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+운영 분류만 정리: (a) **non-GUI crawler = ECS Fargate Task**(Naver / yfinance / KRX 비-GUI 경로 / Public Subnet + `assignPublicIp=ENABLED` / NAT-free) — `portfolio-paper-interest-crawler:7`(image `paper-20260616-nongui` / command `["python", "interest_crawler_daily_nongui.py"]` / log stream prefix `ecs-crawler-nongui-daily`) 1차 RunTask 통과(exitCode 0 / 약 9분 51초 / 8 step SUCCESS).
+
+(b) **KRX GUI crawler = Windows EC2 worker**(Selenium / Chrome / KRX OTP / Chrome download stateful) — Windows Autologon + Administrator console interactive session + Windows Scheduled Task `Portfolio-KRX-Worker-Daily` + SSM RunCommand → `schtasks /Run` trigger.
+
+KRX GUI 는 **headless / Lambda / ECS · Fargate 단독 / SSM direct Python · wrapper 실행 모두 부적합** — Lambda 는 Chrome / 15분 timeout / KRX 세션 stateful 로 비권고(본 표 그대로). ECS · Fargate 단독은 GUI / Display / Chrome download 폴더 미지원으로 KRX OTP 흐름과 호환 부담. SSM direct 실행은 SYSTEM Session 0 / 비대화형 GUI 한계로 KRX 로그인 단계 실패.
+
+Headless / 비대화형 KRX 수집은 nos_setup / 키보드보안 / iframe 제약으로 안정성 미달(로컬 검증상 운영 방식에서 제외). 따라서 KRX GUI 경로는 Windows EC2 worker(Sysinternals Autologon 기반 자동 로그인 + Scheduled Task + SSM trigger) 흐름을 운영 방식으로 확정. (c) Preprocessor MS = ECS Fargate Task 유지(4.4).
+
+자세한 결과는 [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-16 §1 ~ §5 참조.
+
+
+### Evidence Details 4.3 · #8 <a id="evidence-4.3-8"></a>
+
+**2026-06-21 Step 2 성공판정 강화 메모(OD-MS-026 정합 / R-AUTO-020 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+wrapper / Step Functions 후보 orchestration 은 ECS RunTask + SSM RunCommand 혼합으로 유지. Step 2(`INTEREST_CRAWLER`) 성공 기준 6종 모두 통과 필요:
+
+1. non-GUI ECS crawler exitCode 0
+2. Crawler Worker EC2 `running` (stopped 시 즉시 fail-closed / 자동 skip 폐지)
+3. Windows Scheduled Task `Running` → `Ready` 복귀 wait + `sawRunning` 로그
+4. Last Result 0 또는 0x0 (trigger 성공만으로 SUCCESS 처리 금지)
+5. latest worker log path · last write time · size · tail 출력
+6. KRX raw DB validation 통과 (`interest_krx_raw_validate_daily.py` SSM step / `interest_program_raw` · `interest_shortsell_raw` row_count + `max(trade_date)` / 실패 시 exit code 30)
+
+non-GUI ECS RunTask 는 worker 상태와 무관하게 진행하되 `containerOverrides.environment` 로 `TEMP=/tmp` · `TMP=/tmp` · `PYTHONUTF8=1` · `PYTHONIOENCODING=utf-8` 주입(Windows / Linux 인코딩 차이 완화 / 임시 파일 경로 의존성 명시화).
+
+본 메모는 [`./operator-decisions.md`](./operator-decisions.md) OD-MS-026 신규 / [`./risk-register.md`](./risk-register.md) R-AUTO-020 신규 + R-AUTO-007 / R-AUTO-016 / R-AUTO-017 보강 / [`./followups-overview.md`](./followups-overview.md) 2026-06-21 후속 메모 / [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-21 §1 ~ §8 참조.
+
+
+### Evidence Details 4.3 · #9 <a id="evidence-4.3-9"></a>
+
+**2026-06-22 Daily AWS Paper 1~17 두 번째 실 완주 메모(OD-MS-027 / OD-DB-011 신규 / R-AUTO-021 / R-DATA-013 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값(MarketConnector EC2 + EIP / Strategy Decision · Execution ECS Fargate Task / Interest Crawler hybrid / Preprocessor ECS Fargate Task / Research AWS Batch / port-view ECS Fargate Service 후속) 은 변경하지 않는다.
+
+현재 검증은 PowerShell wrapper + ECS RunTask + AWS Batch + SSM RunCommand 조합의 **E2E 리허설 2회차 성공**(2026-06-18 BUY 4건 / 2026-06-22 SELL 1건 한정 / 단순 dry-run 이 아니라 첫 실제 SELL E2E 완주). Step Functions / EventBridge Scheduler 정기 트리거 / View backend orchestration 은 **후속 orchestration target** 으로 유지.
+
+본 일자 보강 사실 — (a) MarketConnector EC2 stop / start 후 `/tmp` 휘발 대응을 wrapper(`daily-aws-paper.functions.ps1`) 안 공통 env bootstrap 함수 호출로 1차 차단(OD-MS-027 신규 / R-AUTO-021 신규 mitigation 1차 실증 — Step 1 / 12 / 13 / 17 4종).
+
+(b) Strategy Decision · Execution(Step 9 `DAILY_SELL_EXECUTION`) 의 `execution_app` 권한 매트릭스에 `decision.strategy_daily_position_decision` 제한적 UPDATE 권한 추가(OD-DB-011 신규 / R-DATA-013 신규 mitigation 1차 실증 / 02 spec `db-roles-and-grants` 정식 매트릭스 갱신 후속).
+
+(c) Interest Crawler / Preprocessor / Strategy Research 행은 본 일자에도 회귀 0건(OD-MS-026 / OD-MS-019 / R-AUTO-015 / R-AUTO-020 정합). (d) 8개 MS 컴퓨트 1순위 / 2순위 / 비권고 결정값 변경 없음 / Lambda 비권고 정책 유지 / NAT-free 정책 유지 / aws-live cutover 는 10 spec 후속.
+
+본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-22(OD-MS-027 / OD-DB-011 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-021 / R-DATA-013 신규 + R-DATA-005 [2026-06-22 보강] / [`./followups-overview.md`](./followups-overview.md) 2026-06-22 후속 메모 / [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md) 2026-06-22 §1 ~ §6 /
+
+[`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-22 §1 ~ §6 / [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md) 2026-06-22 §1 ~ §4 /
+
+[`../09-strategy-research-batch/operation-notes.md`](../09-strategy-research-batch/operation-notes.md) 2026-06-22 §1 ~ §5 참조.
+
+
+### Evidence Details 4.3 · #10 <a id="evidence-4.3-10"></a>
+
+**2026-06-23 Step Functions approval workflow + Step 12 retry-normalizer 실전 검증 메모(OD-MS-028 / OD-MS-029 신규 / R-AUTO-022 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+**Step Functions approval workflow false / true path 실전 검증 완료**:
+
+- 운영자가 직접 `portfolio-paper-daily-step1-17-approval` state machine 의 `allowPaperOrderExecute=false` blocked path 로 Step 1~17 사전 검증 수행
+- 이후 `allowPaperOrderExecute=true` true path 로 Step 12~17 승인 실행해 첫 실 SELL 1건 통과
+- 대상: BGF리테일 `282330` 17주 MARKET
+- 결과: `connector_order_request id 48` FILLED / `strategy_execution_order id 40` FILLED / `broker_order_no 0000006143`
+- Step 17 balance refresh 후 최신 보유 4종목 정상 반영
+
+MarketConnector EC2 + SSM + Step Functions 조합으로 Step 12~17 true path 완료 / Strategy Execution / MarketConnector 간 `REQUESTED → broker submit → fill sync → balance refresh` 경로 확인.
+
+**retry-normalizer 는 Step 12 내부 안전 보완으로 반영** — `port-marketconnector/connector_strategy_order_execute.py` 전체 교체 + Step 12(`MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE`) 시작부에서 retry-normalizer 동작 / 별도 Step 11.5 분리 아님 / 복구 조건 6종(`rejection_code = 40580000` + `broker_order_no IS NULL` + `connector_fill` 없음 등) 모두 만족 시에만 적용(OD-MS-028 신규 / R-AUTO-022 신규 mitigation 1차 실증).
+
+Step Functions 자체 구현은 본 일자 운영자 실증 단계 진입 / **Step Functions 는 여전히 후속 orchestration target 표현 유지**(state machine 정의 / state-by-state input · output / EventBridge Scheduler 정기 트리거 / View backend orchestration 매핑 등 운영 자동화 전체 격상은 04 / 05 / 10 spec 후속 phase 책임).
+
+본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-23(OD-MS-028 / OD-MS-029 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-022 신규 + R-AUTO-021 [2026-06-23 보강] / [`./followups-overview.md`](./followups-overview.md) 2026-06-23 후속 메모 참조.
+
+03 / 04 spec operation-notes 의 2026-06-23 상세 누적은 후속(2차 / 3차) 책임으로 분리.
+
+
+### Evidence Details 4.3 · #11 <a id="evidence-4.3-11"></a>
+
+**2026-06-23 AWS 공통 Slack notifier 구현 + Step Functions 3종 Slack 검증 메모(OD-MS-030 / OD-MS-031 신규 / R-AUTO-023 / R-AUTO-024 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+특히 **Lambda 는 본 표의 8개 MS 주 compute 1순위가 아니라 운영 이벤트 알림 보조 서비스로만 사용**:
+
+- Lambda 비권고 정책(15분 timeout / cold start / 세션 stateful / Selenium 부적합 / VPC connection 영향)은 그대로 유지
+- AWS 공통 Slack notifier Lambda `portfolio-event-notifier`(Python 3.12 / IAM Role `portfolio-event-notifier-lambda-role`) 는 PORT-STRATEGY-AI 전체 운영 이벤트 알림의 단일 진입점으로만 추가
+
+**Step Functions + EventBridge Scheduler + Lambda notifier 조합은 운영 관측성 / 포트폴리오 어필 보강 관점으로 기록**:
+
+- 기존 orchestration 결정값(OD-MS-009): `EventBridge Scheduler → Step Functions state machine → ECS RunTask + SSM RunCommand + AWS Batch`
+- 추가 알림 보조 계층: `Step Functions Catch · Choice → Lambda notifier → Slack webhook`
+- 운영자가 Slack 으로 approval gate / 성공 / 실패를 즉시 인지할 수 있는 흐름이 1차 검증됨
+
+**Daily Batch orchestration 의 1차 Slack 범위는 3종 한정**(OD-MS-031 신규 / 🟢 확정) — (1) `APPROVAL_REQUIRED`(Step 1~11 완료 후 approval gate 진입), (2) `DAILY_EXECUTION_SUCCESS`(Step 17 완료 후 전체 성공), (3) `DAILY_EXECUTION_FAILED`(Step Functions 실행 중 실패 / Catch 경로 / 12~17 test-only 실패 + 1~17 full workflow test-only 실패 수신 검증 완료 / 실제 broker 주문 실패 유발 0건).
+
+장 전 잔고 · 장 후 잔고 · 장중 손절 알림은 후속 분리. **port-view MS 측 SlackNotificationService 는 그대로 유지** — View Daily Batch 수동 실행 결과 알림 책임은 변경 없음(OD-MS-010 본문 변경 없음 / 향후 공통 notifier 이전 가능성만 기록).
+
+**Slack webhook URL 은 secret 취급** — 현재 Lambda 환경변수 `SLACK_WEBHOOK_URL` 로 1차 검증 / 운영 안정화 후 Secrets Manager 또는 SSM Parameter Store(SecureString) 이전 예정(R-AUTO-024 신규 / Status `Accepted` / 06 spec 후속).
+
+본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-23 두 번째 항목(OD-MS-030 / OD-MS-031 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-023 / R-AUTO-024 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-23 두 번째 후속 메모 / [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-23 §9(Slack notifier 검증) 참조.
+
+**6. Slack 구현: 완료 / 7. EventBridge 자동화는 다음 단계**.
+
+
+### Evidence Details 4.3 · #12 <a id="evidence-4.3-12"></a>
+
+**2026-06-23 EventBridge Scheduler + Dispatcher Lambda 기반 Daily 자동화 구현 완료 메모(OD-MS-032 신규 / R-AUTO-025 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다. 기존 ECS / EC2 / Batch 중심 MS compute 1순위 결정값 변경 없음 / Lambda 비권고 정책 그대로 유지.
+
+**Daily Batch orchestration 설명 보강** — `OD-MS-009` 본문의 `Step Functions + EventBridge Scheduler + ECS RunTask` 조합에 `Dispatcher Lambda` 계층을 추가해 **Step Functions + EventBridge Scheduler + Dispatcher Lambda + ECS RunTask + SSM RunCommand + AWS Batch** 의 5계층 조합으로 운영.
+
+Lambda 는 8개 MS 주 compute 가 아니라 **orchestration input 보정 / 휴장일 guard / StartExecution dispatcher** 역할을 담당(OD-MS-032 신규 / 🟢 확정).
+
+Dispatcher Lambda 사양:
+
+- Lambda 이름: `portfolio-paper-daily-scheduler-dispatcher`
+- Runtime: Python 3.12 / Handler `lambda_function.lambda_handler`
+- Timeout 30s / Memory 256MB
+- IAM Role: `portfolio-paper-daily-scheduler-dispatcher-role`
+- 환경변수: `TIMEZONE=Asia/Seoul` · `HOLIDAY_COUNTRY=KR` · `FAIL_CLOSED_ON_HOLIDAY_ERROR=true` · Step Functions ARN 2종
+- ARN 평문 기록 0건
+
+**EventBridge Scheduler 2개 분리 + 단계적 활성화** — (a) `portfolio-paper-daily-step1-11-approval-0800-kst`(cron `cron(0 8 ? * MON-FRI *)` / Asia/Seoul / **ENABLED** / Target input `{"scheduleType":"STEP1_11_APPROVAL","dryRun":false}` / `allowPaperOrderExecute=false` / Step 12 approval gate 차단 / 주문 제출 없음).
+
+(b) `portfolio-paper-daily-step12-17-order-0901-kst`(cron `cron(1 9 ? * MON-FRI *)` / Asia/Seoul / **DISABLED** / Target input `{"scheduleType":"STEP12_17_ORDER","dryRun":false}` / `allowPaperOrderExecute=true` / 주문 자동화 ENABLE 전 최종 안전 점검 후 별도 판단).
+
+대상 Step Functions 2개 모두 ACTIVE 확인 — `portfolio-paper-daily-step1-17-approval` + `portfolio-paper-daily-step12-17-approval` / OD-MS-029 의 `allowPaperOrderExecute` 분기 의미는 그대로 유지 / OD-MS-032 의 schedule + state machine 2개 분리는 EventBridge 자동화 운영 안전성(주문 자동화 단계 분리) 관점.
+
+**Scheduler · Dispatcher Lambda · Step Functions 연결 사슬 실패 위험은 R-AUTO-025 신규 mitigation 으로 1차 차단**(simulate-principal-policy / Lambda dryRun / Scheduler `get-schedule` 상태 확인 / 단계적 활성화). 실제 `StartExecution`(`dryRun=false`) 은 본 일자 미검증 / 내일 08:00 schedule 실행 시 첫 검증 예정.
+
+**Lambda 가 Step Functions 완료까지 대기하지 않음** — 장시간 batch 실행은 Step Functions + ECS RunTask + SSM RunCommand + AWS Batch 가 담당 / Dispatcher Lambda 는 `StartExecution` 호출 후 즉시 종료(OD-MS-032 정합 / Lambda 비권고 정책의 15분 timeout 우회 정합).
+
+본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-23 세 번째 항목(OD-MS-032 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-025 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-23 세 번째 후속 메모 참조. **7.
+
+EventBridge 자동화 구현: 완료** — 08:00 approval 검증 자동화 준비 완료 / 09:01 주문 자동화는 비활성 유지 / 내일 08:00 schedule 실행 결과 확인이 다음 단계.
+
+
+### Evidence Details 4.3 · #13 <a id="evidence-4.3-13"></a>
+
+**2026-06-24 08:00 Scheduler 실 실행 + Step 12 retry-normalizer `EGW00201` 확장 + Step 12~17 수동 실행 4건 FILLED 메모(OD-MS-033 신규 / R-AUTO-025 [2026-06-24 보강] / R-AUTO-026 / R-AUTO-027 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+기존 ECS / EC2 / Batch 중심 MS compute 1순위 결정값 변경 없음 / Lambda 비권고 정책 그대로 유지(Lambda 는 주 compute 가 아니라 운영 orchestration dispatcher / notifier 보조 계층).
+
+**Daily Batch orchestration 5계층 조합 1차 실증**:
+
+(a) **Step Functions + EventBridge Scheduler + Dispatcher Lambda 조합으로 08:00 Step 1~11 approval-required 자동 실행이 실제 검증**:
+
+- 08:00 schedule `portfolio-paper-daily-step1-11-approval-0800-kst` 실 호출
+- → Dispatcher Lambda → Step Functions `portfolio-paper-daily-step1-17-approval` execution
+- → Step 1~11 수행 후 approval-required 흐름으로 완료
+- `APPROVAL_REQUIRED` Slack 수신 / Step 12 이후 주문 차단 / 신규 주문 0건
+
+(b) **Step 12~17 은 자동 Scheduler ENABLE 전 수동 Dispatcher invoke 로 검증**:
+
+- Dispatcher Lambda 로 `STEP12_17_ORDER` 수동 invoke → Step Functions `portfolio-paper-daily-step12-17-approval` execution
+- 4건 새 `connector_order_request` 생성 + `broker_order_no` 생성 + 최종 체결
+- 체결 결과: `042660` 한화오션 FILLED · `004990` 롯데지주 FILLED · `003490` 대한항공 FILLED · `023530` 롯데쇼핑 FILLED
+- `004990` 단건 order-check 재조회 후 `tot_ccld_qty=69` 전량체결
+- `DAILY_EXECUTION_SUCCESS` Slack 수신
+
+(c) **Step 12 retry-normalizer + KIS rate-limit backoff 보완 후 4건 주문 재처리 및 최종 FILLED 확인**:
+
+- retry-normalizer 재시도 대상 확장: `40580000` 단독 → `40580000` + `EGW00201`(KIS gateway rate limit)
+- 주문 사이 기본 sleep + `EGW00201` 발생 시 backoff retry 적용
+- 운영자 직접 `port-marketconnector/connector_strategy_order_execute.py` 전체 교체
+- S3 업로드 + EC2 정식 배포 + `py_compile` + 운영 마커 확인 통과
+- dry-run `candidate_count=4`(`40580000` 2건 + `EGW00201` 2건 모두 후보 인식)
+- OD-MS-033 신규 / R-AUTO-026 mitigation 1차 실증
+
+(d) **`APPROVAL_REQUIRED` Slack summary 0/0 표시 후속(R-AUTO-027 신규 / Status `Accepted`)** — Step Functions approval state 의 input 에 실제 Step · DB 요약(BUY/SELL 후보 수 / 종목 / 사유 / 예상 수량) 반영하는 Slack approval payload builder 정식 개선은 04 / 05 spec 후속 phase 책임 / 단기적으로는 운영자가 Step Functions execution history + DB 직접 점검으로 사후 검증 보완 / 09:01 schedule 자동 ENABLE 별도 운영자 승인 보류 정책의 안전 게이트 역할로 활용.
+
+**9:01 schedule 은 본 일자에도 `DISABLED` 유지** — Step 12~17 수동 검증 성공 이후에도 자동 ENABLE 은 별도 운영자 승인 보류(OD-MS-033 정합 / `APPROVAL_REQUIRED` Slack summary 개선 + Dispatcher Lambda application log 보강 후속 완료 + 운영 회차 누적 결과 점검 후 최종 판단).
+
+**Lambda 는 주 compute 가 아니라 운영 orchestration dispatcher / notifier 보조 계층으로 사용한다는 기존 판단 유지** — Dispatcher Lambda(`portfolio-paper-daily-scheduler-dispatcher`) 의 운영 자동화 dispatcher 역할 + Slack notifier Lambda(`portfolio-event-notifier`) 의 운영 이벤트 알림 보조 계층 역할 모두 본 표의 Lambda 비권고 정책(15분 timeout / cold start / 세션 stateful / Selenium 부적합 / VPC connection 영향) 안에서 동작(Dispatcher Lambda 는 `StartExecution` 후 즉시 종료 / Slack notifier Lambda 는 단순 webhook POST 후 즉시 종료).
+
+본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-24(OD-MS-033 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-025 [2026-06-24 보강] + R-AUTO-026 / R-AUTO-027 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-24 후속 메모 참조.
+
+
+### Evidence Details 4.3 · #14 <a id="evidence-4.3-14"></a>
+
+**2026-06-24 EC2 lifecycle 자동 실행 구현 완료 메모(OD-MS-034 신규 / R-AUTO-025 [2026-06-24 두 번째 보강] / R-AUTO-028 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+기존 ECS / EC2 / Batch 중심 MS compute 1순위 결정값(MarketConnector EC2 + EIP / Crawler hybrid / Decision · Execution ECS Fargate Task / Research AWS Batch / Preprocessor ECS Fargate / port-view ECS Fargate Service 후속)은 변경하지 않는다.
+
+Crawler / Preprocessor / Decision / Execution / Research 의 기존 compute 1순위 결정도 변경하지 않는다.
+
+**Daily Batch orchestration 설명 보강** — 기존 `Step Functions + EventBridge Scheduler + Dispatcher Lambda + ECS RunTask + SSM RunCommand + AWS Batch` 의 5계층 조합에 **EC2 lifecycle Lambda(`portfolio-paper-ec2-lifecycle-dispatcher`)** 계층이 추가되어 6계층 조합으로 운영.
+
+Lambda 는 주 compute 가 아니라 **orchestration dispatcher / notifier / lifecycle 보조 계층**(OD-MS-034 신규 / 🟢 확정 / 영향 spec 03 · 04 · 05 · 08 · 10).
+
+**Daily Batch 주 orchestration 은 Step Functions + EventBridge Scheduler 그대로 유지** — EC2 lifecycle 은 EventBridge Scheduler + Lambda 보조 계층으로 분리 / Lambda 는 주 compute 가 아니라 dispatcher · notifier · lifecycle 보조 역할 / Crawler · Preprocessor · Decision · Execution · Research 의 기존 compute 1순위 결정 변경 없음.
+
+**MarketConnector / Crawler 운영 메모 갱신** — (a) **MarketConnector EC2**: 07:50 KST start(영업일 / Scheduler `portfolio-paper-ec2-start-0750-kst` ENABLED) / 15:50 KST stop(영업일 / Scheduler `portfolio-paper-marketconnector-stop-1550-kst` ENABLED / 휴일 체크 미적용) / EIP attach 상태 유지 / KIS broker 측 IP 등록 변경 0건 / R-BROKER-001 mitigation 회귀 0건.
+
+(b) **Crawler EC2**: 07:50 KST start(MarketConnector 와 동시 / `target=BOTH`) / Step Functions Step 1~11 성공 시 stop(`StopCrawlerEc2AfterStep11Success` task state) / Step 1~11 실패 시 디버깅 위해 유지(stop 하지 않음 / `SendDailyExecutionFailedSlack` 경로로 운영자 알림).
+
+**Lambda 역할 3분리 완료** — (1) `portfolio-paper-daily-scheduler-dispatcher`(08:00 / 09:01 Step Functions schedule dispatcher), (2) `portfolio-paper-ec2-lifecycle-dispatcher`(07:50 / 15:50 EC2 start · stop dispatcher / Step Functions Step 1~11 성공 시 Crawler stop 책임), (3) `portfolio-event-notifier`(Slack 알림 전담).
+
+모두 본 표의 Lambda 비권고 정책(15분 timeout / cold start / 세션 stateful / Selenium 부적합) 안에서 동작. **EC2 lifecycle Lambda 환경변수** — `TIMEZONE=Asia/Seoul` · `HOLIDAY_COUNTRY=KR` · `FAIL_CLOSED_ON_HOLIDAY_ERROR=true` / 휴일 API 장애 시 fail-closed / start 요청에만 휴일 체크 / stop 요청에는 휴일 체크 미적용.
+
+**검증 통과** — Lambda source + `py_compile` + IAM Role + EC2 start · stop 권한 + Scheduler invoke Role + Lambda invoke 권한 + Lambda create + dryRun 3종(`start BOTH` + `stop CRAWLER` + `stop MARKETCONNECTOR`) + 주말 skip(`runDate=2026-06-27`) + 두 Scheduler `get-schedule` 응답 정합(State ENABLED + Flexible OFF + Target Lambda · Target input) + Step Functions ASL 백업 후 update + RevisionId `edd92cc9-1d94-4752-9a43-b7eb5b2f3c2c` + `ACTIVE` 확인.
+
+**실제 영업일 07:50 start / Step 1~11 성공 후 Crawler stop / 15:50 stop 의 실 실행은 다음 영업일 첫 검증 예정**(R-AUTO-028 신규 mitigation 정합).
+
+본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-24 두 번째 항목(OD-MS-034 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-025 [2026-06-24 두 번째 보강] + R-AUTO-028 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-24 두 번째 후속 메모 참조.
+
+
+### Evidence Details 4.3 · #15 <a id="evidence-4.3-15"></a>
+
+**2026-06-24 장중 포지션 확인 3단계 구조 최종안 확정 메모(OD-MS-035 신규 / R-DATA-014 · R-AUTO-029 · R-DATA-015 · R-DATA-016 · R-AUTO-030 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+기존 ECS / EC2 / Batch 중심 MS compute 1순위 결정값 변경 없음 / Lambda 비권고 정책 그대로 유지(Lambda 는 주 compute 가 아니라 Scheduler / lifecycle / notifier / orchestration helper 역할). **Crawler · Preprocessor · Decision · Execution · Research 의 기존 compute 1순위 결정도 변경하지 않는다**.
+
+**Daily Batch orchestration 에 "장중 포지션 확인" 추가** — 기존 Daily Step 1~17(08:00 approval + 09:01 order) + EC2 lifecycle 자동화(07:50 · 15:50) 와 분리된 **장중 전용 경로** 가 본 결정으로 추가 / Daily Batch orchestration 의 5계층 + EC2 lifecycle 6계층 구조 위에 장중 포지션 확인 3단계 경로가 별도 분리되어 운영.
+
+**MarketConnector** — 10분 Snapshot Refresh 는 MarketConnector EC2 + SSM 중심 (EventBridge Scheduler → Lambda dispatcher → SSM RunCommand → MarketConnector EC2 의 venv python snapshot refresh entrypoint / `connector_balance_snapshot` + `connector_position_snapshot` 갱신 / 판단 · 주문 0건 / idempotent / OD-MS-001 본문 변경 없음).
+
+**StrategyExecution** — Intraday Evaluate 는 신규 파일 기반 SSM 실행 후보 (`daily_intraday_position_monitor_run.py` 수정 없이 신규 evaluate 파일 작성 / 1단계 직후 SSM 으로 MarketConnector EC2 의 venv python 으로 실행 / `strategy_intraday_position_check` 저장 / stop candidate + `INTRADAY_STOP_SELL` `READY` order **생성까지만** 수행 / broker 주문 제출 0건 / OD-MS-007 / OD-MS-016 본문 변경 없음 / OD-SAFE-004 정합 — Step Functions Retry 정책에서 자동 주문 제출과 연결되지 않도록 ASL 정의 시 명시).
+
+**Step Functions** — Intraday Stop Sell Submit & Refresh 는 **별도 Step Functions state machine 후보** / Daily Step 1~17 state machine 과 분리 / `source_type=INTRADAY_STOP_SELL` 전용 필터로 Daily BUY/SELL 흐름과 분리 / 초기 자동 ENABLE 보류 + 수동 · 승인 후 실행(OD-MS-033 의 09:01 보류 패턴과 동일한 안전 게이트 / R-AUTO-030 신규 Status `Open` / 정식 구현 + 검증 통과 후 `Mitigated` 승격 후보).
+
+**Lambda** — 주 compute 가 아니라 Scheduler dispatcher / EC2 lifecycle dispatcher / Slack notifier / orchestration helper 역할 유지(OD-MS-009 / OD-MS-030 / OD-MS-032 / OD-MS-034 본문 변경 없음 / 1단계 신규 Dispatcher Lambda 도 동일 정책 적용 / Lambda 비권고 정책의 15분 timeout / cold start / 세션 stateful / VPC connection 영향 안에서 동작).
+
+**장중 안전장치 4종** — stale snapshot · duplicate order · `sellable_qty` · `current_price` 검증 / 모두 2단계 신규 evaluate 파일 안에서 평가 / `READY` order 생성 단계에서 차단 / 3단계 broker 제출 전 추가 사후 검증 가능.
+
+**본 결정은 최종 설계안 확정 / 문서 반영 단계** — 실제 AWS / Lambda / SSM / Step Functions / RDS / KIS API 실행 0건 / AWS 리소스 생성 · 수정 · 삭제 0건 / 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역) / `daily_intraday_position_monitor_run.py` 수정 0건.
+
+1단계 + 2단계 구현은 다음 영업일 후속 phase / 3단계 정식 자동화 ENABLE 은 후속 phase + 운영자 별도 승인 후 진입.
+
+본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-24 세 번째 항목(OD-MS-035 신규) / [`./risk-register.md`](./risk-register.md) R-DATA-014 · R-AUTO-029 · R-DATA-015 · R-DATA-016 · R-AUTO-030 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-24 세 번째 후속 메모 참조.
+
+
+### Evidence Details 4.3 · #16 <a id="evidence-4.3-16"></a>
+
+**2026-06-25 장중 포지션 Step Function 구현 완료 메모(OD-MS-036 신규 / R-AUTO-030 [2026-06-25 보강] / R-AUTO-031 · R-AUTO-032 · R-BROKER-005 신규)** — 본 표의 1순위 / 2순위 / 비권고 결정값은 변경하지 않는다.
+
+기존 ECS / EC2 / Batch 중심 MS compute 1순위 결정값 변경 없음 / Lambda 비권고 정책 그대로 유지 / Crawler · Preprocessor · Decision · Execution · Research 의 기존 compute 1순위 결정도 변경하지 않는다.
+
+**2026-06-24 세 번째 메모의 장중 포지션 확인 3단계 구조 최종안 확정 결과를 운영자가 직접 1단계 + 2단계 + 3단계 일부 구현 단계로 진척** — 본 메모는 운영자가 수행한 결과를 문서화한 것이며 Kiro 가 AWS 리소스를 직접 생성 · 수정 · 삭제하지 않았다.
+
+**MarketConnector(1단계 + 3단계 일부)** — 운영자가 신규 entrypoint `connector_intraday_snapshot_refresh.py`(source_version `connector-intraday-snapshot-refresh-1.0.0` / sha256 `99f7d1394fcd28dc5e070c072a9cdd244244df6afd9def09e62cd08b829b2269`)를 추가 + MarketConnector EC2 venv 에 배포 + KIS 잔고 · 포지션 snapshot 갱신 / broker 주문 제출 0건 / idempotent 성격 유지(OD-MS-001 / OD-MS-035 본문 변경 없음).
+
+3단계 일부로 `connector_strategy_order_execute.py` 의 실행 정책에 `signal_type=INTRADAY_STOP_SELL` 전용 필터를 적용한 patch(sha256 `379895709A7FD1AF6E95D41CF85009FF913A5D60D40788C20630F28730A5F5AE`)를 동일 EC2 에 배포(R-AUTO-032 신규 mitigation 1차 실증 / OD-MS-028 / OD-MS-033 본문 변경 없음 / patch 본문 평문 인용 0건 / 03 spec operation-notes 후속 갱신 책임).
+
+본 표의 MarketConnector EC2 1순위 결정값(EC2 + EIP 단일 노드) 변경 없음.
+
+**StrategyExecution(2단계)**:
+
+- 신규 entrypoint `connector_intraday_position_evaluate.py` (source_version `connector-intraday-position-evaluate-1.1.0`) 추가
+- MarketConnector EC2 의 venv python 으로 SSM 실행
+- 안전장치 4종 검증 (stale snapshot · duplicate order · `sellable_qty` · `current_price`)
+- `strategy_intraday_position_check` 저장 + `INTRADAY_STOP_SELL` `READY` order 생성까지만 수행
+- broker 주문 제출 0건 / `daily_intraday_position_monitor_run.py` 수정 0건 (OD-MS-035 정합)
+
+본 표의 StrategyExecution ECS Fargate Task 1순위 결정값(Decision / Execution 모두 ECS Fargate) 변경 없음 — 장중 evaluate 는 MarketConnector EC2 의 venv python 으로 운영자가 SSM 호출한 보조 실행 경로.
+
+**Step Functions(3단계)**:
+
+- 별도 State Machine `portfolio-paper-intraday-stop-sell-approval` (STANDARD / ACTIVE / 18-state / 2026-06-25T14:58:45+09:00) 신규 생성
+- Daily Step 1~17 state machine 과 완전 분리
+- approval gate (`CheckIntradayStopApproval` → `BlockedByIntradayStopApprovalGate` 분기) 도입
+- true-path 9개 state 정의 (R-AUTO-031 신규 mitigation 1차 실증)
+
+운영자 직접 검증 통과:
+
+- blocked gate 안전 테스트 (execution `intraday-stop-blocked-gate-20260625-145928` / `allowIntradayStopOrderExecute=false` / SUCCEEDED)
+- true-path no-target 안전 테스트 (execution `intraday-stop-truepath-notarget-20260625-150146` / `allowIntradayStopOrderExecute=true` / SUCCEEDED)
+- 신규 `connector_order_request` 0건 / broker 주문 제출 0건 / `max_connector_order_request_id=56` 변동 없음
+- R-AUTO-030 [2026-06-25 보강] · Status `Open` 유지 · 자동 ENABLE 진입 차단 정책 유지
+
+**EventBridge Scheduler** — 운영자가 1단계 + 2단계 자동 tick 용 Scheduler `portfolio-paper-intraday-snapshot-evaluate-10min-kst`(`cron(10/10 9-15 ? * MON-FRI *)` / Asia/Seoul) 신규 ENABLED + 평일 장중 10분 간격 자동 tick 검증 통과(주 compute 변경 없음 / OD-MS-009 / OD-MS-032 / OD-MS-034 본문 변경 없음).
+
+**Lambda** — 본 표의 비권고 정책 안에서 dispatcher 역할만 수행 / 1단계 + 2단계 Lambda 는 SSM RunCommand 호출 + 즉시 종료 보조 계층 / 3단계 State Machine 의 task state 도 ECS RunTask.sync + SSM RunCommand 의 조합으로 broker 호출 책임을 MarketConnector EC2 에 위임 / Lambda 가 broker 호출을 직접 수행하지 않는 원칙 그대로 유지(OD-MS-030 / OD-MS-032 / OD-MS-034 본문 변경 없음).
+
+**본 메모는 운영자 직접 실행 결과의 사실 기록** — Kiro 의 AWS CLI / boto3 / Step Functions / SSM / Lambda / EC2 / RDS / S3 / KIS API 실행 0건 / AWS 리소스 생성 · 수정 · 삭제 0건 / 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog 본 일자 작업으로 인한 변경 0건(spec 영역) / 운영자 직접 patch · 배포한 entrypoint 변경분은 03 spec operation-notes 후속 갱신 책임.
+
+**실제 1주 `INTRADAY_STOP_SELL` 주문 테스트 보류** — 보유 종목 0건 / `sellable_qty=0` 으로 broker 호출 직전 사전 검증 단계에서 운영자가 중단 / 없는 포지션 매도 주문 생성 0건 / 다음 보유 포지션 발생 후 재개(R-BROKER-005 신규 mitigation 1차 실증).
+
+본 메모는 [`./operator-decisions.md`](./operator-decisions.md) Change Log 2026-06-25 항목(OD-MS-036 신규) / [`./risk-register.md`](./risk-register.md) R-AUTO-030 [2026-06-25 보강] + R-AUTO-031 · R-AUTO-032 · R-BROKER-005 신규 / [`./followups-overview.md`](./followups-overview.md) 2026-06-25 후속 메모 참조.
+
+
+### Evidence Details 4.8 · #17 <a id="evidence-4.8-17"></a>
+
+[2026-06-15 보강] 본 일자 운영자 직접 수행:
+
+- (a) AWS Batch CE / Job Queue / Job Definition revision 1 / 3 + CloudWatch Log Group + Secrets Manager + IAM Role 신규 생성
+- (b) py_compile smoke + DB smoke SubmitJob 1차 검증
+- (c) BACKTEST_RESEARCH full + BACKTEST_REPORT 단건 SubmitJob `SUCCEEDED` / exitCode 0 (`run_id a39b0b0c-...` / `total_return 4.55930879` / `sharpe 2.65561307` / `trade_count 308`)
+- (d) BACKTEST_REPORT 산출물의 S3 prefix 한정 보존 검증
+
+→ 본 절의 1순위(AWS Batch + S3) 권고 1차 실증.
+
+View Daily Batch 기준 AWS Batch 포팅 대상은 `BACKTEST_RESEARCH` + `BACKTEST_REPORT` 2종으로 한정되었고(OD-MS-019), `run_extended_analysis.py` 는 `BACKTEST_RESEARCH` 내부에서 이미 수행되어 별도 AWS Batch 포팅 대상에서 제외되었다. `block_watch_*` / `block_exception_buy_*` 4종은 heavy 분류로서 운영자 수동 보조 도구로만 분류된다.
+
+1순위 / 2순위 / 비권고 표 자체의 권고는 변경하지 않는다. 자세한 결과는 [`../09-strategy-research-batch/operation-notes.md`](../09-strategy-research-batch/operation-notes.md) 2026-06-15 3개 섹션 참조.
+
+
+### Evidence Details 6.1 · #18 <a id="evidence-6.1-18"></a>
+
+[2026-06-15 보강] research artifact 행은 본 일자에 1차 실증되었다. 기존 S3 bucket `portfolio-paper-migration-yukiever` 재사용 / Job Role 의 `s3:PutObject` Resource 는 `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` 한정 / public read 0건 / wildcard 0건.
+
+report wrapper 의 `REPORT_S3_BUCKET` 미설정 시 업로드 skip / 설정 시 `REPORT_S3_PREFIX=strategy-research/reports` 기본값 + `AWS_BATCH_JOB_ID` 기준 하위 경로 분리 / `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` 기본값 유지(Fargate ephemeral 영역 정합). S3 lifecycle 정책은 본 일자 미설정 — 후속 분리(R-COST-003 / 06 후속 phase 책임).
+
+KMS encryption 도 후속 spec 결정. 본 매트릭스의 권고(AWS Batch 1순위 + S3 보관 + S3 lifecycle 후속) 자체는 변경하지 않는다.
+
+
+
+## Security Notes
+
+본 문서 편집 · 갱신 회차 전반의 안전 제약이다.
+
+- 서비스 선택 결론(MS별 1순위 서비스 문자열 · 8개 MS 고정 순서) 변경 금지.
+- 실제 AWS 리소스 생성 · 수정 · 삭제 금지. IaC 실제 배포 금지.
+- 8개 MS 저장소(port-marketconnector · port-view · port-interest-crawler · port-interest-preprocessor · port_strategy_common · port_strategy_decision · port_strategy_research · port_strategy_execution) 의 코드 · README · AGENTS.md · CHANGELOG · docs · worklog 수정 금지.
+- 본 문서에 secret · password · token · KIS app key · KIS app secret · Slack webhook URL · 계좌번호 · account-id · 실제 ARN · public IP · broker_order_no · image digest full sha256 원문 기록 금지. `[REDACTED]` 계열 placeholder 만 사용.
+- 쓰기 계열 git 명령(`git add` · `git commit` · `git rm` · `git mv` · `git push`) 실행 금지. 롤백 계열 git 명령(`git checkout` · `git reset` · `git stash` · `git restore`) 자동 실행 금지. git 상태 확인은 읽기 전용 3종(`git status --short` · `git diff --stat` · `git diff --check`) 만 사용.

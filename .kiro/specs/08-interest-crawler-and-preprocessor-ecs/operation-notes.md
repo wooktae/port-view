@@ -2,6 +2,62 @@
 
 본 문서는 08-interest-crawler-and-preprocessor-ecs 진행 중 운영자 / Kiro 가 실제 수행한 작업 결과를 일자별로 누적 기록하는 운영 노트다. 1차 적용 환경은 `aws-paper`, region 은 `ap-northeast-2`, 1차 검증 대상은 Preprocessor MS(`port-interest-preprocessor`).
 
+## Timeline Dashboard
+
+본 spec 의 운영자 실행 이력 요약. 자세한 내용은 각 일자 섹션 참조.
+
+| 일자 | 핵심 결과 | 주요 결정 / mitigation |
+|---|---|---|
+| 2026-06-10 | ECR repo 2개 · Dockerfile · 로컬 빌드 · ECR push · ECS Cluster · Task Role · Log Group · Preprocessor RunTask exitCode 0 | OD-MS-011(hybrid) 전제 확정 |
+| 2026-06-12 | KRX GUI 수집 = Windows EC2 worker 분리(RDP + wrapper 수동 실행 1차 통과) | KRX Secret 신규 · 다운로드 경로 junction · 한글 literal 정책 |
+| 2026-06-13 | SSM RunCommand → `schtasks /Run` → Scheduled Task 자동화 진입점 + ECS crawler rev6 Selenium Chrome smoke 통과 | OD-MS-015(SSM direct 실행 부적합) · hybrid 1차 완성 판단 |
+| 2026-06-15 | Backend AWS E2E dry-run 1차 · CONNECTOR_BALANCE 통과 · Preprocessor ECS 실행 성공(데이터 최신성 제약) · stale raw data 이슈 발견 | OD-MS-020(표현 보정) · OD-MS-021(dry-run 안전 기준) · R-DATA-009 / R-DATA-010 신규 |
+| 2026-06-16 | non-GUI ECS rev7(`paper-20260616-nongui`) 신규 · RunTask exitCode 0 · raw 8종 최신성 회복 · KRX GUI Autologon + Administrator interactive session + Scheduled Task 자동화 실증 | OD-MS-022 신규 · R-SEC-009 · R-AUTO-017 신규 · hybrid 구조 완료 |
+| 2026-06-17 | Daily AWS 17-step E2E 완료(Step 2 crawler + Step 3 preprocessor 통과 · feature 최신성 `2026-06-16`) | R-DATA-009 / R-DATA-010 mitigation 1차 실증 |
+| 2026-06-20 | Daily wrapper 최종 점검 · 6/18 중복 실행 시도 안전 중단 · Step 12 미실행 · 6/19 KRX raw 최신성 복구 확인 | R-AUTO-007 식별(Scheduled Task trigger 성공 → Step 2 SUCCESS 위험) |
+| 2026-06-21 | Step 2 성공판정 강화 · `interest_krx_raw_validate_daily.py` 신규 · DB validation SSM step 연동 · worker stopped fail-closed | OD-MS-026 신규 · R-AUTO-020 신규 mitigation |
+| 2026-06-22 | Daily wrapper 2회차 실 운영 실행 · Step 2 / Step 3 회귀 0건 | R-AUTO-007 / R-AUTO-020 mitigation 회귀 0건 |
+
+## Open Risks & Next Checks
+
+Timeline Dashboard 아래 최신 상태 요약. 자세한 근거는 각 일자 섹션 참조.
+
+### 지금 남은 리스크 (Open)
+
+| ID | 요약 | 상태 | Detection / Mitigation 요약 |
+|---|---|---|---|
+| R-AUTO-020 | Scheduled Task trigger 성공만으로 Step 2 SUCCESS 처리 시 KRX raw 미적재가 Step 3 이후로 전파 | 🟢 Mitigated (2026-06-22 회귀 0건) | Chrome / chromedriver best-effort reset + Running→Ready wait + Last Result 0 확인 + latest worker log 출력 + KRX raw DB validation + worker stopped fail-closed |
+| R-AUTO-016 | crawler worker EC2 stopped 상태에서 Step 2 SUCCESS 진입 | 🟢 Mitigated | 2026-06-21 부터 fail-closed 처리 / skip 폐지 |
+| R-AUTO-017 | Chrome / chromedriver stale process 잔존 | 🟢 Mitigated | Step 2 진입 시 best-effort reset / 실패는 warning 유지 |
+| R-AUTO-007 | wrapper 성공 종료가 실제 DB 적재를 보장하지 않음 | 🟢 Mitigated | task 57 회수 / `KrxDbValidationCommandId` step result 기록 |
+| R-DATA-009 / R-DATA-010 | non-GUI raw 최신성 부족 → Preprocessor 신규 feature date 미생성 | 🟢 Mitigated | 2026-06-16 rev7 운영 경로 생성 + 2026-06-17 17-step E2E 통과 |
+| R-SEC-009 | Windows worker Autologon 자격 노출 시간 | 🟠 Open (paper 한정 예외) | 작업 종료 후 EC2 stop / 문서에 자격값 평문 기록 0건 |
+| interest_foreignindex_raw HANGSENG/NIKKEI225/SHANGHAI NULL | 지수 일부 NULL Data (non-blocker) | 🟠 Open | Preprocessor blocker 아님 / 후속 점검 |
+| interest_ticker_value_raw stale | 최신일 2026-03-09 (별도 도메인) | 🟠 Open | 본 dry-run 차단 요인 제외 / 별도 후속 |
+| EC2 lifecycle 자동화 | MarketConnector EC2 stop / start 후 `/tmp/inject-env.sh` 유실 | 🟠 Open | task 59 후속 분리 / 03 spec 책임 |
+
+### 다음 검증 항목 (Next Checks)
+
+- [ ] task 54: EventBridge Scheduler → SSM RunCommand → `schtasks /Run` 정기 trigger 연계
+- [ ] task 55: Step Functions 에서 ECS RunTask + SSM RunCommand hybrid orchestration
+- [ ] task 56: CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집
+- [ ] task 59: EC2 worker 작업 완료 후 stop 절차 명시 (idle 비용 절감)
+- [ ] task 78: preprocessor 실행 후 raw / feature 최신성 검증 SQL 자동화
+- [ ] task 111: View Daily Batch 에서 `KrxDbValidationCommandId` / latest worker log / Step 2 validation 결과 표시 여부 검토
+
+### Key Fact Preservation (편집 시 유지 필수)
+
+편집 시 다음 근거는 삭제 / 축약 금지. 문서 가독성 개선이 fact loss 로 이어지지 않도록 방어한다.
+
+- KRX GUI worker Last Result `0` (또는 `0x0`) = SUCCESS 조건. `SUCCESS: Attempted to run the scheduled task` marker 만으로는 SUCCESS 처리 금지.
+- Scheduled Task trigger 성공 ≠ Step 2 SUCCESS. 6개 성공 조건(non-GUI ECS exitCode 0 / worker EC2 running / Running→Ready 복귀 / Last Result 0 / latest log 출력 / DB validation 통과) 모두 필요.
+- KRX raw DB validation: `interest_program_raw` / `interest_shortsell_raw` 의 `max(trade_date)` ≥ ExpectedKrxRawDate, row_count > 0 필요. 실패 시 exit code 30.
+- worker EC2 stopped → skip 이 아니라 fail-closed. instanceId / state 를 실패 메시지에 출력.
+- Autologon 사용은 paper 전용 Windows worker 한정 보안 예외. 자격증명 값 평문 기록 금지.
+- SSM direct Python 실행은 SYSTEM Session 0 부적합으로 채택 거부. SSM 은 `schtasks /Run` trigger 역할만 담당.
+- non-GUI ECS Task Definition revision 6 = smoke 전용, revision 7 = daily 운영. 혼동 금지.
+- raw 최신성 회복 근거 수치(2026-06-16 §3): `interest_price_raw` 1,207,904 → 1,209,624, `interest_investorflow_raw` 274,204 → 275,949, `interest_shortsell_raw` +349 row 등. row_count / max_date 수치는 유지.
+
 ## 기록 형식
 
 - 일자별 `## YYYY-MM-DD <요약>` 헤더로 누적한다(02 / 06 spec operation-notes 와 동일).
@@ -20,7 +76,10 @@
 
 ## 2026-06-10 08-interest-crawler-and-preprocessor-ecs 운영자 실행 기록
 
-운영자가 2026-06-10 직접 수행한 ECS / ECR 기본 포팅 1차 결과를 누적 기록한다. 본 일자에 Kiro 는 문서 작성 / 절차 정리만 수행했고, 실제 AWS / IAM / Secrets / RDS 작업은 운영자가 직접 진행했다.
+**Summary** — ECS / ECR 기본 포팅 1차 결과.
+
+- Kiro: 문서 / 절차 정리만
+- 운영자: 실제 AWS / IAM / Secrets / RDS 작업 직접 수행
 
 ### 1. ECR Repository 생성
 
@@ -165,7 +224,11 @@
 
 ## 2026-06-12 Windows EC2 worker 기반 KRX GUI 의존 수집 1차 검증
 
-운영자가 2026-06-12 직접 수행한 Windows EC2 worker 기반 KRX program / shortsell 수집 1차 검증 결과를 누적 기록한다. 본 일자에 Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행했고, 실제 AWS / IAM / Secrets Manager / EC2 / RDS 작업은 운영자가 직접 수행했다. KRX GUI 의존 수집은 Windows EC2 worker 로 분리 확정되었으며, non-GUI crawler 는 ECS Fargate Task 후보로 유지하고, preprocessor 는 ECS Fargate Task 를 그대로 유지한다.
+**Summary** — Windows EC2 worker 기반 KRX program / shortsell 수집 1차 검증.
+
+- 분류 결정: KRX GUI 수집 = Windows EC2 worker / non-GUI crawler = ECS Fargate Task 후보 유지 / preprocessor = ECS Fargate Task 유지
+- Kiro: 문서 / 절차 / 검증 항목 정리만
+- 운영자: 실제 AWS / IAM / Secrets Manager / EC2 / RDS 작업 직접 수행
 
 ### 1. EC2 worker 환경 확인
 
@@ -311,7 +374,13 @@
 
 ## 2026-06-13 SSM RunCommand 자동화 + ECS crawler smoke 1차 검증
 
-운영자가 2026-06-13 직접 수행한 (a) Windows EC2 worker 기반 KRX GUI 의존 수집의 1차 자동화 검증과 (b) ECS crawler Task Definition revision 6 의 Selenium / Chrome / outbound smoke 검증 결과를 누적 기록한다. 본 일자에 Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행했고, 실제 AWS / SSM / EC2 / ECS / CloudWatch / RDS 확인 작업은 운영자가 직접 수행했다. KRX GUI 경로의 1차 자동화 방식은 SSM RunCommand 가 wrapper 를 직접 실행하지 않고 Windows Scheduled Task 를 trigger 하여 Administrator interactive session 위에서 wrapper 가 실행되는 방식으로 확정되었다. 자세한 결정 락은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-012 / OD-MS-015 참조.
+**Summary** — KRX GUI 자동화 진입점 확정 + ECS crawler smoke 통과.
+
+- 자동화 방식 확정: SSM RunCommand → `schtasks /Run /TN "Portfolio-KRX-Worker-Daily"` → Windows Scheduled Task → Administrator interactive session → wrapper. SSM direct wrapper 실행은 채택 거부(SYSTEM Session 0 부적합)
+- ECS crawler Task Definition revision 6 = Selenium / Chrome / outbound smoke 전용
+- Kiro: 문서 / 절차 / 검증 항목 정리만
+- 운영자: 실제 AWS / SSM / EC2 / ECS / CloudWatch / RDS 확인 작업 직접 수행
+- 결정 락: [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-012 / OD-MS-015
 
 ### 1. SSM 관리 상태 확인
 
@@ -454,7 +523,20 @@
 
 ## 2026-06-15 Backend AWS E2E dry-run 1차 / Interest Crawler 상태 재판정
 
-운영자가 2026-06-15 직접 수행한 (a) AWS 계정 / region / EC2 / ECS / AWS Batch 사전 점검, (b) MarketConnector EC2 기반 `CONNECTOR_BALANCE` 1차 실행, (c) Windows EC2 worker 기반 KRX worker 재실행 + `interest_program_raw` / `interest_shortsell_raw` 최신일자 확인, (d) non-GUI crawler `interest_*_raw` 최신일자 SQL 점검, (e) preprocessor ECS RunTask 1회 단발 실행 + DB `updated_at` 갱신 확인 결과를 누적 기록한다. 본 일자에 Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행했고, 실제 AWS / SSM / EC2 / ECS / Batch / RDS 작업은 운영자 직접 수행. 본 일자의 핵심은 View 진입 전 backend AWS 측 dry-run 을 17단계 순서로 점검해 stale raw data 이슈를 조기에 발견한 것이며, 실제 BUY / SELL / `--execute` 주문 전송 계열은 0건이다(OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011 정합).
+**Summary** — Backend AWS E2E dry-run 을 17단계 순서로 1차 점검. View 진입 전 stale raw data 이슈를 조기 발견.
+
+작업 범위:
+
+- (a) AWS 계정 / region / EC2 / ECS / AWS Batch 사전 점검
+- (b) MarketConnector EC2 기반 `CONNECTOR_BALANCE` 1차 실행
+- (c) Windows EC2 worker 기반 KRX worker 재실행 + `interest_program_raw` / `interest_shortsell_raw` 최신일자 확인
+- (d) non-GUI crawler `interest_*_raw` 최신일자 SQL 점검
+- (e) preprocessor ECS RunTask 1회 단발 실행 + DB `updated_at` 갱신 확인
+
+안전:
+
+- Kiro: 문서 / 절차 / 검증 항목 정리만. 운영자: 실제 AWS / SSM / EC2 / ECS / Batch / RDS 작업 직접 수행
+- 실제 BUY / SELL / `--execute` 주문 전송 계열 0건(OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011 정합)
 
 ### 1. 사전 점검 (AWS 계정 / region / EC2 / ECS / AWS Batch)
 
@@ -647,11 +729,22 @@
 5. 표현 통일 — 기존 문서에서 "Interest Crawler 완성: 완료" / "Interest Crawler 는 hybrid execution model 기준으로 1차 완성" 표현은 본 일자 결정 정합으로 보정(WORKLOG.md / followups-overview.md / operator-decisions.md OD-MS-020 정합)
 6. 본 일자 dry-run 결과는 실패가 아니라 **stale raw data 이슈를 조기에 발견한 검증 성공** 으로 기록 — Connector Balance / Preprocessor ECS 실행 경로 성공 + Interest Crawler 재분류 + non-GUI daily 운영 후속 분리
 
-
-
 ## 2026-06-16 Crawler 데이터 미수집 해결 + KRX EC2 자동화 성공
 
-운영자가 2026-06-16 직접 수행한 (a) Crawler 데이터 미수집 원인 진단, (b) non-GUI crawler ECS / Fargate 운영 경로 신규 생성 및 RunTask 성공, (c) raw 최신성 회복, (d) Windows EC2 worker Autologon bootstrap + Administrator interactive session 실증, (e) SSM RunCommand → `schtasks /Run` → Scheduled Task 흐름으로 KRX login / program / shortsell 2026-06-15 적재 성공 결과를 누적 기록한다. 본 일자에 Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행했고, 실제 AWS / SSM / EC2 / ECS / ECR / Docker / IAM / Secrets Manager / RDS 작업은 운영자 직접 수행. 본 일자의 핵심은 2026-06-15 §3 / §4 에서 식별한 stale raw data 이슈의 원인 해소와 Hybrid execution model 1차 자동화 진입점(SSM trigger) 보강이며, 실제 BUY / SELL / `--execute` 주문 전송 계열은 0건이다(OD-SAFE-001 ~ OD-SAFE-004 / OD-MS-021 / R-AUTO-009 ~ R-AUTO-011 정합).
+**Summary** — 2026-06-15 stale raw data 이슈 해소 + Hybrid execution model 1차 자동화 진입점 보강.
+
+작업 범위:
+
+- (a) Crawler 데이터 미수집 원인 진단(rev6 = Selenium / Chrome smoke command / 원본 `interest_crawler_daily.py` KRX GUI 단계 포함 / non-GUI orchestration 부재)
+- (b) non-GUI crawler ECS / Fargate 운영 경로 신규 생성 + RunTask 성공(`portfolio-paper-interest-crawler:7` / `paper-20260616-nongui`)
+- (c) raw 최신성 회복(non-GUI 6종 + KRX 2종 + news / agency)
+- (d) Windows EC2 worker Autologon bootstrap + Administrator interactive session 실증
+- (e) SSM RunCommand → `schtasks /Run` → Scheduled Task 흐름으로 KRX login / program / shortsell 2026-06-15 적재 성공
+
+안전:
+
+- Kiro: 문서 / 절차 / 검증 항목 정리만. 운영자: 실제 AWS / SSM / EC2 / ECS / ECR / Docker / IAM / Secrets Manager / RDS 작업 직접 수행
+- 실제 BUY / SELL / `--execute` 주문 전송 계열 0건(OD-SAFE-001 ~ OD-SAFE-004 / OD-MS-021 / R-AUTO-009 ~ R-AUTO-011 정합)
 
 ### 1. Crawler 데이터 미수집 원인 확인
 
@@ -850,412 +943,14 @@
 9. CloudWatch Logs 본문 / wrapper 로그(`krx_worker_daily_20260616_045550.log`) / SSM 응답 본문 / docker build 로그 / Selenium · Chrome stdout · stderr 전문 평문 인용 0건.
 10. Autologon 사용은 paper 전용 Windows worker 한정 보안 예외(R-SEC-009) — 운영자 노트 / spec 산출물에서 자동 로그인 자격 증명 평문 기록 금지 정책 1차 실증.
 
-
-## 2026-06-16 Crawler 데이터 미수집 해결 + KRX EC2 자동화 성공
-
-운영자가 2026-06-16 직접 수행한 (a) Crawler 데이터 미수집 원인 진단(rev6 = Selenium / Chrome smoke command / 원본 `interest_crawler_daily.py` KRX GUI 단계 포함 / non-GUI orchestration 부재), (b) `interest_crawler_daily_nongui.py` 신규 생성 + Docker rebuild + ECR push + ECS Task Definition `portfolio-paper-interest-crawler:7` 등록 + RunTask exitCode 0 / 전체 non-GUI step SUCCESS, (c) non-GUI raw 6종 + KRX raw 2종 + news / agency 적재로 raw 최신성 회복(price / investorflow / marketbreadth / commodity / foreignindex / macro 2026-06-15 / news / agency 2026-06-16), (d) Windows EC2 worker Autologon bootstrap + Administrator console session Active 확인 + SSM RunCommand → `schtasks /Run` → Scheduled Task 흐름으로 KRX login / program / shortsell 2026-06-15 적재 성공 결과를 누적 기록한다. 본 일자에 Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행했고, 실제 AWS / SSM / EC2 / ECS / ECR / Docker / IAM / Secrets Manager / RDS 작업은 운영자 직접 수행. 본 일자의 핵심은 Crawler 데이터 미수집 해결 완료 + Interest Crawler hybrid 구조 완료 + Preprocessor ECS 재실행 가능 상태 도달이며, 실제 BUY / SELL / `--execute` 주문 전송 계열은 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건이다(OD-SAFE-001 ~ OD-SAFE-004 / OD-MS-021 / R-AUTO-009 ~ R-AUTO-011 정합).
-
-### 1. Crawler 데이터 미수집 원인 확인
-
-1. 원인 1차 진단: 완료
-   1) ECS / Fargate Crawler revision 6 의 `command` 가 실제 daily raw 수집이 아니라 Selenium / Chrome smoke command(2026-06-13 §13.3 / §13.5 정합)임을 확인
-   2) 운영용 daily raw 수집 entrypoint 와 분리되어 있음
-2. 원본 daily wrapper 점검: 완료
-   1) `interest_crawler_daily.py` 가 KRX GUI 의존 단계(`interest_krx_login_new` / `interest_program` / `interest_shortsell`) 를 포함
-   2) ECS / Fargate Task 의 GUI / Display 미지원 환경에서 직접 실행에 부적합(2026-06-12 §9 정합)
-3. non-GUI orchestration 부재: 완료
-   1) non-GUI 전용 daily wrapper / Task Definition / command 미존재
-   2) ECS / Fargate Selenium Chrome smoke 통과는 되었으나 실제 daily 운영 경로 미생성
-   3) 결론: 미수집 원인은 ECS / Fargate 자체 문제가 아니라 non-GUI 전용 orchestration 부재로 정리
-
-### 2. non-GUI crawler ECS / Fargate 운영 경로 생성
-
-1. `interest_crawler_daily_nongui.py` 신규 생성: 완료
-   1) Python patch script 방식으로 생성
-   2) 저장 시 `encoding="utf-8"` 적용(2026-06-12 §6 한글 literal 정책 정합)
-   3) KRX GUI 계열 import 제외: `interest_krx_login_new` / `interest_program` / `interest_shortsell`
-   4) non-GUI 계열 import 포함: `interest_news` / `interest_agency` / `interest_foreignindex` / `interest_commodity` / `interest_macroeconomic` / `interest_price` / `interest_investorflow` / `interest_marketbreadth`
-2. 정적 검증: 완료
-   1) `py_compile` 통과
-   2) AST import 검증 통과(KRX GUI 계열 import 0건 확인)
-   3) Docker image 내부 파일 포함 확인
-3. Docker / ECR push: 완료
-   1) image tag: `paper-20260616-nongui`
-   2) image digest: 운영자가 직접 확인 / 실값 본 노트 미기록(`<image-digest>` placeholder)
-4. ECS Task Definition 등록: 완료
-   1) family: `portfolio-paper-interest-crawler`
-   2) revision: 7
-   3) image tag: `paper-20260616-nongui`
-   4) command: `["python", "interest_crawler_daily_nongui.py"]`
-   5) launch type: FARGATE
-   6) network mode: awsvpc
-   7) cpu: 1024 / memory: 2048(rev6 동상 유지)
-   8) log group: `/portfolio/paper/crawler`
-   9) log stream prefix: `ecs-crawler-nongui-daily`
-   10) crawler-app DB secret 주입 유지
-5. RunTask 실행: 완료
-   1) cluster: `portfolio-paper-cluster`
-   2) Task Definition: `portfolio-paper-interest-crawler:7`
-   3) RunTask submit 성공 / failures 0건
-   4) lastStatus: `STOPPED`
-   5) stopCode: `EssentialContainerExited`
-   6) container exitCode: 0
-   7) 실행 시간 약 9분 51초
-   8) CloudWatch log stream 생성 확인(stream prefix `ecs-crawler-nongui-daily`)
-6. CloudWatch Logs step 결과: 완료
-   1) `interest_news`: SUCCESS
-   2) `interest_agency`: SUCCESS
-   3) `interest_foreignindex`: SUCCESS
-   4) `interest_commodity`: SUCCESS
-   5) `interest_macroeconomic`: SUCCESS
-   6) `interest_price`: SUCCESS
-   7) `interest_investorflow`: SUCCESS
-   8) `interest_marketbreadth`: SUCCESS
-   9) 로그 전문 인용 0건(보안 / 분량 절감)
-
-### 3. raw 최신성 회복
-
-1. `interest_price_raw`: 완료
-   1) max date: 2026-06-08 → 2026-06-15
-   2) row count: 1,207,904 → 1,209,624
-   3) 2026-06-15 324 Price Collected
-2. `interest_investorflow_raw`: 완료
-   1) max date: 2026-06-08 → 2026-06-15
-   2) row count: 274,204 → 275,949
-   3) 2026-06-15 349 Investor Collected
-3. `interest_marketbreadth_raw`: 완료
-   1) max date: 2026-06-08 → 2026-06-15
-   2) row count: 4,788 → 4,793
-4. `interest_commodity_raw`: 완료
-   1) max date: 2026-06-08 → 2026-06-15
-   2) row count: 29,132 → 29,162
-   3) 2026-06-15 6 Commodity Collected
-5. `interest_foreignindex_raw`: 부분 완료
-   1) max date: 2026-06-08 → 2026-06-15
-   2) row count: 33,738 → 33,766
-   3) 2026-06-15 일부 지수 NULL Data 확인 — HANGSENG / NIKKEI225 / SHANGHAI
-   4) 전체 step 실패가 아니라 일부 지수 데이터 공백으로 분리
-   5) 본 일자 Preprocessor blocker 가 아닌 non-blocker 후보로 기록(후속 점검 분리)
-6. `interest_news_raw`: 완료
-   1) max date: 2026-06-11 → 2026-06-16
-   2) row count: 68,881 → 71,614
-   3) 2026-06-16 349 News Collected
-7. `interest_agency_raw`: 완료
-   1) max date: 2026-06-11 → 2026-06-16
-   2) row count: 49,018 → 49,044
-   3) 2026-06-16 15 Agency Reports Collected
-8. `interest_macroeconomic_raw`: 완료
-   1) max date: 2026-06-08 → 2026-06-15
-   2) row count: 75,742 → 75,777
-   3) 2026-06-15 7 Macro Collected
-9. 완료 판단:
-   1) news / agency: 2026-06-16 최신화
-   2) price / investorflow / marketbreadth / commodity / foreignindex / macro: 2026-06-15 최신화
-   3) stale raw data 주요 원인 해소(R-DATA-010 mitigation 1차 실증)
-   4) Preprocessor 입력 데이터로 사용 가능한 수준 도달
-
-### 4. KRX EC2 worker 자동화 재검증
-
-1. 기존 실패 원인 정리: 완료
-   1) SSM direct Python 실행 또는 wrapper 직접 실행은 SYSTEM Session 0 / 비대화형 세션에서 실행됨(2026-06-13 §13.2 정합)
-   2) 해당 방식에서는 Chrome GUI 가 Administrator RDP 화면에 표시되지 않음
-   3) KRX 로그인 / nos_setup / 키보드보안 / iframe 제약으로 headless 또는 비대화형 수집은 제외
-   4) 로컬 검증상 KRX headless / 비대화형 수집은 운영 방식에서 제외
-   5) SSM direct Python 실행은 운영 방식에서 제외
-2. Autologon bootstrap: 완료
-   1) Microsoft Sysinternals Autologon 사용
-   2) Administrator 자동 로그인 설정 완료
-   3) Administrator password 본 노트 평문 기록 0건(`[REDACTED]`)
-   4) Autologon 은 paper 전용 Windows worker 보안 예외로 기록(R-SEC-009 신규)
-   5) 자동 로그인 자격 증명은 본 노트 / spec 산출물 / 콘솔 캡처 / 로그 평문 기록 금지(R-DOCS-001 정합)
-3. EC2 재부팅 후 상태 확인: 완료
-   1) SSM managed instance Online 확인
-   2) `query user` 결과 — USERNAME `administrator` / SESSIONNAME `console` / ID `1` / STATE `Active`
-   3) `whoami` 결과 — `nt authority\system`
-       - SSM RunCommand 자체가 SYSTEM 으로 실행되기 때문에 정상
-       - 필요한 조건은 별도 Administrator console interactive session 존재였고 본 일자에 Active 확인 완료
-4. 최종 실행 경로 확정: 완료
-   1) SSM RunCommand
-   2) `schtasks /Run /TN "Portfolio-KRX-Worker-Daily"`
-   3) Windows Scheduled Task
-   4) Administrator console interactive session
-   5) `powershell.exe -ExecutionPolicy Bypass -File C:\portfolio\run_krx_worker_daily.ps1`
-   6) `python interest_krx_login_new.py`
-   7) `python interest_program.py`
-   8) `python interest_shortsell.py`
-5. Scheduled Task 결과: 완료
-   1) TaskName: `Portfolio-KRX-Worker-Daily`
-   2) Logon Mode: Interactive only
-   3) Run As User: Administrator
-   4) `schtasks /Run` 요청 성공 — `SUCCESS: Attempted to run the scheduled task "Portfolio-KRX-Worker-Daily"`
-   5) 실행 중 상태 — Status `Running` / Last Result `267009`
-   6) 실행 완료 상태 — Status `Ready` / Last Result `0`
-   7) Last Run Time: 2026-06-16 04:55:49
-   8) worker local log: `C:\portfolio\logs\krx_worker_daily_20260616_045550.log`
-6. KRX worker log 결과: 완료
-   1) KRX login 성공 — `KRX ID/PW Login Success` / `KRX Login Ready` / elapsed 92.83s
-   2) `interest_program` — Collected Date 2026-06-15 / 2026-06-15 Collected
-   3) `interest_shortsell` — Collected Date 2026-06-15 / 2026-06-15 349 Company Collected
-   4) wrapper 완료 — `DONE :: KRX worker daily`
-   5) Python process 종료 확인
-   6) Chrome process 잔존 확인 — KRX debug attach 구조상 잔존 가능 / 후속 정리 옵션 분리(R-AUTO-017 신규)
-7. KRX DB 최신성 확인: 완료
-   1) `interest_program_raw` — max date 2026-06-15 / row count 547 → 548
-   2) `interest_shortsell_raw` — max date 2026-06-15 / row count 190,554 → 190,903
-   3) 2026-06-15 데이터 생성 확인
-   4) 중복 insert / upsert 동작은 정상 범위로 판단
-
-### 5. 최종 판단 / 후속 인계
-
-1. Crawler hybrid 구조 완료: 완료
-   1) non-GUI crawler = ECS / Fargate Task Definition revision 7 운영 경로 생성 + RunTask 성공
-   2) KRX GUI crawler = Windows EC2 worker + Autologon + Administrator interactive session + Scheduled Task + SSM trigger 성공
-   3) Preprocessor MS = ECS Fargate Task 유지 / raw 입력 데이터 회복 후 ECS 재실행 가능 상태 도달
-   4) non-GUI ECS / Fargate rev7 과 KRX EC2 worker 역할 분리 확정
-2. KRX GUI 수집 운영 방식 확정: 완료
-   1) Windows Autologon + Administrator interactive session + Scheduled Task + SSM trigger 구조 확정(OD-MS-022 신규)
-   2) Headless / SSM direct Python 실행 / Session 0 GUI 실행은 운영 방식에서 제외
-3. 본 일자 안전 / 문서 기록 점검: 완료
-   1) 실제 secret value / Administrator password / KRX 로그인 password / RDS password / RDS endpoint hostname / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 secret ARN / 실제 IAM Role ARN / image digest full sha256 / IAM access key id / instance-id / task ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder
-   2) Kiro 본 일자 작업으로 인한 AWS / SSM / EC2 / ECS / ECR / Docker / IAM / Secrets Manager / RDS / GRANT 변경 0건 — 모든 실제 작업은 운영자 직접 수행
-   3) Kiro 본 일자 작업으로 인한 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 미수정 — 운영자가 직접 작성한 `interest_crawler_daily_nongui.py` / Dockerfile / requirements.txt 변경분은 본 노트에 사실로만 기록(본문 전체 인용 0건)
-   4) broker / KIS / 주문 / 체결 / Daily Batch entrypoint 호출 0건 / `--execute` 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건
-   5) RDS DDL 0건 / DML 은 정상 raw 적재 + KRX program / shortsell 적재 한정
-   6) CloudWatch Logs 본문 / wrapper 로그(`krx_worker_daily_20260616_045550.log`) / SSM 응답 본문 / Selenium · Chrome stdout · stderr 전문 / Docker build 로그 평문 인용 0건
-   7) `secretsmanager:GetSecretValue` 결과값 평문 기록 0건 / 운영자만 호출 / Kiro 자동 검증 0건
-4. 후속 인계: 후속 분리
-   1) Preprocessor ECS 재실행 — `portfolio-paper-interest-preprocessor` 재실행 → exitCode 0 확인 → feature table max date / `updated_at` 확인 → 신규 feature date 생성 여부 확인(task 77 / R-DATA-010 mitigation 정합)
-   2) Backend AWS E2E dry-run 재개 — `BACKTEST_RESEARCH` → `BACKTEST_REPORT` → `DAILY_BUY_SIGNAL` → `DAILY_POSITION_SIGNAL` 순서. Research 가 Decision 보다 먼저 실행. 주문 전송 / execution 계열은 안전 기준에 따라 skip 또는 dry-run 만 수행(OD-MS-021 정합)
-   3) `interest_foreignindex_raw` HANGSENG / NIKKEI225 / SHANGHAI NULL 후속 점검 — non-blocker 분리 / 별도 일정에 점검
-   4) EventBridge Scheduler → SSM RunCommand → `schtasks /Run` 정기 trigger 연계(task 54)
-   5) Step Functions 에서 ECS Task + EC2 worker hybrid orchestration(task 55)
-   6) CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집(task 56)
-   7) wrapper 내 DB 검증 출력 자동 추가(task 57 / R-AUTO-007 정합)
-   8) EC2 worker 작업 완료 후 stop 절차 명시(task 59 / 비용 절감)
-   9) Chrome process 정리 옵션 검토(R-AUTO-017 신규)
-   10) View 구현 — 후속 예정
-
-
-## 2026-06-16 Crawler 데이터 미수집 해결 + KRX EC2 자동화 성공
-
-운영자가 2026-06-16 직접 수행한 (a) Crawler 데이터 미수집 원인 진단, (b) `interest_crawler_daily_nongui.py` 신규 + Docker rebuild + ECR push + ECS Task Definition `portfolio-paper-interest-crawler:7` 등록 + RunTask 성공, (c) non-GUI raw 6종 + KRX raw 2종 + news / agency 최신성 회복, (d) Windows EC2 worker Autologon bootstrap + Administrator console session Active 확인 + SSM RunCommand → `schtasks /Run` → Scheduled Task 흐름 재검증 결과를 누적 기록한다. 본 일자에 Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행했고, 실제 AWS / SSM / EC2 / ECS / ECR / Docker / IAM / Secrets Manager / RDS 작업은 운영자 직접 수행. 본 일자의 핵심은 2026-06-15 dry-run 에서 식별된 stale raw data 이슈를 hybrid execution model 운영 경로 정식 분리(non-GUI rev7 / KRX GUI Autologon + Scheduled Task)로 해소한 것이며, 실제 BUY / SELL / `--execute` / fill · position sync 자동 재시도 / aws-live 작업은 모두 0건이다(OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011 / OD-MS-021 정합).
-
-### 1. Crawler 데이터 미수집 원인 확인
-
-1. ECS / Fargate Crawler revision 6 의 실제 운영 의미: 확인
-   1) revision 6 의 `command` 는 실제 daily raw 수집 entrypoint 가 아니라 Selenium / Chrome smoke 검증용
-   2) log stream prefix `ecs-selenium-chrome-smoke` 가 1차 단서
-   3) 결과적으로 daily raw 수집은 실행된 적 없음
-2. 원본 `interest_crawler_daily.py` 의 ECS 직접 실행 부적합: 확인
-   1) 원본 wrapper 는 KRX GUI 단계(`interest_krx_login_new` / `interest_program` / `interest_shortsell`) 를 함께 호출
-   2) ECS / Fargate 에는 GUI / Display 가 없어 KRX GUI 단계가 부적합
-   3) 결과적으로 ECS 단독 실행 대상에서 제외되어 있음
-3. non-GUI 전용 orchestration / Task Definition 부재: 확인
-   1) 2026-06-13 §13 의 hybrid execution model 분류는 정의되어 있었지만
-   2) non-GUI daily 운영용 wrapper 와 Task Definition revision 이 분리되지 않은 상태
-   3) 결과적으로 raw 6종(`interest_price_raw` / `interest_investorflow_raw` / `interest_marketbreadth_raw` / `interest_commodity_raw` / `interest_foreignindex_raw` / `interest_macroeconomic_raw`) 의 ECS 자동 적재 경로가 비어 있었음
-4. 핵심 원인 정리: 미수집 원인은 ECS / IAM / Secrets / 네트워크 결함이 아니라 non-GUI 전용 운영 경로 부재(orchestration 누락)
-
-### 2. non-GUI crawler ECS / Fargate 운영 경로 생성
-
-1. 신규 orchestration 파일 생성: 완료
-   1) 파일: `interest_crawler_daily_nongui.py`
-   2) 생성 방식: Python patch script 기반(2026-06-12 §6 한글 literal 정합 정책 그대로 따름)
-   3) 저장 시 `encoding="utf-8"` 적용
-2. KRX GUI 계열 import 제외 확인
-   1) `interest_krx_login_new` 제외
-   2) `interest_program` 제외
-   3) `interest_shortsell` 제외
-3. non-GUI 계열 import 포함 확인
-   1) `interest_news`
-   2) `interest_agency`
-   3) `interest_foreignindex`
-   4) `interest_commodity`
-   5) `interest_macroeconomic`
-   6) `interest_price`
-   7) `interest_investorflow`
-   8) `interest_marketbreadth`
-4. 정적 검증
-   1) `py_compile` 통과
-   2) AST import 검증 통과(`interest_krx_login_new` / `interest_program` / `interest_shortsell` 잔존 0건)
-   3) Docker image 내부 파일 포함 확인(`/app/interest_crawler_daily_nongui.py` 존재)
-5. Docker build / ECR push: 완료
-   1) image tag: `portfolio-interest-crawler:paper-20260616-nongui`
-   2) image digest: 운영자 확인. 본 노트 평문 기록 0건(`<image-digest>` placeholder)
-   3) ECR push 성공
-6. Task Definition 등록: 완료
-   1) family: `portfolio-paper-interest-crawler`
-   2) revision: 7
-   3) image tag: `paper-20260616-nongui`
-   4) command: `["python", "interest_crawler_daily_nongui.py"]`
-   5) launch type: FARGATE
-   6) network mode: awsvpc
-   7) cpu: 1024 / memory: 2048
-   8) log group: `/portfolio/paper/crawler`
-   9) log stream prefix: `ecs-crawler-nongui-daily`
-   10) crawler-app DB secret 주입 유지
-7. RunTask 실행 결과: 성공
-   1) cluster: `portfolio-paper-cluster`
-   2) Task Definition: `portfolio-paper-interest-crawler:7`
-   3) RunTask submit 성공 / failures 0건
-   4) lastStatus: `STOPPED`
-   5) stopCode: `EssentialContainerExited`
-   6) container exitCode: 0
-   7) 실행 시간 약 9분 51초
-   8) CloudWatch log stream 생성 확인
-8. CloudWatch Logs step 결과: 전체 SUCCESS
-   1) `interest_news` SUCCESS
-   2) `interest_agency` SUCCESS
-   3) `interest_foreignindex` SUCCESS
-   4) `interest_commodity` SUCCESS
-   5) `interest_macroeconomic` SUCCESS
-   6) `interest_price` SUCCESS
-   7) `interest_investorflow` SUCCESS
-   8) `interest_marketbreadth` SUCCESS
-   9) 본문 전체 인용은 본 노트에서 생략(R-DOCS-001 / R-DOCS-002 정합)
-
-### 3. raw 최신성 회복
-
-1. `interest_price_raw`: 회복
-   1) 최신일: 2026-06-08 → 2026-06-15
-   2) row count: 1,207,904 → 1,209,624
-   3) 2026-06-15 시점 적재: 324 Price Collected
-2. `interest_investorflow_raw`: 회복
-   1) 최신일: 2026-06-08 → 2026-06-15
-   2) row count: 274,204 → 275,949
-   3) 2026-06-15 시점 적재: 349 Investor Collected
-3. `interest_marketbreadth_raw`: 회복
-   1) 최신일: 2026-06-08 → 2026-06-15
-   2) row count: 4,788 → 4,793
-4. `interest_commodity_raw`: 회복
-   1) 최신일: 2026-06-08 → 2026-06-15
-   2) row count: 29,132 → 29,162
-   3) 2026-06-15 시점 적재: 6 Commodity Collected
-5. `interest_foreignindex_raw`: 회복(부분 NULL non-blocker 분리)
-   1) 최신일: 2026-06-08 → 2026-06-15
-   2) row count: 33,738 → 33,766
-   3) 2026-06-15 일부 지수 NULL Data 확인: HANGSENG / NIKKEI225 / SHANGHAI
-   4) 전체 실패가 아니라 일부 지수 데이터 공백으로 분리(non-blocker 후보)
-   5) 본 일자 Preprocessor blocker 는 아닌 것으로 기록(R-DATA-009 / R-DATA-010 정합)
-6. `interest_news_raw`: 회복
-   1) 최신일: 2026-06-11 → 2026-06-16
-   2) row count: 68,881 → 71,614
-   3) 2026-06-16 시점 적재: 349 News Collected
-7. `interest_agency_raw`: 회복
-   1) 최신일: 2026-06-11 → 2026-06-16
-   2) row count: 49,018 → 49,044
-   3) 2026-06-16 시점 적재: 15 Agency Reports Collected
-8. `interest_macroeconomic_raw`: 회복
-   1) 최신일: 2026-06-08 → 2026-06-15
-   2) row count: 75,742 → 75,777
-   3) 2026-06-15 시점 적재: 7 Macro Collected
-9. 완료 판단
-   1) news / agency: 2026-06-16 최신화
-   2) price / investorflow / marketbreadth / commodity / foreignindex / macro: 2026-06-15 최신화
-   3) stale raw data 주요 원인 해소
-   4) Preprocessor 입력 데이터로 사용 가능한 수준 도달
-
-### 4. KRX EC2 worker 자동화 재검증
-
-1. 기존 실패 원인 정리(2026-06-13 §2 정합)
-   1) SSM direct Python 실행 또는 wrapper 직접 실행은 SYSTEM Session 0 / 비대화형 세션에서 실행됨
-   2) 해당 방식에서는 Chrome GUI 가 Administrator RDP 화면에 표시되지 않음
-   3) KRX 로그인 / nos_setup / 키보드보안 / iframe 제약으로 headless 또는 비대화형 수집은 부적합
-   4) 로컬 검증상 KRX headless / 비대화형 수집은 운영 방식에서 제외
-   5) 따라서 SSM direct Python 실행은 운영 방식에서 제외(OD-MS-022 정합)
-2. Autologon bootstrap: 완료
-   1) Microsoft Sysinternals Autologon 사용
-   2) Administrator 자동 로그인 설정 완료
-   3) Administrator password 본 노트 평문 기록 0건(`[REDACTED]`)
-   4) EC2 재부팅 후 SSM managed instance Online 확인
-3. Administrator console session Active 확인: 완료
-   1) `query user` 결과
-       - USERNAME: administrator
-       - SESSIONNAME: console
-       - ID: 1
-       - STATE: Active
-   2) `whoami` 결과: `nt authority\system`
-       - SSM RunCommand 자체가 SYSTEM 으로 실행되기 때문에 정상
-       - 필요한 조건은 별도 Administrator console interactive session 존재였고 Active 확인 완료
-   3) 결정 — Autologon 은 paper 전용 Windows worker 보안 예외로 기록(R-SEC-009)
-4. SSM RunCommand → `schtasks /Run` → Scheduled Task 흐름: 완료
-   1) SSM RunCommand 실행
-   2) `schtasks /Run /TN "Portfolio-KRX-Worker-Daily"`
-   3) Windows Scheduled Task 진입
-   4) Administrator console interactive session 위에서 wrapper 실행
-   5) 실행 명령: `powershell.exe -ExecutionPolicy Bypass -File C:\portfolio\run_krx_worker_daily.ps1`
-   6) `python interest_krx_login_new.py` 호출
-   7) `python interest_program.py` 호출
-   8) `python interest_shortsell.py` 호출
-5. Scheduled Task 결과: 완료
-   1) TaskName: `Portfolio-KRX-Worker-Daily`
-   2) Logon Mode: Interactive only
-   3) Run As User: Administrator
-   4) `schtasks /Run` 응답: `SUCCESS: Attempted to run the scheduled task "Portfolio-KRX-Worker-Daily"`
-   5) 실행 중 상태: Status `Running` / Last Result `267009`
-   6) 실행 완료 상태: Status `Ready` / Last Result `0`
-   7) Last Run Time: 2026-06-16 04:55:49
-   8) wrapper 로그: `C:\portfolio\logs\krx_worker_daily_20260616_045550.log`
-6. KRX worker 로그 결과(파일 본문 전체는 본 노트 미인용 / 사실만 기록)
-   1) KRX login 성공: `KRX ID/PW Login Success` / `KRX Login Ready` / elapsed=92.83s
-   2) `interest_program` 성공: Collected Date 2026-06-15 / 2026-06-15 Collected
-   3) `interest_shortsell` 성공: Collected Date 2026-06-15 / 2026-06-15 349 Company Collected
-   4) wrapper 완료: `DONE :: KRX worker daily`
-   5) Python process 종료 확인
-   6) Chrome process 잔존 확인 — KRX debug attach 구조상 잔존 가능 / 후속 정리 옵션 분리(R-AUTO-017)
-7. KRX DB 최신성: 완료
-   1) `interest_program_raw`: max date 2026-06-15 / row count 547 → 548
-   2) `interest_shortsell_raw`: max date 2026-06-15 / row count 190,554 → 190,903
-   3) 2026-06-15 데이터 생성 확인
-   4) 중복 insert / upsert 동작은 정상 범위로 판단
-8. SSM direct Python 실행 / Headless / 비대화형 KRX 수집 운영 방식 제외 결정 락(OD-MS-022 정합)
-   1) SSM direct Python 실행: 제외
-   2) Headless KRX 수집: 로컬 검증상 제외
-   3) 비대화형 GUI 실행: 제외
-   4) 운영 방식 = Windows Autologon + Administrator interactive session + Scheduled Task + SSM trigger 단일 흐름
-
-### 5. 최종 판단
-
-1. Crawler hybrid 구조 완료(non-GUI = ECS / Fargate Task Definition revision 7 / KRX GUI = Windows EC2 worker + Autologon + Scheduled Task + SSM trigger / Preprocessor = ECS / Fargate Task 유지)
-2. non-GUI crawler 운영 경로 생성 + RunTask 성공 + raw 최신성 회복으로 Crawler 데이터 미수집 해결: 완료
-3. KRX EC2 worker 자동 로그인 기반 운영 방식 1차 실증: 완료
-4. Preprocessor ECS 재실행 가능 상태 도달(raw 입력 데이터 회복 후 재실행 전 단계까지 도달 / 재실행 자체는 후속)
-5. 남은 후속
-   1) Preprocessor ECS 재실행 → exitCode 0 확인 → feature table max date / `updated_at` / 신규 feature date 생성 여부 확인(task 77 / R-DATA-010 mitigation 정합)
-   2) Backend AWS E2E dry-run 재개 — `BACKTEST_RESEARCH` → `BACKTEST_REPORT` → `DAILY_BUY_SIGNAL` → `DAILY_POSITION_SIGNAL` 순서 / Research 우선 / 주문 · execution 계열 skip 또는 dry-run(OD-MS-021 정합)
-   3) View 구현(05 spec 후속 phase)
-   4) `interest_foreignindex_raw` HANGSENG / NIKKEI225 / SHANGHAI NULL Data 후속 점검
-   5) EventBridge Scheduler 정기 trigger / Step Functions hybrid orchestration / CloudWatch Logs Agent · SSM output 기반 EC2 worker 로그 수집 / wrapper 내 DB 검증 출력 자동 추가 / EC2 worker 작업 완료 후 stop 절차 / Chrome process 정리 옵션은 후속 분리
-
-### 6. 본 일자 안전 / 문서 기록 점검
-
-1. 실제 secret value / Administrator password / KRX 로그인 password / KIS app key / KIS app secret / 계좌번호 / token / RDS endpoint hostname / RDS password / IAM access key id / account-id / 실제 ARN / image digest / instance-id / task ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
-2. Autologon 자격 증명(Administrator password)은 본 노트 / 운영 문서 / 콘솔 캡처 평문 기록 0건. R-DOCS-001 / R-SEC-009 정합.
-3. Kiro 본 일자 작업으로 인한 AWS / SSM / EC2 / ECS / ECR / Docker / IAM / Secrets Manager / RDS / GRANT 변경 0건. 모든 실제 작업은 운영자 직접 수행.
-4. Kiro 본 일자 작업으로 인한 8개 MS(`port-view`, `port-marketconnector`, `port-interest-crawler`, `port-interest-preprocessor`, `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research`) README / AGENTS.md / CHANGELOG / docs / worklog / 패키징 미수정. 운영자가 직접 작성한 `port-interest-crawler` 의 `interest_crawler_daily_nongui.py` / Dockerfile / requirements.txt 변경분은 본 노트에 사실로만 기록(본문 전체 인용 0건).
-5. Kiro 본 일자 작업으로 인한 외부 호출 / 크롤링 / 주문 / RDS DDL · DML 0건. 운영자 직접 수행한 ECS RunTask / SSM RunCommand / KRX worker 실행 / Docker build / ECR push 결과만 본 노트 §1 ~ §4 에 사실 기록.
-6. broker / KIS 호출 0건. 신규 주문 / 매수 / 매도 / 취소 / 정정 / `--execute` 0건. fill / position sync 자동 재시도 0건.
-7. RDS DDL 0건 / DML 은 crawler RunTask + KRX worker wrapper 의 정상 흐름(`interest_*_raw` upsert) 한정.
-8. aws-live 작업 0건 — 본 일자는 `aws-paper` 한정.
-9. CloudWatch Logs 본문 / wrapper 로그(`krx_worker_daily_*.log`) / SSM 응답 본문 / Selenium · Chrome stdout · stderr 전문 / Docker build 로그 본 노트 평문 인용 0건. 사실(파일명 / step SUCCESS / row count / max date)만 기록.
-
-### 7. 후속 인계
-
-1. Preprocessor ECS 재실행 — `portfolio-paper-interest-preprocessor` 단발 RunTask → exitCode 0 → feature table max date / `updated_at` 확인 → 신규 feature date 생성 여부 확인(task 77)
-2. preprocessor 실행 후 raw / feature 최신성 검증 SQL 자동화(task 78 / R-DATA-009 / R-DATA-010 mitigation 정합)
-3. Backend AWS E2E dry-run 재개 — Research 우선 / 주문 · execution 계열 skip 또는 dry-run(OD-MS-021 정합)
-4. EventBridge Scheduler → SSM RunCommand → `schtasks /Run` 정기 trigger 연계(task 54)
-5. Step Functions 에서 ECS Task + EC2 worker 혼합 orchestration(task 55)
-6. CloudWatch Logs Agent 또는 SSM output 기반 EC2 worker 로그 수집(task 56)
-7. wrapper 내 DB 검증 출력 자동 추가(task 57 / R-AUTO-007 정합)
-8. EC2 worker 작업 완료 후 stop 절차 명시(task 59)
-9. Chrome process 잔존 정리 옵션(R-AUTO-017 정합)
-10. View 구현(05 spec 후속 phase)
-
-
 ## 2026-06-17 Daily AWS 17-step E2E 완료 (Interest Crawler + Preprocessor)
 
-운영자가 같은 일자 첫 번째 세션(MarketConnector 조회성 dry-run 재검증) 후속으로 직접 수행한 Daily AWS 17-step E2E 흐름이 본 일자에 끝까지 연결됐다. 본 spec 범위에 해당하는 step 은 2번 `INTEREST_CRAWLER` / 3번 `PREPROCESSOR` 2개. 자세한 17 step 전체 진행 상태는 03 / 04 / 09 spec operation-notes 의 2026-06-17 섹션 참조. Kiro 는 문서 작성 / 절차 정리만 수행. 실제 ECS RunTask / SSM RunCommand / Windows EC2 worker 작업은 운영자 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. KRX GUI = Windows interactive desktop session 기반 유지 / non-GUI + KRX GUI hybrid 구조 1차 실증 정합(OD-MS-011 / OD-MS-022 정합).
+**Summary** — Daily AWS 17-step E2E 흐름이 본 일자에 끝까지 연결됨.
+
+- 본 spec 범위 step: 2번 `INTEREST_CRAWLER` / 3번 `PREPROCESSOR`
+- 17 step 전체 진행 상태: 03 / 04 / 09 spec operation-notes 의 2026-06-17 섹션 참조
+- Kiro: 문서 / 절차 정리만. 운영자: 실제 ECS RunTask / SSM RunCommand / Windows EC2 worker 작업 직접 수행
+- 안전: `aws-paper` 한정 / aws-live 작업 0건 / hybrid 구조 1차 실증 정합(OD-MS-011 / OD-MS-022 정합)
 
 ### 1. Step 2 `INTEREST_CRAWLER`
 
@@ -1300,16 +995,26 @@
 ### 3. 안전 / 보안 점검 결과
 
 1. 본 일자 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 변경 0건. 운영자가 직접 수행한 SSM RunCommand / Windows EC2 worker stop / KRX wrapper 실행 결과는 본 노트에 사실로만 기록.
-2. 실제 secret value / Administrator password / KRX 로그인 password / RDS password / RDS endpoint hostname / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 secret ARN / 실제 IAM Role ARN / image digest full sha256 / IAM access key id / instance-id / task ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder. 운영 식별자(Task Definition family `portfolio-paper-interest-crawler` / `portfolio-paper-interest-preprocessor` / Scheduled Task `Portfolio-KRX-Worker-Daily` / 적재 일자 2026-06-16 / feature 최신일 2026-06-16) 만 사실 기록.
+2. 아래 민감정보 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder:
+   - secret value / Administrator password / KRX 로그인 password / RDS password / RDS endpoint hostname
+   - KIS app key / KIS app secret / 계좌번호 / token
+   - account-id / 실제 secret ARN / 실제 IAM Role ARN / image digest full sha256 / IAM access key id / instance-id / task ARN
+
+   운영 식별자만 사실 기록: Task Definition family `portfolio-paper-interest-crawler` / `portfolio-paper-interest-preprocessor` / Scheduled Task `Portfolio-KRX-Worker-Daily` / 적재 일자 2026-06-16 / feature 최신일 2026-06-16.
 3. AWS / SSM / EC2 / ECS / ECR / Docker / IAM / Secrets Manager / RDS / GRANT 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / wrapper 로그(`krx_worker_daily_*.log`) / SSM 응답 본문 / Selenium · Chrome stdout 본 노트 평문 인용 0건.
 4. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 본 spec 범위 직접 호출 0건. RDS DDL 0건. DML 은 본 일자 17-step 정상 흐름 한정 — `interest.interest_*_raw` insert / `pre_total.pre_total_*_feature` insert / `pre_*.*_feature` insert.
 5. crawler worker stop 요청은 운영자 직접 작업으로 수행 — Autologon 노출 시간 최소화(R-SEC-009 mitigation 정합). 다음 실행 시 EC2 start 후 Administrator console session Active pre-check 흐름 정합(R-AUTO-016 mitigation 정합).
 6. live 자동 crawler / preprocessor 실행은 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. Daily AWS 17-step E2E paper 1차 통과로 backend AWS E2E 의 2번 / 3번 step 정합 — OD-MS-011 / OD-MS-020 / OD-MS-022 mitigation 1차 실증 / Status 기존 값 그대로 유지.
 
-
 ## 2026-06-20 AWS 자동 Wrapper 최종 확인 + 6/18 중복 실행 시도 안전 중단 + 6/19 KRX raw 최신성 복구 상태
 
-운영자가 2026-06-20 직접 수행한 (a) Daily AWS Paper Wrapper 구조 / 안전 기준 / EC2 기동 기준 최종 점검, (b) RunDate `2026-06-18` / Step 1 ~ Step 11 범위 wrapper 재실행 시도 안전 중단, (c) 6/19 KRX raw DB 최신성 복구 상태 점검 결과를 누적 기록한다. 본 일자에 Kiro 는 문서 작성 / 절차 정리만 수행했고, 실제 AWS / SSM / EC2 / RDS 작업은 운영자가 직접 진행했다. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건 / 신규 broker · KIS 주문 제출 0건 / `--execute` 호출 0건.
+**Summary** — Daily wrapper 구조 / 안전 기준 / EC2 기동 기준 최종 점검 + 6/18 중복 실행 시도 안전 중단.
+
+- (a) Daily AWS Paper Wrapper 구조 / 안전 기준 / EC2 기동 기준 최종 점검
+- (b) RunDate `2026-06-18` / Step 1 ~ Step 11 범위 wrapper 재실행 시도 안전 중단(Step 12 미실행 확인)
+- (c) 6/19 KRX raw DB 최신성 복구 상태 점검
+- Kiro: 문서 / 절차 정리만. 운영자: 실제 AWS / SSM / EC2 / RDS 작업 직접 수행
+- 안전: `aws-paper` 한정 / aws-live 작업 0건 / 신규 broker · KIS 주문 제출 0건 / `--execute` 호출 0건
 
 ### 1. Daily AWS Paper Wrapper 최종 점검 (구조 / 안전 기준 / EC2 기동 기준): 완료
 
@@ -1386,7 +1091,21 @@
 
 ## 2026-06-21 Step 2 `INTEREST_CRAWLER` 성공판정 강화 + KRX raw DB validation 연동
 
-운영자가 2026-06-21 직접 수행한 (a) `step-02-interest-crawler.ps1` 성공판정 강화, (b) non-GUI ECS crawler env 보강, (c) `interest_krx_raw_validate_daily.py` 신규 생성 + S3 presigned URL 경유 Windows crawler worker EC2 배포 + EC2 단독 검증, (d) `step-02-interest-crawler.ps1` DB validation 연동, (e) crawler worker stopped fail-closed 처리, (f) Step 2 단독 실행 검증 결과를 누적 기록한다. 본 일자에 Kiro 는 문서 작성 / 절차 정리만 수행했고, 실제 코드 작성 / py_compile / S3 업로드 / SSM RunCommand / EC2 단독 검증 / wrapper 단독 실행은 모두 운영자가 직접 진행했다. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건 / 신규 broker · KIS 주문 제출 0건 / `--execute` 호출 0건.
+**Summary** — Step 2 성공판정 강화 + KRX raw DB validation 연동(OD-MS-026 / R-AUTO-020 신규 mitigation).
+
+작업 범위:
+
+- (a) `step-02-interest-crawler.ps1` 성공판정 강화
+- (b) non-GUI ECS crawler env 보강(`TEMP=/tmp` / `TMP=/tmp` / `PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8`)
+- (c) `interest_krx_raw_validate_daily.py` 신규 생성 + S3 presigned URL 경유 Windows crawler worker EC2 배포 + EC2 단독 검증
+- (d) `step-02-interest-crawler.ps1` DB validation 연동(`INTEREST_CRAWLER_KRX_DB_VALIDATE` SSM step)
+- (e) crawler worker stopped fail-closed 처리(skip → fail-closed)
+- (f) Step 2 단독 실행 검증
+
+안전:
+
+- Kiro: 문서 / 절차 정리만. 운영자: 실제 코드 작성 / py_compile / S3 업로드 / SSM RunCommand / EC2 단독 검증 / wrapper 단독 실행 직접 수행
+- `aws-paper` 한정 / aws-live 작업 0건 / 신규 broker · KIS 주문 제출 0건 / `--execute` 호출 0건
 
 ### 1. `step-02-interest-crawler.ps1` 성공판정 강화: 완료
 
@@ -1540,7 +1259,16 @@
 3. 실제 secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / EIP / image digest full sha256 / task ARN / job ARN / KIS paper login credential / Administrator password / S3 presigned URL 실값 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
 4. AWS / SSM / EC2 / S3 / ECS / RDS / KRX 호출은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. AWS CLI / boto3 실행 0건. AWS 리소스 생성 / 수정 / 삭제 0건. CloudWatch Logs 본문 / SSM 응답 본문 / 운영자 PowerShell stdout 전문 평문 인용 0건.
 5. 운영자 직접 작성 / patch 한 `port-interest-crawler/interest_krx_raw_validate_daily.py` / `step-02-interest-crawler.ps1` / `daily-aws-paper.functions.ps1` 변경분은 본 노트에 사실로만 기록(본문 전체 인용 0건 / R-DOCS-001 정합). 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 패키징 본 일자 작업으로 인한 변경 0건(spec 영역).
-6. 운영 식별자(SSM commandId 4종 `dd8e0f3e-df9a-4268-b11a-eea3f3df66c3` / `c844aea5-1429-430a-9510-39fc99f17f05` / `2279c6d7-2da6-4317-9c10-7cc77374b317` / `f9d82fcc-1e26-4710-87c3-1d20483b63ef` / RunId `daily-aws-paper-20260621-204017` / taskDefinition `portfolio-paper-interest-crawler:7` / taskId `78979b5cbb714d0eb94f5946e15a14ce` / S3 key `tmp/krx/interest_krx_raw_validate_daily.py` / Scheduled Task 이름 `Portfolio-KRX-Worker-Daily` / latest worker log 파일명 `krx_worker_daily_20260621_114154.log` / wrapper 옵션 `-StartStep` · `-EndStep` / DB session user `crawler_app` / schema `interest` / search_path `interest, reference, legacy, public` / row_count 1 · 349 / max_date 2026-06-19) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님.
+6. 운영 식별자만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님:
+   - SSM commandId 4종: `dd8e0f3e-df9a-4268-b11a-eea3f3df66c3` / `c844aea5-1429-430a-9510-39fc99f17f05` / `2279c6d7-2da6-4317-9c10-7cc77374b317` / `f9d82fcc-1e26-4710-87c3-1d20483b63ef`
+   - RunId: `daily-aws-paper-20260621-204017`
+   - Task Definition / taskId: `portfolio-paper-interest-crawler:7` / `78979b5cbb714d0eb94f5946e15a14ce`
+   - S3 key: `tmp/krx/interest_krx_raw_validate_daily.py`
+   - Scheduled Task: `Portfolio-KRX-Worker-Daily`
+   - latest worker log: `krx_worker_daily_20260621_114154.log`
+   - wrapper 옵션: `-StartStep` · `-EndStep`
+   - DB session: user `crawler_app` / schema `interest` / search_path `interest, reference, legacy, public`
+   - DB validation 결과: row_count 1 · 349 / max_date 2026-06-19
 
 ### 8. 본 일자 범위 밖 / 후속 인계: 정리
 
@@ -1551,10 +1279,14 @@
 5. Step 12 실제 paper 주문 제출은 별도 승인 전까지 실행하지 않음(OD-SAFE-002 / OD-SAFE-003 / R-AUTO-002 정합)
 6. 본 일자 작업 범위는 Step 2 보강 완료로 마감 — Step 3 PREPROCESSOR 이후 단계는 본 일자 다음 작업으로 강제하지 않음
 
-
 ## 2026-06-22 Daily AWS Paper Step 2 / Step 3 재검증 (OD-MS-026 1차 실증 Daily run 회귀)
 
-운영자가 2026-06-22 직접 수행한 Daily AWS Paper Wrapper 1 ~ 17 두 번째 실 운영 실행 중 본 spec 책임 step(Step 2 / Step 3) 결과를 누적 기록한다. 2026-06-21 Step 2 성공판정 강화(OD-MS-026 신규 / R-AUTO-020 신규 mitigation) + KRX raw DB validation 연동이 본 일자 실 Daily run 에서 재검증 통과. 환경 `aws-paper` / RunDate `2026-06-22` / region `ap-northeast-2`. Kiro 는 문서 작성 / 절차 정리만 수행 / 실제 ECS RunTask / SSM RunCommand / Windows EC2 worker / RDS 작업은 모두 운영자가 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. broker · KIS / 주문 / 체결 / Daily Batch entrypoint 직접 호출은 본 spec 범위에서 0건.
+**Summary** — Daily wrapper 2회차 실 운영 실행에서 Step 2 / Step 3 회귀 0건 재검증.
+
+- 환경: `aws-paper` / RunDate `2026-06-22` / region `ap-northeast-2`
+- 재검증 통과: 2026-06-21 Step 2 성공판정 강화(OD-MS-026 / R-AUTO-020) + KRX raw DB validation 연동
+- Kiro: 문서 / 절차 정리만. 운영자: 실제 ECS RunTask / SSM RunCommand / Windows EC2 worker / RDS 작업 직접 수행
+- 안전: `aws-paper` 한정 / aws-live 작업 0건 / broker · KIS / 주문 / 체결 / Daily Batch entrypoint 직접 호출 0건
 
 ### 1. Step 2 `INTEREST_CRAWLER` 재검증 (OD-MS-026 정합)
 

@@ -1,6 +1,7 @@
 # Validation Checklist — 06-secrets-and-iam
 
-본 문서는 [`./runbook.md`](./runbook.md) 의 [확인] / 완료 기준을 4종 라벨 기반 체크리스트로 정리한 최소판이다. 본 spec(06) 1차 적용 환경은 `aws-paper`, region 은 `ap-northeast-2`, 1차 적용 대상은 MarketConnector EC2.
+본 문서는 [`./runbook.md`](./runbook.md) 의 [확인] / 완료 기준을 4종 라벨 기반 체크리스트로 정리한 최소판이다.
+본 spec(06) 1차 적용 환경은 `aws-paper`, region 은 `ap-northeast-2`, 1차 적용 대상은 MarketConnector EC2.
 
 라벨 규칙(본 문서 외 라벨 사용 금지):
 
@@ -11,7 +12,10 @@
 
 보안 / 안전 원칙
 
-- 모든 secret value, KIS app key, KIS app secret, 계좌번호, RDS endpoint hostname, RDS password, account-id, 실제 secret ARN, IAM access key id, Slack webhook URL 은 `[REDACTED]` 또는 placeholder 만 사용. 본 문서에 평문 기록 금지.
+- 아래 항목은 `[REDACTED]` 또는 placeholder 만 사용. 본 문서에 평문 기록 금지.
+  - secret value / KIS app key / KIS app secret / 계좌번호
+  - RDS endpoint hostname / RDS password / account-id
+  - 실제 secret ARN / IAM access key id / Slack webhook URL
 - `secretsmanager:GetSecretValue` 실호출은 운영자만. Kiro 자동 검증은 `secretsmanager:DescribeSecret` metadata 만.
 - 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 미수정.
 - 실제 AWS 리소스 미생성 / 미수정 / 미삭제. 본 체크리스트는 점검 / 결과 기록만 한다.
@@ -55,7 +59,12 @@
 - [운영자 확인 필요] Permission Policy 에 `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` 만 허용. 다른 ssm Action 0건
 - [운영자 확인 필요] Permission Policy Resource 에 `"*"` 0건
 - [운영자 확인 필요] Permission Policy Resource 에 `Action: "*"` / `secretsmanager:*` / `ssm:*` 0건
-- [운영자 확인 필요] Permission Policy Resource 에 다른 service prefix(`/portfolio/paper/view/*`, `/portfolio/paper/crawler/*`, `/portfolio/paper/preprocessor/*`, `/portfolio/paper/strategy/*`, `/portfolio/paper/research/*`) 0건
+- [운영자 확인 필요] Permission Policy Resource 에 다른 service prefix 0건 (아래 5종)
+  - `/portfolio/paper/view/*`
+  - `/portfolio/paper/crawler/*`
+  - `/portfolio/paper/preprocessor/*`
+  - `/portfolio/paper/strategy/*`
+  - `/portfolio/paper/research/*`
 - [운영자 확인 필요] Permission Policy Resource 에 다른 환경 prefix(`/portfolio/live/...`) 0건
 - [운영자 확인 필요] Permission Policy Resource 의 secret ARN 4건 / parameter ARN prefix 1건이 design §4.2 매트릭스와 일치
 - [운영자 확인 필요] CMK 사용 결정이 없는 경우 Policy 안 `kms:Decrypt` statement 0건. CMK 사용 결정 시에만 해당 KMS Key ARN 만 한정
@@ -84,15 +93,18 @@
 
 ## 7. Connector smoke test (조회성만)
 
-- [운영자 확인 필요] 임시 export 스크립트 실행 후 `INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD` 환경변수가 현재 shell 에 주입됨 (값 표시 / 로그 기록 금지)
-- [운영자 확인 필요] 임시 export 스크립트 실행 후 `APP_KEY`, `APP_SECRET`, `BASE_URL`, `PAPER_ACNT`, `ACNT_PRDT_CD`, `PORT_ENVIRONMENT`, `PORT_BROKER_NAME` 환경변수 주입됨
+- [운영자 확인 필요] 임시 export 스크립트 실행 후 아래 DB 환경변수가 현재 shell 에 주입됨 (값 표시 / 로그 기록 금지)
+  - `INTEREST_DB_HOST` / `INTEREST_DB_PORT` / `INTEREST_DB_NAME` / `INTEREST_DB_USER` / `INTEREST_DB_PASSWORD`
+- [운영자 확인 필요] 임시 export 스크립트 실행 후 아래 KIS / 설정 환경변수 주입됨
+  - `APP_KEY` / `APP_SECRET` / `BASE_URL` / `PAPER_ACNT` / `ACNT_PRDT_CD` / `PORT_ENVIRONMENT` / `PORT_BROKER_NAME`
 - [운영자 확인 필요] 임시 export 스크립트 / 환경변수 값이 파일 / 로그 / 콘솔 캡처에 평문 저장되지 않음
 - [운영자 확인 필요] RDS `marketconnector_app` 접속 성공 (DDL/DML 미실행, 조회만)
 - [운영자 확인 필요] KIS token 발급 또는 기존 `access_token.txt` 재사용 정상 동작
 - [운영자 확인 필요] `connector_balance.py` 잔고 조회 성공
 - [운영자 확인 필요] `connector_order_check.py` 주문 / 체결 조회 성공
 - [운영자 확인 필요] Flask 조회성 endpoint smoke test 통과 (잔고 / 보유 / 주문 내역 등)
-- [운영자 확인 필요] 본 검증 동안 신규 주문 / 매수 / 매도 / 취소 / 정정 API 호출 0건 (`connector_buy.py`, `connector_sell.py`, `connector_cancel.py`, `connector_modify.py` 미실행)
+- [운영자 확인 필요] 본 검증 동안 신규 주문 / 매수 / 매도 / 취소 / 정정 API 호출 0건
+  - 미실행 대상: `connector_buy.py`, `connector_sell.py`, `connector_cancel.py`, `connector_modify.py`
 
 ## 8. 완료 기준
 
@@ -100,12 +112,19 @@
 - [운영자 확인 필요] Instance Role 자격증명만으로 본 spec 4건 secret + 6건 parameter read 가능
 - [운영자 확인 필요] IAM Permission Policy 에 Resource wildcard / Action wildcard / 다른 service prefix / 다른 환경 prefix 0건
 - [운영자 확인 필요] RDS `marketconnector_app` 조회 + KIS 조회성 smoke test 통과
-- [O] 본 문서 / `requirements.md` / `README.md` / `design.md` / `tasks.md` / `runbook.md` 어디에도 실제 secret value, KIS app key, KIS app secret, 계좌번호, RDS endpoint hostname, RDS password, account-id, 실제 secret ARN, IAM access key id, Slack webhook URL 평문 기록 0건
+- [O] 본 문서 / `requirements.md` / `README.md` / `design.md` / `tasks.md` / `runbook.md` 어디에도 아래 항목 평문 기록 0건
+  - secret value / KIS app key / KIS app secret / 계좌번호
+  - RDS endpoint hostname / RDS password / account-id
+  - 실제 secret ARN / IAM access key id / Slack webhook URL
 
 ## 9. 후속 인계
 
 - [Kiro 후속 작업 필요] [`./operation-notes.md`](./operation-notes.md) 에 본 체크리스트 결과(일자별 누적) 기록 템플릿 작성. secret 값 미기록, 성공 / 실패만 기록.
-- [Kiro 후속 작업 필요] [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 에 OD-SEC-001 / OD-OBS-004 갱신 + 신규 OD-SEC-005 / OD-SEC-006 후보 반영 (운영자 승인 시).
-- [Kiro 후속 작업 필요] [`../_common/risk-register.md`](../_common/risk-register.md) 에 R-SEC 후보 4건(권한 과다 / EC2 secret 평문 노출 / EC2 access key 파일 / naming 불일치) 다음 가용 ID 로 등록 (운영자 승인 시).
+- [Kiro 후속 작업 필요] [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 갱신 (운영자 승인 시)
+  - OD-SEC-001 / OD-OBS-004 갱신
+  - 신규 OD-SEC-005 / OD-SEC-006 후보 반영
+- [Kiro 후속 작업 필요] [`../_common/risk-register.md`](../_common/risk-register.md) 등록 (운영자 승인 시)
+  - R-SEC 후보 4건: 권한 과다 / EC2 secret 평문 노출 / EC2 access key 파일 / naming 불일치
+  - 다음 가용 ID 로 등록
 - [Kiro 후속 작업 필요] [`../_common/followups-overview.md`](../_common/followups-overview.md) 의 06 섹션 갱신 (1차 적용 환경 / 1차 범위 / 범위 밖 / 03 인계).
 - [운영자 확인 필요] 본 spec 결정과 본 체크리스트 통과 결과를 03-marketconnector-ec2 spec 진입 입력으로 인계 (Instance Role 정책 / Access Key 미사용 원칙 / Task Role 골격).

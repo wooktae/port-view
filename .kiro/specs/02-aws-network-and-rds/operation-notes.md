@@ -33,9 +33,20 @@
 
 ## 2026-06-08 Kiro ReadOnly 검증 IAM 설계 및 자동 검증 결과
 
-- Kiro ReadOnly 검증 IAM 설계 완료: 사용자 이름 `portfolio-kiro-readonly-validator`, 정책 이름 `PortfolioKiroReadOnlyValidatorPolicy`. 상세 설계는 [`../../docs/kiro-readonly-validator-iam.md`](../../docs/kiro-readonly-validator-iam.md). 정책에는 ec2/rds/secretsmanager(metadata 한정)/iam/cloudwatch/logs/tag ReadOnly만 포함하고, `secretsmanager:GetSecretValue`와 KMS Decrypt는 명시 Deny.
+- Kiro ReadOnly 검증 IAM 설계 완료.
+  - 사용자 이름 `portfolio-kiro-readonly-validator` / 정책 이름 `PortfolioKiroReadOnlyValidatorPolicy`
+  - 상세 설계 참조: [`../../docs/kiro-readonly-validator-iam.md`](../../docs/kiro-readonly-validator-iam.md)
+  - 정책 포함: ec2 / rds / secretsmanager(metadata 한정) / iam / cloudwatch / logs / tag ReadOnly
+  - 명시 Deny: `secretsmanager:GetSecretValue`, KMS Decrypt
 - 자동 검증 실행: AWS CLI ReadOnly 호출만 사용. 리소스 생성/수정/삭제 없음. SecretsManager는 DescribeSecret만 호출하고 GetSecretValue는 호출하지 않음.
-- 자동 검증 가능 항목: VPC, 6개 Subnet, IGW attach, NAT 미생성, NAT 역할 EC2 미생성, Route Table 3종(rt-public 0/0→IGW, rt-app/rt-data 외부 라우트 없음), SG 8개 인벤토리, sg-rds-postgres inbound SG 참조만(0/0:5432 없음), SSH 22 0/0 inbound 0건, sg-vpc-endpoints inbound, 운영 SG outbound 표 일치 점검, VPC Endpoint 6종 available + Private DNS + sgroup-vpc-endpoints, RDS subnet group / parameter group / instance(class/storage/public access/backup retention/deletion protection/encryption/parameter group in-sync) — 모두 기대값 일치.
+- 자동 검증 가능 항목 — 모두 기대값 일치.
+  - VPC / 6개 Subnet / IGW attach
+  - NAT 미생성 / NAT 역할 EC2 미생성
+  - Route Table 3종(rt-public 0/0→IGW, rt-app/rt-data 외부 라우트 없음)
+  - SG 8개 인벤토리 / sg-rds-postgres inbound SG 참조만(0/0:5432 없음) / SSH 22 0/0 inbound 0건
+  - sg-vpc-endpoints inbound / 운영 SG outbound 표 일치 점검
+  - VPC Endpoint 6종 available + Private DNS + sgroup-vpc-endpoints
+  - RDS subnet group / parameter group / instance(class / storage / public access / backup retention / deletion protection / encryption / parameter group in-sync)
 - 자동 검증 완료 항목 수: 약 38건 (Network 13 + SG 16 + VPC Endpoint 8 + RDS 11에서 자동 가능한 부분 포함, 일부 sub-항목 합산 추정).
 - 수동 확인 필요 항목 수: 약 31건 (Pre-flight 운영자 인지 / 비용 프로파일 결정 인지 / RDS PITR Console 확인 / Cost Validation Billing Dashboard / DB SQL 미실행 / Cutover 합의 / Rollback 미수행 / Documentation 사람 점검 등).
 - 불일치 항목 수: 0건. 기존 `sgroup-marketconnector-ec2` outbound는 AWS CLI 출력 구조상 list 표기 차이로 [X] 후보였으나, 실제 규칙은 HTTPS 0.0.0.0/0 + sgroup-vpc-endpoints(443) + sgroup-rds-postgres(5432)를 모두 충족하므로 운영 불일치 없음.
@@ -71,7 +82,13 @@
   - §1 aws-paper 대상 작업인지 확인 — operator-decisions.md At a Glance OD-ENV-003 = `aws-paper` 🟢 확정과 본 spec 일관 비교로 [O].
   - §9 operator-decisions.md 본 spec 결정 상태 일치 — OD-ENV / OD-NET / OD-RDS / OD-DB / OD-CUT / OD-SAFE 카테고리 모든 핵심 결정이 본 spec design / runbook / decision-matrix와 일관(불일치 0건)으로 [O].
   - §9 risk-register.md mitigation 점검 — R-NET-001~003 / R-SEC-001 / R-DATA-001~002 / R-AUTO-001~002 / R-DOCS-001 / R-COST-001~002 / R-SEC-002~003 mitigation 본문이 본 spec의 design / runbook / validation-checklist 통제와 일관으로 [O].
-  - §9 secret 자리 [REDACTED] 일관성 — `.kiro/**/*.md` 트리에 대해 (AKIA|ASIA) access key id / Slack incoming webhook URL / JWT / `(PASSWORD|SECRET|TOKEN|APP_KEY|APP_SECRET)=값` / `aws_secret_access_key=값` / `KIS*KEY|SECRET|TOKEN=값` / 계좌번호 평문 패턴 grep 모두 0건. [REDACTED-CANDIDATE] 출력 없음. [O]로 격상. repo 외부(콘솔 캡처 / 개인 노트 / 외부 PC 파일)는 §1 [운영자 확인 필요]로 분리 유지.
+  - §9 secret 자리 [REDACTED] 일관성 — `.kiro/**/*.md` 트리에 대해 아래 패턴 grep 모두 0건. [REDACTED-CANDIDATE] 출력 없음. [O]로 격상. repo 외부(콘솔 캡처 / 개인 노트 / 외부 PC 파일)는 §1 [운영자 확인 필요]로 분리 유지.
+    - `(AKIA|ASIA)` access key id
+    - Slack incoming webhook URL / JWT
+    - `(PASSWORD|SECRET|TOKEN|APP_KEY|APP_SECRET)=값`
+    - `aws_secret_access_key=값`
+    - `KIS*KEY|SECRET|TOKEN=값`
+    - 계좌번호 평문 패턴
 - 유지한 항목 (Kiro 후속 작업 필요)
   - §8 Endpoint-Hours 청구 매칭 — Cost Explorer ReadOnly(`ce get-cost-and-usage`)로 USAGE_TYPE 그룹 조회 결과 본 시점 0건(데이터 누적 lag 추정). 며칠 후 재시도하여 [O] / [X]로 갱신 예정.
   - §8 RDS-InstanceUsage 청구 매칭 — 동일 사유. RDS instance class / Single-AZ는 자동 검증으로 [O] 상태이나 청구 라인 매칭은 데이터 누적 후 재시도.
@@ -97,7 +114,11 @@
 - `portfolio_admin`에 `portfolio_owner` 멤버십 부여 완료. 이후 `ALTER SCHEMA ... OWNER TO portfolio_owner` 실행 가능 상태로 진입.
 - 9개 도메인 schema(`reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`)의 owner를 `portfolio_owner`로 이관 완료.
 - `public` schema는 변경하지 않음(RDS 정책 / 호환성 유지).
-- 기존 table / sequence / index의 owner는 `portfolio_admin`(restore 실행 계정)으로 그대로 남아 있음. 본 세션에서는 `REASSIGN OWNED BY portfolio_admin TO portfolio_owner`를 실행하지 않음. 기존 객체에 대해서는 §4.5 default privileges가 자동 적용되지 않으므로, 본 세션에서 §4.4 명시 GRANT만으로 권한 매트릭스를 적용한 상태다(이후 새로 만드는 객체는 default privileges 적용 대상). 후속 세션에서 owner 일괄 이관 여부는 운영자 결정으로 분리 관리한다.
+- 기존 table / sequence / index의 owner는 `portfolio_admin`(restore 실행 계정)으로 그대로 남아 있음.
+  - 본 세션에서는 `REASSIGN OWNED BY portfolio_admin TO portfolio_owner`를 실행하지 않음.
+  - 기존 객체에 대해서는 §4.5 default privileges가 자동 적용되지 않음.
+  - 본 세션에서 §4.4 명시 GRANT만으로 권한 매트릭스를 적용한 상태(이후 새로 만드는 객체는 default privileges 적용 대상).
+  - 후속 세션에서 owner 일괄 이관 여부는 운영자 결정으로 분리 관리한다.
 
 ### app role 7종
 
@@ -205,7 +226,11 @@
 
 ## 2026-06-13 Local-to-AWS Paper RDS 운영 모드 정리
 
-본 섹션은 2026-06-13 운영자가 결정한 Local 개발 / AWS Paper RDS 운영 원칙을 02 spec 운영 노트에 누적 기록한다. RDS Public access 미허용 정책은 변경 없으며(02 spec 1차 적용 결과 / R-SEC-001 / R-NET-004 정합), 로컬 개발 환경에서 AWS Paper RDS 에 접속할 때의 흐름과 guard 조합을 명문화한다. 동일 원칙은 04 spec 2026-06-13 §5(Local-to-AWS Paper RDS) 와 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-ENV-006 / OD-ENV-007 / OD-ENV-008 에 동기화한다.
+본 섹션은 2026-06-13 운영자가 결정한 Local 개발 / AWS Paper RDS 운영 원칙을 02 spec 운영 노트에 누적 기록한다.
+
+- RDS Public access 미허용 정책은 변경 없음(02 spec 1차 적용 결과 / R-SEC-001 / R-NET-004 정합).
+- 로컬 개발 환경에서 AWS Paper RDS 에 접속할 때의 흐름과 guard 조합을 명문화한다.
+- 동일 원칙은 04 spec 2026-06-13 §5(Local-to-AWS Paper RDS) 와 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-ENV-006 / OD-ENV-007 / OD-ENV-008 에 동기화한다.
 
 ### 1. Paper 환경 source of truth
 
@@ -277,7 +302,11 @@
 
 ## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 연결 검증 + Runbook
 
-본 섹션은 같은 일자(2026-06-13)의 Local-to-AWS Paper RDS 운영 모드 정리(앞 섹션) 와 별개로, 운영자가 직접 수행한 SSM Port Forwarding 기반 로컬 → AWS Paper RDS 연결 1차 실증 검증 결과를 누적 기록한다. 본 섹션은 동시에 Local-to-AWS Paper RDS SSM Port Forwarding Runbook 의 1차 본문으로 사용된다. RDS Public access 미허용 정책(R-SEC-001 / R-NET-004) 변경 없음. AWS / RDS / IAM 변경 0건 — 본 일자에는 read-only AWS API 호출과 SSM Port Forwarding 세션 + Python `psycopg2` 접속 검증만 수행했다.
+본 섹션은 같은 일자(2026-06-13)의 Local-to-AWS Paper RDS 운영 모드 정리(앞 섹션) 와 별개로, 운영자가 직접 수행한 SSM Port Forwarding 기반 로컬 → AWS Paper RDS 연결 1차 실증 검증 결과를 누적 기록한다.
+
+- 본 섹션은 동시에 Local-to-AWS Paper RDS SSM Port Forwarding Runbook 의 1차 본문으로 사용된다.
+- RDS Public access 미허용 정책(R-SEC-001 / R-NET-004) 변경 없음.
+- AWS / RDS / IAM 변경 0건 — 본 일자에는 read-only AWS API 호출과 SSM Port Forwarding 세션 + Python `psycopg2` 접속 검증만 수행했다.
 
 ### 1. 사전 도구 확인
 
@@ -460,7 +489,14 @@
 1. AWS 리소스 생성 / 수정 / 삭제 0건. read-only AWS API(`aws ec2 describe-instances` / `aws ssm describe-instance-information` / `aws rds describe-db-instances`) + SSM Port Forwarding 세션(`aws ssm start-session` 한정) + Python `psycopg2` SELECT 조회만 사용.
 2. RDS DDL/DML 0건. INSERT / UPDATE / DELETE / DDL 0건. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 호출 0건.
 3. 실제 password / secret value / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 IAM access key id / 실제 secret ARN / EIP 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
-4. 본 노트 / runbook 본문에 평문으로 포함된 운영 식별자: instance id(`i-0fce77927b7397b88` / `i-0ff768ea639a91355`), private IP(`10.0.0.181` / `10.0.0.169` / `10.0.20.165`), local port(`15433`), SSM session id(`terraform-vjp3fv3nz73konetcevdzjh9de`), RDS endpoint hostname(`portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`). 사용자 명시 정책에 따라 운영 식별자는 작업 로그 / runbook 에는 기록 가능, 민감정보(secret value / password / token / account-id / KIS 자격)는 절대 평문 기록 금지.
+4. 본 노트 / runbook 본문에 평문으로 포함된 운영 식별자:
+   - instance id: `i-0fce77927b7397b88` / `i-0ff768ea639a91355`
+   - private IP: `10.0.0.181` / `10.0.0.169` / `10.0.20.165`
+   - local port: `15433`
+   - SSM session id: `terraform-vjp3fv3nz73konetcevdzjh9de`
+   - RDS endpoint hostname: `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`
+
+   사용자 명시 정책에 따라 운영 식별자는 작업 로그 / runbook 에는 기록 가능, 민감정보(secret value / password / token / account-id / KIS 자격)는 절대 평문 기록 금지.
 5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog 본 일자 작업으로 인한 변경 0건.
 6. session id 는 본 일자 검증 세션의 식별자(임시값)이며, 동일 세션 재기동 시 다른 식별자가 생성된다. 본 노트의 session id 는 재현 / 추적 목적의 사실 기록일 뿐 secret 이 아니다.
 
@@ -477,7 +513,12 @@
 
 ## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 보강 (psql 18 client + pgAdmin4 접속 검증)
 
-본 섹션은 같은 일자 앞 섹션(`## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 연결 검증 + Runbook`) §1 ~ §12 의 후속이며, 운영자가 동일 SSM Port Forwarding tunnel 위에서 추가 client 2종(로컬 PostgreSQL 18 `psql.exe` 직접 경로 실행 + pgAdmin4) 으로 AWS Paper RDS 접속을 1차 실증한 결과를 누적 기록한다. SSM tunnel 자체는 재사용(같은 명령 / 같은 local port `15433` / 새 session id 가능). RDS Public access 미허용 정책 / OD-NET-009 / R-SEC-001 / R-NET-004 본문 변경 없음. AWS / RDS / IAM 변경 0건 — read-only AWS API + SSM Port Forwarding 세션 + psql / pgAdmin4 SELECT 조회만 사용.
+본 섹션은 같은 일자 앞 섹션(`## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 연결 검증 + Runbook`) §1 ~ §12 의 후속이다.
+
+- 운영자가 동일 SSM Port Forwarding tunnel 위에서 추가 client 2종(로컬 PostgreSQL 18 `psql.exe` 직접 경로 실행 + pgAdmin4) 으로 AWS Paper RDS 접속을 1차 실증한 결과를 누적 기록한다.
+- SSM tunnel 자체는 재사용(같은 명령 / 같은 local port `15433` / 새 session id 가능).
+- RDS Public access 미허용 정책 / OD-NET-009 / R-SEC-001 / R-NET-004 본문 변경 없음.
+- AWS / RDS / IAM 변경 0건 — read-only AWS API + SSM Port Forwarding 세션 + psql / pgAdmin4 SELECT 조회만 사용.
 
 ### 1. 로컬 PostgreSQL 18 psql client 접속 검증
 
@@ -595,7 +636,14 @@
 
 ## 2026-06-17 Daily AWS 17-step E2E 흐름 중 발견된 DB Role / 권한 / search_path 보정
 
-운영자가 같은 일자 두 번째 세션(Daily AWS 17-step E2E 완료) 진행 중 발견한 본 spec 범위의 DB Role / 권한 / search_path 보정 사실을 누적 기록한다. 본 spec 자체의 추가 결정 0건 / 본문 변경 0건. 결정 정합 검증과 후속 정식 매트릭스 갱신만 사실 기록. 자세한 17 step 전체 진행 상태는 03 / 04 / 06 / 08 / 09 spec operation-notes 의 2026-06-17 섹션 참조. Kiro 는 문서 작성 / 절차 정리만 수행. 실제 GRANT / search_path 변경은 운영자 직접 진행. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. password / endpoint hostname / account-id / 실제 ARN / 계좌번호 본 노트 평문 기록 0건.
+운영자가 같은 일자 두 번째 세션(Daily AWS 17-step E2E 완료) 진행 중 발견한 본 spec 범위의 DB Role / 권한 / search_path 보정 사실을 누적 기록한다.
+
+- 본 spec 자체의 추가 결정 0건 / 본문 변경 0건.
+- 결정 정합 검증과 후속 정식 매트릭스 갱신만 사실 기록.
+- 자세한 17 step 전체 진행 상태는 03 / 04 / 06 / 08 / 09 spec operation-notes 의 2026-06-17 섹션 참조.
+- Kiro 는 문서 작성 / 절차 정리만 수행. 실제 GRANT / search_path 변경은 운영자 직접 진행.
+- 본 일자는 `aws-paper` 한정 / aws-live 작업 0건.
+- password / endpoint hostname / account-id / 실제 ARN / 계좌번호 본 노트 평문 기록 0건.
 
 ### 1. `execution_app` 의 `interest` schema 권한 보정 (Step 8 영향)
 
@@ -644,7 +692,14 @@
 ### 4. 안전 / 보안 점검 결과
 
 1. 본 일자 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 변경 0건. 02 spec 본문 결정값 변경 0건 — 정식 매트릭스 갱신은 후속.
-2. 실제 password / RDS endpoint hostname / RDS port / database name / username / account-id / 실제 IAM Role ARN / 실제 secret ARN 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder. 운영 식별자(role 이름 `execution_app` / `marketconnector_app` / schema 이름 `interest` / `legacy` / table 이름 `holdings` / search_path 값 `connector, execution, legacy, reference, public`) 만 사실 기록.
+2. 아래 민감정보는 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
+   - 실제 password / RDS endpoint hostname / RDS port / database name / username
+   - account-id / 실제 IAM Role ARN / 실제 secret ARN
+
+   운영 식별자만 사실 기록:
+   - role 이름 `execution_app` / `marketconnector_app`
+   - schema 이름 `interest` / `legacy` / table 이름 `holdings`
+   - search_path 값 `connector, execution, legacy, reference, public`
 3. RDS / GRANT / ALTER ROLE 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / SSM 응답 본문 / 운영자 PowerShell stdout 전문 본 노트 평문 인용 0건.
 4. RDS DDL 0건(본 spec 범위 — schema 생성 / drop / table 생성 / drop 0건). DML 0건(본 spec 범위 — `legacy.holdings` 직접 변경은 03 spec Step 17 책임). GRANT / REVOKE / ALTER DEFAULT PRIVILEGES / ALTER ROLE 작업이 본 일자에 발생했고 이는 본 노트에 사실로만 기록.
 5. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 직접 호출 0건. live 자동 GRANT / DDL / DML 은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. R-DATA-005 / R-DATA-011 mitigation 1차 실증 / Status `Mitigated` 갱신 정합.

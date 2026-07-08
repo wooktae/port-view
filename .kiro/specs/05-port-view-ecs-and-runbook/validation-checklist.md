@@ -1,14 +1,36 @@
 # Validation Checklist — 05-port-view-ecs-and-runbook
 
-본 문서는 port-view ECS Fargate Public IP 1차 포팅 + ECS View → AWS Step Functions Step 12~17 승인 실행 검증 체크리스트다. 본 spec 의 [`./operation-notes.md`](./operation-notes.md) 2026-06-30 (오후) "3. ECS Fargate 포팅: 완료" block 의 사실 기록을 단일 기준으로 한다. 본 체크리스트는 [`./runbook.md`](./runbook.md) 의 절차 1 ~ 절차 3 진행 후 통과 여부를 항목 단위로 점검하기 위한 문서다.
+본 문서는 port-view ECS Fargate Public IP 1차 포팅 + ECS View → AWS Step Functions Step 12~17 승인 실행 검증 체크리스트다.
+
+- 단일 기준 = 본 spec [`./operation-notes.md`](./operation-notes.md) 2026-06-30 (오후) "3. ECS Fargate 포팅: 완료" block.
+- 사용 조건 = [`./runbook.md`](./runbook.md) 절차 1 ~ 절차 3 진행 후 항목 단위 점검.
+
+## Dashboard (2026-06-30 오후 통과 상태 요약)
+
+| 카테고리 | 항목 수 | 통과 (완료) | 최근 통과 회차 |
+|---|---|---|---|
+| Deploy (Docker · ECR · TaskDefinition · ECS Service) | 4 | 4 | 2026-06-30 오후 |
+| Runtime (Spring Boot / RDS) | 2 | 2 | 2026-06-30 오후 |
+| View 화면 조회 (Dashboard / Balance / Positions / Orders / Reports / Daily) | 1 | 1 | 2026-06-30 오후 |
+| Daily Batch UI gate (Step 1~11 · Step 12~17 승인 버튼) | 2 | 2 | 2026-06-30 오후 |
+| Step Functions 실행 + Slack 수신 | 2 | 2 | 2026-06-30 오후 |
+| DB after-check + desiredCount 0 종료 | 2 | 2 | 2026-06-30 오후 |
 
 ## 적용 범위 / 안전 정책
 
-- 1차 적용 환경: `aws-paper` / region: `ap-northeast-2` / 대상: port-view.
-- 본 체크리스트는 ALB 미사용 + public subnet + `assignPublicIp=ENABLED` + 운영자 IP/32 SG inbound + CloudWatch Logs retention 7일 1차 포팅 방식만 다룬다. ALB / HTTPS / Route53 / Cloudflare Tunnel / 인증 · 인가 / Auto Scaling / Blue-Green / multi-AZ 운영은 1차 포팅 이후 보류(05 / 06 / 07 / 10 spec 후속 phase 책임).
-- 본 체크리스트의 모든 명령은 [`../../AGENTS.md`](../../AGENTS.md) 의 "운영 명령 작성 규칙(추가)" 3종(`list/describe → 변수 추출 → 후속 검증` / `information_schema.columns` 사전 확인 / 실패 명령 뒤 SUCCESS marker 금지) 정합으로 작성한다.
-- 본 체크리스트의 모든 명령은 운영자가 직접 실행 / Kiro 는 본 spec 작업공간에서 실행하지 않는다.
-- 비밀번호 / token / API key / 계좌번호 12자리 원문 / RDS password / Slack webhook URL / 실제 ARN / public IP / image digest full sha256 / task ARN / ENI ID / broker_order_no 원문 본 노트 평문 기록 0건(`[REDACTED]` 또는 placeholder).
+- 1차 적용 환경 = `aws-paper` / region = `ap-northeast-2` / 대상 = port-view.
+- 대상 포팅 방식 = ALB 미사용 + public subnet + `assignPublicIp=ENABLED` + 운영자 IP/32 SG inbound + CloudWatch Logs retention 7일 1차 포팅.
+- 보류 항목 (1차 포팅 이후 / 05 · 06 · 07 · 10 spec 후속 phase 책임):
+  - ALB / HTTPS / Route53 / Cloudflare Tunnel.
+  - 인증 · 인가 / Auto Scaling / Blue-Green / multi-AZ.
+- 명령 작성 규칙 = [`../../AGENTS.md`](../../AGENTS.md) "운영 명령 작성 규칙(추가)" 3종 정합:
+  - `list/describe → 변수 추출 → 후속 검증`.
+  - `information_schema.columns` 사전 확인.
+  - 실패 명령 뒤 SUCCESS marker 금지.
+- 실행 주체 = 운영자 직접 / Kiro 는 본 spec 작업공간에서 실행하지 않는다.
+- 평문 기록 0건 (`[REDACTED]` 또는 placeholder):
+  - 비밀번호 / token / API key / 계좌번호 12자리 원문 / RDS password / Slack webhook URL.
+  - 실제 ARN / public IP / image digest full sha256 / task ARN / ENI ID / broker_order_no 원문.
 
 ## 13개 체크 항목 / 본 일자 통과 결과
 
@@ -69,7 +91,9 @@
        - retryable rejected `strategy_execution_order` after: 0
        - active `connector_order_request` after: 0
        - today connector orders after: 0 rows
-       - 최신 `connector_balance_snapshot id=281` / `as_of_date=2026-06-30` / `total_eval_amount=8,706,505` / `cash_balance=8,706,505` / `eval_profit=0` / `source_version=connector-intraday-snapshot-refresh-1.0.0`
+       - 최신 `connector_balance_snapshot id=281` / `as_of_date=2026-06-30`
+       - `total_eval_amount=8,706,505` / `cash_balance=8,706,505` / `eval_profit=0`
+       - `source_version=connector-intraday-snapshot-refresh-1.0.0`
        - 보유 종목 검증은 `connector_position_snapshot` 의 `account_no` + `as_of_date` 기준(컬럼 `balance_snapshot_id` 부재 / 규칙 2 정합)
        - 과거 stale `connector_order_request` 6건 식별 사실(2026-04-27 ACCEPTED 잔여 / 본 일자 실행과 무관 / 후속 cleanup 후보 / preflight count 오염 위험은 후속 후보)
  13) desiredCount 0 종료: 완료
@@ -81,10 +105,12 @@
 ## 결정 / 리스크 매핑
 
 - OD-MS-002(port-view 컴퓨트 = ECS Fargate Service 1순위 / 🟢 확정) — 본 일자 본 체크리스트 1) ~ 13) 통과로 1차 실증 evidence 보강(결정 본문 변경 없음).
-- OD-MS-009(Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) — 본 체크리스트 10) ECS View → Step Functions Step 12~17 approval execution `SUCCEEDED` 통과로 1차 실증 evidence 보강(결정 본문 변경 없음).
+- OD-MS-009 (Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) — 본 체크리스트 10) ECS View → Step Functions Step 12~17 approval execution `SUCCEEDED` 통과로 1차 실증 evidence 보강 (결정 본문 변경 없음).
 - OD-MS-037(View Local AWS Paper read-only 1차 scope + ECS / Fargate 진입 전 batch 2차 검증 선행 정책) — 본 체크리스트 10) 통과는 OD-MS-037 의 후속 phase 인 ECS / Fargate 진입 후 첫 실증으로 evidence 보강(결정 본문 변경 없음).
-- R-AUTO-033 [2026-06-30 오후 보강] — 본 체크리스트 4), 7), 9), 10), 11), 12), 13) 통과로 Public IP direct access + 운영자 IP/32 SG + ECS View → AWS Step Functions Step 12~17 approval 3차 실증 / Status `Mitigated` 유지.
-- R-AUTO-034 [2026-06-30 오후 보강] — 본 체크리스트 10) 통과로 Fargate ECS task role(`portfolio-paper-view-task-role`) 의 `states:StartExecution` 권한이 Step 12~17 approval state machine ARN 한정 부여 1차 실증 / Status `Open` 유지(향후 ALB · HTTPS · CloudWatch alarms 도입 시 cross-spec audit / 06 spec 후속 phase 책임).
+- R-AUTO-033 [2026-06-30 오후 보강] — 본 체크리스트 4) · 7) · 9) · 10) · 11) · 12) · 13) 통과로 Public IP direct access + 운영자 IP/32 SG + ECS View → Step 12~17 approval 3차 실증 / Status `Mitigated` 유지.
+- R-AUTO-034 [2026-06-30 오후 보강]:
+  - 본 체크리스트 10) 통과로 Fargate ECS task role(`portfolio-paper-view-task-role`) 의 `states:StartExecution` 권한이 Step 12~17 approval state machine ARN 한정 부여 1차 실증.
+  - Status `Open` 유지 (향후 ALB · HTTPS · CloudWatch alarms 도입 시 cross-spec audit / 06 spec 후속 phase 책임).
 - 본 체크리스트 12) 의 stale `connector_order_request` 6건 식별 사실은 신규 후속 후보(preflight count 오염 위험 / cleanup 결정) 로 followups-overview 2026-06-30 (오후) 후속 메모에 기록.
 
 ## 본 일자 사실 기록 범위 (2026-06-30 오후)
@@ -92,7 +118,9 @@
 - 본 체크리스트 13개 항목은 모두 운영자가 직접 검증 / Kiro 측 자동 검증 0건.
 - AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건.
 - broker / KIS 호출 = ECS View → Step 12~17 승인 실행 1건(`SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
-- 민감정보 평문 기록 0건 / 모두 `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]` placeholder.
+- 민감정보 평문 기록 0건 — 모두 placeholder:
+  - `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]`.
+  - `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]`.
 
 ## 참조
 
@@ -100,3 +128,49 @@
 - 운영 절차: [`./runbook.md`](./runbook.md)
 - 결정 / 리스크 매핑: [`../_common/operator-decisions.md`](../_common/operator-decisions.md) / [`../_common/risk-register.md`](../_common/risk-register.md)
 - 운영 명령 작성 규칙: [`../../AGENTS.md`](../../AGENTS.md) "운영 명령 작성 규칙(추가)" 3종
+
+## 2026-07-01 검증 결과 — paper Daily 자동화 1차 풀 ON + Step 12~17 Scheduler ENABLED
+
+본 검증은 aws-paper 한정. aws-live 정책 변경 없음(OD-SAFE-002 / OD-SAFE-003 정합).
+
+- [x] **Step 12~17 manual execution `SUCCEEDED`**:
+  - executionName `port-manual-daily-step12-17-20260701-043747` / state machine `portfolio-paper-daily-step12-17-approval`.
+  - status `SUCCEEDED` / execution history `ExecutionSucceeded`.
+  - start `2026-07-01T13:37:47.856+09:00` / stop `2026-07-01T13:40:41.212+09:00`.
+- [x] **Slack received** — 3종 수신 확인 (Portfolio Daily Bot 채널):
+  - 07:50 장전 Slack.
+  - 08:24 승인 필요 Slack.
+  - Step 12~17 성공 Slack.
+- [x] **DB after-check passed** (empty-state 확인):
+  - 2026-07-01 `strategy_execution_order` 0건 / REQUESTED 전략 주문 0건.
+  - active `connector_order_request` 0건 / 오늘 `connector_order_request` 0건.
+  - Step 12~17 NO_TARGET 안전 종료 판정.
+- [x] **DB after-check passed** (stale refresh 확인 — 최신 balance snapshot):
+  - `connector_balance_snapshot id=321` / `as_of_date=2026-07-01`.
+  - `total_eval_amount=8,706,505` / `cash_balance=8,706,505` / `eval_profit=0`.
+- [x] **Step 12~17 Scheduler ENABLED**:
+  - `portfolio-paper-daily-step12-17-order-0901-kst` DISABLED → ENABLED 전환 완료 / State `ENABLED`.
+  - LastModificationDate `2026-07-01T13:53:57.160+09:00`.
+  - cron `cron(1 9 ? * MON-FRI *)` / Asia/Seoul / FlexibleTimeWindow OFF.
+  - Target Lambda `portfolio-paper-daily-scheduler-dispatcher` / Target Input `{"scheduleType":"STEP12_17_ORDER","dryRun":false}`.
+- [x] **Full Daily automation lineup checked** — 7종 Scheduler 모두 ENABLED 확인.
+  - [x] 07:50 EC2 start — `portfolio-paper-ec2-start-0750-kst`.
+  - [x] 07:50 장전 Slack — `portfolio-daily-brief-morning-slack-0750-kst` / eventType `MORNING_BRIEF`.
+  - [x] 08:00 Step 1~11 — `portfolio-paper-daily-step1-11-approval-0800-kst` / dryRun false.
+  - [x] **09:01 Step 12~17 — `portfolio-paper-daily-step12-17-order-0901-kst` / dryRun false / 본 일자 ENABLED**.
+  - [x] 09:10~15:50 10분 장중 손절 — `portfolio-paper-intraday-snapshot-evaluate-10min-kst` / cron `cron(10/10 9-15 ? * MON-FRI *)`.
+  - [x] 15:50 장후 Slack — `portfolio-daily-brief-evening-slack-1550-kst` / eventType `EVENING_BRIEF`.
+  - [x] 15:50 MarketConnector stop — `portfolio-paper-marketconnector-stop-1550-kst`.
+- [x] **No active connector order** — active `connector_order_request` 0건(2026-04-27 stale ACCEPTED 6건은 최신 balance 기준일 2026-07-01 판정과 분리된 stale 후보 / 후속 cleanup).
+- [x] **No today connector order** — 2026-07-01 `connector_order_request` 신규 row 0건 / broker 주문 제출 0건 / `connector_fill` 신규 0건.
+- [x] **Latest balance snapshot 2026-07-01** — `connector_balance_snapshot id=321` / `as_of_date=2026-07-01` / `total_eval_amount=8,706,505` / `cash_balance=8,706,505` / `eval_profit=0`.
+- [x] **aws-live 정책 변경 없음** — **본 변경은 aws-paper 에 한정된다. aws-live 자동 BUY / SELL 정책은 변경하지 않으며, live 는 후보 + 수동 승인 우선 정책을 유지한다.**(OD-SAFE-002 / OD-SAFE-003 정합)
+- [x] **Kiro 문서 수정만** — AWS CLI / boto3 / psql / Spring Boot / 외부 API 실행 0건 / broker 주문 제출 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건(운영자 직접 수행 영역) / secret 원문 기록 0건.
+
+### 남은 검증 (다음 영업일 이후 / 후속 phase)
+
+- [ ] 다음 영업일 09:01 자동 실행 실전 관찰 — Scheduler invocation log · Dispatcher Lambda CloudWatch Logs · Step Functions execution 생성 · Slack 수신 · DB after-check 정합.
+- [ ] 후보 있는 날 자동 주문 제출 · 체결 · balance refresh · Slack 확인 — 본 일자는 후보 없음(NO_TARGET) / 실 후보 회차 첫 검증.
+- [ ] stale `connector_position_snapshot`(2026-06-23 4건) 정리 또는 최신 balance 기준 판정 쿼리 보완.
+- [ ] 2026-04-27 삼성전자 stale ACCEPTED `connector_order_request` 6건 cleanup(03 · 04 spec 후속 phase 책임).
+- [ ] aws-live 자동화 정책 별도 cutover phase 재검토(10 spec 후속 phase 책임).
