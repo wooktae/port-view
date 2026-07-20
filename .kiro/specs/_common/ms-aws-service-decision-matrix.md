@@ -24,8 +24,8 @@ Lambda · EKS · Elastic Beanstalk · App Runner · ECS on EC2 비권고 사유�
 |---|---|---|---|---|
 | `port-marketconnector` | EC2 + EIP | ECS Fargate (broker IP 정책 변경 시) | broker IP 등록 + 단일 access_token + 단일 세션 · NAT-free EIP 고정 가능 | EC2 24/7 + EIP + EBS + broker IP 등록 정책 변경 시 EIP 재부여 부담 |
 | `port-view` | ECS Fargate Service | Elastic Beanstalk | Spring Boot 24/7 + Daily Batch orchestration · 컨테이너 표준 + Step Functions 자연스러운 결합 | Fargate 상시 vCPU · public IPv4 사용 시 IPv4 비용 · Fargate Task Role `states:StartExecution` 광역 부여 위험 |
-| `port-interest-crawler` | ECS Fargate Task (NAT-free public) + Windows EC2 worker (KRX GUI 한정) | ECS on EC2 (Selenium 안정성 미달 시) · AWS Batch (history backfill) | Selenium/Chrome + KRX 로그인 hybrid · non-GUI = Fargate · GUI = Windows EC2 worker | Windows EC2 running 시간 · Autologon 보안 예외 · Scheduled Task 성공 판정 필요 |
-| `port-interest-preprocessor` | ECS Fargate Task | Lambda (짧은 step만) · AWS Batch (backfill) | long upsert + idempotent · Fargate Task 가장 단순 | Fargate Task 실행 시간 · NAT-free public subnet outbound 필요 |
+| `port-interest-crawler` | ECS Fargate Task (NAT-free public) + Windows EC2 worker (KRX GUI 한정) | ECS on EC2 (Selenium 안정성 미달 시) · AWS Batch (history backfill) | Selenium/Chrome + KRX 로그인 hybrid · non-GUI = Fargate · GUI = Windows EC2 worker | Windows EC2 running 시간 · Autologon 보안 예외 · Scheduled Task 성공 판정 필요 · ECS Fargate Task 는 기본 timezone 이 UTC 일 수 있으므로 KST 장전 batch 는 `TZ=Asia/Seoul` 또는 timezone-aware 코드 필요(OD-MS-040) |
+| `port-interest-preprocessor` | ECS Fargate Task | Lambda (짧은 step만) · AWS Batch (backfill) | long upsert + idempotent · Fargate Task 가장 단순 | Fargate Task 실행 시간 · NAT-free public subnet outbound 필요 · ECS Fargate Task 는 기본 timezone 이 UTC 일 수 있으므로 KST 장전 batch 는 `TZ=Asia/Seoul` 또는 timezone-aware 코드 필요(OD-MS-040) |
 | `port_strategy_common` | 별도 컴퓨트 없음 (git submodule packaging) | wheel + CodeArtifact (성숙기) | 순수 Python 라이브러리 · 컴퓨트 대상 아님 | 각 MS 이미지 빌드 시점 동기화 필요 · 정식 package 관리 후속 |
 | `port_strategy_decision` | ECS Fargate Task + EventBridge Scheduler (+ Step Functions in 04) | AWS Batch (다수 day 재처리) | daily idempotent batch · cron + 컨테이너로 충분 (OD-MS-013 Task Definition 2개 분리) | Fargate 실행 시간 · `decision_app` schema 권한 매트릭스 정식화 후속 |
 | `port_strategy_execution` | ECS Fargate Task + Step Functions + EventBridge Scheduler | ECS Fargate Service (intraday 상시) | live 자동 재시도 금지 정책 step 별 인프라 강제 · OD-MS-017 단일 Task Definition + command override | Step Functions transitions + Fargate 실행 시간 · retry 정책 오설정 시 broker 중복 주문 위험 (R-AUTO-001) |
@@ -154,6 +154,8 @@ Lambda · EKS · Elastic Beanstalk · App Runner · ECS on EC2 비권고 사유�
 KIS broker 연동 / Flask API / 단일 access_token.txt / broker outbound IP 등록 가능성. stateful 성격이 강하다.
 
 > 2026-06-30 (오후) 장중 손절 Slack 실제 이벤트 연동 1차 실증 메모(OD-MS-001 / OD-MS-016 / OD-MS-035 / OD-MS-036 본문 변경 없이 evidence 보강 / R-AUTO-035 [2026-06-30 오후 추가 보강] / R-AUTO-036 신규) See Evidence Details [4.1 · #1](#evidence-4.1-1).
+>
+> [2026-07-20 운영 실증 보강] `EC2 + EIP` 결정 유지(본 표 1순위 · 2순위 · 비권고 문자열 변경 없음). 2026-07-20 Step 13 주문·체결 조회에서 KIS `EGW00201`(초당 거래건수 초과) 가 발생해 운영자가 `connector_order_check.py` 전체 교체본(2.0.1 → 2.0.2 · S3 경유 EC2 배포) 으로 주문 조회 사이 5초 대기와 `EGW00201` 한정 최대 2회 재시도(1차 1.5초 · 2차 5초) 를 추가했다. 이는 EC2 기반 connector 운영 보완이며 broker 주문 제출 재시도가 아니라 주문·체결 조회 API 제한 재시도다(주문 제출 재시도와 조회 재시도를 구분). broker 주문 제출 로직 · 서비스 선택 결론 변경 없음 · 신규 Decision ID · Risk ID 없음. 상세는 `_common/risk-register.md` R-AUTO-001 · R-BROKER-004 [2026-07-20 보강] 참조.
 
 | AWS Service Option | 가능 여부 | 비용 | 운영 난이도 | 장점 | 단점 | 장애 / 보안 리스크 | 어필도 | 최종 판단 |
 |--------------------|-----------|------|-------------|------|------|-------------------|--------|-----------|
@@ -213,6 +215,8 @@ Naver / yfinance / KRX 수집. KRX는 Selenium / Chrome 의존. KRX 로그인은
 > 2026-06-24 장중 포지션 확인 3단계 구조 최종안 확정 메모(OD-MS-035 신규 / R-DATA-014 · R-AUTO-029 · R-DATA-015 · R-DATA-016 · R-AUTO-030 신규) See Evidence Details [4.3 · #15](#evidence-4.3-15).
 >
 > 2026-06-25 장중 포지션 Step Function 구현 완료 메모(OD-MS-036 신규 / R-AUTO-030 [2026-06-25 보강] / R-AUTO-031 · R-AUTO-032 · R-BROKER-005 신규) See Evidence Details [4.3 · #16](#evidence-4.3-16).
+>
+> 2026-07-09 CRAWLER Windows EC2 timezone KST 운영 정합 메모(OD-MS-040 [2026-07-09 메모] / R-DATA-010 `Mitigated` 승격 / R-DATA-017 `Open` 유지) — Windows EC2 worker 는 KRX GUI 수집 target date 계산 정합을 위해 KST timezone(Korea Standard Time) 또는 timezone-aware 코드가 필요하다. `datetime.today() - 1` · `datetime.now().date() - 1` 계열 로직이 서버 로컬 timezone 에 의존하므로 UTC 인 상태에서 08:00 KST 실행 시 target date 가 하루 밀리는 문제가 2026-07-08 ~ 2026-07-09 회차에서 실증되었다. 서비스 선택 결론(Windows EC2 worker 1순위 · ECS Fargate 1순위 · 그 외 비권고) 은 변경 없음.
 
 | AWS Service Option | 가능 여부 | 비용 | 운영 난이도 | 장점 | 단점 | 장애 / 보안 리스크 | 어필도 | 최종 판단 |
 |--------------------|-----------|------|-------------|------|------|-------------------|--------|-----------|
@@ -277,6 +281,40 @@ execution order 생성 / connector 주문 호출 / fill sync / position sync / i
 | [Lambda](./aws-resource-glossary.md#lambda) | No | n/a | n/a | broker 호출 / fill sync는 Lambda 환경에 부적합 (15분 timeout / connection 안정성) | 자동 재시도 정책 강제 어려움 | live 환경에서 자동 재시도 사고 위험 | Low | 비권고 |
 | [EC2](./aws-resource-glossary.md#ec2-elastic-compute-cloud) cron | Yes | Medium | Medium | 단순 | live 자동 재시도 정책 강제 어려움 | SPOF + retry 통제 약함 | Low | 비권고 |
 | EKS | Yes | High | High | k8s job 표준화 | 1인 운영 과함 | etcd / addon | High | 비권고 (appendix 7장) |
+
+> [2026-07-16 운영 실증 보강] 본 표의 서비스 선택 결론(1순위 `ECS Fargate Task + EventBridge Scheduler + Step Functions` · 2순위 `ECS Fargate Service (intraday 상시)` · 비권고 4종) 은 변경하지 않는다. Paper Daily 자동화 라인업의 실 매수·체결·Fill·Position E2E 첫 실증 회차에서 관찰된 사실을 짧게 반영한다.
+
+| 항목 | 값 |
+| --- | --- |
+| 실 매수 E2E | Daily Run 76 · BUY 후보 2건 · 13주 · 78주 시장가 매수 전량 체결 · Position 2건 `OPEN` |
+| Step 12 주문 후 조회 대기 | 10초 조회는 모의투자 체결 반영보다 빨랐음 · Wait State `Step12_WaitBeforeCheck` `Seconds` 10 → 60 변경 |
+| Step Functions 성공 판단 | ExitCode 0 만으로 Fill · Position 정합 완료 판단 안 함 |
+| 최종 성공 판정 | Order Request · Fill · Execution Order · Position 정합 확인 원칙 재확인 |
+| 후속 유지 | `ACCEPTED` / `PARTIAL_FILLED` polling · Step 13 · 15 · 16 처리 건수 실패 전파 · 불일치 시 Workflow FAIL · OPS Mirror 세부 확장 · 10분 잔고 스냅샷 연계 |
+| 관련 결정 · 리스크 | OD-MS-032 · OD-SAFE-001 · R-AUTO-037 · R-AUTO-038 · R-BROKER-004 |
+| aws-live 정책 | 변경 없음 (OD-SAFE-002 · OD-SAFE-003 유지) |
+| 신규 Decision ID · Risk ID | 없음 |
+
+실제 State Machine ARN · execution ARN · revision ID · broker 주문번호 · 계좌번호 · account-id · Slack payload · SSM 응답 · psql raw output 은 본 spec 문서에 원문 기록 0건(R-DOCS-001 정합 / 운영 식별자 = Daily Run 번호 · State Machine 이름 · Wait State 이름 · Seconds 값 · Position ID · 종목 코드 · 종목 이름 · 체결 수량 · 평균 체결가 만 사실 기록 — secret 아님).
+
+> [2026-07-20 운영 실증 보강] 본 표의 서비스 선택 결론(1순위 `ECS Fargate Task + EventBridge Scheduler + Step Functions` · 2순위 `ECS Fargate Service (intraday 상시)` · 비권고 4종) 은 변경하지 않는다. Step 13 자동 실행 실패 후 수동 복구 회차에서 관찰된 사실을 짧게 반영한다.
+
+| 항목 | 값 |
+| --- | --- |
+| Step 14~16 ECS 수동 순차 복구 | Step 14(`execution_sync_sell_fill.py`) · Step 15(`execution_sync_buy_fill.py`) · Step 16(`execution_sync_buy_position.py`) ECS Task 임시 State Machine 없이 하나씩 순차 수동 실행 · 모두 ExitCode 0 성공 |
+| Choice 결과 실패 연결 | Task Catch 뿐 아니라 Choice 결과 실패도 실패 Slack 과 OPS 실패 기록으로 연결(Fail State 직행 우회 경로를 Pass State 경유로 보완) |
+| 성공 Slack 경로 보강 | Step Functions 성공 경로에 DB-backed Builder Lambda(`BuildDailyExecutionSuccessSlackSummary`) 삽입 · Builder → Notifier 순서 호출 |
+| Builder 역할 | 실제 fill 집계 · payload 생성만 담당(`connector.connector_fill` · `reference.stock_master` 조회) |
+| Notifier 역할 | Slack formatting · 전송 담당(`portfolio-event-notifier`) |
+| Lambda 계층 결론 | 여전히 주 compute 아님 · Slack payload 생성 보조 계층 유지(OD-MS-009 · OD-MS-030 정합) |
+| IAM | Builder invoke 만 최소 허용(`portfolio-daily-execution-slack-builder-invoke`) |
+| 비용 모델 | 변경 미미(상시 컴퓨트 신규 없음) |
+| runDate 전달 | 실행 날짜를 고정값 아닌 `$.runDate` 로 하위 SSM 명령까지 동적 전달(Step1 잔고 명령 하드코딩 제거) |
+| Lambda 위치 | Lambda 는 여전히 notifier 보조 계층(성공 Slack 수동 호출 대상) · 주 compute 아님 |
+| aws-live 정책 | 변경 없음 (OD-SAFE-002 · OD-SAFE-003 유지) |
+| 신규 Decision ID · Risk ID | 없음 |
+
+상세 근거는 `_common/risk-register.md` R-AUTO-037 · R-AUTO-038 Mitigation history · `_common/operator-decisions.md` OD-MS-009 · OD-MS-030 · OD-MS-032 Details [2026-07-20] 참조. 실제 State Machine ARN · execution ARN · SSM Command ID · ECS Task ARN · broker 주문번호 원문 기록 0건(R-DOCS-001 정합).
 
 ### 4.8 port_strategy_research
 
@@ -784,6 +822,8 @@ Lambda 코드 본문 · Step Functions ASL · Scheduler target JSON · Slack 메
 - 손익 prefix · revisionId · smoke execution name
 
 Decision Summary 카운트 갱신(전체 96 → 97 / 확정 51 → 52 / 잠정 42 유지).
+
+**[2026-07-15 Daily Batch orchestration 운영 메모]** — 서비스 1순위 / 2순위 결론 변경 없음. Daily Batch orchestration 자체는 `Step Functions + EventBridge Scheduler + ECS RunTask`(OD-MS-009) 그대로 유지 · Daily Brief mini state machine 분리(OD-MS-038) 그대로 유지 · Lambda 는 본 프로젝트 8개 MS 의 주 compute 가 아니라 orchestration Dispatcher / Notifier / Builder / lifecycle 보조 계층 유지(OD-MS-030 / OD-MS-032 / OD-MS-034 정합). 본 일자에는 장전 · 장후 Daily Brief Scheduler Target 을 Daily Brief State Machine 직접 호출 대신 Daily Scheduler Dispatcher Lambda 호출로 전환하여 Holiday Guard 책임을 Dispatcher 로 통합(4종 경로 = 07:50 장전 · 08:00 Step 1~11 · 09:01 Step 12~17 · 15:50 장후). EC2 stop Scheduler 15:50 은 휴일 여부와 무관하게 실행하는 기존 구조 유지. Builder Lambda 는 메시지 생성 · DB 조회 책임만 유지 · 내부 Guard 비활성화 · 정상 응답에 `skipped=false` · `skipReason=null` 추가 · `pg8000` 및 관련 의존성 패키징 재배포. 2026-07-15 15:50 자동 장후 초기 실패 후 16:02 장후 실전 smoke 성공 · Slack 실 수신 확인. 신규 Decision ID · Risk ID · Decision Summary count 변경 없음. 상세 근거는 [operator-decisions.md](./operator-decisions.md) OD-MS-032 · OD-MS-038 Details · [risk-register.md](./risk-register.md) R-AUTO-035 Mitigation history · [followups-overview.md](./followups-overview.md) Done recently 2026-07-15 row 참조.
 
 
 ### Evidence Details 4.3 · #7 <a id="evidence-4.3-7"></a>

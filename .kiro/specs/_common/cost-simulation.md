@@ -188,6 +188,7 @@
 - chapter 4.2 paper realistic 합계 `~212 USD/월` 은 NAT Gateway 1 개 + 데이터 처리 + Endpoint 일부 포함한 **모델링 시나리오** 값이다. 현재 실제 aws-paper 운영은 NAT Gateway 미사용 이므로 NAT 관련 두 행 (`NAT Gateway (1개) $43` · `NAT 데이터 처리 $5`) 은 실측 청구에 포함되지 않는다.
 - 실측 148.95 USD (세금 포함) 는 chapter 4.2 low 합계 `~182 USD` 보다도 낮다. 이는 (a) NAT 미사용 · (b) VPC Endpoint 를 필요 최소 세트로만 유지 · (c) Fargate desiredCount 상시 1 이 아닌 검증 시점만 활성 (chapter 3.1 `[2026-06-30 (오후) …]` 메모 정합) · (d) CloudWatch Logs / Metrics / Alarms 사용량이 표 가정 (20 GB · 20 metrics · 20 alarms) 보다 낮음 등의 조합 결과로 해석된다.
 - chapter 4.2 표 자체는 IaC 작성 시 재검증 기준 (상한 참고값) 으로 유지하고, 실측값은 본 절 `2026-07-01 Actual Cost Analysis` 를 우선 참조한다.
+- **[2026-07-08 note · OD-MS-040 정합]** — ECS Fargate crawler / preprocessor TaskDefinition 에 env `TZ=Asia/Seoul` 을 추가하는 단기 패치는 월 비용 영향 없음. Fargate cpu / memory · CloudWatch Logs · Step Functions transitions 무변화. 비용 수치 재산정 대상 아님.
 
 ## 1. 가정과 단서
 

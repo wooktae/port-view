@@ -2242,3 +2242,191 @@ Kiro 측 실행 / 변경 0건:
 - Scheduler 이름 · cron · Asia/Seoul · Target Input · Dispatcher Lambda 이름 · state machine 이름.
 - executionName · status · start · stop timestamp · Slack 이벤트 라벨.
 - balance snapshot id · as_of_date · 금액 · count · 라인업 7종 이름.
+
+
+## 2026-07-15 (오후) — Daily BUY KST 날짜 오판 해결 + Approval Slack 데이터 정합 및 후보 표시 개선
+
+2026-07-15 오후 운영자 직접 수행 결과. 본 노트는 두 개의 서로 다른 장애를 함께 기록한다. (a) 2026-07-13 (월) 매수 후보 4건이 실행되지 않은 원인은 실행 컨테이너의 업무 날짜 판단이 UTC 기준이었기 때문이며 Daily 전략 계산 자체는 정상이었다. (b) 별건으로 Approval Required Slack 이 서로 다른 Daily Run 과 Execution Plan 을 혼합해 표시하고 후보 종목 payload 를 원문 형태로 잘라서 노출하던 문제를 정합했다. Daily Brief Slack 미발송 복구(본 문서 상단 2026-07-15 daily-brief-slack-recovery 섹션 · WORKLOG 2026-07-15 참조) 와는 서로 다른 장애로 구분한다.
+
+본 노트는 Kiro 문서 기록만 담고, 실제 코드 · Lambda 배포 · ECS Task Definition 갱신 · Market EC2 timezone 변경 · Step Functions 실행 경로 연결 · DB 검증은 모두 운영자가 직접 수행했다. Kiro 는 AWS · Lambda · ECS · EC2 · Step Functions · Scheduler · IAM · DB · Slack · broker · KIS 실행 0건. Lambda 코드 본문 · IAM Policy 본문 · SQL raw output · Slack payload · 실제 ARN · executionArn · RequestId · SHA256 · webhook URL · account-id · broker_order_no · 계좌번호 원문 본 노트 평문 기록 0건 · 모두 `[REDACTED_*]` 계열 placeholder.
+
+### 1) 증상
+
+두 개의 서로 다른 이슈가 동일 일자에 식별되었다.
+
+- (A) Daily BUY 미실행 — 2026-07-13 (월) `daily_run_id=73` 이 정상 계산되고 BUY 신호 4건 · 후보 4건이 생성되었음에도 Execution Plan 과 Execution Order 가 생성되지 않아 매수 후보 4건이 실행 대상에 오르지 못했다. Step Functions 는 SUCCESS 로 종료되어 자동 감지가 어려웠다.
+- (B) Approval Slack 데이터 혼합 — Approval Required Slack 메시지에 서로 다른 Daily Run 과 Execution Plan 이 조합되어 실제 DB 에 존재하지 않는 상태/기준일/신호/후보 조합이 표시되었다. 후보 종목명이 `-` 로 표시되고 `buy_info` 원문 딕셔너리가 노출·잘림 상태로 렌더링되어 운영 가독성이 낮았다.
+
+### 2) 원인
+
+**(A) Daily BUY 미실행 · 업무 날짜 UTC 오판**
+
+| 항목 | 값 |
+| --- | --- |
+| 실제 실행 시각 | 2026-07-13 08:00 KST |
+| 실행 컨테이너 UTC 시각 | 2026-07-12 23:00 UTC |
+| 업무 날짜 계산 함수 | `date.today()` · `datetime.today()` (naive) |
+| 컨테이너 내부 산정 결과 | 2026-07-12 (일) |
+| Step8 결과 | `WEEKEND / NO_TARGET` |
+| Execution Plan 생성 | 없음 |
+| Execution Order 생성 | 없음 |
+| Container ExitCode | 0 |
+| Step Functions 전체 | SUCCESS |
+
+**(B) Approval Slack 데이터 혼합 · 독립 latest 조회**
+
+| 항목 | 값 |
+| --- | --- |
+| Builder latest 조회 (Plan) | `latestPlanId=133` · `latestPlanDate=2026-07-09` |
+| Builder latest 조회 (Run) | `latestDailyRunId=73` |
+| 조합 결과 (표시) | 상태 `DEFENSIVE` · 기준일 `2026-07-09` · 신호 4건 · 후보 4건 |
+| 실제 DB 조합 존재 여부 | 없음 |
+| 후보명 렌더링 | `-` |
+| 점수 표시 | `buy_info` 원문 dict + truncation |
+
+### 3) 실제 DB 결과 (Daily 전략 계산 정상)
+
+| 항목 | 값 |
+| --- | --- |
+| `daily_run_id` | 73 |
+| `run_date` (실행 시각 KST 날짜) | 2026-07-12 |
+| `data_date` (시장 기준 데이터 날짜) | 2026-07-10 |
+| `market_signal` | AGGRESSIVE |
+| BUY 신호 | 4건 |
+| 후보 | 4건 |
+| 후보 종목 | DL · 대주전자재료 · 삼성SDI · 한국피아이엠 |
+
+Daily 전략 계산은 정상이었다. `Execution Plan / Order 미생성` 은 이후 실행 컨테이너 업무 날짜 오판 단계에서 발생한 별개 결함이다.
+
+### 4) KST 날짜 기준 수정
+
+원칙: DB timestamp 저장 기준은 UTC 를 유지하고, 업무 날짜 판단은 `Asia/Seoul` 기준으로 통일한다.
+
+| 대상 | 조치 |
+| --- | --- |
+| Daily BUY / SELL 실행 관련 ECS Task Definition | `TZ=Asia/Seoul` 환경변수 추가 |
+| Market EC2 서버 timezone | Korea Standard Time 로 변경 |
+| 관련 실행 스크립트 | 로컬과 ECS 에서 동일한 KST 업무 날짜 사용 보완 |
+| Step Functions 실행 경로 | 신규 ECS Task Definition revision 을 실제 실행 경로에 연결 |
+| DB session timezone | UTC 유지 |
+
+R-DATA-010 [2026-07-15 보강] · OD-MS-040 [2026-07-15 보강] 정합.
+
+### 5) Approval Slack 단일 Daily Run 조회 구조
+
+Builder 조회 기준을 단일 `daily_run_id` 로 확정하고, 독립 latest 조회를 제거했다.
+
+| 항목 | 변경 후 |
+| --- | --- |
+| 조회 기준 | 하나의 `daily_run_id` 를 먼저 확정 |
+| 상태 · 기준일 · 신호 수 · 후보 수 | 동일 Daily Run 기준으로 조회 |
+| 독립 latest 조회 | Plan · Run 각각 따로 선택 방식 제거 |
+| 신호 조회 | Daily Run 기준 Daily Signal 조회 |
+| Order 조회 | `source_daily_run_id` 로 연결된 Execution Order 만 조회 |
+| Plan 조회 | 해당 Order 가 참조하는 Execution Plan 만 사용 |
+| 연결된 Plan 부재 시 | `latestPlanId=null` 로 처리 · 임의 과거 Plan 사용 안 함 |
+| 메시지 상태 · 기준일 | 선택된 Daily Run 의 `market_signal` · `data_date` 사용 |
+| 신호 수 · 후보 수 | 동일 Daily Run 값 또는 실제 조회 건수 |
+| 매수 후보 목록 | 동일 `daily_run_id` 의 Daily Signal 만 사용 |
+
+### 6) 후보 표시 형식 개선
+
+| 항목 | 변경 |
+| --- | --- |
+| 종목명 | 실제 `company_name` 또는 `ticker_code` 사용 |
+| 점수 표시 | Builder 가 후보별 점수 필드를 구조화하여 Notifier 로 전달 · Notifier 가 소수점 셋째 자리까지 표시 |
+| 원본 `buy_info` dict 노출 | 제거 |
+| 한글 라벨 | `final_score` → 종합 · `flow_score` → 수급 · `info_score` → 정보 · `tape_score` → 추세 · `short_score` → 공매도 |
+
+최종 형식 예 (Slack 렌더 · 실제 값 미기록):
+
+```
+[매수 후보]
+- DL
+  · 종합 0.433 / 수급 0.636 / 정보 0.000 / 추세 0.034 / 공매도 0.066
+```
+
+### 7) 배포 대상
+
+| Lambda | 배포 상태 |
+| --- | --- |
+| `portfolio-approval-slack-summary-builder` | `Active` · `LastUpdateStatus=Successful` · Runtime · Handler 변경 없음 |
+| `portfolio-event-notifier` | `Active` · `LastUpdateStatus=Successful` · Runtime · Handler 변경 없음 |
+
+이전 버전 롤백 ZIP 확보 완료(운영자 직접 수행 · SHA256 원문 미기록).
+
+### 8) 검증 결과
+
+Builder 실제 DB 조회 결과:
+
+| 항목 | 값 |
+| --- | --- |
+| 상태 | AGGRESSIVE |
+| 기준일 | 2026-07-10 |
+| 신호 수 | 4건 |
+| 후보 수 | 4건 |
+| `latestPlanId` | null |
+| 후보 종목 | DL · 대주전자재료 · 삼성SDI · 한국피아이엠 |
+| 후보별 필드 | 종합 · 수급 · 정보 · 추세 · 공매도 정상 |
+
+`latestPlanId=null` 은 선택된 Daily Run 에 연결된 Execution Order · Plan 이 없음을 의미하며, 임의의 과거 Plan 을 사용하지 않았다는 검증 결과로 기록한다.
+
+Builder → Notifier → Slack E2E 검증 (테스트 실행 기반, 실제 자동 주문 체결 E2E 아님):
+
+| 항목 | 결과 |
+| --- | --- |
+| 실제 Slack 메시지 수신 | 완료 |
+| 상태 vs DB `market_signal` | 일치 |
+| 기준일 vs DB `data_date` | 일치 |
+| 신호 수 vs 실제 Signal 건수 | 일치 |
+| 후보 수 vs 실제 후보 건수 | 일치 |
+| 후보 종목 vs 동일 `daily_run_id` 종목 목록 | 일치 |
+| 서로 다른 Daily Run · 과거 Plan 혼합 | 없음 |
+| 후보 종목명 정상 표시 | 확인 |
+| 5개 점수 한글 표시 | 확인 |
+| 원본 dict 노출 | 제거 확인 |
+
+### 9) 남은 후속
+
+- [ ] 다음 영업일 KST 기준 Daily BUY 자동 실행 재발 여부 실전 관찰 (Step Functions 정기 회차)
+- [ ] READY 후보가 있는데 Plan / Order 가 없을 때 Step Functions 실패 처리 (실패 전파 강화)
+- [ ] `NO_TARGET` 과 실제 성공 상태의 구분 강화
+- [ ] 내부 주문 실패가 ExitCode 0 및 Step Functions SUCCESS 로 묻히지 않도록 실패 전파 강화
+- [ ] Plan / Order / Connector Request / Signal Order Map / Broker 접수 / Fill / Position 까지 이어지는 주문 검증 체인 보강
+
+관련 항목은 `_common/followups-overview.md` Now · `_common/risk-register.md` R-DATA-010 [2026-07-15 보강] · R-DATA-017 [2026-07-15 보강] · `_common/operator-decisions.md` OD-MS-031 [2026-07-15 보강] · OD-MS-040 [2026-07-15 보강] 참조.
+
+### 10) 사실 기록 범위 (본 일자 Kiro 측)
+
+Kiro 측 실행 / 변경 0건:
+
+- AWS CLI · boto3 · psql · Lambda 실행 · Step Functions 실행 · SSM RunCommand · Slack webhook · KIS API · broker 호출 0건
+- AWS 리소스 신규 생성 · 수정 · 삭제 0건
+- Lambda 배포 · ECS Task Definition 갱신 · EC2 timezone 변경 · Step Functions 실행 경로 연결 0건
+- broker 주문 제출 · fill sync · position sync · aws-live 작업 0건
+- git add · commit · push 실행 0건
+- 8개 MS README · AGENTS.md · CHANGELOG · docs · worklog · 소스 · 패키징 변경 0건
+
+운영자 직접 수행 영역:
+
+- Daily BUY / SELL 실행 관련 ECS Task Definition 신규 revision 등록 · `TZ=Asia/Seoul` 추가
+- Market EC2 서버 timezone Korea Standard Time 변경
+- 실행 스크립트 KST 업무 날짜 산출 보완
+- Step Functions 실행 경로에 신규 Task Definition revision 연결
+- Builder Lambda `portfolio-approval-slack-summary-builder` 재배포 (단일 `daily_run_id` 조회 · 종목명 · 점수 필드 구조화)
+- Notifier Lambda `portfolio-event-notifier` 재배포 (한글 라벨 · 점수 소수점 셋째 자리 · 원본 dict 미노출)
+- Builder → Notifier → Slack 메시지 표시 E2E 검증
+
+민감정보 · 실제 식별자 원문 신규 기록 0건 — 모두 `[REDACTED_*]` placeholder 사용 대상:
+
+- secret value · KIS app key · KIS app secret · 계좌번호 12자리 원문
+- RDS password · RDS endpoint hostname · account-id 12자리 원문
+- 실제 IAM Role ARN · 실제 secret ARN · IAM access key id · instance-id · EIP · public IP
+- image digest full sha256 · task ARN · ENI ID · broker_order_no 원문
+- Slack webhook URL · DB password · 실제 state machine ARN · 실제 Lambda ARN · executionArn · RequestId · SHA256 · Slack payload raw
+
+운영 식별자 (사용자 명시 정책 정합 · 사실 기록):
+
+- `daily_run_id=73` · `run_date=2026-07-12` · `data_date=2026-07-10` · `market_signal=AGGRESSIVE`
+- Lambda 이름 2종 · Deployment status · Runtime · Handler 변경 없음 사실
+- 후보 종목명 · 5개 점수 라벨 (Korean · English key 매핑)

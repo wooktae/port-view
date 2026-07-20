@@ -230,6 +230,7 @@
 - 조심할 점: Task가 너무 자주 멈추면 cold start 비용 증가. 인터넷 outbound가 필요한 Task는 NAT-free 전략에서 public subnet에 두고 SG 통제.
   - **[port-view Fargate Task Role 권한 분리]** — port-view Fargate Task Role 은 `states:StartExecution` 권한을 특정 state machine ARN(`portfolio-paper-daily-step1-17-approval` 권장) 한정으로 부여 / Resource · Action wildcard 0건(OD-SEC-005 / OD-SEC-006 / R-AUTO-034 신규 mitigation 정합 / 06 spec 후속 phase 책임).
   - RDS 접속정보는 image / properties 직접 기록 금지 / Secrets Manager 또는 SSM SecureString 주입 / `stateMachineArn` · region · `executionNamePrefix` 도 env / config 주입.
+  - **[ECS container timezone 운영 주의 · OD-MS-040]** — ECS Fargate 컨테이너의 기본 timezone 이 UTC 일 수 있으므로 KST 장전 batch(예: 08:00 KST Daily Step1~11 crawler / preprocessor) 는 TaskDefinition env 에 `TZ=Asia/Seoul` 을 추가하거나 코드에서 timezone-aware helper(`ZoneInfo("Asia/Seoul")`) 를 사용해야 한다. UTC 기본값에서 timezone 없는 `datetime.now().date()` 를 사용하면 08:00 KST 실행 시 target date 가 하루 더 밀리는 stale data 원인이 될 수 있다(2026-07-08 R-DATA-010 Mitigation history · `_common/operator-decisions.md` OD-MS-040 Details 참조).
 - 관련 spec: 04, 05, 08, 09.
 
 ### ECR (Elastic Container Registry)
@@ -517,6 +518,81 @@
 - Step Functions → Step 1~11 / Step 12~17 State Machine 실행 이력.
 
 본 9차 회차에서는 상단 골격 재편 · 카테고리 H3 강등 · 용어 H3 정렬을 우선 완료했고, 각 서비스별 실증 메모의 세부 이관은 후속 회차에서 이어간다. 개별 서비스 본문에 이미 있는 특정 날짜 evidence 는 원문 그대로 유지되며 삭제하지 않는다.
+
+### 2026-07-20 (Step 13 EGW00201 복구 · rate-limit 보완 · runDate 동적화 · 실패 Slack 경로)
+
+Step 12~17 자동 실행 Step 13 실패 및 수동 복구 회차 정합 메모. 서비스 개념 · 5-field template 변경 없음. 상세 근거는 `_common/risk-register.md` R-AUTO-001 · R-AUTO-037 · R-AUTO-038 · R-BROKER-004 Mitigation history · `_common/operator-decisions.md` OD-SAFE-001 · OD-SAFE-004 · OD-MS-009 · OD-MS-030 · OD-MS-031 · OD-MS-032 Details 참조.
+
+| 항목 | 값 |
+| --- | --- |
+| Step Functions 실행 날짜 | 고정값 아님 · `$.runDate` 로 전달 (Step1 잔고 명령의 `--run-date 2026-06-22` 하드코딩 제거) |
+| Step Functions 실패 경로 | Task Catch 와 Choice 결과 실패를 모두 실패 Slack 으로 연결 (Choice Default 가 Fail State 직행해 실패 Slack 우회하던 문제를 Pass State 경유로 보완 · `Step12_Failed` 제외) |
+| 주문 제출 vs 주문 조회 분리 | 주문 제출 Step(12) 과 주문 조회 Step(13) 을 분리 · Step 12 미재실행으로 중복 주문 방지 · Step 13 만 수동 복구 |
+| SSM RunCommand rate-limit | `connector_order_check.py` 2.0.1 → 2.0.2 · 주문 조회 사이 5초 대기 · `EGW00201` 한정 최대 2회 재시도 (1차 1.5초 · 2차 5초) |
+| rate-limit 보완 성격 | broker 주문 제출 재시도 아님 · idempotent 조회 API 제한 재시도 |
+| 후속 유지 | 다음 다건 주문일 5초 대기·재시도 로그 실운영 확인 (강제 오류 유발 없이) · OPS Mirror 세부 Step 확장 |
+| 신규 용어 · 서비스 결론 | 없음 |
+| 신규 Risk / Decision ID | 없음 |
+
+State Machine ARN · execution ARN · SSM Command ID · ECS Task ARN · broker 주문번호 · account-id · SHA256 원문 기록 0건(R-DOCS-001 정합).
+
+### 2026-07-20 (성공 Slack 실제 체결 내역 표시 · Builder → Notifier)
+
+위 장애 복구와 별개로, `DAILY_EXECUTION_SUCCESS` 성공 Slack 이 당일 실제 매수·매도 체결을 표시하도록 개선한 회차 정합 메모. 서비스 개념 · 5-field template 변경 없음. 상세 근거는 `_common/risk-register.md` R-AUTO-023 Mitigation history · `_common/operator-decisions.md` OD-MS-009 · OD-MS-030 · OD-MS-031 Details 참조.
+
+| 항목 | 값 |
+| --- | --- |
+| Lambda 역할 | 주 compute 아님 · Slack payload 생성 보조 계층 |
+| Lambda (신규) | `portfolio-daily-execution-slack-summary-builder` · 실제 체결 조회 · payload 생성 |
+| Lambda payload 원천 | `connector.connector_fill` 조회 · `reference.stock_master` 종목명 결합 |
+| Step Functions 호출 순서 | 성공 경로 Builder → Notifier → `RecordWorkflowStepSuccess` |
+| Notifier 역할 | Slack formatting · 전송 (`portfolio-event-notifier`) |
+| IAM Role / Policy | Builder invoke 만 최소 허용 (`portfolio-daily-execution-slack-builder-invoke`) |
+| 검증 | 2026-07-20 데이터 수동 smoke · 매수 0건 · 매도 2종목 · Slack 실제 수신 · 전체 execution 미시작 |
+| 신규 용어 · 서비스 결론 | 없음 |
+| 신규 Risk / Decision ID | 없음 |
+
+State Machine ARN · execution ARN · IAM Role ARN · Secret 참조 · account-id · SHA256 원문 기록 0건(R-DOCS-001 정합).
+
+### 2026-07-16 (Daily 실 매수 E2E 첫 실증 · Step 12 Wait 60초)
+
+Paper Daily 자동화 라인업의 실 매수·체결·Fill·Position E2E 첫 실증 회차 정합 메모. 서비스 개념 · 5-field template 변경 없음. 상세 근거는 `_common/risk-register.md` R-AUTO-037 · R-AUTO-038 · R-BROKER-004 Mitigation history · `_common/operator-decisions.md` OD-MS-032 · OD-SAFE-001 Details 참조.
+
+| 항목 | 값 |
+| --- | --- |
+| Step Functions 역할 | 실 매수·체결·Fill·Position E2E 를 State Machine `portfolio-paper-daily-step12-17-approval` 위에서 수행 · 초기 Step 13 조회 시점 문제 재확인 |
+| Wait State 역할 | `Step12_WaitBeforeCheck` · 주문 제출 후 체결 조회 진입 전 대기 |
+| Wait State 변경 | `Seconds=10` → `Seconds=60` · Next State `Step12_GetCommandInvocation` 유지 |
+| Wait 조정 성격 | API 반영 지연 완화책 · polling 대체 아님 |
+| Step Functions SUCCESS 해석 | ExitCode 0 만으로 Fill · Position 정합 완료 판단 안 함 · 최종 성공 판정은 Order Request · Fill · Execution Order · Position 정합 확인 |
+| 실 매수 회차 결과 | Daily Run 76 · BUY 후보 2건 · 13주 · 78주 시장가 매수 전량 체결 · Position ID 13 · 14 `OPEN` |
+| 초기 조회 문제 | 주문 제출 후 약 10초 조회 · 부분체결 · 접수 상태 고착 |
+| 수동 복구 순서 | Step 13 → Step 15 → Step 16 재실행 |
+| 후속 유지 | `ACCEPTED` / `PARTIAL_FILLED` polling · Step 13 · 15 · 16 처리 건수 실패 전파 · Workflow FAIL 전파 · OPS Mirror 세부 Step 확장 |
+| 신규 용어 · 서비스 결론 | 없음 |
+| 신규 Risk / Decision ID | 없음 |
+
+State Machine ARN · execution ARN · revision ID · broker 주문번호 · 계좌번호 · account-id · Slack payload · SSM 응답 · psql raw output 원문 기록 0건(R-DOCS-001 정합).
+
+### 2026-07-15 (Daily Brief Slack recovery · Dispatcher 공통 Holiday Guard 통합)
+
+Daily Brief mini state machine 자동 장후 발송 실패 원인 분석 후속 정합 메모. 서비스 개념 · 5-field template 변경 없음. 상세 근거는 `_common/risk-register.md` R-AUTO-035 Mitigation history · `_common/operator-decisions.md` OD-MS-032 · OD-MS-038 Details 참조.
+
+| 항목 | 값 |
+| --- | --- |
+| EventBridge Scheduler 역할 | 장전 · 장후 Daily Brief Scheduler Target 을 Daily Brief State Machine 직접 호출 → Daily Scheduler Dispatcher Lambda 호출로 전환 |
+| Scheduler 시각 · 상태 | 기존 시각 유지 · ENABLED 유지 · MON-FRI · Asia/Seoul · Flexible OFF |
+| Lambda 역할 (Dispatcher) | `MORNING_BRIEF` · `EVENING_BRIEF` scheduleType 지원 추가 · Daily Brief State Machine ARN 환경변수 추가 · Holiday Guard 를 4종 경로 공통 계층으로 통합 |
+| Lambda 역할 (Builder) | 메시지 생성 · DB 조회 책임만 유지 · 내부 Holiday Guard 환경변수 제어로 비활성화 · 정상 응답에 `skipped=false` · `skipReason=null` 추가 · 관련 의존성 패키징 재배포 |
+| Step Functions 역할 | mini state machine `portfolio-daily-brief-slack-notification` 구조 유지 · `CheckHolidaySkip` Choice 정합은 Builder 정상 응답 필드로 확보 |
+| 4종 경로 정합 | 07:50 장전 · 08:00 Step 1~11 · 09:01 Step 12~17 · 15:50 장후 모두 동일 Dispatcher · 동일 Holiday Guard 통과 |
+| EC2 stop Scheduler 15:50 | 변경 없음 · 휴일 여부 무관 실행 유지 |
+| 실 수신 검증 | 2026-07-15 16:02 장후 실전 smoke Step Functions `SUCCEEDED` · Notifier `statusCode=200` · Slack 실제 수신 확인 |
+| 후속 유지 | 다음 평일 07:50 자동 장전 Slack 실 수신 확인 · Holiday API fallback 정책 |
+| 신규 용어 · 서비스 결론 | 없음 |
+| 신규 Risk / Decision ID | 없음 |
+
+Lambda 코드 · IAM Policy · Step Functions history · execution ARN · RequestId · SHA256 · webhook 원문 · 의존성 세부 버전 본 문서 평문 기록 0건(R-DOCS-001 정합).
 
 ## Update Rules
 

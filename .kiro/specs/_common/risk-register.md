@@ -32,16 +32,16 @@ raw log 전문 · SQL 전체 출력 · AWS CLI 전체 JSON 응답 · CloudWatch 
 
 | 상태 | 건수 | 배지 |
 |---|---|---|
-| Open | 31 | 🟠 (High 21건은 🔴) |
-| Mitigated | 43 | 🟢 |
+| Open | 30 | 🟠 (High 20건은 🔴) |
+| Mitigated | 44 | 🟢 |
 | Accepted | 2 | 🔵 |
 | Closed | 0 | ⚫ |
 
-Area count: Automation 38 · Data 17 · Security 7 · Broker 5 · Network 4 · Cost 3 · Docs 2. Impact count: High 46 · Medium 28 · Low 2. (2026-07-03 R-AUTO-038 신규 · Mitigated 정합)
+Area count: Automation 38 · Data 17 · Security 7 · Broker 5 · Network 4 · Cost 3 · Docs 2. Impact count: High 46 · Medium 28 · Low 2. (2026-07-09 R-DATA-010 Mitigated 승격 정합)
 
-### 그룹 1 — 🔴 Open High risks (21건 · 즉시 관심 대상)
+### 그룹 1 — 🔴 Open High risks (20건 · 즉시 관심 대상)
 
-Impact High + Status Open. 상세 mitigation / detection / rollback / evidence 는 아래 `Risk Table` 및 `Risk Details` 참조.
+Impact High + Status Open. 상세 mitigation / detection / rollback / evidence 는 아래 `Risk Table` 및 `Risk Details` 참조. R-DATA-010 은 2026-07-09 회차에서 `Mitigated` 로 승격되어 본 그룹에서 제외.
 
 | Risk ID | Area | 한 줄 위험 요약 | Affected Spec |
 |---|---|---|---|
@@ -55,7 +55,6 @@ Impact High + Status Open. 상세 mitigation / detection / rollback / evidence �
 | R-DATA-001 | Data | RDS role search_path 미설정 → SQL 조회 실패 · 잘못된 schema 참조 | 02 |
 | R-DATA-002 | Data | pg_dump / restore cutover 정합성 깨짐 | 02, 10 |
 | R-DATA-007 | Data | local vs AWS Paper RDS 병합 → source of truth 붕괴 | 02, 03, 04, 05, 10 |
-| R-DATA-010 | Data | non-GUI raw 최신성 부족 → downstream stale data | 08, 04, 09 |
 | R-DATA-017 | Data | worker exit 0 ≠ KRX raw 최신성 보장 → stale data 전파 | 04, 08, 09, 10 |
 | R-BROKER-001 | Broker | EIP detach / EC2 교체 → broker 등록 IP 불일치 | 03 |
 | R-BROKER-002 | Broker | 단일 access_token 다중 갱신 충돌 | 03 |
@@ -67,7 +66,7 @@ Impact High + Status Open. 상세 mitigation / detection / rollback / evidence �
 | R-AUTO-034 | Automation | Fargate Task Role `states:StartExecution` 광역 부여 · Step 12 gate 우회 | 04, 05, 06, 10 |
 | R-DOCS-001 | Docs | spec 산출물에 secret / token / 계좌번호 / webhook 평문 기록 | 모든 spec |
 
-### 그룹 2 — 🟢 Mitigated High risks (총 25건)
+### 그룹 2 — 🟢 Mitigated High risks (총 26건)
 
 Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 항목만 요약 (상세는 `Risk Table` 참조).
 
@@ -77,6 +76,7 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
 | R-DATA-004 | Data | `--no-owner --no-privileges` + 사후 GRANT 재구성 | 02, 10 |
 | R-DATA-005 | Data | GRANT 매트릭스 정식 정리 · 17-step E2E 검증 통과 | 02, 04, 05, 06, 08 |
 | R-DATA-006 | Data | Secrets Manager JSON multi-key 재생성 | 02, 08 |
+| R-DATA-010 | Data | ECS Fargate `TZ=Asia/Seoul` + CRAWLER Windows EC2 KST 변경 · raw 최신성 회복 확인 (2026-07-09) | 08, 04, 09 |
 | R-DATA-011 | Data | `marketconnector_app` legacy schema search_path 보정 | 02, 03, 06 |
 | R-DATA-012 | Data | 추가매수 case unique constraint merge patch | 04, 10 |
 | R-DATA-013 | Data | `execution_app` decision UPDATE 권한 정식 부여 | 02, 04 |
@@ -122,7 +122,6 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
 | R-AUTO-034 | Automation | Fargate Task Role `states:StartExecution` Resource 를 approval + safe 두 ARN 한정 재부여 | 06 후속 |
 | R-DATA-017 | Data | Step2B 성공 기준 강화 + Slack KRX 기준일 표시 + feature lag 정책 명문화 | 04, 08, 09 후속 |
 | R-AUTO-014 | Automation | Step Functions state name ↔ command override 매핑 표 정식 정리 | 04 후속 |
-| R-DATA-010 | Data | non-GUI raw 최신성 회복 후 preprocessor 재실행 | 08 후속 |
 | R-COST-001 · R-COST-002 · R-COST-003 | Cost | 월 비용 spike / NAT 미사용 재확인 / S3 lifecycle 정책 도입 | 06, 10 후속 |
 
 ### 컬럼 정의
@@ -190,7 +189,7 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
 | R-DATA-008 | Data | 🟠 Open | Medium | Research 내부 adapter 3종이 port_strategy_common 계약 변경 미추종 → 결과 불일치 | py_compile / import smoke + Daily Decision vs Research sample 비교. [See details: R-DATA-008 Details](#r-data-008-details) |
 | R-COST-003 | Cost | 🟠 Open | Medium | S3 리포트 lifecycle 미설정 → storage 비용 누적 · public read 부주의 노출 위험 | Job Role PutObject prefix 한정 · S3 lifecycle 정책 도입 후속. [See details: R-COST-003 Details](#r-cost-003-details) |
 | R-DATA-009 | Data | 🟠 Open | Medium | smoke 통과 표현이 raw 최신성 완료로 오해되어 stale data 기반 운영 진입 위험 | 표현을 "부분 완료" 로 통일 · non-GUI raw 7종 MAX(trade_date) SQL 점검. [See details: R-DATA-009 Details](#r-data-009-details) |
-| R-DATA-010 | Data | 🔴 Open | High | non-GUI raw 최신성 미회복 → preprocessor · Research · Decision stale raw 전파 위험 | raw 최신성 회복 후 preprocessor 재실행 · 신규 feature date 검증. [See details: R-DATA-010 Details](#r-data-010-details) |
+| R-DATA-010 | Data | 🟢 Mitigated | High | non-GUI raw 최신성 미회복 → preprocessor · Research · Decision stale raw 전파 위험 | raw 최신성 회복 후 preprocessor 재실행 · 신규 feature date 검증. [See details: R-DATA-010 Details](#r-data-010-details) |
 | R-SEC-009 | Security | 🟠 Open | Medium | Windows worker Autologon 자격 · RDP 노출로 KRX worker + EC2 OS 동시 침해 위험 | Autologon 은 paper worker 한정 · RDP 운영자 IP 한정 · SSM 우선. [See details: R-SEC-009 Details](#r-sec-009-details) |
 | R-AUTO-016 | Automation | 🔴 Open | High | Windows worker Administrator interactive session 부재 → KRX GUI 수집 실패 위험 | Autologon bootstrap · query user Active pre-check · wrapper 로그 login 모니터. [See details: R-AUTO-016 Details](#r-auto-016-details) |
 | R-AUTO-017 | Automation | 🟢 Mitigated | Low | wrapper 종료 후 Chrome process 잔존 → 메모리 누수 · 다음 Selenium attach 충돌 | step-02 wrapper 가 KRX 실행 직전 chrome/chromedriver best-effort reset. [See details: R-AUTO-017 Details](#r-auto-017-details) |
@@ -243,6 +242,7 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
     - BUY / SELL / fill sync / position 변경 step 자동 재시도 금지 정책 유지 재확인.
     - Step 12~17 approval state machine 안 Step 12 / 14 / 15 / 16 계열 state Retry block 부재 audit 는 04 spec 후속 phase.
     - 본 일자 Step 12~17 수동 실행 회차(executionName `port-manual-daily-step12-17-20260701-043747` / SUCCEEDED / NO_TARGET 안전 종료) 는 broker 주문 제출 0건 / `connector_order_request` 신규 0건 / 자동 재시도 진입 0건.
+  - [2026-07-20 보강] 2026-07-20 Step 13 `EGW00201`(초당 거래건수 초과) rate-limit 보완 회차에서 broker 주문 자체 재시도는 여전히 금지 원칙을 유지한다. 이번에 추가한 재시도는 주문 제출(BUY/SELL) 재시도가 아니라 idempotent 한 주문·체결 조회 API(`connector_order_check.py`) 의 `EGW00201` 한정 최대 2회 재시도(1차 1.5초 · 2차 5초) 이며, 주문 조회 사이 5초 대기와 함께 적용됐다(다른 오류 코드 미적용 · broker 주문 제출 로직 변경 없음). Step 12 는 중복 주문 방지를 위해 재실행하지 않고 Step 13 만 수동 실행해 복구했으므로 자동 재시도로 인한 broker 중복 주문 진입 0건. Status `Open` 유지(Step Functions state machine 안 BUY / SELL / fill sync / position 계열 Retry block 부재 audit 는 04 spec 후속) · 신규 Risk ID 없음.
 - Detection: `connector_order_request` 단기간 중복 insert 감지 + broker 측 동일 종목 · 동일 가격 중복 주문 알림. [2026-06-13 보강] Step Functions execution history 의 retry attempt 기록 / state name ↔ command override 매핑 audit / `connector_order_request` 의 `idempotency_key` 또는 `client_order_id` 중복 row 점검.
 - Rollback: 해당 Step Functions execution 즉시 stop → broker 측 취소 또는 수동 정리 → retry 비활성화로 state machine 재배포.
 - Evidence links: [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md), [`../03-marketconnector-ec2/operation-notes.md`](../03-marketconnector-ec2/operation-notes.md).
@@ -374,6 +374,14 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
     - (d) Builder Lambda `portfolio-daily-brief-slack-summary-builder`(Python 3.12 + `pg8000` + Secrets Manager `valueFrom` / `psycopg2` 미사용) + Notifier `portfolio-event-notifier` 분리.
       - (e) IAM Role 2종(`portfolio-daily-brief-sfn-role` + `portfolio-daily-brief-scheduler-role`) — Daily 본 실행 IAM Role 과 분리.
     - (f) DB password Secrets Manager `valueFrom`. (g) Slack webhook 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운영 안정화 후 Secrets Manager / SSM SecureString 이전(R-AUTO-024 `Accepted`).
+- Mitigation history:
+  - [2026-07-08 보강] Summary Builder 에 holiday guard 배포 (`HOLIDAY_COUNTRY` · `FAIL_CLOSED_ON_HOLIDAY_ERROR` env 추가) + state machine 에 `CheckHolidaySkip` Choice 신규 삽입 — `skipped=true` 이면 `SkipDailyBriefSlack` 로 종료 / `skipped=false` 또는 값 없음이면 `SendSlackNotifier` 진행. 휴일 dryRun 에서 `SkipDailyBriefSlack` 진입 · `SendSlackNotifier` 미진입 확인. Status `Mitigated` 유지 · 신규 Risk ID 없음 · 실제 배포 · env 추가 · state machine 업데이트 · dryRun 은 운영자 직접 수행 · Lambda 코드 · zip SHA256 · execution ARN · AWS CLI 전문 본 문서 평문 기록 0건.
+  - [2026-07-15 보강] Daily Brief 자동 장후 Slack 실전 수신 확인 (운영자 직접 수행).
+    - 장애 원인 = (a) Builder Lambda 가 VPC 안에서 외부 Holiday API 호출에 실패해 Fail-Closed 로 장전 · 장후 Slack 이 skip 되던 상태 · (b) Builder 내부 Holiday Guard 를 비활성화한 뒤 정상 응답에 `skipped` 필드가 없어 mini state machine 의 `CheckHolidaySkip` Choice 에서 `States.Runtime` 발생 · (c) 배포 ZIP 에 `pg8000` 이 없어 DB 경로 진입 시 import 오류.
+    - 조치 = Daily Scheduler Dispatcher 에 `MORNING_BRIEF` · `EVENING_BRIEF` scheduleType 지원과 Daily Brief State Machine ARN 환경변수 · Resource 한정 `states:StartExecution` IAM 을 추가. 장전 · 장후 Scheduler Target 을 Daily Brief State Machine 직접 호출 대신 Dispatcher Lambda 호출로 전환해 Holiday Guard 를 Dispatcher 로 통합. Builder 는 메시지 생성 · DB 조회 책임만 유지하도록 내부 Guard 를 환경변수 제어로 비활성화하고 정상 응답에 `skipped=false` · `skipReason=null` 추가 · `pg8000` 및 관련 의존성 패키징 재배포.
+    - 통합 구조 = 07:50 장전 · 08:00 Step 1~11 · 09:01 Step 12~17 · 15:50 장후 4종 모두 동일 Dispatcher · 동일 Holiday Guard 통과. EC2 stop Scheduler 15:50 은 휴일 여부와 무관하게 실행하는 기존 구조 유지.
+    - 검증 = 2026-07-15 15:50 자동 장후 실행이 초기 `CheckHolidaySkip` `States.Runtime` 으로 실패한 뒤 16:02 장후 실전 smoke 에서 Step Functions `SUCCEEDED` · Notifier `statusCode=200` · Slack 실제 수신 확인. 주말 실제 실행 모드 smoke 에서 Dispatcher Holiday Guard 차단 확인. Builder DB 조회 정상. 07:50 자동 장전 실전 수신은 다음 평일 후속 유지.
+    - Status `Mitigated` 유지 · 신규 Risk ID 없음 · Decision Summary count 변경 없음 · 실제 배포 · Scheduler Target 전환 · IAM 갱신 · state machine 업데이트 · 실전 smoke 는 운영자 직접 수행 · Lambda 코드 · IAM Policy · Step Functions history · execution ARN · RequestId · SHA256 · webhook 원문 본 문서 평문 기록 0건.
 - Detection:
   - mini Step Functions execution history 의 `SUCCEEDED` / `FAILED` audit + Scheduler `LastInvocationDate` audit
   - Notifier Lambda CloudWatch Logs 의 `SlackPostSuccess` / `SlackPostFailure` audit + Slack 채널 수신 로그 audit
@@ -411,10 +419,13 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
 - Rollback: (a) 잘못된 상태에서 진행 시 즉시 `aws scheduler update-schedule --state DISABLED` + Step 12~17 수동 실행으로 복귀. (b) 진행 중 execution 은 `stop-execution` + 영향 row 직접 SQL 점검 + broker 측 취소(R-AUTO-001 / R-AUTO-002 / R-AUTO-019 / R-BROKER-004 결합).
   - (c) 07:50 EC2 lifecycle 실패 시 08:00 Step 1~11 실패 → 09:01 fail-closed(R-AUTO-028 결합). (d) 잘못된 broker 주문 발견 시 KIS 취소 + SQL 정리 + ASL 안전 gate 강화 + 운영자 승인 후 ENABLED 복귀. (e) Status 승격 조건 — 1주일 운영 회차 누적에서 잘못된 broker 주문 · stale 신호 실행 · market status 미확인 실행 0건 audit 통과. (f) aws-live 재검토는 10 spec 후속.
 - Evidence links: [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md).
+- Mitigation history:
+  - [2026-07-16 실 매수 E2E 첫 실증 보강] Paper Daily 자동화 라인업의 실 매수·체결·Fill·Position E2E 가 처음 완료됐다. Daily Run 76 이 `run_date=2026-07-16` · `data_date=2026-07-15` · `market_signal=AGGRESSIVE` 로 정상 계산되고 BUY 후보 2건(엔씨소프트 036570 · 코오롱생명과학 102940) 생성. 운영자가 Step 12~17 을 수동 재실행해 13주 · 78주 시장가 매수 주문을 접수했고 두 주문 모두 KIS 모의투자에서 전량 체결(엔씨소프트 최종 보유수량 13주 · 평균 체결가 223,500 원 · 코오롱생명과학 최종 보유수량 78주 · 평균 체결가 약 38,839.7436 원). 초기 Step 13 조회가 주문 제출 후 약 10초 시점에 이뤄져 엔씨소프트 9주 부분체결 · 코오롱생명과학 접수 상태로 고착되어 실제 시장가 주문은 이후 계속 체결됐으나 내부 상태가 최초 조회 결과에 머무는 문제 확인(전체 Step Functions 는 ExitCode 0 기준 SUCCESS 처리 · Step Functions SUCCESS 가 Fill · Position 정합 완료를 보장하지 않는 축 재확인). 운영자가 직접 Step 13(`connector_order_check.py`) 재실행으로 두 주문 `FILLED` 반영 · Connector Order Event 최신 상태 · Connector Fill 13주 · 78주 정상 반영 · Step 15(`execution_sync_buy_fill.py`) 재실행으로 Execution Order 2건 `SUBMITTED` → `FILLED` · Step 16(`execution_sync_buy_position.py`) 재실행으로 `filled_buy_orders_without_position=2` · `synced_count=2` · `skipped_count=0` · Position ID 13 · 14 모두 `OPEN` 생성 순서로 DB 정합 복구. 재발 방지 조치로 State Machine `portfolio-paper-daily-step12-17-approval` Wait State `Step12_WaitBeforeCheck` `Seconds` 10 → 60 변경 · Next State `Step12_GetCommandInvocation` 유지 · State Machine 업데이트 후 재조회 검증 완료(실제 ARN · revision ID · broker 주문번호 원문 문서 미기록). 대기시간 조정만으로 완전 해결됐다고 판단하지 않으며 `ACCEPTED` / `PARTIAL_FILLED` 주문의 후속 재조회 polling · Step 13 · 15 · 16 처리 건수 기반 실패 전파 강화 · Execution Order · Connector Request · Fill · Position 불일치 시 Workflow FAIL · OPS Mirror 세부 Step 확장 · 10분 잔고 스냅샷 연계는 후속 유지. Status `Mitigated` 유지(aws-paper 한정 조건 그대로 · aws-live 정책 변경 없음 · OD-SAFE-002 / OD-SAFE-003 유지). 신규 Risk ID 없음 · Risk Dashboard count 변경 없음.
+  - [2026-07-20 Step 13 실패 · 후속 Step 중단 · 실패 Slack 경로 보완] 2026-07-20 09:01 자동 실행된 State Machine `portfolio-paper-daily-step12-17-approval` 이 Step 13(주문·체결 조회)에서 실패했다. Step 12 주문 제출 자체는 정상 완료(매도 2건 broker 접수 · 첫 주문 전량 체결) 였고 둘째 주문 조회에서 KIS `EGW00201`(초당 거래건수 초과) 발생. Step 13 실패로 Step 14~17 과 성공 Slack 이 자동 실행되지 않아 "후속 Step 이 선행 Step 실패에 의해 중단된다"는 흐름이 실증됐다. 운영자가 Step 12 를 중복 주문 방지 목적으로 재실행하지 않고 Step 13 만 수동 실행해 두 주문 `FILLED` 복구 후 Step 14~17 을 순차 수동 완주했다. 성공 Slack 은 자동 결과가 아니라 수동 복구 후 `portfolio-event-notifier` 수동 호출로 수신했고 09:01 자동 실행 이력은 FAILED 유지. 추가로 `Step1_SendConnectorBalanceCommand` 의 `--run-date 2026-06-22` 하드코딩을 제거하고 `$.runDate` 동적 전달로 변경했으며, Task 정상 종료·결과 비정상 시 Choice Default 가 Fail State 로 직행해 실패 Slack 을 우회하던 경로를 Step13·14·15·16·Step1 Default → 실패 컨텍스트 Pass State(실패 Slack · OPS 실패 기록 후 최종 FAILED 유지) 로 보완했다(`Step12_Failed` 제외). Status `Mitigated` 유지 · 신규 Risk ID 없음 · Risk Dashboard count 변경 없음. 상세는 R-AUTO-001 · R-AUTO-038 · R-BROKER-004 [2026-07-20 보강] 참조.
 
 ### R-AUTO-038 Details <a id="r-auto-038-details"></a>
 
-- Current status (R-AUTO-038): `Mitigated` (2026-07-03) — aws-paper 한정. run-level + 대표 workflow step mirror 1차 완료. 전체 세부 step mirror 확장 · View Daily Batch 화면 실 렌더링 검증은 후속.
+- Current status (R-AUTO-038): `Mitigated` (2026-07-03) — aws-paper 한정. run-level + 대표 workflow step mirror 1차 완료. 2026-07-08 UI consumption 검증 통과. 전체 세부 step mirror 확장 · 화면 payload / ARN / accountNo redaction 은 후속.
 - R-AUTO-038 · Impact Medium · Probability Medium · Affected Spec 04, 05, 10.
 - Background: 2026-07-02 View Daily Batch 화면 기준선 smoke 회차에서 Step Functions 실행 이력이 `ops.strategy_daily_batch_run` 에 기록되지 않아 화면이 AWS Step Functions 실행 이력을 직접 보여주지 못하는 이슈가 식별되었다(followups-overview `Done recently` 2026-07-02 정합). Slack 및 업무 테이블은 정상 갱신되고 있었으나 이력 표시 계층만 부재.
 - Mitigation summary:
@@ -425,6 +436,16 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
   - (e) 대상 State Machine 2종 `portfolio-paper-daily-step1-17-approval` · `portfolio-paper-daily-step12-17-approval` 이 run-level + 대표 workflow step 진입 · 종료 · 실패 지점에서 Recorder 호출.
   - (f) fail-open 정책 — Recorder 실패는 Step Functions 흐름 자체를 중단시키지 않는다. 업무 테이블 · Slack 은 정상 진행.
   - (g) 권한 분리 — View 는 reader / controller 역할 유지. `execution_app` / `view_app` 권한 확대 0건. 업무 테이블 write 권한 확대 0건.
+- Mitigation history:
+  - [2026-07-08 보강] UI consumption 검증 통과 (운영자 직접 수행).
+    - `view_app` 기준 `ops` schema USAGE · `ops.strategy_daily_batch_run` · `ops.strategy_daily_batch_step_log` SELECT 확인.
+    - `AWS_STEPFUNCTIONS` run 이력 적재 확인 — 최근 run_status 흐름 SUCCESS · 대표 이력 #61(Step 12~17) · #60(Step 1~11).
+    - step_log 상세 확인 — #61 대표 `SFN_STEP12_17_WORKFLOW` / SUCCESS · #60 대표 `APPROVAL_BLOCKED` / SKIPPED.
+    - `/daily-batch` 화면 렌더링 확인 — 실행 모드 `aws-stepfunctions` 표시 · 최근 실행 이력 `AWS_STEPFUNCTIONS` 라벨 · 선택 run(#61) 상세와 step log 렌더링 · AWS Step 1~11 시작 · AWS Step 12~17 승인 실행 버튼 표시 · Local File 실행 OFF · aws-stepfunctions 실행 ON.
+    - Status `Mitigated` 유지. 신규 Risk ID 없음.
+    - 화면 표시 계층의 payload / accountNo / ARN redaction · timestamp UTC → KST 표시 보완 · `APPROVAL_BLOCKED` / SKIPPED 문구 운영자 친화적 개선은 05 spec 후속 Next 로 신규 등록 — 화면 노출 계층 개선 성격이며 별도 Risk ID 신설은 하지 않는다.
+  - [2026-07-16 세부 Step 확장 필요성 재확인] Paper Daily 실 매수 E2E 첫 실증 회차에서 OPS Mirror 가 Step 12~17 전체 Workflow 를 대표 Step 1건(예: `SFN_STEP12_17_WORKFLOW`) 으로만 기록해 Step 13 · Step 15 · Step 16 각각의 처리 건수 · 결과 · 부분 실패 축이 `ops.strategy_daily_batch_step_log` 에 남지 않는 축이 재확인됐다. 초기 Step 13 조회 시점 문제(주문 제출 후 약 10초 · 부분체결/접수 상태 고착) 는 운영자가 직접 Step 13 → Step 15 → Step 16 재실행으로 복구 완료 · Position ID 13 · 14 `OPEN` 생성 · Order Request · Fill · Execution Order · Position 정합 복구 완료. 본 실증은 R-AUTO-038 의 세부 Step 확장 후속(`Now` 리스트) 필요성을 강화하는 evidence 이며, 화면 · Recorder Lambda · State Machine 안 mirror step 배치 자체는 본 회차에서 변경 없음. Status `Mitigated` 유지(aws-paper 한정 · run-level + 대표 workflow step mirror 기존 범위 유지). 신규 Risk ID 없음 · Risk Dashboard count 변경 없음.
+  - [2026-07-20 자동 실행 실패 vs 수동 복구 이력 구분 필요] 2026-07-20 09:01 자동 실행이 Step 13 `EGW00201` 로 FAILED 로 남은 뒤 운영자가 Step 13 만 수동 복구하고 Step 14~17 을 순차 수동 완주한 회차에서, 자동 실행 실패 이력과 수동 복구 이력을 OPS Mirror 상에서 구분해 남길 필요성이 재확인됐다. 원래 09:01 자동 Step Functions 실행 이력은 실제 장애 보존을 위해 FAILED 로 유지하고 수동 복구를 자동 성공으로 덮어쓰지 않았으므로, 자동 실행 run 과 수동 복구 run 을 별도 run 이력으로 구분해 mirror 하는 것과 Step 13 · 15 · 16 각각의 처리 건수 · 결과를 세부 step 으로 기록하는 것이 기존 OPS 세부 Step 확장 후속(`Now`) 과 함께 유지된다. 신규 Risk ID 는 만들지 않고 Follow-up 후보로만 유지 · Status `Mitigated` 유지 · Risk Dashboard count 변경 없음. 같은 일자 성공 경로에 신규 State `BuildDailyExecutionSuccessSlackSummary`(Builder → Notifier) 가 삽입됐고 ASL 검증 OK · 로컬/AWS 정의 canonical(key 정렬) 비교 의미상 차이 0건 · State Machine 전체 execution 은 미수행(수동 smoke 만) 이므로 OPS Mirror 세부 Step 배치 자체는 본 회차 변경 없음.
 - Detection: (a) `RECORD_START` 응답 `ok true` 확인. (b) `RECORD_STEP` 응답 `ok true` + `stepLogId` 생성 확인. (c) `RECORD_SUCCESS` 응답 `ok true` 확인. (d) commit smoke `batchRunId=53` 확인. (e) Step 12 approval-blocked smoke 후 `ops.strategy_daily_batch_run` + `ops.strategy_daily_batch_step_log` row 정합 확인. (f) Recorder Lambda CloudWatch Logs 의 action 별 invocation 결과 · duration · error 여부.
 - Rollback: (a) mirror 실패 반복 시 Recorder Lambda 롤백 또는 Step Functions 안 mirror step 을 `Retry` + `Catch → NoOp` 로 재구성. (b) `ops` schema 안 stale row 는 SQL 로 정리 (DELETE 권한은 별도 운영자 role 로만 수행 · `ops_recorder_app` 은 DELETE 없음). (c) `chk_strategy_daily_batch_run_type` 롤백 시 `AWS_STEPFUNCTIONS` 값 사용 row 를 먼저 정리 후 constraint drop · re-create. (d) 광역 mirror 실패 시 View Daily Batch 화면 문구를 "AWS Step Functions 이력 표시 일시 비활성" 으로 임시 표시하고 followups-overview 에 후속 남긴다.
 - Evidence links: `.kiro/specs/_common/operator-decisions.md` 의 OD-DB-012 · OD-MS-039 Details + Change Log Details 2026-07-03 (1차). 실행 상세는 [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) · [`../05-port-view-ecs-and-runbook/operation-notes.md`](../05-port-view-ecs-and-runbook/operation-notes.md) 후속 반영 후 참조.
@@ -630,6 +651,14 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
     - R-AUTO-020 [2026-06-26 보강] worker exit 0 ≠ KRX raw 최신성 보장 가설 row-level 입증.
     - Step2B 강화 + Slack KRX 기준일 + feature lag 정책 우선순위 격상.
     - Status `Open` 유지.
+  - [2026-07-09 보강 · Open 유지] 2026-07-09 KRX 재수집 회차에서 잔존 false-success 이슈 재확인 — `interest_program.py` · `interest_shortsell.py` 가 `[Error]` 출력에도 exit code 0 로 종료 가능 · `run_krx_worker_daily.ps1` 이 이를 성공으로 오판 가능 · Windows Scheduled Task `LastTaskResult=0` · Step2B SSM `ResponseCode=0` · Step Functions 전체 `SUCCEEDED` 임에도 DB 에 해당 `trade_date` raw 부재 가능. R-DATA-010 회복은 CRAWLER Windows EC2 KST 변경 축이며 본 축과 구분.
+    - 후속 후보: (a) `run_krx_worker_daily.ps1` `[Error]` 감지 시 exit 1 · (b) `interest_program.py` / `interest_shortsell.py` 실패 시 `sys.exit(1)` · (c) Step2B 뒤 DB validation (expected trade_date 기준 program >= 1 · shortsell = 349) · (d) 검증 실패 시 Step Functions Fail.
+    - Status `Open` 유지.
+  - [2026-07-15 보강 · Open 유지] 본 false-success 패턴이 Daily BUY 실행 컨테이너 축에서도 관찰됨 (KRX Step2B 축과 구분 · 동일 패턴의 별개 사례). 2026-07-13 (월) 매수 후보 4건 미실행 사건에서 실행 컨테이너의 업무 날짜 UTC 오판(R-DATA-010 [2026-07-15 보강] 축) 으로 Step8 이 `WEEKEND / NO_TARGET` 으로 종료 · Execution Plan · Execution Order 미생성 · Container ExitCode 0 · Step Functions 전체 SUCCESS 로 표시. Daily 전략 계산과 2026-07-10 기준 데이터는 정상(`daily_run_id=73` · `data_date=2026-07-10` · `market_signal=AGGRESSIVE` · BUY 신호 4건 · 후보 4건).
+    - KST 날짜 직접 원인은 R-DATA-010 축에서 Mitigated 유지(운영자 ECS Task Definition `TZ=Asia/Seoul` · Market EC2 KST · 실행 스크립트 KST 통일 · 신규 revision Step Functions 실행 경로 연결). 본 R-DATA-017 축은 실패 전파 · false-success 성격이므로 별도 Open 유지.
+    - 후속 후보 (본 축): (a) READY 후보가 있는데 Execution Plan / Execution Order 가 없을 때 Step Functions FAIL 처리 · (b) `NO_TARGET` 과 실제 성공 상태의 구분 강화 · (c) 내부 주문 실패가 ExitCode 0 및 Step Functions SUCCESS 로 묻히지 않도록 실패 전파 강화 · (d) 주문 검증 체인 (Plan → Order → Connector Request → Signal Order Map → Broker 접수 → Fill → Position) 보강.
+    - 다음 영업일 KST 기준 Daily BUY 자동 실행 재발 여부 실전 관찰 유지. 실패 전파 보강 완료 전까지 Status `Open` 유지 · Mitigated 또는 Closed 로 조기 승격 금지.
+    - Status `Open` 유지 · 신규 Risk ID 없음 · Risk Dashboard count 변경 없음 · 실제 ECS Task Definition · Market EC2 timezone 변경 · Step Functions 실행 경로 연결 · 검증은 모두 운영자 직접 수행 · Lambda 코드 · IAM Policy · Step Functions history · execution ARN · RequestId · SHA256 · Slack payload raw · 실제 revision ID 원문 본 문서 평문 기록 0건.
 - Detection:
   - `interest_program_raw` · `interest_shortsell_raw` `MAX(trade_date)` vs 직전 영업일 SQL 정기 점검 / SF `SUCCEEDED` + KRX raw N영업일 이상 lag audit
   - Slack `APPROVAL_REQUIRED` KRX 기준일 표시(후속) vs 실제 DB 일치 / `ExpectedKrxRawDate` 산정 vs worker 실제 수집일 분포 / feature 신규 date 생성
@@ -642,7 +671,7 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
 
 ### R-DATA-010 Details
 
-- Current status (R-DATA-010): `Open` — 정식 자동화 진입까지 운영자 raw 최신성 SQL 점검 단기 mitigation 유지.
+- Current status (R-DATA-010): `Mitigated` — 2026-07-08 ECS Fargate crawler / preprocessor 컨테이너 timezone 단기 패치(`TZ=Asia/Seoul`) 적용 · 2026-07-09 KRX CRAWLER Windows EC2 timezone UTC → Korea Standard Time 변경 및 KRX Scheduled Task 수동 재실행으로 `interest_program_raw` · `interest_shortsell_raw` `MAX(trade_date)=2026-07-08` (program rows 1 · shortsell rows 349) 회복 확인. non-GUI ECS raw + KRX GUI worker 두 축 모두 최신성 회복. 원인 축 구분: (a) ECS Fargate 컨테이너 UTC + naive `datetime.now()` (2026-07-08 mitigation) / (b) CRAWLER Windows EC2 서버 timezone UTC (2026-07-09 mitigation). 정기 audit + detection 유지. KRX Step2B worker exit 0 ≠ raw 최신성 문제는 R-DATA-017 로 별도 관리.
 - R-DATA-010 · Impact High · Probability Medium · Affected Spec 08, 04, 09.
 - Mitigation summary (OD-MS-020 · OD-MS-021 정합):
   - Backend AWS E2E dry-run 17단계 선행 · stale raw data 조기 식별.
@@ -654,6 +683,24 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
   - [2026-06-15 보강] Backend AWS E2E dry-run 1차 — preprocessor exitCode 0 · `updated_at` 갱신에도 신규 2026-06-15 feature 0건 → 원인 raw 최신성 부족(`interest_price_raw` 등 7종 최신일 = 2026-06-08) 1차 실증.
   - [2026-06-16 보강] non-GUI crawler 실 운영 Task Definition rev7 분리 · RunTask exitCode 0 · 전체 step SUCCESS · raw 최신성 회복(price/investorflow/marketbreadth/commodity/foreignindex/macro 2026-06-15 · news/agency 2026-06-16).
     - KRX `interest_program_raw` 547→548 · `interest_shortsell_raw` 190,554→190,903. `interest_foreignindex_raw` HANGSENG · NIKKEI225 · SHANGHAI 일부 NULL 은 non-blocker.
+  - [2026-07-08 보강] Daily Step1~11 자동 실행(2026-07-08 08:00 KST) SUCCEEDED 였으나 `interest_price_raw` · `interest_investorflow_raw` · `interest_program_raw` · `interest_shortsell_raw` · `pre_total_market_daily_feature` · `pre_total_stock_daily_feature` 모두 `MAX(trade_date)=2026-07-06` 정체 · `decision.strategy_daily_run.data_date=2026-07-06` · `execution.strategy_execution_plan` NO_CANDIDATE 확인.
+    - 원인: ECS Fargate 컨테이너 UTC timezone + `datetime.now().date()` naive 사용 → 08:00 KST 실행 시 UTC 는 전일 23시대 → `datetime.now().date()=2026-07-07` → `-1 day` 후 target date 2026-07-06 으로 밀림. `is_holiday(2026-07-07,"KR")==False` 확인으로 휴장일 오판 배제.
+    - Mitigation: `portfolio-paper-interest-crawler:8` · `portfolio-paper-interest-preprocessor:2` 신규 revision 에 `TZ=Asia/Seoul` 추가 · State Machine `portfolio-paper-daily-step1-17-approval` Step2A_RunInterestCrawlerNongui(`:7`→`:8`) · Step3_RunPreprocessor(`:1`→`:2`) 갱신 · State Machine revisionId 원문 미기록(`[REDACTED_REVISION_ID]`) · one-off TZ smoke 통과(`TZ_ENV=Asia/Seoul` · `time.tzname=('KST','KST')` · `naive_yesterday=2026-07-07`).
+    - Detection: 2026-07-09 08:00 KST 자동 실행 후 `interest_price_raw` · `interest_investorflow_raw` · `pre_total_market_daily_feature` · `pre_total_stock_daily_feature` `MAX(trade_date)` 가 2026-07-07 로 회복되는지 · `decision.strategy_daily_run.data_date=2026-07-07` 확인 · 09:01 Step12~17 자동 실행이 stale data 영향 없이 정상 흐름인지 확인.
+    - 결정 락: OD-MS-040(ECS batch container 는 Daily market-date 계산 시 UTC 기본값에 의존하지 않고 `TZ=Asia/Seoul` 을 명시한다 · 근본 개선은 timezone-aware helper 로 `datetime.now()` 직접 사용 제거).
+    - 본 회차 mitigation 은 partial 로 취급하고 Status `Open` 유지 · 다음 자동 실행 검증 후 승격 판단. R-DATA-017(KRX GUI worker 계열 · Step2B) 과는 원인이 구분됨.
+  - [2026-07-09 보강 · Status Mitigated 승격] 잔여 원인 축 확인 — KRX CRAWLER Windows EC2 timezone 이 UTC 로 설정되어 있어 08:00 KST 실행 시 서버 로컬 날짜가 UTC 기준 전일 23시대로 계산 · `datetime.today() - 1` · `datetime.now().date() - 1` 계열 로직이 target date 를 2026-07-07 로 산출.
+    - Mitigation: 운영자 직접 CRAWLER Windows EC2 timezone UTC → Korea Standard Time 변경 · Get-Date · Get-TimeZone · Python `datetime.now()` / `today` / `yesterday` 기준이 KST 로 계산되는 것 확인 · CRAWLER EC2 start → SSM Online 확인 → Portfolio-KRX-Worker-Daily Windows Scheduled Task 수동 실행.
+    - Detection: `interest_program_raw` `latest_date=2026-07-08` · `rows_20260708=1` · `interest_shortsell_raw` `latest_date=2026-07-08` · `rows_20260708=349` · program `created_at=2026-07-09 02:23:33 UTC` (KST 11:23:33) · shortsell `created_at=2026-07-09 02:24:08 UTC` (KST 11:24:08).
+    - 원인 축 구분 명확화: ECS Fargate 컨테이너 UTC + naive `datetime.now()` (2026-07-08) 와 CRAWLER Windows EC2 서버 timezone UTC (2026-07-09) 는 별도 축.
+    - Status `Open` → `Mitigated` 승격 · DB session timezone 자체는 UTC 유지 권고 · 운영 표시는 `at time zone 'Asia/Seoul'` 로 KST 변환.
+    - R-DATA-017 (Step2B worker exit 0 · SSM ResponseCode 0 · Step Functions SUCCEEDED ≠ raw 최신성) 는 별개 축으로 Open 유지.
+  - [2026-07-15 보강 · Status Mitigated 유지] Daily BUY / SELL 실행 컨테이너 축 확인 — 2026-07-13 (월) 매수 후보 4건 미실행 사건에서 실행 컨테이너가 `date.today()` · `datetime.today()` naive 함수로 08:00 KST (= 2026-07-12 23:00 UTC) 를 2026-07-12 (일) 로 판단 · Step8 이 `WEEKEND / NO_TARGET` 으로 종료 · Execution Plan · Execution Order 미생성. Daily 전략 계산과 2026-07-10 기준 데이터는 정상 (`daily_run_id=73` · `run_date=2026-07-12` · `data_date=2026-07-10` · `market_signal=AGGRESSIVE` · BUY 신호 4건 · 후보 4건).
+    - Mitigation: 운영자 직접 원칙을 DB timestamp 저장 UTC 유지 · 업무 날짜 판단 Asia/Seoul 통일로 확정 · Daily BUY / SELL 실행 관련 ECS Task Definition 에 `TZ=Asia/Seoul` 추가 · Market EC2 서버 timezone Korea Standard Time 변경 · 실행 스크립트가 로컬 · ECS 에서 동일한 KST 업무 날짜를 사용하도록 보완 · 신규 Task Definition revision 을 실제 Step Functions 실행 경로에 연결.
+    - Detection: 다음 영업일 KST 기준 Daily BUY 자동 실행 재발 여부 실전 관찰 유지 · Step Functions execution history 의 실행 시각 · 컨테이너 timezone env · Step8 결과 audit · `strategy_daily_run.data_date` vs `strategy_execution_plan` / `strategy_execution_order` 정합 audit · `NO_TARGET` 과 실제 후보 있는 상태의 구분 강화 audit.
+    - 원인 축 구분 명확화: ECS Fargate crawler / preprocessor 컨테이너 (2026-07-08) · CRAWLER Windows EC2 (2026-07-09) · Daily BUY / SELL 실행 컨테이너 및 Market EC2 (2026-07-15) 3개 축.
+    - Status `Mitigated` 유지 · 신규 Risk ID 없음 · Risk Dashboard count 변경 없음 · 실제 ECS Task Definition 갱신 · Market EC2 timezone 변경 · Step Functions 경로 연결 · 검증은 모두 운영자 직접 수행 · Lambda 코드 · IAM Policy · Step Functions history · execution ARN · RequestId · SHA256 · 실제 revision ID 원문 본 문서 평문 기록 0건.
+    - 다음 자동 실행 재발 여부 · `NO_TARGET` 성공 상태 구분 · ExitCode 0 · Step Functions SUCCESS 로 묻히지 않도록 실패 전파 강화 · 주문 검증 체인 보강은 R-DATA-017 [2026-07-15 보강] 축으로 별도 관리.
 - Detection: `interest_*_raw` `MAX(trade_date)` vs 직전 거래일 SQL / preprocessor `updated_at` 후 신규 feature date / Research · Decision `data_date` vs 직전 거래일 / N-2 이상 lag 즉시 식별 / Backend E2E dry-run step 4~7 진입 전 raw 최신성 점검.
 - Rollback: raw 최신성 회복 후 preprocessor 재실행 → exitCode 0 → feature max date/`updated_at` 확인 → 신규 feature date 생성 → 정상 시 BACKTEST/DAILY 재진입. stale 결과 산출 시 영향 row 운영자 SQL 식별 후 manual rerun.
 - Evidence links: [`../08-interest-crawler-and-preprocessor-ecs/operation-notes.md`](../08-interest-crawler-and-preprocessor-ecs/operation-notes.md), [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md), [`../09-strategy-research-batch/operation-notes.md`](../09-strategy-research-batch/operation-notes.md).
@@ -748,6 +795,7 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
     - `DAILY_EXECUTION_FAILED` 실패 formatter 는 본 smoke 회차 미확인 — 재배포 후 실 실패 회차 또는 test-only 실패 주입 회차에서 별도 검증 필요(followups-overview 2026-07-02 후속 메모 남은 후속 1 정합).
     - Status `Mitigated` 유지 근거 = 2026-06-23 3종 test-only base 검증 결과 유효 · 재배포 후 실패 formatter 재검증 완료 시점까지 caveat 유지.
     - Slack 본문 · Lambda 코드 · webhook URL · webhook 응답 본문 평문 인용 0건(R-DOCS-001 정합).
+  - [2026-07-20 성공 Slack 실제 체결 내역 표시 개선] `DAILY_EXECUTION_SUCCESS` formatter 가 실행일 · 최종 상태 · [매수 체결] · [매도 체결] 목록을 표시하도록 개선됐다. 신규 `portfolio-daily-execution-slack-summary-builder` Lambda 가 `view_app` 로 `connector.connector_fill` 당일 체결(`created_at` 을 Asia/Seoul 날짜로 변환해 runDate 비교)을 조회하고 `reference.stock_master` 로 종목명을 붙여 `buyFills` · `sellFills`(종목별 `tickerCode` · `stockName` · `fillQty`) payload 를 만든다. State Machine `portfolio-paper-daily-step12-17-approval` 성공 경로가 신규 State `BuildDailyExecutionSuccessSlackSummary` → Notifier(`$.dailyExecutionSuccessSummary.Payload`) → `RecordWorkflowStepSuccess` 로 변경됐고 Builder 실패 시 기존 `SendDailyExecutionFailedSlack` 경로로 연결한다. IAM 은 Builder 전용 최소 실행 Role 과 State Machine Role 의 `lambda:InvokeFunction` inline(`portfolio-daily-execution-slack-builder-invoke`)만 추가. 2026-07-20 데이터로 Builder → Notifier 수동 smoke(전체 execution 미시작)에서 매수 0건 · 매도 엔씨소프트(036570) 13주 · 코오롱생명과학(102940) 78주 · StatusCode 200 · ok=true · Slack 실제 수신 확인. 이 개선은 실패 formatter 재검증(위 [2026-07-02 보강] caveat)과는 별개이며, 09:01 자동 실행은 Step 13 `EGW00201` FAILED 유지. Status `Mitigated` 유지 · 신규 Risk ID 없음 · Risk Dashboard count 변경 없음. Slack 본문 · Lambda 코드 · webhook URL · 실제 ARN · SHA256 평문 인용 0건.
 - Detection: SF Failed/TimedOut/Aborted state 발생 시 Slack `DAILY_EXECUTION_FAILED` 부재 · Lambda CloudWatch error/timeout · webhook 응답 비-200 · Catch state input↔invoke output 매핑 실패. 메시지 본문/Lambda 코드/SF history/webhook 응답 본문 평문 인용 0건(R-DOCS-001 정합) — metadata 만 점검. [2026-07-02 보강] Lambda 재배포 후 실패 formatter 별도 smoke 미완료 상태 audit 항목 추가.
 - Rollback: Slack 누락 시 Catch 정의 · invoke 매핑 · IAM 권한 점검 · Lambda 실패 시 운영자 직접 webhook 수동 호출(webhook URL 평문 0건) 또는 port-view 콘솔에서 Daily Batch 상태 확인 · broker 흐름 끊김은 R-AUTO-001/002 · R-BROKER-004 rollback 결합. DLQ/retry/CloudWatch Alarm 도입은 후속.
 - Evidence links: [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md), [`../05-port-view-ecs-and-runbook/operation-notes.md`](../05-port-view-ecs-and-runbook/operation-notes.md).
@@ -1020,6 +1068,8 @@ Impact High + Status Mitigated. 정기 audit + detection 계속 유지. 대표 �
   - (e) Step 12 `-AllowPaperOrderExecute` 옵션과 함께 사용되므로 R-AUTO-019 mitigation 과 결합.
   - [2026-06-18 1차 실증] 본 일자 Step 12 1차 시도에서 KIS paper API read timeout / `connector_order_request 38 ~ 41` FAILED / `strategy_execution_order 30 ~ 33` FAILED 발생. 네트워크 / DNS / TCP / HTTPS 기본 연결은 정상 확인되어 KIS paper endpoint 일시 지연성 장애로 판단.
   - broker_order_no 부재 + 사전 점검 통과 후 통제된 REQUESTED 복구 → 재시도 KIS paper BUY 4건 제출 성공(`connector_order_request 42 ~ 45` ACCEPTED / broker_order_no 4종) → 중복 주문 0건 1차 실증
+  - [2026-07-16 실 매수 회차 회귀 없음] Paper Daily 실 매수·체결·Fill·Position E2E 첫 실증 회차(Daily Run 76 · BUY 후보 2건 · 엔씨소프트 036570 13주 · 코오롱생명과학 102940 78주 시장가 매수) 에서 broker 중복 주문 0건 유지. 초기 Step 13 조회가 주문 제출 후 약 10초에 이뤄져 부분체결·접수 상태로 고착됐으나 broker_order_no 사전 점검 정책은 그대로 유지되어 Step 13 재실행 / Step 15 재실행 / Step 16 재실행 순서로 DB 정합 복구 완료(broker 재제출 0건 · 단순 재실행 없음). Step 12 주문 후 체결 조회 대기시간을 State Machine `portfolio-paper-daily-step12-17-approval` Wait State `Step12_WaitBeforeCheck` `Seconds` 10 → 60 으로 변경(실제 ARN · revision ID · broker 주문번호 원문 문서 미기록). Status `Mitigated` 유지 · 신규 Risk ID 없음 · Risk Dashboard count 변경 없음.
+  - [2026-07-20 Step 12 미재실행 · Step 13 만 복구] 2026-07-20 09:01 자동 실행이 Step 13 조회에서 KIS `EGW00201`(초당 거래건수 초과) 로 실패한 회차에서 broker 중복 주문 0건을 유지했다. Step 12 주문 제출 자체는 정상 완료(매도 2건 broker 접수 · 첫 주문 전량 체결) 였고, 운영자는 중복 주문 위험 때문에 Step 12 를 재실행하지 않고 Step 13 만 수동 실행해 둘째 주문 13주 전량 체결 `FILLED` 반영 · 두 주문 모두 `FILLED` · active 대상 0건으로 복구했다(단순 재실행 없이 조회·복구만 수행 · broker 재제출 0건). 조회 API rate-limit 보완(`connector_order_check.py` 2.0.1 → 2.0.2 · 주문 간 5초 대기 · `EGW00201` 한정 최대 2회 재시도) 은 주문 제출 재시도가 아니라 조회 API 제한 재시도이며 broker 주문 제출 로직 변경 없음. Status `Mitigated` 유지 · 신규 Risk ID 없음 · Risk Dashboard count 변경 없음.
 - Detection:
   - `connector.connector_api_call_log` 의 `response_status` / 응답 timeout 패턴(503 / 504 / read timeout / 게이트웨이 무응답)
     - `connector.connector_order_request` 의 짧은 시간 내 동일 strategy_execution_order_id 에 대한 다중 row 패턴 / `broker_order_no` null + FAILED status 조합

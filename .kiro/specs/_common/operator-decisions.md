@@ -320,6 +320,7 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
 | OD-MS-036 | Intraday Stop Sell Submit Workflow (장중 손절 주문 제출 전용 State Machine + 수동 승인 운영) | 별도 state machine `portfolio-paper-intraday-stop-sell-approval` + 수동 승인. See details: OD-MS-036 Details | 🟢 확정 | 03, 04, 05, 10 |
 | OD-MS-038 | Daily Brief Slack mini workflow 운영 방식 (Daily 주문 실행 경로와 분리) | 별도 mini Step Functions + Builder Lambda + Notifier Lambda + Scheduler 2개. See details: OD-MS-038 Details | 🟢 확정 | 04, 05, 10 |
 | OD-MS-039 | Step Functions 실행 이력 OPS mirror 운영 방식 (Recorder Lambda + 전용 최소 권한 role · 2026-07-03) | Recorder Lambda `portfolio-daily-batch-ops-recorder`(Python 3.12 / ap-northeast-2 / VPC Lambda / Secrets Manager `ops_recorder_app` secret 사용 / action `RECORD_START` · `RECORD_STEP` · `RECORD_SUCCESS` · `RECORD_FAILURE`) 를 Step Functions 실행 role 에 `lambda:InvokeFunction` 한정 부여 후 State Machine 이 `ops.strategy_daily_batch_run` + `ops.strategy_daily_batch_step_log` 에 run-level + 대표 workflow step 을 mirror 한다. 대상 State Machine 은 `portfolio-paper-daily-step1-17-approval` + `portfolio-paper-daily-step12-17-approval` 2종. 1차 범위는 전체 세부 step mirror 가 아니라 run-level + 대표 workflow step 중심. View 는 reader / controller 역할 유지. See details: OD-MS-039 Details | 🟢 확정 | 04, 05, 10 |
+| OD-MS-040 | ECS batch container Asia/Seoul timezone 정책 (Daily market-date 계산 포함 컨테이너 · 2026-07-08) | Daily market-date 계산을 포함하는 ECS batch container 는 UTC 기본값에 의존하지 않고 `TZ=Asia/Seoul` 을 명시한다. 단기 조치는 TaskDefinition env 에 `TZ=Asia/Seoul` 추가(`portfolio-paper-interest-crawler:8` · `portfolio-paper-interest-preprocessor:2`) + State Machine `portfolio-paper-daily-step1-17-approval` 의 Step2A_RunInterestCrawlerNongui · Step3_RunPreprocessor task revision 갱신. 근본 개선은 코드에서 `datetime.now()` 직접 사용을 timezone-aware helper 로 대체하여 컨테이너 default TZ 의존을 제거하는 것(후속). See details: OD-MS-040 Details | 🟢 확정 | 04, 08 |
 
 | OD-MS-037 | View Local AWS Paper read-only 1차 scope 확정 + ECS / Fargate 진입 전 batch 2차 검증 선행 정책 | read-only 1차 scope 확정 + ECS 진입 전 batch 2차 검증 선행. See details: OD-MS-037 Details | 🟢 확정 | 04, 05, 10 |
 | OD-ENV-006 | Paper 환경 DB source of truth | AWS Paper RDS 단일 source of truth. `PORT_ENVIRONMENT=paper` 이면 로컬 실행에서도 AWS Paper RDS 사용 | 🟡 잠정 | 02, 03, 04, 05, 08, 09, 10 |
@@ -696,18 +697,25 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
 - 선택값 상세: Lambda `portfolio-event-notifier` (Runtime Python 3.12 / IAM Role `portfolio-event-notifier-lambda-role`) 기반 AWS 공통 Slack notifier 채택. Step Functions · EventBridge · EC2 SSM · Batch · Lambda 어디서든 호출 가능한 단일 진입점.
 - 비용 상세: 매우 낮음 — Lambda 1M requests + 400,000 GB-sec 무료 한도 안. Slack webhook 호출 자체 비용 없음.
 - 운영 리스크 상세: webhook URL 환경변수 장기 보관 위험(R-AUTO-024 신규 / Accepted — 운영 안정화 후 Secrets Manager 또는 SSM SecureString 이전) + Slack 발송 실패 위험(R-AUTO-023 신규).
+- 운영 실증 상세 [2026-07-20]: 공통 notifier Lambda `portfolio-event-notifier` 가 실패 알림뿐 아니라 수동 복구 완료 알림에도 보조 계층으로 사용됐다. 2026-07-20 09:01 자동 실행이 Step 13 실패로 성공 Slack 을 자동 발송하지 못한 뒤, 운영자가 Step 13~17 수동 복구를 완료하고 Lambda 를 `DAILY_EXECUTION_SUCCESS`(runDate=2026-07-20 · stage=AFTER_STEP_17) 로 수동 호출해 StatusCode 200 · ok=true · 채널 실제 수신을 확인했다(자동 실행 성공으로 표현하지 않음 · 09:01 자동 이력 FAILED 유지). 또한 결과 실패 시 실패 Slack 이 우회되던 State Machine 경로를 실패 컨텍스트 Pass State 경유로 보완해 Choice 결과 실패도 notifier 실패 경로로 연결했다(OD-MS-009 [2026-07-20] 정합). Lambda 는 여전히 notifier 보조 계층이며 주 compute 아님 · Status 기존 값 그대로 유지 · 신규 Decision ID 없음.
+- 운영 실증 상세 [2026-07-20 성공 Slack 체결 내역 표시]: `portfolio-event-notifier` 는 formatter · 전송 역할만 유지하고, 성공 Slack 에 표시할 당일 실제 체결(`connector.connector_fill` · `reference.stock_master`) DB 조회는 신규 Builder Lambda(`portfolio-daily-execution-slack-summary-builder`) 로 분리했다. Notifier 의 `DAILY_EXECUTION_SUCCESS` formatter 는 Builder payload(`buyFills` · `sellFills`) 를 받아 매수·매도 체결 목록을 표시(없으면 `- 없음`)한다. 두 Lambda 모두 주 compute 가 아닌 Slack 보조 계층이라는 기존 결정을 유지한다 · Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · 상세 근거는 R-AUTO-023 [2026-07-20 보강] 참조.
 
 ### OD-MS-031 Details
 
 - 선택값 상세: 3종(`APPROVAL_REQUIRED` + `DAILY_EXECUTION_SUCCESS` + `DAILY_EXECUTION_FAILED`) 한정. 2026-06-23 검증 통과. 장 전 / 장 후 / 장중 손절 알림은 후속 분리(OD-MS-035 / OD-MS-036 / OD-MS-038 정합).
 - 비용 상세: Step Functions transitions 비용 변화 미미 / Lambda 호출 비용 무료 한도 안 / 매 운영 회차 Slack 발송 3건 이내.
 - 운영 리스크 상세: 본 결정의 핵심은 메시지 누락이 아니라 Step Functions Catch 경로에서 실패 알림이 끊기지 않는 것(R-AUTO-023 정합).
+- 운영 실증 상세 [2026-07-15]: `APPROVAL_REQUIRED` Slack Builder(`portfolio-approval-slack-summary-builder`) 조회 구조를 단일 `daily_run_id` 기준으로 정합. 서로 다른 최신 Execution Plan(`latestPlanId=133` · `latestPlanDate=2026-07-09`) 과 최신 Daily Run(`latestDailyRunId=73`) 을 각각 독립 조회하던 방식을 제거하고, 하나의 `daily_run_id` 를 먼저 확정 후 상태 · 기준일 · 신호 수 · 후보 수를 동일 Daily Run 기준으로 조회. `source_daily_run_id` 로 연결된 Execution Order 만 조회 · 해당 Order 가 참조하는 Execution Plan 만 사용 · 연결된 Plan 부재 시 `latestPlanId=null` 로 처리해 임의 과거 Plan 사용 안 함. Builder 와 Notifier 책임 분리 유지 — Builder 가 후보별 점수 필드 구조화(`final_score` · `flow_score` · `info_score` · `tape_score` · `short_score`) 후 Notifier 로 전달 · Notifier 가 소수점 셋째 자리 · 한글 라벨(종합 · 수급 · 정보 · 추세 · 공매도) 로 표시 · 원본 `buy_info` dict Slack 노출 제거. 두 Lambda 재배포 결과 `Active` · `LastUpdateStatus=Successful` · Runtime · Handler 변경 없음 · 이전 버전 롤백 ZIP 확보. Builder DB 검증 상태 `AGGRESSIVE` · 기준일 2026-07-10 · 신호 4건 · 후보 4건 · `latestPlanId=null` · 후보 종목 4건 정상(DL · 대주전자재료 · 삼성SDI · 한국피아이엠). Builder → Notifier → Slack 메시지 표시 E2E 완료 (실제 자동 주문 체결 E2E 는 아님). Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · Decision Summary count 변경 없음. 다음 자동 Scheduler 실전 수신 관찰은 후속 유지.
+- 운영 실증 상세 [2026-07-20]: `DAILY_EXECUTION_SUCCESS` 메시지가 실행일 · 최종 상태 외에 당일 실제 매수·매도 체결 목록([매수 체결] · [매도 체결]) 을 표시하도록 개선됐다. 체결이 없으면 `- 없음`, 있으면 `- 종목명 / 수량주` 로 표시한다. 2026-07-20 데이터 수동 smoke 에서 매수 0건 · 매도 2종목(엔씨소프트 036570 13주 · 코오롱생명과학 102940 78주) 체결 표시를 실제 Slack 수신으로 확인했다. Slack 이벤트 종류 3종(`APPROVAL_REQUIRED` + `DAILY_EXECUTION_SUCCESS` + `DAILY_EXECUTION_FAILED`) 한정 결정 자체는 변경 없음 · Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · Decision Summary count 변경 없음 · 상세 근거는 R-AUTO-023 [2026-07-20 보강] 참조.
 
 ### OD-MS-032 Details
 
 - 선택값 상세: 2개 Scheduler 분리 + Dispatcher Lambda 호출 + 단계적 활성화. 08:00 KST `portfolio-paper-daily-step1-11-approval-0800-kst`(ENABLED / `allowPaperOrderExecute=false`) + 09:01 KST `portfolio-paper-daily-step12-17-order-0901-kst`(초기 DISABLED / 후속 ENABLE).
 - 비용 상세: EventBridge Scheduler 14M / Lambda 1M requests 무료 한도 안 / Step Functions Standard transitions 비용은 OD-MS-009 정합.
 - 운영 리스크 상세: Scheduler / Dispatcher Lambda / Step Functions 연결 실패 위험(R-AUTO-025 신규) — IAM simulate + Lambda dryRun + Scheduler get-schedule 상태 확인으로 mitigation.
+- 운영 실증 상세 [2026-07-15]: 장전 · 장후 Daily Brief Scheduler Target 을 Daily Brief State Machine 직접 호출 대신 본 결정의 Dispatcher Lambda 호출로 전환. Dispatcher 에 `MORNING_BRIEF` · `EVENING_BRIEF` scheduleType 지원과 Daily Brief State Machine ARN 환경변수 · Resource 한정 `states:StartExecution` IAM 추가. Holiday Guard 책임을 Dispatcher 로 통합해 08:00 Step 1~11 · 09:01 Step 12~17 · 07:50 장전 · 15:50 장후 4종 모두 동일 Dispatcher · 동일 Holiday Guard 통과 구조로 정합. EC2 stop Scheduler 15:50 은 휴일 여부와 무관하게 실행하는 기존 구조 유지. Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · Decision Summary count 변경 없음 · 상세 근거는 R-AUTO-035 [2026-07-15 보강] 참조.
+- 운영 실증 상세 [2026-07-16]: 본 결정의 2개 Scheduler + Dispatcher Lambda + Step Functions 사슬 위에서 Paper Daily 자동화 라인업의 실 매수·체결·Fill·Position E2E 가 처음 완료됐다. Daily Run 76 이 `run_date=2026-07-16` · `data_date=2026-07-15` · `market_signal=AGGRESSIVE` 로 정상 계산되어 BUY 후보 2건(엔씨소프트 036570 · 코오롱생명과학 102940) 이 생성됐고, 운영자가 Step 12~17 을 수동 재실행해 13주 · 78주 시장가 매수 주문을 접수했으며 두 주문 모두 KIS 모의투자에서 전량 체결(엔씨소프트 최종 보유수량 13주 · 평균 체결가 223,500 원 · 코오롱생명과학 최종 보유수량 78주 · 평균 체결가 약 38,839.7436 원) 됐다. 초기 Step 13 조회가 주문 제출 후 약 10초 시점에 이뤄져 엔씨소프트 9주 부분체결 · 코오롱생명과학 접수 상태로 고착되고 실제 시장가 주문은 이후 계속 체결됐으나 내부 상태가 최초 조회 결과에 머무는 문제를 확인했으며(전체 Step Functions 는 ExitCode 0 기준 SUCCESS 처리 · Step Functions SUCCESS 가 Fill · Position 정합 완료를 보장하지 않는 축 재확인), 운영자가 Step 13(`connector_order_check.py`) → Step 15(`execution_sync_buy_fill.py`) → Step 16(`execution_sync_buy_position.py`) 재실행 순서로 두 주문 `FILLED` 반영 · Execution Order 2건 `SUBMITTED` → `FILLED` · `synced_count=2` · Position ID 13 · 14 `OPEN` 생성으로 DB 정합을 복구했다. 재발 방지 조치로 State Machine `portfolio-paper-daily-step12-17-approval` Wait State `Step12_WaitBeforeCheck` `Seconds` 10 → 60 변경 · Next State `Step12_GetCommandInvocation` 유지 · State Machine 업데이트 후 재조회 검증 완료(실제 ARN · revision ID · broker 주문번호 원문 문서 미기록). 시장가 주문 접수 성공만으로 체결 완료를 판단하지 않고 Order Request · Fill · Execution Order · Position 정합을 함께 확인해야 함이 명확해졌다. 대기시간 조정만으로 완전 해결됐다고 판단하지 않으며 `ACCEPTED` / `PARTIAL_FILLED` polling · Step 13 · 15 · 16 처리 건수 기반 실패 전파 강화 · 불일치 시 Workflow FAIL · OPS Mirror 세부 Step 확장 · 10분 잔고 스냅샷 연계는 후속 유지. 본 변경은 aws-paper 한정 · aws-live 자동 BUY / SELL 정책 변경 없음(OD-SAFE-002 / OD-SAFE-003 유지). Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · Decision Summary count 변경 없음 · 상세 근거는 R-AUTO-037 · R-AUTO-038 · R-BROKER-004 [2026-07-16 보강] 참조.
+- 운영 실증 상세 [2026-07-20]: 본 결정의 2개 Scheduler + Dispatcher Lambda + Step Functions 사슬 위에서 09:01 자동 실행의 실제 실패와 수동 복구가 함께 관찰됐다. 09:01 자동 실행된 State Machine `portfolio-paper-daily-step12-17-approval` 이 Step 13(주문·체결 조회)에서 KIS `EGW00201`(초당 거래건수 초과) 로 실패했고(Step 12 주문 제출 자체는 정상 · 매도 2건 broker 접수 · 첫 주문 전량 체결), Step 13 실패로 Step 14~17 과 성공 Slack 이 자동 실행되지 않았다. 운영자가 Step 12 를 중복 주문 방지 위해 재실행하지 않고 Step 13 만 수동 실행해 두 주문 `FILLED` 복구 후 Step 14~17 을 순차 수동 완주했으며, 성공 Slack 은 수동 복구 완료 후 Lambda 수동 호출로 수신했다(09:01 자동 실행 이력은 실제 장애 보존을 위해 FAILED 유지 · 수동 복구를 자동 성공으로 덮어쓰지 않음). 추가로 잔고 명령 runDate 하드코딩(`--run-date 2026-06-22`) 을 제거해 `$.runDate` 를 하위 SSM 명령까지 동적 전달하고, 결과 실패 시 실패 Slack 을 우회하던 Choice Default 경로를 실패 컨텍스트 Pass State 경유로 보완했다(OD-MS-009 · OD-MS-030 [2026-07-20] 정합). aws-paper 한정 · aws-live 정책 변경 없음 · Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · Decision Summary count 변경 없음 · 상세 근거는 R-AUTO-037 · R-AUTO-038 [2026-07-20 보강] 참조. 같은 일자 성공 경로에 Builder → Notifier(`BuildDailyExecutionSuccessSlackSummary`) 가 삽입됐으나 Scheduler · Dispatcher 구조 자체는 변경 없음이며, 새 성공 경로가 자동 진입해 성공 Slack 에 당일 체결 내역을 표시하는지는 다음 정상 09:01 자동 회차에서 관찰이 필요하다(강제 주문·오류 유발 없이 · OD-MS-023 · R-AUTO-023 정합).
 
 ### OD-MS-033 Details
 
@@ -745,6 +753,7 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
   `portfolio-daily-brief-evening-slack-1550-kst`) + 알림 전용 IAM Role 2종.
 - 비용 상세: mini Step Functions transitions + Lambda 호출 + Scheduler 2개 invocations 모두 매우 작음(평일 2회 = 월 약 44 invocation).
 - 운영 리스크 상세: Daily Brief 알림 누락 / 중복 위험(R-AUTO-035 신규) / Slack webhook URL Lambda 환경변수 노출 위험(R-AUTO-024 정합) / DB password Lambda 환경변수 주입 위험은 Secrets Manager `valueFrom` 방식으로 완화.
+- 운영 실증 상세 [2026-07-15]: Builder Lambda `portfolio-daily-brief-slack-summary-builder` 는 메시지 생성 · DB 조회 책임만 유지하도록 내부 Holiday Guard 를 환경변수 제어 방식으로 비활성화. 정상 응답에 `skipped=false` · `skipReason=null` 을 추가하여 mini state machine `CheckHolidaySkip` Choice 정합 확보. `pg8000` 및 관련 의존성 패키징 재배포. Holiday Guard 책임 자체는 Daily Scheduler Dispatcher(OD-MS-032) 로 통합. 2026-07-15 15:50 자동 장후 초기 `CheckHolidaySkip` 오류 실패 후 16:02 장후 실전 smoke 에서 Step Functions `SUCCEEDED` · Notifier `statusCode=200` · Slack 실제 수신 확인. 07:50 자동 장전 실 수신은 다음 평일 후속 유지. Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · Decision Summary count 변경 없음 · 상세 근거는 R-AUTO-035 [2026-07-15 보강] 참조.
 
 ### OD-DB-012 Details <a id="od-db-012-details"></a>
 
@@ -784,7 +793,35 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
 | 운영 리스크 | R-AUTO-038 정합 — Step Functions 이력 mirror 실패 시 View Daily Batch 화면이 다시 이력 불일치를 노출할 위험. Lambda fail-open + CloudWatch Logs 관찰 + 후속 phase 에서 CloudWatch Alarm 도입 후보. |
 | 보안 판단 | Recorder 는 writer 역할만 수행. View 는 reader / controller 역할 유지. 업무 테이블 write 권한 확대 없음. `execution_app` / `view_app` 권한 확대 0건. |
 | 후속 spec 영향 | 04, 05, 10 |
-| 후속 작업 | 전체 세부 step mirror 확장 · View Daily Batch 화면이 `AWS_STEPFUNCTIONS` run 이력을 렌더링하는지 실 실행 회차 확인 (followups-overview 2026-07-03 정합) |
+| 후속 작업 | 전체 세부 step mirror 확장 · Recorder Lambda 실패 CloudWatch Alarm 도입 검토 · `/daily-batch` 화면 표시 계층 redaction 후속 (`requestPayload` / `resultPayload` 마스킹 · `accountNo` 마스킹 · `executionArn` / `stateMachineArn` redaction · timestamp UTC → KST 표시 · `APPROVAL_BLOCKED` / SKIPPED 문구 운영자 친화적 개선) |
+| 2026-07-08 UI consumption 확인 | 완료 (운영자 직접 수행). `view_app` 기준 `ops` schema USAGE · `ops.strategy_daily_batch_run` · `ops.strategy_daily_batch_step_log` SELECT 확인 · `AWS_STEPFUNCTIONS` run 이력 적재 확인(#61 Step 12~17 SUCCESS · #60 Step 1~11 `APPROVAL_BLOCKED` / SKIPPED) · `/daily-batch` 화면 aws-stepfunctions 실행 모드 표시 · 선택 run 상세 + step log 렌더링 · AWS Step 1~11 시작 · AWS Step 12~17 승인 실행 버튼 표시 · Local File 실행 OFF · aws-stepfunctions 실행 ON 표시 확인. 1차 범위(전체 세부 step mirror 아님 · run-level + 대표 workflow step) 결정 유지. |
+| 근거 링크 (2026-07-08) | `.kiro/WORKLOG.md` 2026-07-08 view-daily-batch-ops-mirror-ui-consumption-confirmed 섹션 · `_common/risk-register.md` R-AUTO-038 Mitigation history 2026-07-08 보강 · `_common/followups-overview.md` Done recently 2026-07-08 row |
+
+### OD-MS-040 Details <a id="od-ms-040-details"></a>
+
+| 항목 | 값 |
+|---|---|
+| Decision ID | OD-MS-040 |
+| Selected | Daily market-date 계산을 포함하는 ECS batch container 는 UTC 기본값에 의존하지 않고 `TZ=Asia/Seoul` 을 명시한다 |
+| Status | 🟢 확정 |
+| 결정 일자 | 2026-07-08 |
+| 배경 | 2026-07-08 08:00 KST Daily Step1~11 자동 실행이 SUCCEEDED 였음에도 `interest_price_raw` · `interest_investorflow_raw` · `interest_program_raw` · `interest_shortsell_raw` · `pre_total_market_daily_feature` · `pre_total_stock_daily_feature` `MAX(trade_date)=2026-07-06` 정체 · `decision.strategy_daily_run.data_date=2026-07-06` · `execution.strategy_execution_plan` NO_CANDIDATE 로 관찰됨 |
+| 직접 원인 | ECS Fargate 컨테이너 기본 timezone 이 UTC 인 상태에서 crawler `interest_price.py` · `interest_investorflow.py` 등이 timezone 없는 `datetime.now().date() - timedelta(days=1)` 을 사용하여 최신 영업일을 계산 → 08:00 KST 실행 시 UTC 는 전일 23시대이므로 `datetime.now().date()=2026-07-07` → `-1 day` 적용 후 target date 2026-07-06 으로 밀림 |
+| 배제 원인 | `interest_get_holidays.is_holiday(2026-07-07,"KR")==False` 확인 · 2026-07-07 은 KRX 정상 개장일이며 휴장일 오판 원인 아님 |
+| 단기 조치 | (1) 신규 TaskDefinition `portfolio-paper-interest-crawler:8` · `portfolio-paper-interest-preprocessor:2` 등록 · env 에 `TZ=Asia/Seoul` 추가 · 이미지 · 명령 · IAM Role · 리소스 스펙 변경 없음 · (2) State Machine `portfolio-paper-daily-step1-17-approval` 의 Step2A_RunInterestCrawlerNongui task revision `:7`→`:8` · Step3_RunPreprocessor task revision `:1`→`:2` 갱신 · revisionId 원문 미기록(`[REDACTED_REVISION_ID]`) · (3) one-off TZ smoke 성공 — crawler:8 · preprocessor:2 각 `TZ_ENV=Asia/Seoul` · `time.tzname=('KST','KST')` · `naive_yesterday=2026-07-07` |
+| 근본 개선 (후속) | 코드에서 `datetime.now()` 직접 사용을 timezone-aware helper 로 대체하여 컨테이너 default TZ 의존을 제거한다. 대상 파일 후보: `interest_price.py` · `interest_investorflow.py` 및 유사 crawler / preprocessor entry point. 08 spec 후속 phase 로 유지. |
+| 오늘 조치 | Step1~11 수동 재실행은 하지 않는다 |
+| 검증 예정 | 2026-07-09 08:00 KST Daily Step1~11 자동 실행 · 09:01 Step 12~17 자동 실행에서 (a) Step2A crawler log 의 `interest_price` · `interest_investorflow` 가 2026-07-07 을 수집하는지 · (b) preprocessor latest date 가 2026-07-07 로 올라오는지 · (c) `decision.strategy_daily_run.data_date=2026-07-07` · (d) Step 12~17 자동 실행이 stale data 영향 없이 정상 흐름인지 |
+| 비용 영향 | TaskDefinition env 추가는 월 비용 영향 없음. Step Functions transitions · Fargate cpu / memory · CloudWatch Logs 비용은 무변화 |
+| 운영 리스크 | R-DATA-010 정합 — partial mitigation applied · next auto-run verification pending. 다음 자동 실행에서 최신성 회복이 관찰되지 않으면 원인 재조사 필요. R-DATA-017(KRX GUI worker 계열 · Step2B 성공 기준) 과는 원인이 구분됨. |
+| 보안 판단 | 이미지 · 명령 · IAM Role · Secrets Manager 참조 · Task Role · Execution Role 변경 0건. env `TZ=Asia/Seoul` 만 추가. secret 원문 노출 0건. |
+| 후속 spec 영향 | 04, 08 |
+| 후속 작업 | 2026-07-09 자동 실행 검증 후 성공 시 Status 유지 · 실패 시 원인 재조사 · 근본 개선(timezone-aware helper 도입) 은 08 spec 후속 phase |
+| 근거 링크 | `.kiro/WORKLOG.md` 2026-07-08 daily-step1-11-ecs-timezone-tz-patch 섹션 · `_common/risk-register.md` R-DATA-010 Mitigation history 2026-07-08 보강 · [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md) |
+| 2026-07-09 메모 | 본 결정의 범위는 ECS Fargate batch container 이지만, KRX GUI 경로의 CRAWLER Windows EC2 도 동일 취지로 KST timezone 으로 운영한다. 2026-07-09 회차에서 CRAWLER Windows EC2 timezone 이 UTC 로 설정되어 있어 08:00 KST 실행 시 서버 로컬 날짜가 UTC 기준 전일 23시대로 계산되어 `datetime.today() - 1` 계열 로직이 target date 를 2026-07-07 로 산출하는 문제가 확인됨. 운영자 직접 timezone 을 Korea Standard Time 으로 변경 후 KRX 수동 재수집으로 `interest_program_raw` · `interest_shortsell_raw` `MAX(trade_date)=2026-07-08` 회복. DB session timezone 자체는 UTC 유지 권고이며 운영 표시는 `at time zone 'Asia/Seoul'` 로 KST 변환. R-DATA-010 `Mitigated` 승격 근거. 신규 Decision ID 는 부여하지 않고 본 OD-MS-040 범위 안 확장으로 관리한다. |
+| 2026-07-09 근거 링크 | `.kiro/WORKLOG.md` 2026-07-09 krx-crawler-ec2-timezone-fix-and-recollect 섹션 · `_common/risk-register.md` R-DATA-010 Mitigation history 2026-07-09 보강 · `_common/ms-aws-service-decision-matrix.md` 4.3 port-interest-crawler 절 KST 메모 |
+| 2026-07-15 메모 | 본 결정의 범위 확장을 Daily BUY / SELL 실행 ECS 컨테이너까지 명시적으로 적용. 2026-07-13 (월) 매수 후보 4건 미실행 사건 정합 — 실행 컨테이너가 `date.today()` · `datetime.today()` naive 함수로 08:00 KST (= 2026-07-12 23:00 UTC) 를 2026-07-12 (일) 로 판단 · Step8 이 `WEEKEND / NO_TARGET` 으로 종료 · Execution Plan · Execution Order 미생성 · ExitCode 0 으로 Step Functions 전체 SUCCESS 로 표시되어 자동 감지가 어려웠음. Daily 전략 계산과 2026-07-10 기준 데이터는 정상(`daily_run_id=73` · `run_date=2026-07-12` · `data_date=2026-07-10` · `market_signal=AGGRESSIVE` · BUY 신호 4건 · 후보 4건). 운영자 직접 원칙을 DB timestamp 저장 UTC 유지 · 업무 날짜 판단 Asia/Seoul 통일로 확정하고 Daily BUY / SELL 실행 관련 ECS Task Definition 에 `TZ=Asia/Seoul` 추가 · Market EC2 서버 timezone Korea Standard Time 변경 · 실행 스크립트 KST 업무 날짜 산출 보완 · 신규 Task Definition revision 을 실제 Step Functions 실행 경로에 연결. UTC 날짜 오판 직접 원인 해결 완료 · 신규 revision 연결 완료. 다음 자동 실행 재발 여부 · `NO_TARGET` 성공 상태 구분 강화 · ExitCode 0 및 Step Functions SUCCESS 로 묻히지 않도록 실패 전파 강화 · 주문 검증 체인 보강은 별도 후속. Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · Decision Summary count 변경 없음 · R-DATA-010 · R-DATA-017 Mitigation history 별도 보강. |
+| 2026-07-15 근거 링크 | `.kiro/WORKLOG.md` 2026-07-15 오후 Daily BUY KST 섹션 · [04 operation-notes](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-07-15 (오후) 섹션 · `_common/risk-register.md` R-DATA-010 · R-DATA-017 Mitigation history 2026-07-15 보강 · `_common/followups-overview.md` Now |
 
 ---
 
@@ -1250,6 +1287,8 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
 - 운영 리스크 상세: 기존 port-view subprocess는 AWS에서 그대로 쓰지 않음
 - 후속 spec 영향: 04, 05
 - 근거 링크: — (없음)
+- 운영 실증 상세 [2026-07-20]: Step Functions orchestration 의 실패 처리 정합 보강. Task 자체 오류는 기존 Catch 로 실패 Slack 에 연결돼 있었으나, Task 가 정상 종료했지만 결과값이 비정상인 경우 Choice Default 가 직접 Fail State 로 진입해 실패 Slack 을 우회하던 문제를 확인했다. Step13·14·15·16·Step1 각 Default 를 실패 컨텍스트 Pass State(`$.dailyExecutionFailure` 에 Error·Cause 저장 후 실패 Slack · OPS 실패 기록 실행, 최종 상태는 FAILED 유지) 로 변경해 Choice 결과 실패도 notifier · recorder 경로로 연결했다(`Step12_Failed` 제외). 또한 `Step1_SendConnectorBalanceCommand` 의 잔고 명령 `--run-date 2026-06-22` 하드코딩을 제거하고 실행 입력 `$.runDate` 를 States.Array · States.Format 기반 동적 commands 배열로 하위 SSM 명령까지 전달하도록 변경했다. ASL 검증 OK · 배포 후 재조회 확인 · Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · 상세 근거는 R-AUTO-037 [2026-07-20 보강] 참조.
+- 운영 실증 상세 [2026-07-20 성공 경로 Builder 연결]: 같은 일자 별도 후속으로 Step 12~17 성공 경로에 DB-backed Builder Lambda(`BuildDailyExecutionSuccessSlackSummary` · `portfolio-daily-execution-slack-summary-builder`) 를 삽입해 Step 완료 → Builder → Notifier → `RecordWorkflowStepSuccess` 순서로 연결했다. Builder 는 runDate 를 입력받아 당일 실제 체결을 조회한 결과를 `$.dailyExecutionSuccessSummary` 에 저장하고, Notifier 는 `$.dailyExecutionSuccessSummary.Payload` 를 성공 Slack payload 로 받는다. Notifier 성공 후 기존 최종 OPS 성공 기록 경로(`RecordWorkflowStepSuccess`)는 그대로 유지하며 Builder 실패 시 기존 `SendDailyExecutionFailedSlack` 경로로 연결한다. ASL 검증 OK · canonical 의미 비교 차이 0건 · 수동 smoke 만 수행(전체 execution 미시작) · Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · 상세 근거는 R-AUTO-023 [2026-07-20 보강] 참조.
 
 ### OD-MS-010 Details
 
@@ -1437,6 +1476,8 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
 - 운영 리스크 상세: 모의투자라도 fill/position sync 오류는 재현해야 함
 - 후속 spec 영향: 04, 10
 - 근거 링크: — (없음)
+- 운영 실증 상세 [2026-07-16]: 본 결정의 "검증 후 허용" 라인이 처음으로 실 매수·체결·Fill·Position E2E 로 회수됐다. Daily Run 76 · BUY 후보 2건(엔씨소프트 036570 13주 · 코오롱생명과학 102940 78주) 이 KIS 모의투자에서 전량 체결되어 Execution Order 2건 `FILLED` · Position ID 13 · 14 `OPEN` 생성까지 이어졌다. 다만 초기 Step 13 조회가 주문 제출 후 약 10초 시점에 이뤄져 부분체결 · 접수 상태로 고착됐고 실제 시장가 주문은 이후 계속 체결됐으나 내부 상태가 최초 조회 결과에 머무는 문제(Step Functions ExitCode 0 SUCCESS 가 Fill · Position 정합 완료를 보장하지 않는 축) 가 확인되어, 운영자가 Step 13 → Step 15 → Step 16 순서로 재실행해 DB 정합을 복구했다. 재발 방지 조치로 State Machine `portfolio-paper-daily-step12-17-approval` Wait State `Step12_WaitBeforeCheck` `Seconds` 10 → 60 변경(실제 ARN · revision ID · broker 주문번호 원문 문서 미기록). 시장가 주문 접수 성공만으로 체결 완료를 판단하지 않고 Order Request · Fill · Execution Order · Position 정합을 함께 확인한다는 원칙이 명확해졌으며, `ACCEPTED` / `PARTIAL_FILLED` polling · Step 13 · 15 · 16 처리 건수 기반 실패 전파 강화 · Workflow FAIL 전파 · OPS Mirror 세부 Step 확장은 후속 유지된다. 본 변경은 aws-paper 한정 · aws-live 자동 BUY / SELL 정책 변경 없음(OD-SAFE-002 / OD-SAFE-003 유지). Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · Decision Summary count 변경 없음 · 상세 근거는 R-AUTO-037 · R-AUTO-038 · R-BROKER-004 [2026-07-16 보강] 참조.
+- 운영 실증 상세 [2026-07-20]: paper 자동 BUY/SELL 실운영 장애 복구 회차. 2026-07-20 09:01 자동 실행 State Machine `portfolio-paper-daily-step12-17-approval` 이 Step 13(주문·체결 조회)에서 KIS `EGW00201`(초당 거래건수 초과) 로 실패했고, Step 12 주문 제출 자체는 정상 완료(매도 2건 broker 접수 · 첫 주문 전량 체결) 였다. 운영자는 Step 12 를 중복 제출 방지를 위해 재실행하지 않고 Step 13 만 수동 실행해 두 주문 모두 `FILLED` 로 복구한 뒤 Step 14~17 을 순차 수동 완주했다. 성공 Slack 은 자동 실행 결과가 아니라 수동 복구 완료 후 `portfolio-event-notifier` 수동 호출로 수신했으며 09:01 자동 실행 이력은 실제 장애 보존을 위해 FAILED 로 유지했다. 본 결정의 "초기 차단 → 검증 후 허용" 라인 위에서 자동 실행 실패 시에도 중복 주문 없이 수동 복구가 가능함을 재확인했다. aws-paper 한정 · aws-live 정책 변경 없음(OD-SAFE-002 / OD-SAFE-003 유지). Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · Decision Summary count 변경 없음 · 상세 근거는 R-AUTO-001 · R-AUTO-037 · R-BROKER-004 [2026-07-20 보강] 참조.
 
 ### OD-SAFE-002 Details
 
@@ -1470,6 +1511,7 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
 - 운영 리스크 상세: BUY/SELL/fill sync/position 변경/intraday stop SELL 생성은 재시도 금지
 - 후속 spec 영향: 04, 08, 10
 - 근거 링크: — (없음)
+- 운영 실증 상세 [2026-07-20]: 본 결정의 "idempotent step 만 자동 재시도" 원칙이 rate-limit 보완 회차에서 재확인됐다. 2026-07-20 Step 13 조회에서 KIS `EGW00201`(초당 거래건수 초과) 가 발생해 운영자가 `connector_order_check.py`(2.0.1 → 2.0.2) 에 재시도를 추가했는데, 이는 broker 주문 제출(BUY/SELL) 자동 재시도가 아니라 idempotent 한 주문·체결 조회 API 의 `EGW00201` 한정 최대 2회 재시도(1차 1.5초 · 2차 5초 · 주문 간 5초 대기 결합) 다. broker 주문 자동 재시도 금지 정책은 그대로 유지되고, Step 12 는 중복 주문 방지를 위해 재실행하지 않았다. Status 기존 값 그대로 유지 · 신규 Decision ID 없음 · 상세 근거는 R-AUTO-001 · R-BROKER-004 [2026-07-20 보강] 참조.
 
 ## Change Log
 
@@ -1515,6 +1557,7 @@ Decision ID · 선택값 · 비용 영향 · 운영 리스크 · 후속 spec 영
 | 2026-06-30 (오후) 장중 손절 Slack | OD-MS-030/035/036/038 evidence 보강 (`INTRADAY_STOP_LOSS` Slack 실제 이벤트 연동 완료) | [2026-06-30 (오후) 장중 손절 Slack 1차](#change-log-details-2026-06-30------------Slack-1) |
 | 2026-07-01 | OD-SAFE-001/002/003 + OD-MS-009/032/033 evidence 보강 (aws-paper Daily 자동화 1차 풀 ON) | [2026-07-01 1차](#change-log-details-2026-07-01-1) |
 | 2026-07-03 | OD-DB-012 · OD-MS-039 신규 (Step Functions 실행 이력 OPS mirror + `ops_recorder_app` 전용 role · Recorder Lambda) | [2026-07-03 1차](#change-log-details-2026-07-03-1) |
+| 2026-07-08 | OD-MS-040 신규 (ECS batch container Asia/Seoul timezone 정책 · crawler / preprocessor TaskDefinition `TZ=Asia/Seoul` 단기 패치 · State Machine Step2A / Step3 task revision 갱신) | [2026-07-08 1차](#change-log-details-2026-07-08-1) |
 
 ## Decision Change Log Details
 
@@ -3217,6 +3260,33 @@ secret · Secrets Manager value · Lambda 실제 ARN · Recorder invocation 응�
 AWS / EventBridge Scheduler / Lambda / Step Functions / SSM / EC2 / IAM / RDS / KIS API 호출은 본 일자 Kiro 측 변경 0건 — Kiro 는 본 일자 `.kiro/specs/_common` 하위 문서 갱신만 수행 / AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 0건 / broker 주문 0건 / aws-live 작업 0건 / secret 원문 기록 0건.
 
 **신규 결정 2건** — OD-DB-012 · OD-MS-039 (모두 CONFIRMED). Decision Summary 카운트는 재집계 필요(Review Needed 이월 상태) — 본 회차에서는 원문 유지 원칙에 따라 상단 dashboard 숫자 갱신을 이월한다.
+
+
+### Change Log Details 2026-07-08 (1차) <a id="change-log-details-2026-07-08-1"></a>
+
+변경 요약: **OD-MS-040** 신규 (ECS batch container Asia/Seoul timezone 정책 + crawler / preprocessor TaskDefinition `TZ=Asia/Seoul` 단기 패치 + State Machine `portfolio-paper-daily-step1-17-approval` 의 Step2A / Step3 task revision 갱신). 2026-07-08 08:00 KST Daily Step1~11 자동 실행이 SUCCEEDED 였음에도 DB 최신 raw / feature / decision `data_date` 가 2026-07-06 에 정체된 사실을 원인 분석한 결과, ECS Fargate 컨테이너 UTC timezone + `datetime.now().date()` naive 사용이 stale target date 로 직접 이어졌음을 확정.
+
+| 항목 | 값 |
+|---|---|
+| 반영 주제 | 2026-07-08 Daily Step1~11 stale data 원인 확정 + ECS TZ 단기 패치 |
+| 배경 | Daily Step1~11 자동 실행 SUCCEEDED (2026-07-08 08:00 KST) 였으나 `interest_price_raw` · `interest_investorflow_raw` · `interest_program_raw` · `interest_shortsell_raw` · `pre_total_market_daily_feature` · `pre_total_stock_daily_feature` `MAX(trade_date)=2026-07-06` 정체 · `decision.strategy_daily_run.data_date=2026-07-06` · `execution.strategy_execution_plan` NO_CANDIDATE |
+| 직접 원인 | ECS Fargate 컨테이너 기본 timezone 이 UTC 인 상태에서 crawler `interest_price.py` · `interest_investorflow.py` 등이 timezone 없는 `datetime.now().date() - timedelta(days=1)` 을 사용 → 08:00 KST 실행 시 UTC 는 전일 23시대 → `datetime.now().date()=2026-07-07` → `-1 day` 후 target date 2026-07-06 |
+| 배제 원인 | `is_holiday(2026-07-07,"KR")==False` 확인 · 2026-07-07 KRX 정상 개장 · 휴장일 오판 원인 아님 |
+| 단기 조치 (운영자 직접 수행) | (1) `portfolio-paper-interest-crawler:8` · `portfolio-paper-interest-preprocessor:2` 신규 revision 등록 · env 에 `TZ=Asia/Seoul` 추가 · (2) State Machine `portfolio-paper-daily-step1-17-approval` Step2A_RunInterestCrawlerNongui task `:7`→`:8` · Step3_RunPreprocessor task `:1`→`:2` 갱신 · State Machine revisionId 원문 미기록(`[REDACTED_REVISION_ID]`) · (3) crawler:8 · preprocessor:2 one-off TZ smoke 성공(`TZ_ENV=Asia/Seoul` · `time.tzname=('KST','KST')` · `naive_yesterday=2026-07-07`) |
+| 오늘 조치 | Step1~11 수동 재실행 없음 |
+| 검증 예정 | 2026-07-09 08:00 KST Daily Step1~11 자동 실행 + 09:01 Step 12~17 자동 실행에서 (a) Step2A crawler log 의 `interest_price` · `interest_investorflow` 2026-07-07 수집 · (b) preprocessor latest date 2026-07-07 · (c) `decision.strategy_daily_run.data_date=2026-07-07` · (d) Step 12~17 자동 실행이 stale data 영향 없이 정상 흐름 |
+| 근본 개선 (후속) | 코드에서 `datetime.now()` 직접 사용을 timezone-aware helper 로 대체 · 대상 후보 `interest_price.py` · `interest_investorflow.py` 등 crawler / preprocessor entry point · 08 spec 후속 phase |
+| 비용 영향 | TaskDefinition env 추가는 월 비용 영향 없음. Step Functions transitions · Fargate cpu / memory · CloudWatch Logs 비용 무변화 |
+| 실행 | 본 문서 반영 중 실제 AWS / DB / Slack / crawler / broker / KIS API 호출 0건 (Kiro 문서 갱신만) · ECS RegisterTaskDefinition · State Machine UpdateStateMachine · one-off TZ smoke 는 운영자 직접 수행 |
+| 후속 | 2026-07-09 자동 실행 최신성 회복 검증 · 성공 시 R-DATA-010 Status 승격 판단 · 실패 시 원인 재조사 |
+
+관련 리스크: **R-DATA-010 Mitigation history 보강** (partial mitigation applied · next auto-run verification pending · Status `Open` 유지). R-DATA-017(KRX GUI worker 계열 · Step2B 성공 기준) 과는 원인이 구분됨.
+
+secret · Secrets Manager value · Lambda 실제 ARN · Task Definition ARN · State Machine 실 executionName · 실행 role ARN · Task ARN · ENI ID · public IP · account-id · image digest full sha256 평문 인용 0건(R-DOCS-001 정합). 운영 식별자(TaskDefinition 이름 · State Machine 이름 · State 이름 `Step2A_RunInterestCrawlerNongui` · `Step3_RunPreprocessor` · revision number `:7` / `:8` / `:1` / `:2` · env key `TZ` · env value `Asia/Seoul` · smoke 결과 라벨) 만 사용자 명시 정책 정합으로 사실 기록 — secret 가 아님. State Machine revisionId 는 `[REDACTED_REVISION_ID]` placeholder 로 표기.
+
+AWS / EventBridge Scheduler / Lambda / Step Functions / SSM / EC2 / IAM / RDS / KIS API 호출은 본 일자 Kiro 측 변경 0건 — Kiro 는 본 일자 `.kiro` 루트 + `.kiro/specs/_common` 하위 문서 갱신만 수행 / AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 0건 / broker 주문 0건 / aws-live 작업 0건 / secret 원문 기록 0건 / git add · commit · push 실행 0건.
+
+**신규 결정 1건** — OD-MS-040 (CONFIRMED). Decision Summary 카운트는 재집계 필요(Review Needed 이월 상태) — 본 회차에서는 원문 유지 원칙에 따라 상단 dashboard 숫자 갱신을 이월한다.
 
 ## Decision Update Rules
 
