@@ -1,118 +1,137 @@
 # port-view
 
-Spring MVC 기반 Portfolio View 모듈입니다. 포트폴리오 현황, 잔고, 보유 종목, 주문, 전략 실행 계획, 전략 리포트, Daily Batch 실행 상태를 Thymeleaf 화면으로 조회하고 일부 실행 액션을 제공합니다.
+Spring MVC와 Thymeleaf 기반의 Portfolio View 마이크로서비스다.
 
-이 문서는 현재 코드에서 확인 가능한 구조를 기준으로 작성되었습니다. 외부 모듈의 세부 동작은 이 저장소 범위 밖이므로 요약 수준으로만 다룹니다.
+계좌, 잔고, 포지션, 주문, 전략 실행 계획, 전략 결과와 Daily Batch 실행 상태를 조회하고, 운영자가 AWS Step Functions 실행을 안전하게 요청할 수 있는 View UI를 제공한다.
+
+외부 마이크로서비스의 내부 비즈니스 로직과 AWS orchestration 세부 구현은 이 저장소의 책임 범위가 아니다.
+
+## 현재 상태
+
+| 항목 | 값 |
+| --- | --- |
+| 애플리케이션 | 🟢 주요 화면과 AWS Paper DB 조회 검증 완료 |
+| ECS Fargate | 🟢 1차 포팅과 화면 조회 실증 완료 |
+| 현재 운영 성격 | 포트폴리오 실증 상태 유지 |
+| 기본 실행 backend | `aws-stepfunctions` |
+| Local File backend | 운영자 로컬 검증과 복구용 |
+| Step 1~11 | safe trigger 분리 |
+| Step 12~17 | approval trigger 분리 |
+| Paper Daily | 2026-07-22 기준 1차 안정화 완료 |
+| P2 View 고도화 | 🟠 미수행 · 현재 범위 제외 |
+| aws-live BUY/SELL | 🔴 미진행 |
+
+> ALB, HTTPS, Route53, 인증, Auto Scaling, Blue/Green과 외부 공개는 현재 완료 상태가 아니다. 외부 공개 또는 다중 사용자 운영이 필요할 때 재검토한다.
 
 ## 기술 스택
 
-- Java 25
-- Spring Boot 4.1.0-SNAPSHOT
-- Spring MVC
-- Thymeleaf
-- Spring Data JPA
-- JdbcTemplate
-- PostgreSQL
-- Lombok
-- Maven Wrapper
+| 항목 | 값 |
+| --- | --- |
+| Java | 25 |
+| Spring Boot | 4.1.0-SNAPSHOT |
+| Web | Spring MVC |
+| Template | Thymeleaf |
+| Persistence | Spring Data JPA · JdbcTemplate |
+| Database | PostgreSQL |
+| Utility | Lombok |
+| Build | Maven Wrapper |
+| Container | Docker · ECS Fargate 실증 구성 |
 
 ## 주요 화면
 
-- Dashboard: `/`, `/dashboard`
-  - 계좌 요약, 최근 주문, 보유 종목, 최신 전략 실행/리포트 요약을 DB 기준으로 표시합니다.
-  - `portfolio.snapshot-refresh.enabled=true` + `portfolio.dashboard.snapshot-refresh-enabled=true` 조합이면 진입 시 AWS Paper 계좌 Snapshot Refresh가 활성화될 수 있습니다.
-- Balance: `/balance-summary`
-  - 계좌 잔고 요약과 평가금액 관련 정보를 표시합니다.
-  - `portfolio.snapshot-refresh.enabled=true`이면 진입 시 계좌 스냅샷 refresh 후 잔고를 조회합니다.
-- Positions: `/positions`, `/positions/{tickerCode}`
-  - 보유 종목 목록과 종목 상세 화면을 제공합니다.
-  - 목록 진입 시 Snapshot Refresh 후 DB 기준으로 보유 종목을 조회하고, 상세 화면은 stale 기준으로 refresh를 수행합니다.
-- Orders: `/orders`, `/orders/{id}`
-  - Connector 주문 요청, 주문 체인, 이벤트, 체결 정보를 조회합니다.
-- Strategy Execution: `/strategy/execution/plans`, `/strategy/execution/plans/{planId}`
-  - 전략 실행 계획과 주문 후보를 조회하고, 주문 제출 액션을 제공합니다.
-- Strategy Report: `/strategy/reports/latest`, `/strategy/reports/{runId}`
-  - 백테스트 리포트 요약, 통계, 거래 상세를 표시합니다.
-- Strategy Daily: `/strategy/daily/latest`, `/strategy/daily/{dailyRunId}`
-  - Daily Run, signal, position decision 조회 화면입니다.
-- Daily Batch: `/daily-batch`, `/daily-batch/{batchRunId}`
-  - Daily Batch 실행 이력, 단계별 실행 결과, status 색상, 로그 보기 UI를 제공합니다.
-  - Local File 기반 Step 1~17 실행 gate를 화면에서 확인할 수 있고, 수동 실행/재실행/Slack 테스트 액션을 제공합니다.
-  - 전체 1~17 또는 Step 10/11/12 포함 범위는 AWS Paper 주문 제출 가능성이 있으므로, 운영자는 실행 버튼 클릭 전 실행 범위와 gate를 반드시 확인해야 합니다.
+| 화면 | 경로 |
+| --- | --- |
+| Dashboard | `/` · `/dashboard` |
+| Balance | `/balance-summary` |
+| Positions | `/positions` · `/positions/{tickerCode}` |
+| Orders | `/orders` · `/orders/{id}` |
+| Strategy Execution | `/strategy/execution/plans` · `/strategy/execution/plans/{planId}` |
+| Strategy Report | `/strategy/reports/latest` · `/strategy/reports/{runId}` |
+| Strategy Daily | `/strategy/daily/latest` · `/strategy/daily/{dailyRunId}` |
+| Daily Batch | `/daily-batch` · `/daily-batch/{batchRunId}` |
+
+### 화면별 역할
+
+| 화면 | 내용 |
+| --- | --- |
+| Dashboard | 계좌 요약 · 최근 주문 · 포지션 · 최신 전략 결과 |
+| Balance | 잔고와 평가금액 조회 |
+| Positions | 보유 종목 목록과 상세 조회 |
+| Orders | 주문 요청 · 주문 체인 · 이벤트 · 체결 조회 |
+| Strategy Execution | 실행 계획과 주문 후보 조회 |
+| Strategy Report | 백테스트 리포트 · 통계 · 거래 상세 |
+| Strategy Daily | Daily Run · signal · position decision |
+| Daily Batch | Batch Run · Step 결과 · 상태 · 로그 조회 |
+
+Daily Batch 화면은 AWS Step Functions 실행 요청 UI를 제공한다.
+
+- Step 1~11은 safe trigger로 분리한다.
+- Step 12~17은 approval trigger와 Paper 주문 gate 뒤에서만 허용한다.
+- `local-file` 실행과 Slack 테스트 기능은 운영자 로컬 검증과 복구 범위에서만 사용한다.
 
 ## View 책임 경계
 
-port-view는 조회, 승인, 트리거 UI를 담당하는 View 마이크로서비스입니다. 실제 Daily Batch 실행 책임은 View 컨테이너 안 subprocess가 아니라 AWS Step Functions, EventBridge Scheduler, ECS RunTask, SSM RunCommand, AWS Batch, Lambda 쪽에 있습니다.
+### 담당 범위
 
-View가 담당하는 범위:
+| 항목 | 내용 |
+| --- | --- |
+| 조회 | Dashboard · Balance · Positions · Orders · Strategy · Daily Batch |
+| 상태 표시 | Batch Run · Step Log · 주문 · 체결 · 포지션 · 잔고 |
+| Safe trigger | AWS Step 1~11 실행 요청 |
+| Approval trigger | AWS Step 12~17 승인 실행 요청 |
+| Gate | 실행 가능 범위와 Paper 주문 허용 상태 표시 |
 
-- Dashboard / Balance / Positions / Orders / Strategy Execution / Strategy Daily / Strategy Report / Daily Batch 화면 제공
-- 운영자가 AWS Paper 상태를 조회하고 필요한 경우 Step Functions 실행을 트리거하는 UI
-- Step 1~11 safe trigger와 Step 12~17 approval trigger 분리 제공
-- 실행 결과와 상태 화면 표시
+### 직접 담당하지 않는 범위
 
-View가 직접 책임지지 않는 범위:
+| 항목 | 실제 책임 영역 |
+| --- | --- |
+| broker 주문 제출 | MarketConnector와 Strategy Execution |
+| 전략 판단 | Strategy Research · Decision · Execution |
+| 데이터 수집 | Interest Crawler |
+| 전처리 | Interest Preprocessor |
+| orchestration | Step Functions · EventBridge Scheduler |
+| 원격 실행 | ECS RunTask · SSM RunCommand · AWS Batch |
+| 자동 Slack | Lambda와 cross-service workflow |
+| aws-live | 별도 승인과 cutover 범위 |
 
-- 실제 broker 주문 제출 로직
-- 장중 포지션 판단 로직
-- 데이터 수집 / 전처리 / 리서치 / 전략 판단 실행
-- Step Functions 내부 orchestration 흐름
-- EventBridge Scheduler 자동 실행
-- MarketConnector EC2 내부 명령 수행
+View 코드 안에 다른 MS의 핵심 로직을 복제하지 않는다.
 
-Fargate 기준 기본 운영 backend는 `aws-stepfunctions`입니다. `local-file` backend는 운영자 로컬 검증/복구용으로만 보존되며 Fargate에서는 사용하지 않습니다.
+## 패키지 구조
 
-## 패키지 구조 요약
+| 패키지 | 역할 |
+| --- | --- |
+| `controller` | 요청 파라미터 처리 · Model 조립 · View 반환 |
+| `service` | 화면 DTO 조립 · Connector 연동 · 실행 요청 |
+| `repository` | JPA Repository · JdbcTemplate query |
+| `dto` | 화면 표시용 DTO |
+| `entity` | JPA Entity |
+| `config` | `@ConfigurationProperties` · executor 설정 |
+| `util` | 포맷팅 · label · account resolver · CSS helper |
+| `common` | Thymeleaf View 이름 상수 |
 
-- `controller`: Spring MVC Controller. 요청 파라미터를 해석하고 service 결과를 Model에 담아 Thymeleaf view를 반환합니다.
-- `service`: 화면 DTO 조립, 외부 Connector 호출, Daily Batch 실행, Slack 알림 등 application service 역할을 담당합니다.
-- `repository`: JPA Repository와 JdbcTemplate 기반 query repository가 함께 존재합니다.
-- `dto`: 화면 표시용 DTO입니다. Lombok class DTO와 Java record DTO가 혼재되어 있습니다.
-- `entity`: JPA Entity입니다. balance, holdings, trade orders, connector snapshot/order/fill/event 계열이 있습니다.
-- `config`: `@ConfigurationProperties`, async executor 등 설정 객체입니다.
-- `util`: 화면 포맷팅, label 변환, account resolver, CSS class helper입니다.
-- `common`: Thymeleaf view 이름 상수(`ViewNames`)를 관리합니다.
+주요 파일의 상세 역할은 [소스 파일 카탈로그](docs/source-file-catalog.md)를 참고한다.
 
-## 소스 파일 카탈로그
+## 로컬 실행
 
-AWS Migration 전 초기 정리를 위해 주요 소스/설정/문서 파일의 역할을 [docs/source-file-catalog.md](docs/source-file-catalog.md)에 정리했습니다.
-파일 삭제 없이 Java/Thymeleaf/CSS/properties/docs 파일의 책임과 운영 주의사항을 한글로 기록합니다.
+### 기본 실행
 
-## 실행 방법
-
-로컬 실행 전 PostgreSQL, Connector API, Daily Batch에서 호출하는 외부 모듈 경로가 준비되어 있어야 합니다.
+Linux와 macOS:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Windows PowerShell에서는 다음을 사용할 수 있습니다.
+Windows PowerShell:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
-기본 서버 포트는 `application.properties`의 `server.port` 설정을 따릅니다.
+기본 포트는 `application.properties`의 `server.port`를 따른다.
 
-### AWS Paper Local View 실행
+### 빌드
 
-AWS Paper 환경의 RDS와 secret을 사용해서 Local View를 띄우는 경우에는 다음 전제가 충족되어 있어야 합니다.
-
-- AWS Paper RDS로 향하는 port forwarding(예: `127.0.0.1:15433`)이 별도 창에서 미리 열려 있어야 합니다.
-- 로컬 secret loader 또는 환경변수로 DB/KIS secret과 계좌번호가 준비되어 있어야 합니다. 실제 값은 저장소에 기록하지 않고 `[REDACTED]` 처리합니다.
-
-View 실행은 운영자 로컬 도구 폴더의 starter 스크립트 한 줄로 가능합니다.
-
-```powershell
-C:\Workspaces\portfolio-local-env\Start-PortfolioViewAwsPaperBatch.ps1
-```
-
-실행 스크립트 역할은 다음과 같습니다(스크립트 자체는 운영자 로컬 도구 폴더에 위치하며 본 저장소 범위 밖입니다).
-
-- `Load-PortfolioViewAwsPaperBatchEnv.ps1`: UTF-8 콘솔, DB/KIS secret, `aws-paper` profile, 기본 계좌, Snapshot Refresh, Daily Batch gate 환경변수를 로드합니다.
-- `Start-PortfolioViewAwsPaperBatch.ps1`: 위 Load 파일을 dot-source한 뒤 `port-view`에서 `mvnw spring-boot:run -Dspring-boot.run.profiles=aws-paper`를 실행합니다.
-
-## 빌드 방법
+Linux와 macOS:
 
 ```bash
 ./mvnw clean package
@@ -124,221 +143,319 @@ Windows PowerShell:
 .\mvnw.cmd clean package
 ```
 
-## ECS Fargate 배포 관점
+### AWS Paper Local View
 
-port-view는 ECS Fargate Service로 운영합니다. 컴퓨트 서비스 결정은 저장소 밖의 AWS Migration spec에서 관리하며, port-view 저장소 관점에서는 다음 흐름을 따릅니다.
+AWS Paper RDS와 secret을 사용하는 Local View는 다음 전제가 필요하다.
 
-1. `Dockerfile`로 컨테이너 이미지 build
-2. ECR repository로 push
-3. ECS Task Definition 신규 revision 등록 (환경변수, secret 주입 설정 포함)
-4. ECS Service가 신규 revision으로 rollout
+| 항목 | 값 |
+| --- | --- |
+| RDS 연결 | 운영자가 별도 port forwarding 준비 |
+| Spring profile | `aws-paper` |
+| DB · KIS secret | local secret loader 또는 환경변수 |
+| 계좌번호 | 환경변수 주입 · 저장소 기록 금지 |
+| wrapper 위치 | `C:\Workspaces\portfolio-local-env` |
 
-민감정보 또는 환경 종속 정보는 저장소에 직접 기록하지 않습니다. 필요한 경우 다음 placeholder를 사용합니다.
+backend별 wrapper는 분리되어 있다.
 
-- account-id 12자리 원문 대신 `[REDACTED]`
-- 실제 IAM Role ARN 대신 `[REDACTED_ARN]`
-- 실제 secret ARN 대신 `[REDACTED_SECRET_ARN]`
-- ECR image URI 원문 대신 `<ECR_IMAGE_URI>`
-- ALB DNS 또는 공개 endpoint 원문 대신 `<ALB_ENDPOINT>`
-- 실제 state machine ARN 전체 대신 `<STATE_MACHINE_ARN>` / `<APPROVAL_STATE_MACHINE_ARN>`
+| backend | Starter |
+| --- | --- |
+| `local-file` | `Start-PortfolioViewAwsPaperLocalFile.ps1` |
+| `aws-stepfunctions` | `Start-PortfolioViewAwsPaperStepFunctions.ps1` |
 
-### Fargate 운영 안전 기본값
+각 starter는 동일 이름의 `Load-*Env.ps1`을 dot-source한 뒤 port-view를 실행한다.
 
-Fargate에서 Daily Batch 관련 설정의 안전 기본값은 다음과 같습니다.
+구형 `Start-PortfolioViewAwsPaperBatch.ps1`은 현행 기본 wrapper로 문서화하지 않는다.
 
-- `portfolio.batch.execution-mode=aws-stepfunctions`
-- `portfolio.batch.local-file-execution-enabled=false`
-- `portfolio.batch.paper-order-enabled=false`
-- `portfolio.batch.full-pipeline-execution-enabled=false`
-- `portfolio.batch.max-executable-step-order=11`
+## 실행 backend
 
-Step 12~17 주문성 구간은 approval workflow state machine과 별도 gate 뒤에서만 활성화됩니다. 운영자가 명시적으로 gate를 ENABLE하고 approval workflow ARN이 주입되어 있을 때만 승인 실행 endpoint가 활성화됩니다.
+`portfolio.batch.execution-mode`로 backend를 선택한다.
 
-### container 환경변수 주입
+### `aws-stepfunctions`
 
-Fargate task에는 다음 유형의 환경변수를 주입합니다. 실제 값은 secret manager 또는 배포 설정으로 관리하고 저장소 문서에는 키 이름만 남깁니다.
+ECS Fargate와 AWS Paper View의 기본 경로다.
 
-- `aws-paper` profile 활성화 (`SPRING_PROFILES_ACTIVE=aws-paper`)
-- RDS 접속정보 (`INTEREST_DB_*`) — password는 secret 주입
-- Step Functions region / 일반 state machine ARN / approval state machine ARN / execution-name prefix / start-enabled / step-start-enabled
-- Daily Batch gate (`portfolio.batch.*`)
-- Snapshot Refresh gate (`portfolio.snapshot-refresh.*`)
-- 기본 계좌번호 env (`PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO`, `PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO`) — 값은 원문 기록 금지
+View는 Python subprocess를 직접 실행하지 않고 AWS Step Functions `StartExecution`만 호출한다.
 
-### ALB 노출 방식
+실제 Step 실행은 다음 서비스가 담당한다.
 
-port-view는 ALB 뒤에서 접근되는 View UI로 운영합니다. 세부 인증, 접근 제한, source IP allowlist 등의 구성은 저장소 밖의 AWS 운영 영역이며 본 README는 다음 원칙만 명시합니다.
+- AWS Step Functions
+- ECS RunTask
+- SSM RunCommand
+- AWS Batch
+- Lambda
 
-- 초기 노출은 source IP 제한 또는 최소 인증 게이트 뒤에서만 허용합니다.
-- 공개 접근 URL, 실제 ALB DNS, 보안그룹 상세값은 문서에 원문으로 기록하지 않습니다.
-- 필요한 경우 `<ALB_ENDPOINT>` placeholder를 사용합니다.
+### `local-file`
 
-### 로컬 절대 경로 의존
+운영자 Local View의 검증과 복구용 backend다.
 
-Fargate에서는 로컬 절대 경로(예: `C:/Workspaces/port-marketconnector`)와 local subprocess 의존을 운영 경로로 사용하지 않습니다. 이러한 경로는 `local-file` backend를 사용하는 운영자 로컬 검증/복구용 wrapper에서만 유효합니다.
+ProcessBuilder로 운영자 로컬 source의 Python command를 실행할 수 있다.
+
+Fargate 운영 경로에서는 사용하지 않는다.
+
+| 환경 | backend |
+| --- | --- |
+| ECS Fargate | `aws-stepfunctions` |
+| Local View 운영 검증 | `aws-stepfunctions` |
+| Local View 복구 | 필요 시 `local-file` |
+
+## AWS Step Functions trigger
+
+### Controller endpoint
+
+| 경로 | 역할 |
+| --- | --- |
+| `POST /daily-batch/aws-stepfunctions/start-range` | Step 1~11 safe trigger |
+| `POST /daily-batch/aws-stepfunctions/start-approval-range` | Step 12~17 approval trigger |
+
+일반 workflow와 approval workflow ARN은 별도로 주입한다.
+
+approval ARN이 없거나 gate가 비활성화되면 Step 12~17 요청을 차단한다.
+
+### StartExecution payload
+
+| 타입 | 필드 |
+| --- | --- |
+| boolean | `allowPaperOrderExecute` · `paperOrderEnabled` |
+| numeric | `fromStepOrder` · `toStepOrder` · `startStep` · `endStep` |
+| date string | `runDate` · Asia/Seoul 기준 `yyyy-MM-dd` |
+| string | `environment` · `dbTarget` · `source` · `requestedBy` |
+| string | `requestedFrom` · `fromStepCode` · `toStepCode` |
+
+Choice State와 타입이 일치해야 하므로 boolean과 numeric 값을 문자열로 보내지 않는다.
+
+성공 화면에는 `executionName`과 redaction된 `executionArn`만 표시한다.
+
+## Daily Batch gate
+
+| 설정 | 역할 |
+| --- | --- |
+| `portfolio.batch.execution-enabled` | 실행 액션 전체 허용 |
+| `portfolio.batch.local-file-execution-enabled` | Local File 실행 허용 |
+| `portfolio.batch.full-pipeline-execution-enabled` | 전체 1~17 실행 허용 |
+| `portfolio.batch.paper-order-enabled` | Paper 주문성 Step 허용 |
+| `portfolio.batch.min-executable-step-order` | 최소 실행 Step |
+| `portfolio.batch.max-executable-step-order` | 최대 실행 Step |
+| `portfolio.batch.aws-stepfunctions-start-enabled` | Step Functions backend 허용 |
+| `portfolio.batch.aws-stepfunctions-step-start-enabled` | Step 1~11 버튼 허용 |
+
+### Fargate 안전 기본값
+
+| 설정 | 값 |
+| --- | --- |
+| execution mode | `aws-stepfunctions` |
+| local file | `false` |
+| Paper order | `false` |
+| full pipeline | `false` |
+| max Step | `11` |
+
+> `BATCH_PAPER_ORDER_ENABLED=true`이고 Step 12 이상을 실행하면 AWS Paper 주문이 제출될 수 있다. 실행 범위, approval workflow와 gate를 반드시 확인한다.
+
+## Snapshot Refresh
+
+Dashboard, Balance, Positions의 Snapshot Refresh는 환경별 책임을 구분한다.
+
+| 환경 | 처리 |
+| --- | --- |
+| Local View | MarketConnector subprocess refresh 사용 가능 |
+| ECS Fargate | 로컬 subprocess 사용 금지 |
+| Fargate 조회 | DB에 적재된 Snapshot 조회 중심 |
+| 원격 refresh | AWS orchestration 또는 Connector 경로 |
+
+주요 설정:
+
+| 설정 | 역할 |
+| --- | --- |
+| `portfolio.snapshot-refresh.enabled` | 전체 활성화 |
+| `portfolio.dashboard.snapshot-refresh-enabled` | Dashboard 진입 시 활성화 |
+| `portfolio.snapshot-refresh.stale-minutes` | stale 기준 |
+| `portfolio.snapshot-refresh.timeout-seconds` | subprocess timeout |
+| `portfolio.snapshot-refresh.marketconnector-dir` | Local MarketConnector 경로 |
+| `portfolio.snapshot-refresh.balance-script-name` | balance script |
+| `portfolio.snapshot-refresh.python-executable` | Python 실행 파일 |
+
+Fargate에서는 `C:/Workspaces/...` 같은 로컬 절대 경로를 운영 경로로 사용하지 않는다.
+
+## Database
+
+### 연결 기준
+
+| 항목 | 값 |
+| --- | --- |
+| Database | `portfolio` |
+| Spring datasource user | `view_app` |
+| Connector subprocess user | `marketconnector_app` |
+| Password | 환경변수 또는 secret 주입 |
+| SQL 해석 | Hikari `search_path` 기반 |
+
+`view_app`에 connector 쓰기 권한을 추가하는 방식으로 DB user 분리를 무력화하지 않는다.
+
+### Domain schema
+
+- `ops`
+- `execution`
+- `decision`
+- `research`
+- `connector`
+- `preprocessor`
+- `interest`
+- `reference`
+- `legacy`
+- `public`
+
+기본 `search_path`:
+
+```text
+ops, execution, decision, research, connector,
+preprocessor, interest, reference, legacy, public
+```
+
+기존 unqualified SQL은 위 `search_path` 기준으로 동작한다.
+
+신규 운영 SQL과 진단 SQL은 가능한 한 schema-qualified 이름을 사용한다.
+
+OPS Mirror 기준 테이블:
+
+| 테이블 | 역할 |
+| --- | --- |
+| `ops.strategy_daily_batch_run` | Batch Run |
+| `ops.strategy_daily_batch_step_log` | Step 실행 로그 |
+
+### DB 환경변수
+
+| 환경변수 | 기본값 · 역할 |
+| --- | --- |
+| `INTEREST_DB_HOST` | `localhost` |
+| `INTEREST_DB_PORT` | `5433` |
+| `INTEREST_DB_NAME` | `portfolio` |
+| `PORTFOLIO_DB_NAME` | `portfolio` |
+| `INTEREST_DB_USER` | 환경별 DB user |
+| `INTEREST_DB_PASSWORD` | 기본값 없음 |
+
+## 주요 설정 범주
+
+| 설정 | 역할 |
+| --- | --- |
+| `spring.datasource.*` | PostgreSQL 연결 |
+| `spring.jpa.*` | JPA · Hibernate |
+| `portfolio.view.*` | 기본 계좌와 화면 limit |
+| `connector.*` | Connector URL과 API path |
+| `portfolio.batch.*` | backend · gate · timeout · log |
+| `portfolio.snapshot-refresh.*` | Snapshot Refresh |
+| `slack.*` | Local View Slack 기능 |
+
+설정 키를 추가하거나 변경하면 properties, `@ConfigurationProperties`, README와 배포 환경변수 이름을 함께 확인한다.
+
+## ECS Fargate
+
+port-view는 ECS Fargate Service 1차 포팅과 AWS Paper 연동 실증을 완료했다.
+
+현재는 상시 외부 공개 서비스가 아니라 포트폴리오 실증 상태로 유지한다.
+
+### 배포 흐름
+
+1. `Dockerfile`로 image build
+2. ECR repository push
+3. ECS Task Definition revision 등록
+4. ECS Service rollout
+5. 화면과 Step Functions trigger 확인
+
+### Container 설정
+
+| 항목 | 값 |
+| --- | --- |
+| Spring profile | `SPRING_PROFILES_ACTIVE=aws-paper` |
+| Database | `INTEREST_DB_*` |
+| Step Functions | region · 일반 ARN · approval ARN |
+| Gate | `portfolio.batch.*` |
+| Snapshot | `portfolio.snapshot-refresh.*` |
+| 계좌 | 환경변수 주입 · 원문 기록 금지 |
+
+### 외부 노출 AS-IS
+
+| 항목 | 값 |
+| --- | --- |
+| 현재 실증 | ECS Fargate Public IP 기반 |
+| ALB | 미수행 |
+| HTTPS · Route53 | 미수행 |
+| 인증 | 미수행 |
+| Auto Scaling | 미수행 |
+| Blue/Green | 미수행 |
+| 외부 공개 | 미수행 |
+| 재검토 조건 | 외부 공개 또는 다중 사용자 운영 |
+
+향후 ALB를 도입하면 source IP 제한 또는 인증 게이트를 우선 적용한다.
+
+## Slack
+
+`SlackNotificationService`는 Local View에서 다음 메시지를 조립할 수 있다.
+
+- Daily Batch 결과
+- Daily Run 요약
+- 전략 실행 요약
+- 잔고와 포지션 요약
+
+자동 운영 Slack의 주 책임은 cross-service workflow와 Lambda에 있다.
+
+Webhook URL은 환경변수 또는 local config로 주입하며 저장소에 기록하지 않는다.
 
 ## 외부 의존 모듈
 
-Daily Batch와 Connector 연동은 외부 프로젝트 및 API에 의존합니다.
+| 모듈 | 관계 |
+| --- | --- |
+| `port-marketconnector` | 계좌 · 주문 · 체결 |
+| `port-interest-crawler` | 원천 데이터 수집 |
+| `port-interest-preprocessor` | 전처리 |
+| `port_strategy_research` | 전략 연구 |
+| `port_strategy_decision` | 전략 판단 |
+| `port_strategy_execution` | 주문 계획과 실행 |
 
-- `port-marketconnector`
-- `port-interest-crawler`
-- `port-interest-preprocessor`
-- `port_strategy_research`
-- `port_strategy_decision`
-- `port_strategy_execution`
+실제 경로와 운영 명령은 환경변수 또는 local config로 분리한다.
 
-위 모듈의 실제 경로, 실행 명령, 운영 환경별 설정은 환경변수 또는 local config로 분리하는 방향이 적합합니다.
+## 보안
 
-## 주요 설정 항목
-
-주요 설정은 `src/main/resources/application.properties`와 `config` 패키지의 `@ConfigurationProperties` 객체에서 확인할 수 있습니다.
-
-- `spring.datasource.*`: PostgreSQL 연결 설정. DB 접속정보는 `INTEREST_DB_*` 환경변수로 주입합니다.
-- `spring.jpa.*`: JPA/Hibernate 설정
-- `portfolio.view.*`: 화면 기본 계좌번호와 화면별 limit 설정
-- `connector.*`: Connector base URL과 API path 설정
-- `portfolio.batch.*`: Daily Batch 실행 경로, Python 실행 파일, timeout, log tail 설정
-- `portfolio.snapshot-refresh.*`: snapshot stale 여부와 refresh 실행 설정
-- `slack.*`: Slack 알림 활성화 여부와 webhook 설정
-
-민감정보 값은 저장소에 직접 두지 않고 환경변수 또는 로컬 전용 설정으로 분리해야 합니다.
-
-### Snapshot Refresh 설정
-
-Dashboard / Balance / Positions 진입 시 계좌 스냅샷을 새로 받아오는 동작은 다음 설정으로 제어합니다.
-
-- `portfolio.snapshot-refresh.enabled`: Snapshot Refresh 전체 활성 여부
-- `portfolio.dashboard.snapshot-refresh-enabled`: Dashboard 진입 시 Snapshot Refresh 사용 여부
-- `portfolio.snapshot-refresh.stale-minutes`: 스냅샷을 stale로 판정하는 분 단위 임계값
-- `portfolio.snapshot-refresh.timeout-seconds`: refresh subprocess 최대 실행 시간
-- `portfolio.snapshot-refresh.marketconnector-dir`: `connector_balance.py`를 실행할 MarketConnector 디렉터리 경로
-- `portfolio.snapshot-refresh.balance-script-name`: 실행할 balance 스크립트 파일명
-- `portfolio.snapshot-refresh.python-executable`: 사용할 Python 실행 파일 경로
-
-### DB user 분리
-
-Spring View datasource와 Connector subprocess는 서로 다른 DB user를 사용합니다.
-
-- Spring View datasource는 `view_app`을 사용합니다.
-- `ConnectorSnapshotRefreshService`가 실행하는 `connector_balance.py` subprocess는 `marketconnector_app`을 사용합니다.
-- `view_app`에 connector 쓰기 권한을 부여하는 방식이 아니라, subprocess의 DB user 자체를 분리한 구조입니다.
-
-### Daily Batch gate
-
-Daily Batch 화면에서 실행 가능한 step 범위는 다음 gate로 제한합니다.
-
-- `portfolio.batch.execution-enabled`: 화면에서 Daily Batch 실행 액션 허용 여부
-- `portfolio.batch.local-file-execution-enabled`: Local File 기반 실행 허용 여부
-- `portfolio.batch.full-pipeline-execution-enabled`: 전체 1~17 실행 허용 여부
-- `portfolio.batch.paper-order-enabled`: Paper 주문 제출 가능 step 허용 여부
-- `portfolio.batch.min-executable-step-order`: 실행 허용 최소 step order
-- `portfolio.batch.max-executable-step-order`: 실행 허용 최대 step order
-
-### 안전 주의
-
-`BATCH_PAPER_ORDER_ENABLED=true`이면 Daily Batch 화면에서 Step 12 이상 또는 전체 1~17 범위 실행 시 실제 AWS Paper 주문이 제출될 수 있습니다. 운영자는 버튼 클릭 전 실행 범위와 gate를 반드시 확인해야 합니다.
-
-DB 접속 환경변수:
-
-- `INTEREST_DB_HOST`: PostgreSQL host. 기본값은 `localhost`
-- `INTEREST_DB_PORT`: PostgreSQL port. 기본값은 `5433`
-- `INTEREST_DB_NAME`: PostgreSQL database name. 기본값은 `portfolio`
-- `PORTFOLIO_DB_NAME`: 별도 환경변수로 분리하는 경우 PostgreSQL database name. 기본값은 `portfolio`
-- `INTEREST_DB_USER`: PostgreSQL username. 기본값은 `postgres`
-- `INTEREST_DB_PASSWORD`: PostgreSQL password. 기본값 없음
-
-DB schema 구성:
-
-- AWS Migration 준비 관점에서 단일 PostgreSQL database `portfolio`와 schema-per-domain 구조를 사용합니다.
-- domain schema는 `reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`, `public`입니다.
-- port-view는 여러 domain schema를 통합 조회하는 운영 콘솔이므로 가장 넓은 `search_path`를 사용합니다.
-- `spring.datasource.hikari.connection-init-sql`로 `search_path`를 `ops, execution, decision, research, connector, preprocessor, interest, reference, legacy, public` 순서로 설정합니다.
-- schema-per-domain 전환 후에도 기존 SQL은 명시 schema prefix 없이 위 `search_path` 기반으로 동작합니다.
-- Dashboard, Balance, Holdings, Strategy Plan, Daily Batch, Report 화면 조회 검증이 완료된 구조입니다.
-
-## Daily Batch 요약
-
-Daily Batch는 여러 외부 모듈의 Python command를 순차 실행하고, 실행 이력을 `strategy_daily_batch_run`, step 로그를 `strategy_daily_batch_step_log`에 기록하는 흐름입니다.
-
-지원되는 주요 액션:
-
-- 전체 Daily Pipeline 실행
-- 특정 step부터 재실행
-- 실패 step 재실행
-- Intraday Monitor 단독 실행
-- Slack 테스트 메시지 전송
-- Daily Batch Slack summary 전송
-
-상세 내용은 [docs/daily-batch.md](docs/daily-batch.md)를 참고합니다.
-
-### Daily Batch 실행 backend
-
-Daily Batch 실행 backend는 두 가지로 분리되어 있습니다. `portfolio.batch.execution-mode` 값으로 선택합니다.
-
-- `local-file`: 운영자 로컬 검증 도구로 보존하는 backend. Local View 버튼이 ProcessBuilder로 로컬 source(예: `C:/Workspaces/port-marketconnector`)의 Python command를 직접 실행해 AWS Paper DB에 결과를 저장합니다. Fargate에서는 사용하지 않습니다.
-- `aws-stepfunctions`: View가 Python subprocess나 로컬 source를 직접 실행하지 않고 AWS Step Functions `StartExecution`만 호출하는 backend입니다. 실제 Step 1~17 실행은 Step Functions state machine + ECS RunTask + SSM RunCommand + AWS Batch 가 담당합니다.
-
-`aws-stepfunctions` backend 는 `StepFunctionsDailyBatchExecutionService`가 담당하고, Daily Batch 화면에 `AWS Step 1~11` safe trigger 버튼과 `AWS Step 12~17` 승인 실행 버튼을 분리해 노출합니다. 기본은 `allowPaperOrderExecute=false` 기준이며, Step 12~17 주문성 구간은 별도 approval / preflight / paper-order gate 뒤에서만 활성화됩니다.
-
-Controller endpoint(기존 endpoint 이름은 그대로 유지):
-
-- `POST /daily-batch/aws-stepfunctions/start-range`: Step 1~11 safe trigger
-- `POST /daily-batch/aws-stepfunctions/start-approval-range`: Step 12~17 승인 실행
-
-성공 시 `executionName`과 account-id를 redaction한 `executionArn`을 flash message로 표시합니다. 승인 실행은 `requestedBy=VIEW_APPROVAL_BUTTON`, `allowPaperOrderExecute=true`, `paperOrderEnabled=true` payload를 사용합니다.
-
-State machine 식별자는 일반 workflow와 approval workflow를 분리해 환경변수로 주입합니다. 실제 ARN 값은 본 저장소 문서에 기록하지 않고 `[REDACTED]` 또는 placeholder로 표기합니다.
-
-- `portfolio.batch.aws-stepfunctions-region`: Step Functions 호출 region (예: `ap-northeast-2`)
-- `portfolio.batch.aws-stepfunctions-state-machine-arn`: 일반 workflow state machine ARN (`portfolio-paper-daily-step1-17-approval`)
-- `portfolio.batch.aws-stepfunctions-approval-state-machine-arn`: 승인형 workflow state machine ARN (`portfolio-paper-daily-step12-17-approval`). 승인 ARN이 비어 있으면 승인형 실행은 서비스 레벨에서 차단됩니다.
-- `portfolio.batch.aws-stepfunctions-execution-name-prefix`: `StartExecution` `name` prefix
-- `portfolio.batch.aws-stepfunctions-start-enabled`: aws-stepfunctions backend 사용 허용 여부
-- `portfolio.batch.aws-stepfunctions-step-start-enabled`: AWS Step 1~11 safe trigger 버튼 활성 허용 여부
-
-`StartExecution` payload의 타입은 다음을 따릅니다(Step Functions Choice `BooleanEquals` 조건과 정합).
-
-- `allowPaperOrderExecute` · `paperOrderEnabled`: boolean JSON
-- `fromStepOrder` · `toStepOrder` · `startStep` · `endStep`: numeric JSON
-- `runDate`: Asia/Seoul 기준 yyyy-MM-dd 문자열
-- `environment` · `dbTarget` · `source` · `requestedBy` · `requestedFrom` · `fromStepCode` · `toStepCode`: 문자열
-
-Fargate에서는 `portfolio.batch.local-file-execution-enabled=false`, `portfolio.batch.paper-order-enabled=false`, `portfolio.batch.full-pipeline-execution-enabled=false`를 기본값으로 권장하고, Step 1~11 safe trigger부터 단계적으로 활성화합니다. Step 12 이상 또는 전체 1~17 범위는 운영자가 별도 gate를 명시적으로 ENABLE한 뒤에만 허용됩니다.
-
-운영자 로컬 도구 폴더(`C:\Workspaces\portfolio-local-env\`)에는 backend별 wrapper 2종이 분리되어 있습니다. 본 저장소 범위 밖이라 스크립트 본체는 두지 않고 파일명만 참고로 적습니다.
-
-- `Start-PortfolioViewAwsPaperLocalFile.ps1` + `Load-PortfolioViewAwsPaperLocalFileEnv.ps1`: `local-file` backend 기준으로 View를 띄웁니다. `PORTFOLIO_BATCH_EXECUTION_MODE=local-file`, `PORTFOLIO_BATCH_LOCAL_FILE_EXECUTION_ENABLED=true`, `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_START_ENABLED=false`로 설정됩니다.
-- `Start-PortfolioViewAwsPaperStepFunctions.ps1` + `Load-PortfolioViewAwsPaperStepFunctionsEnv.ps1`: `aws-stepfunctions` backend 기준으로 View를 띄웁니다. `PORTFOLIO_BATCH_EXECUTION_MODE=aws-stepfunctions`, `PORTFOLIO_BATCH_LOCAL_FILE_EXECUTION_ENABLED=false`, 일반 + approval ARN 환경변수가 모두 set 되어야 합니다.
-
-두 wrapper 모두 `aws-paper` profile + Step 1~17 전체 실행 가능 gate로 구성되며, safe-only 검증용이 아니라 운영자 선택형 전체 실행 wrapper입니다.
-
-## Slack 알림 요약
-
-`SlackNotificationService`는 Daily Batch 결과, Daily Run 요약, 전략 실행 요약, 잔고/보유 요약을 텍스트 메시지로 조립해 Slack webhook으로 전송합니다.
-
-Webhook URL은 문서나 코드에 직접 기록하지 않고 환경변수 또는 local config를 통해 주입해야 합니다.
-
-## 보안 주의사항
-
-다음 유형은 민감정보 또는 환경 의존 정보로 취급합니다.
+아래 값은 코드, 문서, 로그에 원문으로 기록하지 않는다.
 
 - DB password
+- KIS app key · app secret
+- token
 - Slack webhook URL
 - 실제 계좌번호
-- Connector URL
-- 외부 프로젝트 절대 경로
-- 토큰/API key 유형의 값
+- AWS account-id
+- 실제 ARN
+- public IP
+- broker 주문번호
+- image digest full SHA256
 
-자세한 원칙과 점검 목록은 [docs/security-notes.md](docs/security-notes.md)를 참고합니다.
+Placeholder:
 
-## 향후 리팩토링 후보
+| 값 | Placeholder |
+| --- | --- |
+| 일반 민감정보 | `[REDACTED]` |
+| 계좌번호 | `[REDACTED_ACCOUNT_NO]` |
+| ARN | `[REDACTED_ARN]` |
+| secret ARN | `[REDACTED_SECRET_ARN]` |
+| task ARN | `[REDACTED_TASK_ARN]` |
+| public IP | `[REDACTED_PUBLIC_IP]` |
+| broker 주문번호 | `[REDACTED_BROKER_ORDER_NO]` |
+| ECR image | `<ECR_IMAGE_URI>` |
+| 향후 ALB | `<ALB_ENDPOINT>` |
+
+보안 기준은 위 목록과 이 README 내용으로 충분하며 별도 상세 문서는 두지 않는다.
+
+## 상세 문서
+
+현재 유지하는 port-view 상세 문서는 아래 하나다.
+
+| 문서 | 역할 |
+| --- | --- |
+| [source-file-catalog](docs/source-file-catalog.md) | 소스 파일 역할 |
+
+구조 · 설정 · Daily Batch · 보안 · 리팩토링 기준은 README와 `docs/source-file-catalog.md`에 통합한다.
+
+## 리팩토링 후보
 
 - `DailyBatchService` 책임 분리
-- `SlackNotificationService` 전송/메시지 조립/조회 책임 분리
+- `SlackNotificationService` 조회 · 메시지 조립 · 전송 분리
 - View 공통 util과 label util 정리
-- `templates/pages`와 루트 template 병존 구조 정리 검토
-- 루트 CSS와 `static/css/pages` CSS 병존 구조 정리 검토
-- legacy/unused 의심 파일은 삭제가 아니라 사용 여부 검증 대상으로 관리
-
-상세 후보는 [docs/refactoring-backlog.md](docs/refactoring-backlog.md)를 참고합니다.
+- Template과 CSS의 legacy 구조 정리
+- unused 후보는 삭제 전 참조 여부 검증
