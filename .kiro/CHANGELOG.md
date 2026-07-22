@@ -4,11 +4,166 @@
 
 ## 작성 원칙
 
-- spec 구조 변경, 루트 공통 문서 변경, 신규 spec 생성, 주요 문서 재구성만 기록한다.
-- 8개 MS의 세부 코드 변경 이력은 본 문서에 기록하지 않는다.
-- 너무 자세한 일일 작업 로그는 `.kiro/WORKLOG.md`에 남기고, 본 문서에는 의미 있는 변경만 짧게 정리한다.
+- spec 구조 변경, 루트 공통 문서 변경, 신규 spec 생성과 주요 문서 재구성을 기록한다.
+- 운영 코드 변경은 문서 정합에 필요한 결과만 요약하고, 세부 구현 이력은 `WORKLOG.md` 또는 해당 `operation-notes.md`로 분리한다.
+- 변경 결과는 가능한 한 `항목 / 값` 2열 표로 정리한다.
+- 긴 셀은 여러 행으로 나누고 raw log·전체 SQL·전체 AWS 응답은 기록하지 않는다.
 - 항목 분류는 `Added`, `Changed`, `Removed`, `Security`로 통일한다.
-- 날짜는 한국 기준의 작업 일자를 사용한다.
+- 날짜는 한국 기준 작업 일자를 사용한다.
+
+## 2026-07-22 (Paper Daily 정상 자동 회차 acceptance · 1차 안정화 완료 · P2 View 고도화 범위 제외)
+
+### Changed
+
+- 🟢 Paper Daily 정상 자동 회차 end-to-end acceptance 완료 반영 (운영자 직접 확인 · Kiro 문서만 수정)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | Step 1~11 | 정상 Scheduler 자동 실행 SUCCEEDED (08:00 → 08:21 KST) |
+  | Step 12~17 | 정상 Scheduler 자동 실행 SUCCEEDED (09:01 → 09:06 KST) |
+  | Crawler 검증 | Program 최신 거래일 2026-07-21 1건 · Shortsell 349건 |
+  | Daily Run | 2026-07-22 COMPLETED · 기준일 2026-07-21 · AGGRESSIVE · 후보 1건 |
+  | Execution Plan | READY · 주문 준비 대상 1건 · 차단·스킵 0건 |
+  | validator | READY Plan → Order · Order Chain 자동 통과 |
+  | 주문·체결 | 한국전력 83주 BUY · Execution Order · Request FILLED · Fill 83주 1건 |
+  | Position·Balance | Position 83주 OPEN · Balance Snapshot 생성 |
+  | Slack·OPS | 성공 Slack 자동 수신 · Workflow·Batch 성공 기록 확인 |
+
+- 🟢 P1 완료 처리 · Paper Daily 1차 안정화 완료 선언
+
+  | 항목 | 값 |
+  | --- | --- |
+  | P1 후속 | 다음 정상 자동 회차 end-to-end 관찰 완료 처리 |
+  | 선언 | Paper Daily 1차 안정화 완료 |
+  | 확대 해석 금지 | aws-live 준비·장기 무장애·전체 AWS Migration 완료 아님 |
+  | 실패 이력 | 2026-07-20 · 2026-07-21 FAILED 이력 보존 (성공으로 덮어쓰지 않음) |
+
+- 🟢 P2 View 운영 보안·표시 고도화 범위 제외 결정 반영
+
+  | 항목 | 값 |
+  | --- | --- |
+  | P2 상태 | 미수행 (의도적 범위 제외 · 기능 제거·AWS 리소스 삭제 아님) |
+  | 대상 | ALB · HTTPS · Route53 · 인증 · Auto Scaling · Blue/Green · UI 고도화 · 외부 공개 |
+  | 현재 범위 | ECS Fargate 1차 실증 상태 유지 |
+  | 재검토 조건 | 외부 공개 또는 다중 사용자 운영 필요 시 |
+  | 실제 AWS 리소스 변경 | 없음 |
+
+- 🟢 `_common` · README 문서 반영
+
+  | 항목 | 값 |
+  | --- | --- |
+  | README | Paper Daily Step 1~11 · Step 12~17 · port-view row · 최근 검증 일자 2026-07-22 |
+  | followups-overview | Now P1 → Done recently 2026-07-22 · Next/Later P2 활성 항목 제거 후 결정 표로 이동 |
+  | operator-decisions | OD-SAFE-001 · OD-MS-002 반영 · 신규 Decision ID 없음 · Dashboard count 변경 없음 |
+  | ms-aws-service-decision-matrix | port_strategy_execution · port-view 운영 메모 · 서비스 선택 결론 변경 없음 |
+  | aws-resource-glossary | 운영 실증 메모 2026-07-22 추가 · 5-field template 변경 없음 |
+  | risk-register | 검토만 · 상태·count 변경 없음 · 신규 Risk ID 없음 |
+  | 신규 Risk ID · Decision ID | 없음 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| AWS · DB · broker · KIS · Slack · ECS · EC2 · Lambda · Step Functions 실행 | Kiro 실행 0건 · 운영자 직접 수행 |
+| State Machine ARN · execution ARN · ECS Task ARN · account-id · 계좌번호 · broker 주문번호 · SHA256 원문 신규 기록 | 0건 |
+| git add · commit · push · reset · restore | 0건 |
+| placeholder 정책 | `[REDACTED_ARN]` · `[REDACTED_EXECUTION_ARN]` · `[REDACTED_TASK_ARN]` · `[REDACTED_ACCOUNT_NO]` · `[REDACTED_BROKER_ORDER_NO]` 계열만 사용 |
+| 저장 인코딩 | UTF-8 No BOM 유지 |
+
+## 2026-07-21 (AWS Migration 공통 문서 최종 정합 보완)
+
+### Changed
+
+- 🟢 SSM Endpoint 실제 운영 구조 정합 (문서 정합 · 실제 AWS 리소스 변경 아님)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | operator-decisions.md | OD-NET-005 기본 세트(S3 GW + ECR api/dkr + Secrets + Logs) + SSM 선택형 |
+  | operator-decisions.md | OD-SEC-007 SSM outbound 경로 Public 또는 Endpoint 정합 |
+  | risk-register.md | R-NET-003 위험·대응을 접근 경로/Endpoint 세트 불일치로 정합 |
+  | aws-resource-glossary.md | VPC Endpoint Gateway/Interface 구분 · SSM 선택형 |
+  | ms-aws-service-decision-matrix.md | Network and Data VPC Endpoint 역할 분리 |
+  | 신규 Risk ID · Decision ID | 없음 · 상태 집계 보존 |
+
+- 🟢 Crawler 현재 운영 / 목표 구조 표현 통일
+
+  | 항목 | 값 |
+  | --- | --- |
+  | operator-decisions.md | OD-MS-003 목표 관점 · OD-MS-011 현재 Hybrid 관점 구분 |
+  | ms-aws-service-decision-matrix.md | Crawler 카드에 현재 운영·장기 목표 행 분리 |
+
+- 🟢 Followups orchestration 문구 갱신
+
+  | 항목 | 값 |
+  | --- | --- |
+  | followups-overview.md | Next Daily orchestration을 구축·ENABLED 완료 + 실패 전파 정합으로 갱신 |
+
+### Removed
+
+  | 항목 | 값 |
+  | --- | --- |
+  | operator-decisions.md | OD-MS-027~040 죽은 `See details` 참조 제거 |
+  | followups-overview.md | Historical Notes 잔재 참조·행 제거 |
+
+### Security
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 실제 AWS · DB · broker · KIS · Slack 실행 | 0건 |
+  | 민감정보 원문 신규 기록 | 0건 |
+  | git 명령 실행 | 0건 |
+
+## 2026-07-21 (정상 무주문 회차 validator 실패 · `--allow-no-target` 보완)
+
+### Changed
+
+- 🟢 `P0_ValidateOrderChain` 정상 무주문 회차 처리 수정 (운영자 직접 수행)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 배경 | 2026-07-21 09:01 자동 실행이 Step 12~16 통과 후 최종 `P0_ValidateOrderChain` 에서 FAILED (실제 주문 0건인 정상 무주문 회차를 `NO_EXECUTION_ORDER_TARGET` 로 실패 판정한 설정 누락) |
+  | State Machine ECS command | `--allow-no-target` 추가 |
+  | Python 소스 | 변경 없음 |
+  | ECS 이미지 | 변경 없음 |
+  | Task Definition | 변경 없음 |
+  | ASL 검증 | validate-state-machine-definition OK · 배포 후 재조회 확인 |
+  | validator 단독 smoke | `ORDER_CHAIN_VALIDATION=SUCCESS target=0 errors=0` · ExitCode 0 |
+  | 전체 자동 execution 재실행 | 없음 |
+  | 09:01 자동 execution 이력 | FAILED 보존 |
+  | 신규 Risk ID · Decision ID | 없음 |
+
+- 🟢 `_common` 문서 Details / Evidence 짧은 보강
+
+  | 항목 | 값 |
+  | --- | --- |
+  | risk-register.md | R-AUTO-001 · R-AUTO-037 Mitigation history 2026-07-21 보강 · 신규 Risk ID 없음 · Dashboard count 변경 없음 |
+  | operator-decisions.md | OD-SAFE-004 · OD-MS-032 Details 2026-07-21 운영 메모 · 신규 Decision ID 없음 · Status count 변경 없음 |
+  | followups-overview.md | Now P1 갱신 · `NO_TARGET` 구분 항목 갱신 · Done recently 2026-07-21 항목 추가 |
+  | ms-aws-service-decision-matrix.md | 4.7 port_strategy_execution 운영 메모 · 서비스 선택 결론 변경 없음 |
+  | aws-resource-glossary.md | Usage Notes 2026-07-21 추가 · 5-field template 변경 없음 |
+  | README.md | Current Status Dashboard Paper Daily Step 12-17 row · 최근 검증 일자 2026-07-21 · footnote 추가 |
+
+- 🟢 P3 KRX Crawler 실패 전파 강화 · runner DB validator 추가 (운영자 직접 수행)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 배경 | Windows Scheduled Task `Portfolio-KRX-Worker-Daily` 가 `C:\portfolio\run_krx_worker_daily.ps1` 실행 · `interest_program.py` · `interest_shortsell.py` 가 내부 실패 결과에도 exit 0 로 끝날 수 있던 false-success 축(R-DATA-017) |
+  | Python 종료 코드 전파 | `interest_program.py` · `interest_shortsell.py` — `SUCCESS` · 정상 `NO_CHANGE` 이고 `error_count=0` 이면 exit 0 · `FAILED` · 부분 오류 · 알 수 없는 상태는 exit 1 · `PROCESS_EXIT_DECISION` 로그 추가 (두 파일만 수정 · 로그인·Chrome 보조 파일 미수정) |
+  | runner DB validator | `run_krx_worker_daily.ps1` 후단에 추가 · expected trade date 기준 `interest_program_raw` 최신 거래일 일치 + 정확히 1건 · `interest_shortsell_raw` 최신 거래일 일치 + 최소 300건 · 실행 순서 KRX login → program → shortsell → Validate crawler DB → DONE |
+  | 실패 전파 | 검증 실패 시 runner non-zero → SSM → Step Functions 실패 전파 |
+  | 검증 | 로컬 import·종료 코드 단위 테스트 성공 · 기존 파일 백업 후 배포 · 로컬·원격 SHA256 일치 · 운영 venv py_compile · 원격 PowerShell parse 성공 · validator 단독 실행 expected trade date 2026-07-20 · Program 1건 · Shortsell 349건 · `CRAWLER_DB_VALIDATION=SUCCESS` · ExitCode 0 |
+  | 실제 재실행 | crawler 재수집·전체 State Machine 재실행 없음 |
+  | Risk / Decision 변화 | R-DATA-017 `Open` → `Mitigated` 승격 · R-AUTO-020 `Mitigated` 유지 · OD-MS-026 Details 보강 · 신규 Risk ID · Decision ID 없음 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| AWS · DB · broker · KIS · Slack · ECS · EC2 · Lambda · Step Functions 실행 | Kiro 실행 0건 · 운영자 직접 수행 |
+| State Machine ARN · execution ARN · ECS Task ARN · account-id · broker 주문번호 · SHA256 원문 신규 기록 | 0건 |
+| git add · commit · push · reset · restore | 0건 |
+| placeholder 정책 | `[REDACTED_ARN]` · `[REDACTED_EXECUTION_ARN]` · `[REDACTED_TASK_ARN]` · `[REDACTED_ACCOUNT_NO]` 계열만 사용 |
+| 저장 인코딩 | UTF-8 No BOM 유지 |
 
 ## 2026-07-20 (Step 13 EGW00201 복구 · rate-limit 보완 · Step 14~17 수동 완주 · State Machine 실패 Slack 및 runDate 정합)
 
@@ -58,6 +213,18 @@
   | 수동 smoke | 2026-07-20 데이터 · 매수 0건 · 매도 엔씨소프트 13주 · 코오롱생명과학 78주 · Slack 실제 수신 |
   | 자동 실행 구분 | 전체 execution 미시작 · 09:01 자동 실행은 Step 13 `EGW00201` FAILED 유지 |
 
+- 🟢 P0 운영 안전성 강화 (장애 복구 이후 수행 · 운영자 직접 수행)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | Step 13 제한 polling | `connector_order_check.py` 2.0.2 → 2.0.3 · active 주문(ACCEPTED · SUBMITTED · PENDING · PARTIAL_FILLED · PARTIALLY_FILLED) 최대 3회 추가 polling(기본 10초) · 종료 후 active 이면 exit 1 · 조회 API 반복 조회이며 주문 제출 재시도 아님 · S3 임시 객체 경유 EC2 배포 후 삭제 |
+  | Step14~16 fail-closed | Step14 SELL Fill · Step15 BUY Fill 대상·처리 건수 검증 · Step16 BUY Position 연결·수량 검증 · 누락·불일치 시 rollback 후 exit 1 · 전체 일치 시에만 commit |
+  | Execution Task Definition | 불변 태그 `paper-20260720-p0-integrity-v1` 신규 빌드(기존 태그 미덮어쓰기) · `portfolio-paper-strategy-execution` revision 3 · Step14·15·16 연결 · ECS Fargate smoke 성공 |
+  | State Machine validator 연결 | `execution_validate_ready_plan_order.py`(Step12 직전) · `execution_validate_order_chain.py`(Step16 직후) read-only 검증 연결 · 실패 시 실패 Slack·OPS 실패 경로 |
+  | Step12 실패 Slack 경로 | `Step12_Failed` 직접 Fail 제거 · `dailyExecutionFailure` 저장 후 `SendDailyExecutionFailedSlack` → `RecordBatchFailure` → 최종 Fail 연결 · ASL validation OK |
+  | 실패 formatter smoke | 실제 주문 실패 없이 `DAILY_EXECUTION_FAILED` 테스트 이벤트로 Notifier 직접 호출 · 실패 항목 표시 확인 · Portfolio Daily Bot 실제 수신 |
+  | 완료 범위 · 미완료 | P0 구현·운영 배포·단독 smoke·State Machine 연결 완료 · 다음 정상 자동 회차 성공 아님 · 전체 자동 회차 acceptance test 미수행(P1 유지) · 09:01 자동 execution FAILED 보존 · 신규 Risk / Decision ID 없음 |
+
 - 🟢 `_common` 문서 Details / Evidence 짧은 보강
 
   | 항목 | 값 |
@@ -68,6 +235,15 @@
   | ms-aws-service-decision-matrix.md | 4.1 port-marketconnector · 4.7 port_strategy_execution 운영 메모 · 서비스 선택 결론 변경 없음 |
   | aws-resource-glossary.md | Usage Notes 2026-07-20 추가 · 5-field template 변경 없음 |
   | README.md | Current Status Dashboard Paper Daily Step 12-17 row · 최근 검증 일자 2026-07-20 |
+
+### Added
+
+- 🟢 신규 read-only validator 2개 (운영자 직접 수행)
+
+  | 항목 | 값 |
+  | --- | --- |
+  | `execution_validate_ready_plan_order.py` | plan_date 기준 최신 Execution Plan 의 READY 상태·`ready_order_count` 와 실제 PAPER_STRATEGY Order 건수 비교 · 누락·건수 불일치·잘못된 수량/종목 시 exit 1 · 2026-07-20 Plan 143 · Order 2건 실데이터 검증 성공 · Step12 직전 연결 |
+  | `execution_validate_order_chain.py` | Plan→Order→Request→Fill→Position 연결 read-only 검증 · 불일치 시 exit 1 · 2026-07-20 SELL 2건 실데이터 검증 성공 · Step16 직후 연결 |
 
 ### Security
 
@@ -1340,15 +1516,15 @@
 
 - 🟢 **paper Daily 자동화 라인업 7종 ENABLED 확인 결과 추가**
 
-  | 시각 | 작업 | 상태 |
-  | --- | --- | --- |
-  | 07:50 | EC2 start | 🟢 **ENABLED** |
-  | 07:50 | 장전 Slack | 🟢 **ENABLED** |
-  | 08:00 | Step 1~11 | 🟢 **ENABLED** |
-  | **09:01** | **Step 12~17 (본 일자 ENABLED)** | 🟢 **ENABLED** |
-  | 09:10~15:50 | 10분 장중 손절 | 🟢 **ENABLED** |
-  | 15:50 | 장후 Slack | 🟢 **ENABLED** |
-  | 15:50 | MarketConnector stop | 🟢 **ENABLED** |
+| 항목 | 값 |
+| --- | --- |
+| 07:50 | **작업**: EC2 start<br>**상태**: 🟢 **ENABLED** |
+| 07:50 | **작업**: 장전 Slack<br>**상태**: 🟢 **ENABLED** |
+| 08:00 | **작업**: Step 1~11<br>**상태**: 🟢 **ENABLED** |
+| **09:01** | **작업**: **Step 12~17 (본 일자 ENABLED)**<br>**상태**: 🟢 **ENABLED** |
+| 09:10~15:50 | **작업**: 10분 장중 손절<br>**상태**: 🟢 **ENABLED** |
+| 15:50 | **작업**: 장후 Slack<br>**상태**: 🟢 **ENABLED** |
+| 15:50 | **작업**: MarketConnector stop<br>**상태**: 🟢 **ENABLED** |
 
   - 상세: [04 operation-notes](specs/04-strategy-batch-stepfunctions/operation-notes.md)
 
@@ -1751,10 +1927,10 @@
 
 - 🟢 **장전/장후 EventBridge Scheduler 2개 ENABLED 추가**
 
-  | Scheduler | cron | Timezone | Flexible | Input eventType | State |
-  | --- | --- | --- | --- | --- | --- |
-  | `portfolio-daily-brief-morning-slack-0750-kst` | `cron(50 7 ? * MON-FRI *)` | Asia/Seoul | OFF | `MORNING_BRIEF` | 🟢 **ENABLED** |
-  | `portfolio-daily-brief-evening-slack-1550-kst` | `cron(50 15 ? * MON-FRI *)` | Asia/Seoul | OFF | `EVENING_BRIEF` | 🟢 **ENABLED** |
+| 항목 | 값 |
+| --- | --- |
+| `portfolio-daily-brief-morning-slack-0750-kst` | **cron**: `cron(50 7 ? * MON-FRI *)`<br>**Timezone**: Asia/Seoul<br>**Flexible**: OFF<br>**Input eventType**: `MORNING_BRIEF`<br>**State**: 🟢 **ENABLED** |
+| `portfolio-daily-brief-evening-slack-1550-kst` | **cron**: `cron(50 15 ? * MON-FRI *)`<br>**Timezone**: Asia/Seoul<br>**Flexible**: OFF<br>**Input eventType**: `EVENING_BRIEF`<br>**State**: 🟢 **ENABLED** |
 
   - Scheduler input 에 고정 `runDate` 미주입 · Builder 가 실행 시점 KST 기준 처리
   - MarketConnector EC2 start · stop 과 독립 운영
@@ -2077,7 +2253,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 - IAM Role — `portfolio-daily-brief-sfn-role` · `portfolio-daily-brief-scheduler-role`.
 - Scheduler — `portfolio-daily-brief-morning-slack-0750-kst` · `portfolio-daily-brief-evening-slack-1550-kst` · cron `cron(50 7 ? * MON-FRI *)` / `cron(50 15 ? * MON-FRI *)` · Asia/Seoul.
 - eventType 라벨 — `MORNING_BRIEF` · `EVENING_BRIEF` · `PRE_MARKET_STATUS` · `POST_MARKET_STATUS` · `APPROVAL_REQUIRED` · `DAILY_EXECUTION_SUCCESS` · `DAILY_EXECUTION_FAILED` · `INTRADAY_STOP_LOSS`.
-- 장중 손절 — SSM commandId `5b19d5da-5e2e-4b35-821b-c3cf2b36d131` · IAM Role `portfolio-paper-marketconnector-ec2-role` · inline policy `portfolio-paper-marketconnector-event-notifier-invoke` · state machine `portfolio-paper-intraday-stop-sell-approval` · marker 3종 `STEP19C_INTRADAY_STOP_FINAL_DB_AFTER_CHECK=SUCCESS` · `INTRADAY_SNAPSHOT_AND_EVALUATE=SUCCESS` · `EMPTY_NORMAL`.
+- 장중 손절 · SSM commandId `5b19d5da-5e2e-4b35-821b-c3cf2b36d131` · IAM Role `portfolio-paper-marketconnector-ec2-role` · inline policy `portfolio-paper-marketconnector-event-notifier-invoke`
+  state machine `portfolio-paper-intraday-stop-sell-approval` · marker 3종 `STEP19C_INTRADAY_STOP_FINAL_DB_AFTER_CHECK=SUCCESS` · `INTRADAY_SNAPSHOT_AND_EVALUATE=SUCCESS` · `EMPTY_NORMAL`.
 - balance snapshot — `id=281` · `as_of_date=2026-06-30` · `total_eval_amount=8,706,505` · `cash_balance=8,706,505` · `cumulativeProfitRate=-12.94%` · `cumulativeProfitAmount=-1,293,495` · `positionCount=0`.
 - 상세 evidence — [03](specs/03-marketconnector-ec2/operation-notes.md) · [04](specs/04-strategy-batch-stepfunctions/operation-notes.md) · [05](specs/05-port-view-ecs-and-runbook/operation-notes.md) · [06](specs/06-secrets-and-iam/operation-notes.md).
 
@@ -2224,32 +2401,85 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
 ### Added
 
-- **Local View → AWS Step Functions Step 12~17 승인형 실행 검증 통과** — Daily Pipeline 측이 아니라 Local View 가 직접 Step Functions `StartExecution` external caller 로 붙는 두 번째 phase.
-   - executionName `port-view-step12-17-step12-17-20260629-194314-ba5edaf8`.
-   - state machine `portfolio-paper-daily-step12-17-approval` · status `SUCCEEDED`.
-   - start `2026-06-29T19:43:15.673+09:00` · stop `2026-06-29T19:46:06.546+09:00`.
-   - 진행: `Step12_CheckApproval` 통과 → `Step12_RunMarketConnectorStrategyOrderExecute` → `Step12_GetCommandInvocation` → Step 13~17 전체 진행 → `ExecutionSucceeded`.
-   - DB 안전 후검증 통과 — marker `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS` · 오늘 신규 `connector_order_request` 0건 · READY · REQUESTED `strategy_execution_order` 0건 · 신규 broker 주문 0건.
-   - 상세: [04 operation-notes](specs/04-strategy-batch-stepfunctions/operation-notes.md).
-- **AWS Step 12~17 승인 실행 endpoint / 버튼 추가**
-   - `POST /daily-batch/aws-stepfunctions/start-approval-range` Controller endpoint 추가.
-   - `daily_batch.html` 에 승인 실행 버튼 분리 (safe / approval 활성화 조건 분리).
-   - payload — `requestedBy=VIEW_APPROVAL_BUTTON` · `allowPaperOrderExecute=true` · `paperOrderEnabled=true` (boolean).
-   - `executionName` + redaction 된 `executionArn` 화면 표시.
-- **Step 12~17 전용 state machine ARN 분리**
-   - 일반 workflow ARN `portfolio-paper-daily-step1-17-approval` 과 approval workflow ARN `portfolio-paper-daily-step12-17-approval` 분리.
-   - `application.properties` 키 `portfolio.batch.aws-stepfunctions-approval-state-machine-arn` 추가.
-   - 환경변수 `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_APPROVAL_STATE_MACHINE_ARN` 추가.
-   - `DailyBatchProperties` 에 `awsStepfunctionsApprovalStateMachineArn` 필드 + getter / setter 추가.
-   - `StepFunctionsDailyBatchExecutionService` — `startSafeRange` 는 일반 ARN · `startApprovalRange` 는 approval 전용 ARN 사용.
-   - approval ARN 비어 있으면 승인형 실행 차단.
-- **로컬 View 구동 wrapper 2종 정리**
-   - `Start-PortfolioViewAwsPaperLocalFile.ps1` — env `PORTFOLIO_BATCH_EXECUTION_MODE=local-file` + 모든 gate ON · aws-stepfunctions gate OFF.
-   - `Start-PortfolioViewAwsPaperStepFunctions.ps1` — env `PORTFOLIO_BATCH_EXECUTION_MODE=aws-stepfunctions` + 모든 gate ON · 일반 + approval ARN set.
-   - 두 wrapper 모두 `aws-paper` profile + Step 1~17 전체 실행 가능.
-   - env loader 2종(`Load-PortfolioViewAwsPaperLocalFileEnv.ps1` · `Load-PortfolioViewAwsPaperStepFunctionsEnv.ps1`) 동시 정리.
-   - wrapper 본체는 운영자 로컬 도구 폴더(`C:\Workspaces\portfolio-local-env\`) 로 본 spec 범위 밖.
-- **05 spec `operation-notes.md` 4) Step 12~17 승인형 검증 완료 + 5) 로컬 View 구동 wrapper 정리 완료 섹션 추가** — 기존 미완료 항목 → 완료로 갱신 + Docker · ECR · Task Definition / Fargate 검증 항목을 6) · 7) 로 renumber.
+- 🟢 Local View → AWS Step Functions Step 12~17 승인형 실행 검증
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 검증 phase | Daily Pipeline이 아닌 Local View가 직접 Step Functions `StartExecution` external caller로 연결되는 두 번째 phase |
+  | executionName | `port-view-step12-17-step12-17-20260629-194314-ba5edaf8` |
+  | State Machine | `portfolio-paper-daily-step12-17-approval` |
+  | 실행 상태 | `SUCCEEDED` |
+  | 시작 시각 | `2026-06-29T19:43:15.673+09:00` |
+  | 종료 시각 | `2026-06-29T19:46:06.546+09:00` |
+  | 시작 gate | `Step12_CheckApproval` 통과 |
+  | Step 12 실행 | `Step12_RunMarketConnectorStrategyOrderExecute` |
+  | Step 12 확인 | `Step12_GetCommandInvocation` |
+  | 후속 흐름 | Step 13~17 전체 진행 |
+  | 최종 State | `ExecutionSucceeded` |
+  | DB 후검증 marker | `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS` |
+  | 신규 `connector_order_request` | 0건 |
+  | READY·REQUESTED `strategy_execution_order` | 0건 |
+  | 신규 broker 주문 | 0건 |
+  | 상세 | [04 operation-notes](specs/04-strategy-batch-stepfunctions/operation-notes.md) |
+
+- 🟢 AWS Step 12~17 승인 실행 endpoint와 버튼 추가
+
+  | 항목 | 값 |
+  | --- | --- |
+  | Controller endpoint | `POST /daily-batch/aws-stepfunctions/start-approval-range` |
+  | View 파일 | `daily_batch.html` |
+  | 버튼 구조 | safe 실행과 approval 실행 버튼 분리 |
+  | 활성 조건 | safe·approval gate를 각각 별도 적용 |
+  | `requestedBy` | `VIEW_APPROVAL_BUTTON` |
+  | `allowPaperOrderExecute` | `true` |
+  | `paperOrderEnabled` | `true` |
+  | payload 타입 | boolean 유지 |
+  | 성공 표시 | `executionName` 표시 |
+  | ARN 표시 | redaction된 `executionArn` 표시 |
+
+- 🟢 Step 12~17 전용 State Machine ARN 분리
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 일반 workflow | `portfolio-paper-daily-step1-17-approval` |
+  | approval workflow | `portfolio-paper-daily-step12-17-approval` |
+  | properties key | `portfolio.batch.aws-stepfunctions-approval-state-machine-arn` |
+  | 환경변수 | `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_APPROVAL_STATE_MACHINE_ARN` |
+  | 설정 클래스 | `DailyBatchProperties` |
+  | 신규 필드 | `awsStepfunctionsApprovalStateMachineArn` |
+  | accessor | getter·setter 추가 |
+  | `startSafeRange` | 일반 workflow ARN 사용 |
+  | `startApprovalRange` | approval 전용 ARN 사용 |
+  | fail-closed | approval ARN이 비어 있으면 승인형 실행 차단 |
+
+- 🟢 로컬 View 구동 wrapper 2종 정리
+
+  | 항목 | 값 |
+  | --- | --- |
+  | Local File wrapper | `Start-PortfolioViewAwsPaperLocalFile.ps1` |
+  | Local File mode | `PORTFOLIO_BATCH_EXECUTION_MODE=local-file` |
+  | Local File gate | local-file 관련 gate ON |
+  | Step Functions gate | OFF |
+  | Step Functions wrapper | `Start-PortfolioViewAwsPaperStepFunctions.ps1` |
+  | Step Functions mode | `PORTFOLIO_BATCH_EXECUTION_MODE=aws-stepfunctions` |
+  | Step Functions gate | ON |
+  | ARN 주입 | 일반 ARN과 approval ARN 모두 set |
+  | 공통 profile | `aws-paper` |
+  | 실행 가능 범위 | Step 1~17 전체 |
+  | Local File env loader | `Load-PortfolioViewAwsPaperLocalFileEnv.ps1` |
+  | Step Functions env loader | `Load-PortfolioViewAwsPaperStepFunctionsEnv.ps1` |
+  | wrapper 위치 | `C:\Workspaces\portfolio-local-env\` |
+  | spec 범위 | wrapper 본체는 운영자 로컬 도구로 본 spec 범위 밖 |
+
+- 🟢 05 spec operation notes 갱신
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 대상 문서 | `specs/05-port-view-ecs-and-runbook/operation-notes.md` |
+  | 신규 완료 섹션 4 | Step 12~17 승인형 검증 완료 |
+  | 신규 완료 섹션 5 | 로컬 View 구동 wrapper 정리 완료 |
+  | 기존 미완료 항목 | 완료로 갱신 |
+  | renumber | Docker·ECR·Task Definition·Fargate 검증을 6)·7)로 이동 |
 
 ### Changed
 
@@ -2370,18 +2600,96 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
 ### Added
 
-- **port-view aws-stepfunctions Daily Batch trigger 1차 구현 결과 반영** — Kiro 문서 업데이트이며 실제 코드 변경은 port-view commit `e72de6f` (`feat(view): add Step Functions daily batch trigger`) 참조.
-   - 변경 파일 — `pom.xml` · `DailyBatchProperties.java` · `DailyBatchController.java` · `StepFunctionsDailyBatchExecutionService.java` · `application-aws-paper.properties` · `daily_batch.html`.
-   - AWS SDK v2 Step Functions client 추가.
-   - Daily Batch 실행 backend 를 `local-file` / `aws-stepfunctions` 로 분리.
-   - Python subprocess · 로컬 source 직접 실행 없이 Step Functions `StartExecution` 만 수행.
-   - `stateMachineArn` · region · `executionNamePrefix` 는 env 주입.
-   - 화면에 AWS Step 1~11 safe trigger 버튼 + `POST /daily-batch/aws-stepfunctions/start-range` endpoint 추가.
-   - 성공 시 `executionName` + account-id redaction 처리된 `executionArn` flash message 표시.
-- **로컬 Step 1~11 `StartExecution` 검증 통과 결과 반영** — 로컬 View 를 `aws-paper` profile + `aws-stepfunctions` backend 로 실행 → 화면 AWS Step 1~11 safe trigger 클릭 → `StartExecution` 성공 → Step 1~11 workflow 실행 → Step 12~17 주문성 구간 `allowPaperOrderExecute=false` 기준 차단 유지 → `APPROVAL_REQUIRED` Slack 수신 end-to-end 통과 / broker 주문 제출 0건 / 신규 `connector_order_request` 0건.
-- **runDate 누락 이슈 및 보완 결과 반영** — 최초 검증에서 Step 1~11 후 `StopCrawlerEc2AfterStep11Success` 상태에서 `States.Runtime` 발생(원인 = ASL Payload `runDate.$=$.runDate` 참조에 대해 View `StartExecution` input 에 `runDate` 누락) / `StepFunctionsDailyBatchExecutionService` 에서 Asia/Seoul 기준 `runDate`(yyyy-MM-dd) 를 input JSON 에 추가 / 재검증 시 `StopCrawlerEc2AfterStep11Success` 이후 `SendApprovalRequiredSlack` 까지 통과.
-- **신규 R-AUTO-034 row 추가** — Fargate View 의 `states:StartExecution` 권한 과다 부여 + Step 12 이상 주문성 구간 gate 우회 위험 · Status `Open` · Task Role `states:StartExecution` 특정 state machine ARN 한정 + `paperOrderEnabled=false` 기본값 + `maxExecutableStepOrder=11` 초기값 + Step 12~17 preflight + approval gate + paper-order gate 뒤에서만 활성 + `executionArn` · account-id redaction 유지 정책(05 · 06 · 10 spec 후속 phase 책임).
-- **05 spec `port-view-ecs-and-runbook` 폴더 신규 생성** — `.kiro/specs/05-port-view-ecs-and-runbook/operation-notes.md` 신규 생성(6. ECS Fargate 포팅 계획: 완료 + 7. ECS Fargate 포팅 구현(Step Functions backend · aws-stepfunctions mode · 로컬 Step 1~11 검증 완료 + Step 12~17 승인형 · Docker · ECR · ECS Task Definition · Fargate 검증 미완료) 사실 기록).
+- 🟢 port-view aws-stepfunctions Daily Batch trigger 1차 구현
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 문서 반영 | Kiro 문서 업데이트 |
+  | 실제 코드 기준 | port-view commit `e72de6f` |
+  | commit message | `feat(view): add Step Functions daily batch trigger` |
+  | 변경 파일 | `pom.xml` |
+  | 변경 파일 | `DailyBatchProperties.java` |
+  | 변경 파일 | `DailyBatchController.java` |
+  | 변경 파일 | `StepFunctionsDailyBatchExecutionService.java` |
+  | 변경 파일 | `application-aws-paper.properties` |
+  | 변경 파일 | `daily_batch.html` |
+  | AWS SDK | AWS SDK v2 Step Functions client 추가 |
+  | backend | `local-file`과 `aws-stepfunctions`로 분리 |
+  | View 실행 책임 | Python subprocess 직접 실행 안 함 |
+  | 로컬 source 실행 | 직접 실행 안 함 |
+  | AWS 호출 | Step Functions `StartExecution`만 수행 |
+  | env 주입 | `stateMachineArn` |
+  | env 주입 | region |
+  | env 주입 | `executionNamePrefix` |
+  | 화면 버튼 | AWS Step 1~11 safe trigger |
+  | Controller endpoint | `POST /daily-batch/aws-stepfunctions/start-range` |
+  | 성공 표시 | `executionName` |
+  | ARN 표시 | account-id redaction 처리된 `executionArn` flash message |
+
+- 🟢 로컬 Step 1~11 StartExecution 검증
+
+  | 항목 | 값 |
+  | --- | --- |
+  | View profile | `aws-paper` |
+  | 실행 backend | `aws-stepfunctions` |
+  | 시작 방식 | 화면의 AWS Step 1~11 safe trigger 클릭 |
+  | StartExecution | 성공 |
+  | workflow | Step 1~11 실행 |
+  | Step 12~17 | 주문성 구간 차단 유지 |
+  | 차단 기준 | `allowPaperOrderExecute=false` |
+  | Slack | `APPROVAL_REQUIRED` 수신 |
+  | E2E 결과 | 통과 |
+  | broker 주문 제출 | 0건 |
+  | 신규 `connector_order_request` | 0건 |
+
+- 🟠 `runDate` 누락 문제와 보완
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 최초 실패 위치 | `StopCrawlerEc2AfterStep11Success` |
+  | 오류 | `States.Runtime` |
+  | ASL 참조 | `runDate.$=$.runDate` |
+  | 직접 원인 | View `StartExecution` input에 `runDate` 누락 |
+  | 수정 클래스 | `StepFunctionsDailyBatchExecutionService` |
+  | 추가 값 | Asia/Seoul 기준 `runDate` |
+  | 형식 | `yyyy-MM-dd` |
+  | 재검증 | `StopCrawlerEc2AfterStep11Success` 통과 |
+  | 최종 확인 | `SendApprovalRequiredSlack`까지 통과 |
+
+- 🟠 신규 Risk `R-AUTO-034` 추가
+
+  | 항목 | 값 |
+  | --- | --- |
+  | Risk ID | `R-AUTO-034` |
+  | 위험 | Fargate View의 `states:StartExecution` 권한 과다 부여 |
+  | 추가 위험 | Step 12 이상 주문성 gate 우회 |
+  | Status | `Open` |
+  | IAM mitigation | 특정 State Machine ARN으로 Resource 제한 |
+  | 기본 gate | `paperOrderEnabled=false` |
+  | 초기 Step 상한 | `maxExecutableStepOrder=11` |
+  | Step 12~17 조건 | preflight 뒤에서만 활성 |
+  | Step 12~17 조건 | approval gate 뒤에서만 활성 |
+  | Step 12~17 조건 | paper-order gate 뒤에서만 활성 |
+  | 화면 보안 | `executionArn` redaction |
+  | 화면 보안 | account-id redaction |
+  | 후속 spec | 05·06·10 |
+
+- 🟢 05 spec 폴더 신규 생성
+
+  | 항목 | 값 |
+  | --- | --- |
+  | 폴더 | `.kiro/specs/05-port-view-ecs-and-runbook/` |
+  | 신규 문서 | `operation-notes.md` |
+  | 6번 섹션 | ECS Fargate 포팅 계획 완료 |
+  | 7번 섹션 | ECS Fargate 포팅 구현 |
+  | 구현 완료 | Step Functions backend |
+  | 구현 완료 | `aws-stepfunctions` mode |
+  | 구현 완료 | 로컬 Step 1~11 검증 |
+  | 구현 미완료 | Step 12~17 승인형 검증 |
+  | 구현 미완료 | Docker |
+  | 구현 미완료 | ECR |
+  | 구현 미완료 | ECS Task Definition |
+  | 구현 미완료 | Fargate 검증 |
 
 ### Changed
 
@@ -2492,7 +2800,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
 - port-view commit hash `e72de6f` · commit message `feat(view): add Step Functions daily batch trigger`.
 - Controller endpoint path `/daily-batch/aws-stepfunctions/start-range`.
-- Spring Boot properties key 6종 — `portfolio.batch.execution-mode` · `portfolio.batch.aws-stepfunctions-region` · `portfolio.batch.aws-stepfunctions-state-machine-arn` · `portfolio.batch.aws-stepfunctions-execution-name-prefix` · `portfolio.batch.aws-stepfunctions-start-enabled` · `portfolio.batch.aws-stepfunctions-step-start-enabled`.
+- Spring Boot properties key 6종 · `portfolio.batch.execution-mode` · `portfolio.batch.aws-stepfunctions-region` · `portfolio.batch.aws-stepfunctions-state-machine-arn` · `portfolio.batch.aws-stepfunctions-execution-name-prefix`
+  `portfolio.batch.aws-stepfunctions-start-enabled` · `portfolio.batch.aws-stepfunctions-step-start-enabled`.
 - StartExecution payload — 11종 + `runDate` (Asia/Seoul yyyy-MM-dd).
 - state name — `StopCrawlerEc2AfterStep11Success` · `SendApprovalRequiredSlack` · `Step6ToStep11_Succeeded` · `Step12_CheckApproval`.
 - Slack 이벤트 라벨 `APPROVAL_REQUIRED` · 에러 라벨 `States.Runtime` · Class `StepFunctionsDailyBatchExecutionService`.
@@ -2535,12 +2844,12 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
 - 🟢 **Step 13~16 후속 동기화 정상 통과**
 
-  | Step | 결과 | 처리 건수 |
-  | --- | --- | --- |
-  | `CONNECTOR_ORDER_CHECK` | 🟢 **SUCCESS** | active connector order 0건 |
-  | `SYNC_SELL_FILL` | 🟢 **SUCCESS** | `submitted_position_sell_orders=0` |
-  | `SYNC_BUY_FILL` | 🟢 **SUCCESS** | `submitted_buy_orders=0` |
-  | `SYNC_BUY_POSITION` | 🟢 **SUCCESS** | `filled_buy_orders_without_position=0` |
+| 항목 | 값 |
+| --- | --- |
+| `CONNECTOR_ORDER_CHECK` | **결과**: 🟢 **SUCCESS**<br>**처리 건수**: active connector order 0건 |
+| `SYNC_SELL_FILL` | **결과**: 🟢 **SUCCESS**<br>**처리 건수**: `submitted_position_sell_orders=0` |
+| `SYNC_BUY_FILL` | **결과**: 🟢 **SUCCESS**<br>**처리 건수**: `submitted_buy_orders=0` |
+| `SYNC_BUY_POSITION` | **결과**: 🟢 **SUCCESS**<br>**처리 건수**: `filled_buy_orders_without_position=0` |
 
   - mitigation 회귀 — OD-MS-016 · OD-MS-021 · OD-MS-024 · OD-MS-025 · R-AUTO-018 · R-DATA-012 모두 0건
   - 상세: [04 operation-notes](specs/04-strategy-batch-stepfunctions/operation-notes.md)
@@ -2600,7 +2909,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | 근거 | DB password 대화 중 노출 이력 식별 · 신규 R-SEC-010 으로 후속 분리 |
   | Status | 🟢 **Mitigated** 유지 |
   | R-SEC-010 | 신규 row |
-  | mitigation | (a) app role rotate (`view_app` · `marketconnector_app` · `crawler_app` · `preprocessor_app` · `research_app` · `decision_app` · `execution_app` 중 노출 role) (b) Secrets Manager / SSM SecureString 갱신 (c) local PowerShell secret loader · env 재검증 (d) rotate 완료 전 starter 실행 신중 점검 |
+  | mitigation | (a) app role rotate (`view_app` · `marketconnector_app` · `crawler_app` · `preprocessor_app` · `research_app` · `decision_app` |
+  | mitigation (계속) | `execution_app` 중 노출 role) (b) Secrets Manager / SSM SecureString 갱신 (c) local PowerShell secret loader · env 재검증 (d) rotate 완료 전 starter 실행 신중 점검 |
   | detection | 노출 이력 audit + rotate 완료 시점 운영자 노트 |
   | rollback | rotate 완료 시점에 Status → 🟢 **Mitigated** 승격 |
   | Status | 🟠 **Open** |
@@ -2637,7 +2947,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 | fill · position sync 자동 재시도 | 0건 |
 | aws-live 작업 | 0건 |
 
-> broker · KIS 호출 = Step 17 balance refresh 1건 (KIS token 재발급 + 잔고 조회 Status `200`) + Step 12 `--execute` 1건 (<span style="color:#0969DA">**NO_TARGET**</span> · broker 호출 0건) + Step 13 active connector order 조회 1건 (대상 0건). `connector_order_request` 신규 0건 · `NO_ORDER_SUBMITTED` 후검증 통과. mitigation 회귀 (R-AUTO-001 · R-AUTO-002 · R-AUTO-019 · R-AUTO-031 · R-AUTO-032 · R-BROKER-004 · R-AUTO-033) 모두 0건.
+> broker · KIS 호출 = Step 17 balance refresh 1건 (KIS token 재발급 + 잔고 조회 Status `200`) + Step 12 `--execute` 1건 (<span style="color:#0969DA">**NO_TARGET**</span> · broker 호출 0건) + Step 13 active connector order 조회 1건 (대상 0건).
+> `connector_order_request` 신규 0건 · `NO_ORDER_SUBMITTED` 후검증 통과. · mitigation 회귀 (R-AUTO-001 · R-AUTO-002 · R-AUTO-019 · R-AUTO-031 · R-AUTO-032 · R-BROKER-004 · R-AUTO-033) 모두 0건.
 
 <details>
 <summary>🟠 DB password 평문 노출 이력 등록</summary>
@@ -3110,7 +3421,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | broker 호출 위임 | SFN → SSM RunCommand + ECS RunTask.sync → MarketConnector EC2 |
   | Lambda 역할 | dispatcher 한정 (broker 호출 직접 수행 0건) |
 
-  - true-path state 9종 — `RunIntradayStopOrderExecute` · `GetIntradayStopOrderExecuteInvocation` · `RunConnectorOrderCheck` · `GetConnectorOrderCheckInvocation` · `RunSyncSellFill` · `RunConnectorBalanceRefresh` · `GetConnectorBalanceRefreshInvocation` · `IntradayStopWorkflowSucceeded` · `IntradayStopWorkflowFailed`.
+  - true-path state 9종 · `RunIntradayStopOrderExecute` · `GetIntradayStopOrderExecuteInvocation` · `RunConnectorOrderCheck` · `GetConnectorOrderCheckInvocation` · `RunSyncSellFill` · `RunConnectorBalanceRefresh`
+    `GetConnectorBalanceRefreshInvocation` · `IntradayStopWorkflowSucceeded` · `IntradayStopWorkflowFailed`.
 
 - 🟢 `connector_strategy_order_execute.py` — `signal_type=INTRADAY_STOP_SELL` 전용 필터 patch
 
@@ -3160,12 +3472,12 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
 - 🟢 **신규 리스크 3건 + 보강 1건**
 
-  | ID | 상태 | 메모 |
-  | --- | --- | --- |
-  | R-AUTO-030 | 🟠 **Open** 유지 | [2026-06-25 보강] State Machine 생성 + blocked gate + no-target 검증 통과. 자동 ENABLE 진입 차단 정책 유지 |
-  | R-AUTO-031 | 🟢 **Mitigated** | Intraday Stop Sell approval gate 오설정 위험. blocked gate 테스트 1차 실증 |
-  | R-AUTO-032 | 🟢 **Mitigated** | Daily SELL ↔ Intraday Stop Sell `signal_type` 필터 부재 위험. 전용 필터 patch 배포 정합 |
-  | R-BROKER-005 | 🟢 **Mitigated** | 보유 종목 0건 상태 실주문 시도 위험. 사전 검증 단계 중단 정합 |
+| 항목 | 값 |
+| --- | --- |
+| R-AUTO-030 | **상태**: 🟠 **Open** 유지<br>**메모**: [2026-06-25 보강] State Machine 생성 + blocked gate + no-target 검증 통과. 자동 ENABLE 진입 차단 정책 유지 |
+| R-AUTO-031 | **상태**: 🟢 **Mitigated**<br>**메모**: Intraday Stop Sell approval gate 오설정 위험. blocked gate 테스트 1차 실증 |
+| R-AUTO-032 | **상태**: 🟢 **Mitigated**<br>**메모**: Daily SELL ↔ Intraday Stop Sell `signal_type` 필터 부재 위험. 전용 필터 patch 배포 정합 |
+| R-BROKER-005 | **상태**: 🟢 **Mitigated**<br>**메모**: 보유 종목 0건 상태 실주문 시도 위험. 사전 검증 단계 중단 정합 |
 
 ### Changed
 
@@ -3316,12 +3628,12 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | Slack | `DAILY_EXECUTION_SUCCESS` 수신 |
   | 4건 처리 결과 | 새 `connector_order_request` 생성 + `broker_order_no` 생성 + 최종 체결 |
 
-  | 종목 코드 | 종목명 | 결과 |
-  | --- | --- | --- |
-  | `042660` | 한화오션 | 🟢 **FILLED** |
-  | `004990` | 롯데지주 | 🟢 **FILLED** |
-  | `003490` | 대한항공 | 🟢 **FILLED** |
-  | `023530` | 롯데쇼핑 | 🟢 **FILLED** |
+| 항목 | 값 |
+| --- | --- |
+| `042660` | **종목명**: 한화오션<br>**결과**: 🟢 **FILLED** |
+| `004990` | **종목명**: 롯데지주<br>**결과**: 🟢 **FILLED** |
+| `003490` | **종목명**: 대한항공<br>**결과**: 🟢 **FILLED** |
+| `023530` | **종목명**: 롯데쇼핑<br>**결과**: 🟢 **FILLED** |
 
 - 🟢 **`004990` 부분체결 후 단건 order-check 재조회로 전량체결 확인**
 
@@ -3334,11 +3646,11 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
 - 🟢 **신규 결정 · 리스크**
 
-  | ID | Status | 메모 |
-  | --- | --- | --- |
-  | OD-MS-033 | 🟢 **확정** | Step 12 retry-normalizer 대상 확장 + KIS rate-limit backoff retry + 09:01 자동 ENABLE 보류 |
-  | R-AUTO-026 | 🟢 **Mitigated** | `EGW00201` rate limit 재시도 누락 위험 |
-  | R-AUTO-027 | 🔵 **Accepted** | `APPROVAL_REQUIRED` Slack summary 0/0 표시 위험 |
+| 항목 | 값 |
+| --- | --- |
+| OD-MS-033 | **Status**: 🟢 **확정**<br>**메모**: Step 12 retry-normalizer 대상 확장 + KIS rate-limit backoff retry + 09:01 자동 ENABLE 보류 |
+| R-AUTO-026 | **Status**: 🟢 **Mitigated**<br>**메모**: `EGW00201` rate limit 재시도 누락 위험 |
+| R-AUTO-027 | **Status**: 🔵 **Accepted**<br>**메모**: `APPROVAL_REQUIRED` Slack summary 0/0 표시 위험 |
 
 - 🟢 **EC2 자동 실행 구현 완료**
 
@@ -3449,7 +3761,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | Lambda 2차 보강 | Slack notifier · scheduler dispatcher · EC2 lifecycle dispatcher 3분리 · orchestration 보조 계층 유지 |
   | Step Functions 2차 보강 | Step 1~11 success path 에 Crawler stop Lambda task (`StopCrawlerEc2AfterStep11Success`) · Approval Slack 전 Crawler stop 수행 · RevisionId `edd92cc9-1d94-4752-9a43-b7eb5b2f3c2c` |
   | EC2 항목 신규 | MarketConnector EC2 07:50 start · 15:50 stop · Crawler EC2 07:50 start · Step 1~11 성공 시 stop · 실패 시 디버깅 유지 |
-  | 3차 보강 (장중 포지션 확인) | 10분 Snapshot Refresh Scheduler 후보 `portfolio-paper-intraday-snapshot-refresh-10min-kst` 추가<br>intraday snapshot refresh orchestration helper Lambda 후보 추가<br>SSM RunCommand 항목에 snapshot refresh + intraday evaluate 제어 경로 추가<br>Intraday Stop Sell Submit & Refresh 별도 state machine 후보 추가<br>MarketConnector EC2 장중 10분 refresh 대상 메모 추가 |
+  | 3차 보강 (장중 포지션 확인) | 10분 Snapshot Refresh Scheduler 후보 `portfolio-paper-intraday-snapshot-refresh-10min-kst` 추가 · intraday snapshot refresh orchestration helper Lambda 후보 추가 · SSM RunCommand 항목에 snapshot refresh + intraday evaluate 제어 경로 추가 |
+  | 3차 보강 (장중 포지션 확인) (계속) | Intraday Stop Sell Submit & Refresh 별도 state machine 후보 추가 · MarketConnector EC2 장중 10분 refresh 대상 메모 추가 |
 
 - 🟢 `.kiro/specs/_common/followups-overview.md`
 
@@ -3465,7 +3778,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | --- | --- |
   | 2026-06-24 메모 | Daily Batch orchestration 5계층 조합 1차 실증 · 08:00 Step 1~11 approval-required 자동 실행 · Step 12~17 수동 Dispatcher invoke 4건 FILLED · Step 12 retry-normalizer + KIS rate-limit backoff · Lambda 는 orchestration dispatcher/notifier 보조 계층 유지 |
   | 2026-06-24 두 번째 메모 | EC2 lifecycle 자동 실행 구현 완료 · orchestration 6계층 조합 확장 |
-  | 2026-06-24 세 번째 메모 | 장중 포지션 확인 3단계 구조 최종안 · MarketConnector 10분 Snapshot Refresh 는 MC EC2 + SSM 중심 · Intraday Evaluate 는 신규 파일 SSM 실행 후보 · READY order 생성까지만 · Intraday Stop Sell Submit & Refresh 는 별도 SFN 후보 · Lambda 는 Scheduler/lifecycle/notifier/orchestration helper 역할 · 8개 MS 1순위 결정값 변경 없음 |
+  | 2026-06-24 세 번째 메모 | 장중 포지션 확인 3단계 구조 최종안 · MarketConnector 10분 Snapshot Refresh 는 MC EC2 + SSM 중심 · Intraday Evaluate 는 신규 파일 SSM 실행 후보 · READY order 생성까지만 · Intraday Stop Sell Submit & Refresh 는 별도 SFN 후보 |
+  | 2026-06-24 세 번째 메모 (계속) | Lambda 는 Scheduler/lifecycle/notifier/orchestration helper 역할 · 8개 MS 1순위 결정값 변경 없음 |
 
 - 🟢 **Daily Batch orchestration 문서 상태 갱신**
 
@@ -3561,7 +3875,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | --- | --- |
   | 대상 파일 | `port-marketconnector/connector_strategy_order_execute.py` (전체 교체) |
   | 반영 위치 | Step 12 시작부 · 기존 Step 12 내부 안전 보완 · 별도 Step 11.5 아님 |
-  | 복구 조건 | `execution_mode = PAPER_STRATEGY` + `action_type IN (BUY, SELL)` + `execution_status IN (READY, FAILED)` + `connector_order_request_id IS NOT NULL` + linked `connector_order_request.request_status = REJECTED` + `rejection_code = 40580000` + `broker_order_no IS NULL` + `connector_fill` 없음 |
+  | 복구 조건 | `execution_mode = PAPER_STRATEGY` + `action_type IN (BUY, SELL)` + `execution_status IN (READY, FAILED)` + `connector_order_request_id IS NOT NULL` + linked `connector_order_request.request_status = REJECTED` + |
+  | 복구 조건 (계속) | `rejection_code = 40580000` + `broker_order_no IS NULL` + `connector_fill` 없음 |
   | 복구 처리 | `execution_status = REQUESTED` + `connector_order_request_id = NULL` + `result_payload.retry_normalizer` 에 old request 이력 저장 |
   | EC2 정식 배포 | 완료 |
   | `.venv/bin/python` dry-run | 통과 (retry 후보 0건 · REQUESTED 주문 0건) |
@@ -3604,9 +3919,11 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 값 |
   | --- | --- |
-  | Scheduler `portfolio-paper-daily-step1-11-approval-0800-kst` | cron `cron(0 8 ? * MON-FRI *)`<br>Asia/Seoul<br>Flexible OFF<br>Target Lambda `portfolio-paper-daily-scheduler-dispatcher`<br>Target Role `portfolio-paper-eventbridge-scheduler-role`<br>Target input `{"scheduleType":"STEP1_11_APPROVAL","dryRun":false}`<br>State 🟢 **ENABLED**<br>`allowPaperOrderExecute=false` |
+  | Scheduler `portfolio-paper-daily-step1-11-approval-0800-kst` | cron `cron(0 8 ? * MON-FRI *)` · Asia/Seoul · Flexible OFF · Target Lambda `portfolio-paper-daily-scheduler-dispatcher` · Target Role `portfolio-paper-eventbridge-scheduler-role` |
+  | Scheduler `portfolio-paper-daily-step1-11-approval-0800-kst` (계속) | Target input `{"scheduleType":"STEP1_11_APPROVAL","dryRun":false}` · State 🟢 **ENABLED** · `allowPaperOrderExecute=false` |
   | Scheduler `portfolio-paper-daily-step12-17-order-0901-kst` | cron `cron(1 9 ? * MON-FRI *)` · Asia/Seoul · Flexible OFF · Target Lambda 동일 · Target input `{"scheduleType":"STEP12_17_ORDER","dryRun":false}` · State 🟠 **DISABLED** · `allowPaperOrderExecute=true` |
-  | Dispatcher Lambda `portfolio-paper-daily-scheduler-dispatcher` | Runtime Python 3.12<br>Handler `lambda_function.lambda_handler`<br>Timeout 30s<br>Memory 256MB<br>State 🟢 **Active**<br>IAM Role `portfolio-paper-daily-scheduler-dispatcher-role`<br>환경변수 `TIMEZONE=Asia/Seoul`<br>`HOLIDAY_COUNTRY=KR`<br>`FAIL_CLOSED_ON_HOLIDAY_ERROR=true`<br>Step1~17 / Step12~17 State Machine ARN 미기록 |
+  | Dispatcher Lambda `portfolio-paper-daily-scheduler-dispatcher` | Runtime Python 3.12 · Handler `lambda_function.lambda_handler` · Timeout 30s · Memory 256MB · State 🟢 **Active** · IAM Role `portfolio-paper-daily-scheduler-dispatcher-role` · 환경변수 `TIMEZONE=Asia/Seoul` |
+  | Dispatcher Lambda `portfolio-paper-daily-scheduler-dispatcher` (계속) | `HOLIDAY_COUNTRY=KR` · `FAIL_CLOSED_ON_HOLIDAY_ERROR=true` · Step1~17 / Step12~17 State Machine ARN 미기록 |
   | Dispatcher Lambda 역할 | KST `runDate` (YYYY-MM-DD) 생성 · 주말 · 휴장일 skip · scheduleType 별 payload 분기 · SFN `StartExecution` 호출 · 즉시 종료 (SFN 완료 대기 없음) |
   | IAM Role / Inline policy | 4종 + 3종 |
 
@@ -3658,7 +3975,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 값 |
   | --- | --- |
-  | port-interest-crawler 행 위 메모 | "2026-06-23 SFN approval workflow false · true path 실전 검증 완료 · MarketConnector EC2 + SSM + SFN 조합으로 Step 12~17 true path 완료 · Strategy Execution · MarketConnector 간 REQUESTED → broker submit → fill sync → balance refresh 경로 확인 · retry-normalizer 는 Step 12 내부 안전 보완으로 반영" 한 단락 추가 |
+  | port-interest-crawler 행 위 메모 | "2026-06-23 SFN approval workflow false · true path 실전 검증 완료 · MarketConnector EC2 + SSM + SFN 조합으로 Step 12~17 true path 완료 · Strategy Execution |
+  | port-interest-crawler 행 위 메모 (계속) | MarketConnector 간 REQUESTED → broker submit → fill sync → balance refresh 경로 확인 · retry-normalizer 는 Step 12 내부 안전 보완으로 반영" 한 단락 추가 |
   | 결정값 (1순위 / 2순위 / 비권고) | 변경 없음 |
 
 - 🟢 **EventBridge 자동화 1차 범위를 Slack 3종으로 한정**
@@ -3690,8 +4008,10 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 메모 | 내용 |
   | --- | --- |
-  | 2026-06-23 두 번째 | AWS 공통 Slack notifier 구현 + SFN 3종 Slack 검증 · OD-MS-030 · OD-MS-031 신규 · R-AUTO-023 · R-AUTO-024 신규 · Lambda 비권고 유지 · 운영 이벤트 알림 보조 서비스로만 사용 근거 보강 · SFN + Scheduler + Lambda notifier 를 운영 관측성 / 포트폴리오 어필 관점 기록 · Daily Batch 1차 Slack 3종 · port-view Slack 유지 · 결정값 변경 없음 |
-  | 2026-06-23 세 번째 | Scheduler + Dispatcher Lambda 기반 Daily 자동화 구현 완료 · OD-MS-032 신규 · R-AUTO-025 신규 · Daily Batch orchestration 5계층 조합 (SFN + Scheduler + Dispatcher Lambda + ECS RunTask + SSM RunCommand + AWS Batch) · Lambda 는 orchestration input 보정 · 휴장일 guard · StartExecution dispatcher · 결정값 변경 없음 · 단계적 활성화 정합 |
+  | 2026-06-23 두 번째 | AWS 공통 Slack notifier 구현 + SFN 3종 Slack 검증 · OD-MS-030 · OD-MS-031 신규 · R-AUTO-023 · R-AUTO-024 신규 · Lambda 비권고 유지 · 운영 이벤트 알림 보조 서비스로만 사용 근거 보강 · SFN + Scheduler + Lambda notifier 를 운영 관측성 / 포트폴리오 어필 관점 기록 |
+  | 2026-06-23 두 번째 (계속) | Daily Batch 1차 Slack 3종 · port-view Slack 유지 · 결정값 변경 없음 |
+  | 2026-06-23 세 번째 | Scheduler + Dispatcher Lambda 기반 Daily 자동화 구현 완료 · OD-MS-032 신규 · R-AUTO-025 신규 · Daily Batch orchestration 5계층 조합 (SFN + Scheduler + Dispatcher Lambda + ECS RunTask + SSM RunCommand + AWS Batch) |
+  | 2026-06-23 세 번째 (계속) | Lambda 는 orchestration input 보정 · 휴장일 guard · StartExecution dispatcher · 결정값 변경 없음 · 단계적 활성화 정합 |
 
 - 🟢 `.kiro/specs/_common/operator-decisions.md` (2차 · 3차 항목)
 
@@ -3744,7 +4064,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 결과 |
   | --- | --- |
-  | secret · KIS app key · secret · 계좌번호 · 비밀번호 · token · RDS password · RDS endpoint · account-id · IAM Role ARN · secret ARN · access key id · instance-id · EIP · image digest · task ARN · job ARN · broker 응답 전문 · webhook URL · KIS paper login credential · Administrator password 평문 기록 | 0건 (모두 `[REDACTED]` 또는 placeholder) |
+  | 민감정보 평문 기록 | secret · KIS app key · secret · 계좌번호 · 비밀번호 · token · RDS password · RDS endpoint · account-id · IAM Role ARN · secret ARN · access key id · instance-id · EIP · image digest |
+  | 민감정보 평문 기록 (계속) | task ARN · job ARN · broker 응답 전문 · webhook URL · KIS paper login credential · Administrator password 평문 기록 · 0건 (모두 `[REDACTED]` 또는 placeholder) |
   | DB 한글 확인 SQL 결과 | `server_encoding` · `client_encoding` 모두 `UTF8` 확인 · 테이블 4종 한글 정상 (민감정보 없이 요약) |
   | Slack webhook URL 평문 기록 | 0건 (`SLACK_WEBHOOK_URL` 은 키 이름 · 의미만 · 값 · Lambda 코드 본문 · Slack 메시지 · SFN Catch state ASL · Slack webhook 응답 인용 0건 · R-DOCS-001 정합) |
   | webhook URL 이전 계획 | 1차 검증용 한정 → Secrets Manager / SSM Parameter Store(SecureString) · R-AUTO-024 신규 · Status 🔵 **Accepted** · 06 spec 후속 · Lambda runtime 조회 · IAM Role Resource ARN 한정 read (wildcard 0건 · OD-SEC-006 정합) |
@@ -3861,12 +4182,12 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
 - 🟢 **신규 결정 · 리스크**
 
-  | ID | Status | 메모 |
-  | --- | --- | --- |
-  | OD-MS-027 신규 | 🟠 **잠정** | MarketConnector env bootstrap 재생성 운영 정책 · `/tmp/inject-env.sh` 선존재 가정 폐기 · step 실행 시점 재생성 · wrapper 공통 함수 · secret value 미출력 · chmod 700 |
-  | OD-DB-011 신규 | 🟢 **확정** | `execution_app` 의 `decision.strategy_daily_position_decision` 제한적 UPDATE 권한 · SELL execution link update 책임 한정 |
-  | R-AUTO-021 신규 | 🟢 **Mitigated** | MC EC2 stop · start 후 `/tmp` 휘발로 Step 1 · 12 · 13 · 17 실패 위험 |
-  | R-DATA-013 신규 | 🟢 **Mitigated** | `execution_app` 의 `decision` schema UPDATE 권한 누락으로 Step 9 SELL execution link update 실패 위험 |
+| 항목 | 값 |
+| --- | --- |
+| OD-MS-027 신규 | **Status**: 🟠 **잠정**<br>**메모**: MarketConnector env bootstrap 재생성 운영 정책 · `/tmp/inject-env.sh` 선존재 가정 폐기 · step 실행 시점 재생성 · wrapper 공통 함수 · secret value 미출력 · chmod 700 |
+| OD-DB-011 신규 | **Status**: 🟢 **확정**<br>**메모**: `execution_app` 의 `decision.strategy_daily_position_decision` 제한적 UPDATE 권한 · SELL execution link update 책임 한정 |
+| R-AUTO-021 신규 | **Status**: 🟢 **Mitigated**<br>**메모**: MC EC2 stop · start 후 `/tmp` 휘발로 Step 1 · 12 · 13 · 17 실패 위험 |
+| R-DATA-013 신규 | **Status**: 🟢 **Mitigated**<br>**메모**: `execution_app` 의 `decision` schema UPDATE 권한 누락으로 Step 9 SELL execution link update 실패 위험 |
 
 ### Changed
 
@@ -4064,10 +4385,12 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
 - 🟢 **신규 결정 · 리스크**
 
-  | ID | Status | 메모 |
-  | --- | --- | --- |
-  | OD-MS-026 신규 | 🟠 **잠정** | Step 2 성공 기준 = Scheduled Task trigger 가 아니라 KRX raw DB validation · KRX GUI 경로는 Windows Administrator interactive Scheduled Task 유지 · wrapper 는 실행 · 종료 대기 · Last Result · latest log · DB validation orchestration · validation script 가 raw 최신성 검증 · worker stopped 는 fail-closed |
-  | R-AUTO-020 신규 | 🟢 **Mitigated** | Scheduled Task trigger 성공만 보고 Step 2 SUCCESS 처리 시 KRX raw 미적재가 Step 3 이후로 전파될 위험 · mitigation = Chrome / chromedriver best-effort reset + Running → Ready wait + Last Result + latest log + DB validation + worker stopped fail-closed |
+| 항목 | 값 |
+| --- | --- |
+| OD-MS-026 신규 | **Status**: 🟠 **잠정** · **메모**: Step 2 성공 기준 = Scheduled Task trigger 가 아니라 KRX raw DB validation · KRX GUI 경로는 Windows Administrator interactive Scheduled Task 유지 · wrapper 는 실행 · 종료 대기 · Last Result · latest log |
+| OD-MS-026 신규 (계속) | DB validation orchestration · validation script 가 raw 최신성 검증 · worker stopped 는 fail-closed |
+| R-AUTO-020 신규 | **Status**: 🟢 **Mitigated** · **메모**: Scheduled Task trigger 성공만 보고 Step 2 SUCCESS 처리 시 KRX raw 미적재가 Step 3 이후로 전파될 위험 |
+| R-AUTO-020 신규 (계속) | mitigation = Chrome / chromedriver best-effort reset + Running → Ready wait + Last Result + latest log + DB validation + worker stopped fail-closed |
 
 ### Changed
 
@@ -4297,7 +4620,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | 항목 | 값 |
   | --- | --- |
   | Change Log 2026-06-18 두 번째 항목 | 추가 |
-  | OD-MS-025 신규 | <span style="color:#BF8700">**잠정**</span> · `connector_order_check.py` 운영 모드 = active 주문 단건 순차 조회 기본 · broad 일괄 조회는 legacy · `--broad` 명시 시만 · 명시 주문 조회는 `--code` · `--order-no` · `--no-broad` · 다건 active 시 summary fallback DB 반영 금지 · 단건 후보 확정 시만 허용 · wrapper ps1 은 orchestration 만 · 체결조회 방식 제어는 `connector_order_check.py` 내부 · OD-MS-016 · OD-MS-021 · OD-MS-023 본문 유지 |
+  | OD-MS-025 신규 | <span style="color:#BF8700">**잠정**</span> · `connector_order_check.py` 운영 모드 = active 주문 단건 순차 조회 기본 · broad 일괄 조회는 legacy · `--broad` 명시 시만 · 명시 주문 조회는 `--code` · `--order-no` · `--no-broad` |
+  | OD-MS-025 신규 (계속) | 다건 active 시 summary fallback DB 반영 금지 · 단건 후보 확정 시만 허용 · wrapper ps1 은 orchestration 만 · 체결조회 방식 제어는 `connector_order_check.py` 내부 · OD-MS-016 · OD-MS-021 · OD-MS-023 본문 유지 |
   | Decision Summary | 전체 82 → 83 / 잠정 37 → 38 |
   | OD-MS-016 · OD-MS-021 · OD-MS-023 | 본문 변경 없이 1차 실증 메모 보강 |
 
@@ -4372,11 +4696,13 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | 섹션 | 내용 |
   | --- | --- |
   | (a) Step 1 CONNECTOR_BALANCE | 운영자 직접 SSM RunCommand 🟢 **통과** |
-  | (b) Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE (`-AllowPaperOrderExecute` 명시) | 1차 KIS paper API read timeout · connector_order_request id `38~41` <span style="color:#D1242F">**FAILED**</span> · strategy_execution_order id `30~33` <span style="color:#D1242F">**FAILED**</span> · 네트워크·DNS·TCP·HTTPS 정상 → KIS paper endpoint 일시 지연성 장애 판단 |
+  | (b) Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE (`-AllowPaperOrderExecute` 명시) | 1차 KIS paper API read timeout · connector_order_request id `38~41` <span style="color:#D1242F">**FAILED**</span> · strategy_execution_order id `30~33` <span style="color:#D1242F">**FAILED**</span> |
+  | (b) Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE (`-AllowPaperOrderExecute` 명시) (계속) | 네트워크·DNS·TCP·HTTPS 정상 → KIS paper endpoint 일시 지연성 장애 판단 |
   | (b) 통제된 REQUESTED 복구 | `connector_order_request` · `connector_api_call_log` · `broker_order_no` 존재 여부 사전 점검 후 운영자 직접 작업 |
   | (b) 재시도 KIS paper BUY 4건 제출 | connector_order_request id `42~45` 🟢 **ACCEPTED** · broker_order_no `0000025576` 004990 · `0000025740` 023530 · `0000025744` 003490 · `0000025747` 042660 · strategy_execution_order id `30~33` 🟢 **SUBMITTED** |
   | (c) Step 13 CONNECTOR_ORDER_CHECK | broad 응답 `output1 empty` + `output2 summary-only` · active candidate 4건 · summary fallback guard 자동 skip (R-AUTO-018 mitigation 1차 실증) → `--code` · `--order-no` · `--no-broad` 단건 재조회로 4건 모두 체결 반영 · 4주 · 8주 · 6주 · 11주 |
-  | (d) Step 17 BALANCE_REFRESH | SSM commandId `66ec8831-74b9-469c-8410-6ccb11cb3400`<br>responseCode 0<br>Status Success<br>`connector.connector_position_snapshot` row_count `36`<br>max_created_at `2026-06-18 04:33:07.456056+00`<br>`legacy.holdings` row_count `41`<br>max_created_at `2026-06-18 04:33:07.420226`<br>view_app 의 legacy schema SELECT 권한 부재 → `portfolio_admin` 우회 (R-DATA-005 보강<br>followups 후속) |
+  | (d) Step 17 BALANCE_REFRESH | SSM commandId `66ec8831-74b9-469c-8410-6ccb11cb3400` · responseCode 0 · Status Success · `connector.connector_position_snapshot` row_count `36` · max_created_at `2026-06-18 04:33:07.456056+00` |
+  | (d) Step 17 BALANCE_REFRESH (계속) | `legacy.holdings` row_count `41` · max_created_at `2026-06-18 04:33:07.420226` · view_app 의 legacy schema SELECT 권한 부재 → `portfolio_admin` 우회 (R-DATA-005 보강 · followups 후속) |
 
 - 🟢 `.kiro/specs/04-strategy-batch-stepfunctions/operation-notes.md` (2026-06-18 §1~§6)
 
@@ -4395,7 +4721,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | · phase 2 패치 | `execution_sync_buy_position.py` — `account_id` · `ticker_code` 기준 OPEN 조회 · 기존 OPEN 시 `merge_open_position_state()` · `buy_info.additional_buys` 이력 · `execution_order_id` · `connector_order_request_id` 기준 중복 방지 |
   | · phase 3 rebuild | Docker rebuild (`portfolio-strategy-execution:paper-20260613`) + ECR push (image digest 운영자 보관 · 평문 0건) |
   | · phase 4 재실행 | ECS task 재실행 exitCode 0 · 🟢 **SUCCESS** · position_sync_result 생성 |
-  | Step 16 포지션 반영 | 004990 65 → 69주 (`position_state_id 7` 유지 · additional_buys 30) · 003490 52 → 58주 (`position_state_id 8` 유지 · additional_buys 32) · 023530 신규 `position_state_id 11` 8주 entry_price `194225.0000` · 042660 신규 `position_state_id 12` 11주 entry_price `126118.1818` |
+  | Step 16 포지션 반영 | 004990 65 → 69주 (`position_state_id 7` 유지 · additional_buys 30) · 003490 52 → 58주 (`position_state_id 8` 유지 · additional_buys 32) · 023530 신규 `position_state_id 11` 8주 entry_price `194225.0000` |
+  | Step 16 포지션 반영 (계속) | 042660 신규 `position_state_id 12` 11주 entry_price `126118.1818` |
   | Docker build 주의 | Dockerfile `port_strategy_execution/...` COPY → `C:\Workspaces` 기준 build · PowerShell pipe 기반 `docker login` 400 시 `cmd /c` pipe 우회 |
 
 - 🟢 `.kiro/specs/_common/operator-decisions.md`
@@ -4456,7 +4783,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 결과 |
   | --- | --- |
-  | secret · KIS · 계좌 · token · RDS · account-id · IAM Role ARN · secret ARN · access key · instance-id · EIP · image digest · task ARN · job ARN 평문 기록 | 0건 (모두 `[REDACTED]` 또는 `<account-id>` · `<region>` · `<rds-endpoint>` · `<role-arn>` · `<secret-arn>` · `<instance-id>` · `<eip>` · `<image-digest>` · `<task-arn>` · `<job-arn>`) |
+  | 민감정보 평문 기록 | secret · KIS · 계좌 · token · RDS · account-id · IAM Role ARN · secret ARN · access key · instance-id · EIP · image digest · task ARN · job ARN 평문 기록 |
+  | 민감정보 평문 기록 (계속) | 0건 (모두 `[REDACTED]` 또는 `<account-id>` · `<region>` · `<rds-endpoint>` · `<role-arn>` · `<secret-arn>` · `<instance-id>` · `<eip>` · `<image-digest>` · `<task-arn>` · `<job-arn>`) |
   | ECR push image digest | 운영자 보관 · spec 산출물 평문 금지 (R-DOCS-001 정합) |
   | broker / KIS 호출 | KIS paper BUY 4건 (Step 12 본 실행) + balance · order check 조회성 |
   | SELL · 취소 · 정정 · 추가 `--execute` · `mark_position_sell_ordered()` | 0건 |
@@ -4513,16 +4841,18 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | 위치 | 운영자 로컬 도구 · Kiro spec 산출물 외부 · 8개 MS 소스와 별개 |
   | main wrapper | `run-daily-aws-paper.ps1` · 파라미터 `RunDate` · `Region` · `Environment` · `StartStep` · `EndStep` · `DryRun` · `AllowPaperOrderExecute` · Step 12 PAPER_ORDER_GATE 중앙 차단 · summary 생성 |
   | config | `daily-aws-paper.config.ps1` · region · cluster · instance id · subnet · SG · task definition · job definition · log group · output path 관리 |
-  | functions | `daily-aws-paper.functions.ps1`<br>Step registry<br>SSM 공통 (`AWS-RunShellScript` Linux + `AWS-RunPowerShellScript` Windows)<br>ECS RunTask 공통 (UTF-8 no BOM JSON `--overrides file://...`)<br>AWS Batch SubmitJob 공통<br>CloudWatch log 수집<br>SSM stdout<br>stderr 저장<br>summary 기록<br>성공·실패·blocker 판정<br>PowerShell UTF-8 보정 |
+  | functions | `daily-aws-paper.functions.ps1` · Step registry · SSM 공통 (`AWS-RunShellScript` Linux + `AWS-RunPowerShellScript` Windows) · ECS RunTask 공통 (UTF-8 no BOM JSON `--overrides file://...`) · AWS Batch SubmitJob 공통 |
+  | functions (계속) | CloudWatch log 수집 · SSM stdout · stderr 저장 · summary 기록 · 성공·실패·blocker 판정 · PowerShell UTF-8 보정 |
   | step 파일 | `steps/step-01-connector-balance.ps1` ~ `steps/step-17-balance-refresh.ps1` (17개) |
   | bundled wrapper | `run-daily-aws-paper-bundled.ps1` 본 일자 미생성 · 후속 선택 작업 |
 
 - 🟢 **신규 결정 · 리스크**
 
-  | ID | Status | 메모 |
-  | --- | --- | --- |
-  | OD-MS-023 신규 | 🟠 **잠정** | Daily AWS wrapper 정책 · Windows PowerShell 기준 · 분리 파일 구조 · bundled wrapper 필요 시 · Step 12 는 `-AllowPaperOrderExecute` 없이 차단 · 완전 자동화 이전 단계별 확인 가능한 CLI 기준선 · 환경 입력 `aws-paper` 만 · wrapper 자체는 EC2 · ECS · Batch 내부 실행 대상 아님 |
-  | R-AUTO-019 신규 | 🟢 **Mitigated** | wrapper 기반 Step 12 의도하지 않은 `-AllowPaperOrderExecute` 사용 시 실 KIS paper 주문 제출 위험<br>mitigation = 중앙 PAPER_ORDER_GATE + Step 12 내부 이중 gate + 옵션 명시<br>default OFF<br>사용 시 운영자 노트 사전 기록 권고<br>detection = summary `PaperOrder : True`<br>Step 12 옵션 사용 빈도<br>`connector_order_request` insert audit<br>rollback = Step 12 즉시 중단<br>SSM RunCommand stop<br>broker 취소 |
+| 항목 | 값 |
+| --- | --- |
+| OD-MS-023 신규 | **Status**: 🟠 **잠정**<br>**메모**: Daily AWS wrapper 정책 · Windows PowerShell 기준 · 분리 파일 구조 · bundled wrapper 필요 시 · Step 12 는 `-AllowPaperOrderExecute` 없이 차단 · 완전 자동화 이전 단계별 확인 가능한 CLI 기준선 · 환경 입력 `aws-paper` 만 · wrapper 자체는 EC2 · ECS · Batch 내부 실행 대상 아님 |
+| R-AUTO-019 신규 | **Status**: 🟢 **Mitigated** · **메모**: wrapper 기반 Step 12 의도하지 않은 `-AllowPaperOrderExecute` 사용 시 실 KIS paper 주문 제출 위험 · mitigation = 중앙 PAPER_ORDER_GATE + Step 12 내부 이중 gate + 옵션 명시 · default OFF · 사용 시 운영자 노트 사전 기록 권고 |
+| R-AUTO-019 신규 (계속) | detection = summary `PaperOrder : True` · Step 12 옵션 사용 빈도 · `connector_order_request` insert audit · rollback = Step 12 즉시 중단 · SSM RunCommand stop · broker 취소 |
 
 ### Changed
 
@@ -4584,7 +4914,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 결과 |
   | --- | --- |
-  | secret · KIS · 계좌 · token · RDS · account-id · IAM Role ARN · secret ARN · access key · instance-id · EIP · image digest · task ARN · job ARN 평문 기록 | 0건 (`[REDACTED]` 또는 `<account-id>` · `<region>` · `<rds-endpoint>` · `<role-arn>` · `<secret-arn>` · `<instance-id>` · `<eip>` · `<image-digest>` · `<task-arn>` · `<job-arn>`) |
+  | 민감정보 평문 기록 | secret · KIS · 계좌 · token · RDS · account-id · IAM Role ARN · secret ARN · access key · instance-id · EIP · image digest · task ARN · job ARN 평문 기록 |
+  | 민감정보 평문 기록 (계속) | 0건 (`[REDACTED]` 또는 `<account-id>` · `<region>` · `<rds-endpoint>` · `<role-arn>` · `<secret-arn>` · `<instance-id>` · `<eip>` · `<image-digest>` · `<task-arn>` · `<job-arn>`) |
   | wrapper summary · overrides JSON · SSM stdout · stderr 파일 secret 평문 | 0건 (`/tmp/inject-env.sh` v5 env injection 만 · value 평문 출력 0건 · key presence / length 만 점검) |
   | 실 broker · KIS · 신규 BUY · SELL · 취소 · 정정 · `--execute` · `mark_position_sell_ordered()` · fill · position sync 자동 재시도 | 0건 |
   | 본 세션 환경 | `aws-paper` 한정 · aws-live 작업 0건 · wrapper 환경 입력 자체가 `aws-paper` 만 |
@@ -4610,8 +4941,10 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | (a) Step 1 CONNECTOR_BALANCE 연결 | 첫 세션 (v5 env injection · `as_of_date 2026-06-17`) 을 17-step 시작 상태로 사실 연결 |
   | (b) Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE 최종 성공 | KIS paper BUY 4건 · `execution_order` id `26~29` 🟢 **SUBMITTED** · `connector_order_request` id `34~37` · `broker_order_no 0000035906` · `0000035912` · `0000035918` · `0000035932` |
   | (b) 1차 실패 · 보정 사유 | `connector_strategy_order_execute.py` MC EC2 미배포 · system python `psycopg` 부재 → venv python 사용 필요 · `execution` table UPDATE 권한 누락 → 운영자 직접 GRANT 보정 · `source_run_id` fallback 패치 후 정식 배포 |
-  | (c) Step 13 CONNECTOR_ORDER_CHECK | 1차 응답 `output1 empty` + `output2 aggregate summary` 다건 active fallback 매핑 오염 → 잘못 생성된 `connector_order_event` / `connector_fill` 삭제 + `connector_order_request` 상태 복구 + summary fallback guard 패치 (1건일 때만 허용 · 다건 시 event / fill / status 변경 금지) + `broker_order_no` 별 단건 조회로 체결 동기화 성공 (`connector_order_request 34~37` FILLED · `connector_fill 26~29` 생성) |
-  | (d) Step 17 BALANCE_REFRESH | 1차 실패 = `marketconnector_app` legacy schema USAGE<br>`legacy.holdings` DML<br>sequence<br>search_path 누락 → search_path 보정 + USAGE · DML · sequence GRANT + default privileges 보정 → 재실행 🟢 **Success**<br>ResponseCode 0<br>`connector_position_snapshot` 4종목<br>`position_snapshot_id 120~123`<br>quantity `52 · 65 · 244 · 17`<br>avg_buy_price `28980.77 · 27043.08 · 5744.41 · 120182.35` |
+  | (c) Step 13 CONNECTOR_ORDER_CHECK | 1차 응답 `output1 empty` + `output2 aggregate summary` 다건 active fallback 매핑 오염 → 잘못 생성된 `connector_order_event` / `connector_fill` 삭제 + `connector_order_request` 상태 복구 + summary fallback guard 패치 (1건일 때만 허용 |
+  | (c) Step 13 CONNECTOR_ORDER_CHECK (계속) | 다건 시 event / fill / status 변경 금지) + `broker_order_no` 별 단건 조회로 체결 동기화 성공 (`connector_order_request 34~37` FILLED · `connector_fill 26~29` 생성) |
+  | (d) Step 17 BALANCE_REFRESH | 1차 실패 = `marketconnector_app` legacy schema USAGE · `legacy.holdings` DML · sequence · search_path 누락 → search_path 보정 + USAGE · DML · sequence GRANT + default privileges 보정 → 재실행 🟢 **Success** · ResponseCode 0 |
+  | (d) Step 17 BALANCE_REFRESH (계속) | `connector_position_snapshot` 4종목 · `position_snapshot_id 120~123` · quantity `52 · 65 · 244 · 17` · avg_buy_price `28980.77 · 27043.08 · 5744.41 · 120182.35` |
   | (e) 안전 / 보안 점검 | secret · KIS · 계좌 · token · RDS · account-id · ARN · access key · EIP · image digest 평문 기록 0건 · SELL · 취소 · 정정 호출 0건 · aws-live 0건 · patch 본문 인용 0건 |
 
 - 🟢 `.kiro/specs/04-strategy-batch-stepfunctions/operation-notes.md` (2026-06-17 §1~§6)
@@ -4641,7 +4974,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | Step | 결과 |
   | --- | --- |
-  | Step 2 INTEREST_CRAWLER | non-GUI ECS Fargate Task `portfolio-paper-interest-crawler:7` 성공 · KRX Windows EC2 worker Scheduled Task 성공 · `interest_program_raw` · `interest_shortsell_raw` 2026-06-16 적재 · crawler worker stop 요청 완료 · KRX GUI = Windows interactive desktop session · non-GUI + KRX GUI hybrid 구조 1차 실증 |
+  | Step 2 INTEREST_CRAWLER | non-GUI ECS Fargate Task `portfolio-paper-interest-crawler:7` 성공 · KRX Windows EC2 worker Scheduled Task 성공 · `interest_program_raw` · `interest_shortsell_raw` 2026-06-16 적재 · crawler worker stop 요청 완료 |
+  | Step 2 INTEREST_CRAWLER (계속) | KRX GUI = Windows interactive desktop session · non-GUI + KRX GUI hybrid 구조 1차 실증 |
   | Step 3 PREPROCESSOR | ECS RunTask exitCode 0 · `PREPROCESSOR PIPELINE END` · `pre_total_market_daily_feature` · `pre_total_stock_daily_feature` 최신성 `2026-06-16` |
   | 1차 실패 이슈 | `execution_app` interest schema · table SELECT 권한 누락 (Step 8 영향 · preprocessor 자체는 정상 · 02 · 06 spec 사실 기록) · aws-live 0건 · RDS DDL 0건 |
 
@@ -4650,7 +4984,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | 섹션 | 내용 |
   | --- | --- |
   | (a) `execution_app` 의 `interest` schema | USAGE + table SELECT + sequence + default privileges 보정 (Step 8 1차 실패 → GRANT 후 재실행 통과 · R-DATA-005 [2026-06-17 보강] 정합) |
-  | (b) `marketconnector_app` 의 `legacy` | schema USAGE + `legacy.holdings` DML + sequence + database search_path 보정 (Step 17 1차 실패 → search_path `connector, execution, legacy, reference, public` + USAGE · DML · sequence GRANT + default privileges 보정 후 재실행 통과 · R-DATA-005 · R-DATA-011 정합) |
+  | (b) `marketconnector_app` 의 `legacy` | schema USAGE + `legacy.holdings` DML + sequence + database search_path 보정 (Step 17 1차 실패 → search_path `connector, execution, legacy, reference, public` + USAGE · DML · sequence GRANT + default privileges 보정 후 재실행 통과 |
+  | (b) `marketconnector_app` 의 `legacy` (계속) | R-DATA-005 · R-DATA-011 정합) |
   | (c) 검증 SQL 후보 | app role 별 `current_setting('search_path')` 점검 · future default privileges 보정 · bare table name 의존 legacy 경로 검증 |
   | 02 spec db-roles-and-grants 정식 갱신 | 후속 분리 (태스크 단위) · 본 일자 password · endpoint · account-id · ARN · 계좌번호 평문 기록 0건 |
 
@@ -4666,8 +5001,10 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 파일 | 변경 |
   | --- | --- |
-  | `runbook.md` §4 | 검증 SQL 후보 보강 (Step 12 `connector_order_request` `SUBMITTED` + `execution_order` `SUBMITTED` 정합<br>Step 13 active 후보 1건일 때만 summary fallback<br>Step 17 `connector_position_snapshot`<br>`connector_balance_snapshot` 최신성 `as_of_ts` / `max(created_at)` 구분 점검)<br>§2 env 주입에 venv python 사용 필요 (system python `psycopg` 없음) 메모<br>결정값 변경 없음 |
-  | `validation-checklist.md` §4/§5/§7 | 2026-06-17 17-step E2E 행 추가 · Step 12 KIS paper BUY 4건 <span style="color:#1A7F37">**[O]**</span> · Step 13 summary fallback guard 1차 실증 <span style="color:#1A7F37">**[O]**</span> · Step 17 legacy.holdings 권한 / search_path 보정 후 재실행 <span style="color:#1A7F37">**[O]**</span> · SELL · 취소 · 정정 · aws-live 0건 <span style="color:#1A7F37">**[O]**</span> |
+  | `runbook.md` §4 | 검증 SQL 후보 보강 (Step 12 `connector_order_request` `SUBMITTED` + `execution_order` `SUBMITTED` 정합 · Step 13 active 후보 1건일 때만 summary fallback · Step 17 `connector_position_snapshot` |
+  | `runbook.md` §4 (계속) | `connector_balance_snapshot` 최신성 `as_of_ts` / `max(created_at)` 구분 점검) · §2 env 주입에 venv python 사용 필요 (system python `psycopg` 없음) 메모 · 결정값 변경 없음 |
+  | `validation-checklist.md` §4/§5/§7 | 2026-06-17 17-step E2E 행 추가 · Step 12 KIS paper BUY 4건 <span style="color:#1A7F37">**[O]**</span> · Step 13 summary fallback guard 1차 실증 <span style="color:#1A7F37">**[O]**</span> |
+  | `validation-checklist.md` §4/§5/§7 (계속) | Step 17 legacy.holdings 권한 / search_path 보정 후 재실행 <span style="color:#1A7F37">**[O]**</span> · SELL · 취소 · 정정 · aws-live 0건 <span style="color:#1A7F37">**[O]**</span> |
   | `tasks.md` | task 5 · 6 · 9 · 12 17-step E2E 정합 사실 보강 · §8 신규 task 29 · 30 · 31 (`inquire-daily-ccld` summary fallback 테스트 · `connector_strategy_order_execute.py` `source_daily_signal_id` null 보정 · `connector_balance_snapshot` 최신성 SQL 정리) · 결정값 변경 없음 |
   | `design.md` §8.3 | Step 12 / 13 책임 경계 1차 실증 · `inquire-daily-ccld` `output1` / `output2` 처리 정책 · summary fallback guard 정책 · 결정값 변경 없음 |
 
@@ -4705,7 +5042,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | ID | 변경 |
   | --- | --- |
   | R-AUTO-018 신규 | `inquire-daily-ccld` summary fallback 오매핑 위험 · mitigation = guard 패치 (1건일 때만 허용) + `broker_order_no` 별 단건 조회 · detection = mapping 정합성 · rollback = 잘못 생성된 row 삭제 + 재실행 · Status 🟢 **Mitigated** |
-  | R-DATA-011 신규 | `marketconnector_app` legacy schema USAGE · `legacy.holdings` DML · sequence · search_path 누락으로 BALANCE_REFRESH 실패 위험 · mitigation = search_path `connector, execution, legacy, reference, public` + GRANT + default privileges · detection = `relation "holdings" does not exist` · Status 🟢 **Mitigated** |
+  | R-DATA-011 신규 | `marketconnector_app` legacy schema USAGE · `legacy.holdings` DML · sequence · search_path 누락으로 BALANCE_REFRESH 실패 위험 |
+  | R-DATA-011 신규 (계속) | mitigation = search_path `connector, execution, legacy, reference, public` + GRANT + default privileges · detection = `relation "holdings" does not exist` · Status 🟢 **Mitigated** |
   | R-DOCS-001 detection / mitigation | [2026-06-17 보강(17-step E2E)] 재실증 |
   | R-DATA-005 detection / mitigation | [2026-06-17 보강] `execution_app` interest / `marketconnector_app` legacy.holdings 권한 누락 사례 + GRANT 해소 · 02 spec 정식 갱신 후속 |
   | R-AUTO-009 · R-AUTO-010 · R-AUTO-011 | Status 🟢 **Mitigated** · KIS paper BUY 4건 한정 end-to-end 통과 · live cutover 전 평일 · 안전 데이터 추가 검증 후속 |
@@ -4715,7 +5053,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | 후속 | 내용 |
   | --- | --- |
   | 완료 범위 | 17-step |
-  | 후속 유지 | `connector_order_check.py` summary fallback 테스트 · `connector_strategy_order_execute.py` `source_daily_signal_id` null 보정 · `legacy.holdings` 권한 / search_path 정식 문서화 · `connector_balance_snapshot` 최신성 `as_of_ts` SQL 정리 · Windows cp949 콘솔 stdout 이모지 회피 · AWS paper 자동화 orchestrator 후보 · View AWS 실행 매핑 (05) · Step Functions + EventBridge Scheduler (04) · aws-live cutover (10) · CI/CD OIDC (07) |
+  | 후속 유지 | `connector_order_check.py` summary fallback 테스트 · `connector_strategy_order_execute.py` `source_daily_signal_id` null 보정 · `legacy.holdings` 권한 / search_path 정식 문서화 · `connector_balance_snapshot` 최신성 `as_of_ts` SQL 정리 |
+  | 후속 유지 (계속) | Windows cp949 콘솔 stdout 이모지 회피 · AWS paper 자동화 orchestrator 후보 · View AWS 실행 매핑 (05) · Step Functions + EventBridge Scheduler (04) · aws-live cutover (10) · CI/CD OIDC (07) |
 
 - 🟢 `.kiro/specs/_common/ms-aws-service-decision-matrix.md`
 
@@ -4736,7 +5075,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 결과 |
   | --- | --- |
-  | secret · KIS · 계좌 · token · RDS · account-id · IAM Role ARN · secret ARN · access key · instance-id · EIP · image digest · task ARN · job ARN 평문 기록 | 0건 (모두 `[REDACTED]` 또는 `<account-id>` · `<region>` · `<rds-endpoint>` · `<role-arn>` · `<secret-arn>` · `<instance-id>` · `<eip>` · `<image-digest>` · `<task-arn>` · `<job-arn>`) |
+  | 민감정보 평문 기록 | secret · KIS · 계좌 · token · RDS · account-id · IAM Role ARN · secret ARN · access key · instance-id · EIP · image digest · task ARN · job ARN 평문 기록 |
+  | 민감정보 평문 기록 (계속) | 0건 (모두 `[REDACTED]` 또는 `<account-id>` · `<region>` · `<rds-endpoint>` · `<role-arn>` · `<secret-arn>` · `<instance-id>` · `<eip>` · `<image-digest>` · `<task-arn>` · `<job-arn>`) |
   | broker / KIS 호출 | KIS paper BUY 4건 (`MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` 본 실행) + `inquire-balance` / `inquire-daily-ccld` 조회성 |
   | SELL · 취소 · 정정 · 추가 `--execute` · `mark_position_sell_ordered()` | 0건 |
   | 본 세션 환경 | `aws-paper` 한정 · aws-live 작업 0건 |
@@ -4817,9 +5157,12 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 섹션 | 내용 |
   | --- | --- |
-  | (a) CONNECTOR_BALANCE | 1차 실패 원인 = JSON SecretString 전체 export mapping 오류 → v5 패턴 보정 → 최종 성공 · `connector_balance_snapshot` 최신 row (`as_of_date 2026-06-17` · `as_of_ts 2026-06-17 00:46:17 UTC` · `created_at 2026-06-17 00:46:17 UTC` · `source_api inquire-balance` · `source_version connector-balance-1.0.0` · 보유종목 0건 정상) |
-  | (b) CONNECTOR_ORDER_CHECK | v5 재사용 (MC 조회계열 선행 검증) · `inquire-daily-ccld` `response_status=200` · `response_code=0` · `is_success=true` · `called_at 2026-06-17 00:51:03 UTC` · row count `connector_order_request 33` · `connector_order_event 18` · `connector_fill 13` · 신규 0건 정상 · PowerShell 변수 일시 소실은 운영자 측 경미 이슈 |
-  | (c) 안전 / 보안 점검 | 신규 주문 0건 · `--execute` 0건 · aws-live 0건 · RDS DDL 0건 · `connector_balance_snapshot` insert 1건만 · secret · 계좌 · token · RDS · account-id · ARN · access key · instance-id · EIP · image digest 평문 기록 0건 · 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 변경 0건 |
+  | (a) CONNECTOR_BALANCE | 1차 실패 원인 = JSON SecretString 전체 export mapping 오류 → v5 패턴 보정 → 최종 성공 · `connector_balance_snapshot` 최신 row (`as_of_date 2026-06-17` · `as_of_ts 2026-06-17 00:46:17 UTC` · `created_at 2026-06-17 00:46:17 UTC` |
+  | (a) CONNECTOR_BALANCE (계속) | `source_api inquire-balance` · `source_version connector-balance-1.0.0` · 보유종목 0건 정상) |
+  | (b) CONNECTOR_ORDER_CHECK | v5 재사용 (MC 조회계열 선행 검증) · `inquire-daily-ccld` `response_status=200` · `response_code=0` · `is_success=true` · `called_at 2026-06-17 00:51:03 UTC` · row count `connector_order_request 33` · `connector_order_event 18` |
+  | (b) CONNECTOR_ORDER_CHECK (계속) | `connector_fill 13` · 신규 0건 정상 · PowerShell 변수 일시 소실은 운영자 측 경미 이슈 |
+  | (c) 안전 / 보안 점검 | 신규 주문 0건 · `--execute` 0건 · aws-live 0건 · RDS DDL 0건 · `connector_balance_snapshot` insert 1건만 · secret · 계좌 · token · RDS · account-id · ARN · access key · instance-id · EIP · image digest 평문 기록 0건 |
+  | (c) 안전 / 보안 점검 (계속) | 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 변경 0건 |
 
 - 🟢 `.kiro/specs/03-marketconnector-ec2/tasks.md`
 
@@ -4857,7 +5200,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | ID | 변경 |
   | --- | --- |
-  | R-DOCS-001 detection / mitigation | [2026-06-17 보강] JSON SecretString 내부 value 추출 후 환경변수 export · value 평문 출력 0건 · runbook §4.1 · §4.2 검증 SQL 기반 점검 · `connector_api_call_log` BALANCE · ORDER 의 `response_status` · `response_code` · `is_success` · `connector_balance_snapshot` 최신 row · `CONNECTOR_ORDER_CHECK` 신규 row 0건도 정상 판단 |
+  | R-DOCS-001 detection / mitigation | [2026-06-17 보강] JSON SecretString 내부 value 추출 후 환경변수 export · value 평문 출력 0건 · runbook §4.1 · §4.2 검증 SQL 기반 점검 · `connector_api_call_log` BALANCE · ORDER 의 `response_status` · `response_code` · `is_success` |
+  | R-DOCS-001 detection / mitigation (계속) | `connector_balance_snapshot` 최신 row · `CONNECTOR_ORDER_CHECK` 신규 row 0건도 정상 판단 |
   | 신규 R | 0건 |
 
 - 🟢 `.kiro/WORKLOG.md`
@@ -4870,7 +5214,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 결과 |
   | --- | --- |
-  | secret · KIS · 계좌 · token · RDS · account-id · IAM Role ARN · secret ARN · access key · instance-id · EIP · image digest · task ARN · job ARN 평문 기록 | 0건 (모두 `[REDACTED]` 또는 `<account-id>` · `<region>` · `<rds-endpoint>` · `<role-arn>` · `<secret-arn>` · `<instance-id>` · `<eip>` · `<venv-path>`) |
+  | 민감정보 평문 기록 | secret · KIS · 계좌 · token · RDS · account-id · IAM Role ARN · secret ARN · access key · instance-id · EIP · image digest · task ARN · job ARN 평문 기록 |
+  | 민감정보 평문 기록 (계속) | 0건 (모두 `[REDACTED]` 또는 `<account-id>` · `<region>` · `<rds-endpoint>` · `<role-arn>` · `<secret-arn>` · `<instance-id>` · `<eip>` · `<venv-path>`) |
   | JSON SecretString 내부 key parsing | mapping 사실만 기록 · value 평문 0건 · raw SecretString 전체 export 한 1차 실패 사례는 원인 · 조치 · 결과 중심 요약 (R-DOCS-001 [2026-06-17 보강] 정합) |
   | AWS · SSM · EC2 · RDS · Secrets Manager · SSM Parameter Store · KIS API | 모두 운영자 직접 수행 · Kiro 는 문서 · 절차 · 검증 정리만 |
   | AWS CLI 실행 · AWS 리소스 생성 · 수정 · 삭제 | 0건 |
@@ -4902,9 +5247,11 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 값 |
   | --- | --- |
-  | (a) BACKTEST_RESEARCH AWS Batch | `portfolio-paper-strategy-research:5` 🟢 **SUCCEEDED**<br>exitCode 0<br>run_id `439d78e7-41fd-4bb7-b455-18564ddff758`<br>backtest_end_date `2026-06-15`<br>`strategy_trade_log` 310<br>`strategy_backtest_daily` 822<br>`strategy_backtest_daily_position` 2375<br>total_return `4.66534417`<br>mdd `-0.08941942`<br>sharpe `2.68071466`<br>trade_count `310` |
+  | (a) BACKTEST_RESEARCH AWS Batch | `portfolio-paper-strategy-research:5` 🟢 **SUCCEEDED** · exitCode 0 · run_id `439d78e7-41fd-4bb7-b455-18564ddff758` · backtest_end_date `2026-06-15` · `strategy_trade_log` 310 · `strategy_backtest_daily` 822 |
+  | (a) BACKTEST_RESEARCH AWS Batch (계속) | `strategy_backtest_daily_position` 2375 · total_return `4.66534417` · mdd `-0.08941942` · sharpe `2.68071466` · trade_count `310` |
   | (b) BACKTEST_REPORT rev1~rev3 교정 | rev1 local-only · rev2 wrapper 경로 부재 · rev3 module 호출 방식으로 최종 확정 |
-  | (c) `portfolio-paper-strategy-report:3` SubmitJob | 🟢 **SUCCEEDED** · S3 prefix `strategy-research/reports/20260616/67522706-9b5f-4770-a312-ceb1987c4655/` 안 4개 객체 (`01_요약_리포트` 7,258 bytes · `02_일자별_매매_리포트` 552,540 bytes · `03_거래_상세_리포트` 329,088 bytes · `04_추천_리포트` 11,847 bytes · private 유지 · public read 0건) |
+  | (c) `portfolio-paper-strategy-report:3` SubmitJob | 🟢 **SUCCEEDED** · S3 prefix `strategy-research/reports/20260616/67522706-9b5f-4770-a312-ceb1987c4655/` 안 4개 객체 (`01_요약_리포트` 7,258 bytes · `02_일자별_매매_리포트` 552,540 bytes · `03_거래_상세_리포트` 329,088 bytes |
+  | (c) `portfolio-paper-strategy-report:3` SubmitJob (계속) | `04_추천_리포트` 11,847 bytes · private 유지 · public read 0건) |
   | (d) Task 완료 처리 | BACKTEST_RESEARCH · BACKTEST_REPORT AWS Batch 실행 검증 + S3 업로드 보강 + 운영 경로 교정 완료 (rev1 / rev2 는 closed 교정 이력) |
 
 - 🟢 `.kiro/specs/04-strategy-batch-stepfunctions/operation-notes.md` (2026-06-16 §1~§7)
@@ -4960,7 +5307,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 값 |
   | --- | --- |
-  | OD-MS-022 신규 | 🟠 **잠정**<br>KRX GUI crawler 자동 로그인 운영 방식 = Windows Autologon + Administrator interactive session + Scheduled Task + SSM trigger<br>SSM RunCommand 가 wrapper<br>Python 을 SYSTEM Session 0 에서 직접 실행하는 방식은 KRX GUI 로그인에 부적합<br>Headless<br>비대화형 KRX 수집은 로컬 검증상 운영 방식에서 제외<br>Autologon 은 paper 전용 Windows worker 보안 예외<br>Administrator session 부재 시 실패 가능성<br>Chrome process 잔존 가능성 |
+  | OD-MS-022 신규 | 🟠 **잠정** · KRX GUI crawler 자동 로그인 운영 방식 = Windows Autologon + Administrator interactive session + Scheduled Task + SSM trigger · SSM RunCommand 가 wrapper · Python 을 SYSTEM Session 0 에서 직접 실행하는 방식은 KRX GUI 로그인에 부적합 |
+  | OD-MS-022 신규 (계속) | Headless · 비대화형 KRX 수집은 로컬 검증상 운영 방식에서 제외 · Autologon 은 paper 전용 Windows worker 보안 예외 · Administrator session 부재 시 실패 가능성 · Chrome process 잔존 가능성 |
   | Decision Summary | 전체 79 → 80 / 잠정 34 → 35 |
   | Change Log 2026-06-16 | 추가 |
   | OD-MS-011 · OD-MS-015 · OD-MS-020 | 본문 변경 없이 1차 실증 메모 보강 · KRX GUI = Windows EC2 worker + Autologon + Scheduled Task + SSM trigger 1차 실증 · non-GUI = ECS Fargate Task Definition `portfolio-paper-interest-crawler:7` + RunTask exitCode 0 · Preprocessor = raw 회복 후 ECS 재실행 가능 상태 |
@@ -5000,7 +5348,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 값 |
   | --- | --- |
-  | §15 신규 task 82~91 | non-GUI Task Definition rev 7 분리<br>non-GUI raw 최신성 회복<br>KRX EC2 Autologon bootstrap<br>Administrator console session Active<br>SSM → schtasks → Scheduled Task 재검증<br>KRX program<br>shortsell 2026-06-15 DB 최신성<br>Preprocessor 재실행 가능 상태 판단<br>SSM direct Python<br>wrapper 실행 부적합 결정 락<br>Headless<br>비대화형 KRX 수집 제외 결정 락<br>Chrome process 잔존 후속 분리 |
+  | §15 신규 task 82~91 | non-GUI Task Definition rev 7 분리 · non-GUI raw 최신성 회복 · KRX EC2 Autologon bootstrap · Administrator console session Active · SSM → schtasks → Scheduled Task 재검증 · KRX program · shortsell 2026-06-15 DB 최신성 |
+  | §15 신규 task 82~91 (계속) | Preprocessor 재실행 가능 상태 판단 · SSM direct Python · wrapper 실행 부적합 결정 락 · Headless · 비대화형 KRX 수집 제외 결정 락 · Chrome process 잔존 후속 분리 |
   | 2026-06-15 이월 항목 완료 처리 | task 72 (non-GUI Task Definition 분리) · task 74 (raw 최신성 회복) |
   | Task Dependency Graph | 82~91 분기 추가 |
   | 2026-06-16 이월 항목 요약 | 추가 |
@@ -5039,10 +5388,13 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 파일 | 변경 |
   | --- | --- |
-  | `08/design.md` §15 | 2026-06-16 Hybrid execution model 갱신 · rev 6 / rev 7 의미 분리 · SSM direct Python · wrapper 실행 부적합 · Headless · 비대화형 KRX 수집 제외 · §12~§14 결정값 변경 없음 · 워크로드 별 상태 (Preprocessor MS ECS Fargate 유지 · non-GUI crawler ECS rev 7 · KRX GUI crawler Windows EC2 + Autologon + Scheduled Task + SSM) |
-  | `08/requirements.md` R8 · R9 | KRX GUI = Windows interactive session 필수 · SSM 은 직접 Python 실행이 아니라 Scheduled Task trigger · Autologon 은 paper 전용 예외 · KRX program · shortsell 완료 기준 = DB max date + row count · non-GUI crawler = ECS Fargate 에서 KRX GUI import 제외 · step 별 SUCCESS 로그 · raw table 최신성 검증 |
+  | `08/design.md` §15 | 2026-06-16 Hybrid execution model 갱신 · rev 6 / rev 7 의미 분리 · SSM direct Python · wrapper 실행 부적합 · Headless · 비대화형 KRX 수집 제외 · §12~§14 결정값 변경 없음 · 워크로드 별 상태 (Preprocessor MS ECS Fargate 유지 · non-GUI crawler ECS rev 7 |
+  | `08/design.md` §15 (계속) | KRX GUI crawler Windows EC2 + Autologon + Scheduled Task + SSM) |
+  | `08/requirements.md` R8 · R9 | KRX GUI = Windows interactive session 필수 · SSM 은 직접 Python 실행이 아니라 Scheduled Task trigger · Autologon 은 paper 전용 예외 · KRX program · shortsell 완료 기준 = DB max date + row count |
+  | `08/requirements.md` R8 · R9 (계속) | non-GUI crawler = ECS Fargate 에서 KRX GUI import 제외 · step 별 SUCCESS 로그 · raw table 최신성 검증 |
   | `_common/cost-simulation.md` 6.1 | KRX Windows worker 비용 메모 · Autologon · Scheduled Task · SSM RunCommand 자체 비용 0 · Windows EC2 running · EIP · storage · 로그 저장량 중심 · 작업 완료 후 stop 후속 비용 절감 · paper / live 단가 변경 없음 |
-  | `_common/ms-aws-service-decision-matrix.md` 4.3 · 5장 | hybrid execution model 메모 갱신 (2026-06-16 결과) · KRX GUI = Windows EC2 worker · non-GUI = ECS Fargate · preprocessor = ECS Fargate · KRX GUI headless · Lambda · ECS 단독 · SSM direct 부적합 근거 메모 · non-GUI rev 7 실증 완료 · 결정값 변경 없음 |
+  | `_common/ms-aws-service-decision-matrix.md` 4.3 · 5장 | hybrid execution model 메모 갱신 (2026-06-16 결과) · KRX GUI = Windows EC2 worker · non-GUI = ECS Fargate · preprocessor = ECS Fargate · KRX GUI headless · Lambda · ECS 단독 · SSM direct 부적합 근거 메모 · non-GUI rev 7 실증 완료 |
+  | `_common/ms-aws-service-decision-matrix.md` 4.3 · 5장 (계속) | 결정값 변경 없음 |
   | `.kiro/README.md` | "현재 진행 상태 요약" · Interest Crawler "hybrid 1차 부분 완료" → "hybrid 구조 완료 (non-GUI = ECS rev 7 · KRX GUI = Windows EC2 + Autologon + Scheduled Task + SSM · raw 최신성 회복 · Preprocessor 재실행 가능)" · View / Backend AWS E2E dry-run 후속 재개 유지 |
   | `.kiro/WORKLOG.md` | 2026-06-16 (Crawler 데이터 미수집 해결 + KRX EC2 자동화 성공) 섹션 신규 누적 · 다른 세션 변경 없음 |
 
@@ -5050,7 +5402,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 결과 |
   | --- | --- |
-  | secret · Administrator password · KRX 로그인 password · RDS · KIS · 계좌 · token · account-id · IAM · secret ARN · ECR URI · image digest · instance-id · task ARN 평문 기록 | 0건 (모두 `[REDACTED]` 또는 `<account-id>` · `<region>` · `<rds-endpoint>` · `<image-tag>` · `<image-digest>` · `<task-arn>` · `<role-arn>` · `<secret-arn>`) |
+  | 민감정보 평문 기록 | secret · Administrator password · KRX 로그인 password · RDS · KIS · 계좌 · token · account-id · IAM · secret ARN · ECR URI · image digest · instance-id · task ARN 평문 기록 |
+  | 민감정보 평문 기록 (계속) | 0건 (모두 `[REDACTED]` 또는 `<account-id>` · `<region>` · `<rds-endpoint>` · `<image-tag>` · `<image-digest>` · `<task-arn>` · `<role-arn>` · `<secret-arn>`) |
   | Autologon 처리 | paper 전용 Windows worker 보안 예외 (R-SEC-009) · Autologon 기반 Administrator interactive session 자동 생성 · 자격 증명 문서화 금지 · Administrator password 평문 기록 0건 · 관리자 권한 복호화 가능성 리스크 명시 |
   | SSM direct Python · wrapper 실행 | 운영 방식 제외 (SYSTEM Session 0 / 비대화형 GUI · KRX GUI 로그인 부적합 · OD-MS-022 정합) |
   | Headless · 비대화형 KRX 수집 | 운영 방식 제외 (KRX 로그인 · nos_setup · 키보드보안 · iframe 제약 · OD-MS-022 정합) |
@@ -5087,8 +5440,10 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | OD-MS-020 | `port-interest-crawler` 상태 재판정 — Interest Crawler hybrid 1차 구현 부분 완료 · KRX GUI worker 운영 가능 · ECS Fargate crawler smoke 검증 완료 · non-GUI daily raw 수집 운영 경로와 raw 전체 최신성 검증은 후속 |
   | OD-MS-020 판정 원칙 | "완료" 표기는 실제 데이터 적재 · 최신성 검증까지 확인된 경우에만 사용 |
   | OD-MS-021 | Backend AWS E2E dry-run 17단계 순서 + 안전 기준 |
-  | 17단계 순서 | 1 `CONNECTOR_BALANCE`<br>2 `INTEREST_CRAWLER`<br>3 `PREPROCESSOR`<br>4 `BACKTEST_RESEARCH`<br>5 `BACKTEST_REPORT`<br>6 `DAILY_BUY_SIGNAL`<br>7 `DAILY_POSITION_SIGNAL`<br>8~11 BUY/SELL/AUTO<br>12 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE`<br>13 `CONNECTOR_ORDER_CHECK`<br>14~16 fill·position sync<br>17 `BALANCE_REFRESH` |
-  | 안전 기준 | 실제 BUY / SELL 실행 <span style="color:#D1242F">**금지**</span> · `--execute` 주문 전송 <span style="color:#D1242F">**금지**</span> · fill·position sync 자동 재시도 <span style="color:#D1242F">**금지**</span> · aws-live 작업 <span style="color:#D1242F">**금지**</span> · Research 는 Decision 보다 먼저 · Execution·MarketConnector 계열은 dry-run 또는 skip |
+  | 17단계 순서 | 1 `CONNECTOR_BALANCE` · 2 `INTEREST_CRAWLER` · 3 `PREPROCESSOR` · 4 `BACKTEST_RESEARCH` · 5 `BACKTEST_REPORT` · 6 `DAILY_BUY_SIGNAL` · 7 `DAILY_POSITION_SIGNAL` · 8~11 BUY/SELL/AUTO |
+  | 17단계 순서 (계속) | 12 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` · 13 `CONNECTOR_ORDER_CHECK` · 14~16 fill·position sync · 17 `BALANCE_REFRESH` |
+  | 안전 기준 | 실제 BUY / SELL 실행 <span style="color:#D1242F">**금지**</span> · `--execute` 주문 전송 <span style="color:#D1242F">**금지**</span> · fill·position sync 자동 재시도 <span style="color:#D1242F">**금지**</span> |
+  | 안전 기준 (계속) | aws-live 작업 <span style="color:#D1242F">**금지**</span> · Research 는 Decision 보다 먼저 · Execution·MarketConnector 계열은 dry-run 또는 skip |
   | Status | 두 항목 모두 🟠 **잠정** |
   | Decision Summary | 전체 77 → 79 · 잠정 32 → 34 |
   | Change Log | 2026-06-15 두 번째 항목 |
@@ -5114,10 +5469,13 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | 섹션 | 내용 |
   | --- | --- |
   | (a) 사전 점검 | AWS 계정 · region · EC2 · ECS · AWS Batch |
-  | (b) `CONNECTOR_BALANCE` | MarketConnector EC2 · venv python · SSM RunCommand · KIS Secrets JSON key parsing 정정 (`APP_KEY` → `KIS_APP_KEY` 등 mapping) · 기존 `access_token.txt` 백업 · 신규 token 발급 · KIS balance API status 200 · 모의투자 잔고 조회 · `connector_balance_snapshot` 저장 · `connector_position_snapshot` 보유 0건 · legacy holdings 0건 |
+  | (b) `CONNECTOR_BALANCE` | MarketConnector EC2 · venv python · SSM RunCommand · KIS Secrets JSON key parsing 정정 (`APP_KEY` → `KIS_APP_KEY` 등 mapping) · 기존 `access_token.txt` 백업 · 신규 token 발급 · KIS balance API status 200 · 모의투자 잔고 조회 |
+  | (b) `CONNECTOR_BALANCE` (계속) | `connector_balance_snapshot` 저장 · `connector_position_snapshot` 보유 0건 · legacy holdings 0건 |
   | (c) KRX GUI worker 재실행 | `KRX already logged in` · `KRX Login Ready` · `[Collected Date] None` idempotent · `interest_program_raw` · `interest_shortsell_raw` 최신일 2026-06-12 |
-  | (d) non-GUI raw 7종 SQL 점검 | `interest_agency_raw` 2026-06-11 · `interest_news_raw` 2026-06-11 · `interest_commodity_raw` · `interest_foreignindex_raw` · `interest_investorflow_raw` · `interest_marketbreadth_raw` · `interest_price_raw` 모두 2026-06-08 · `interest_ticker_value_raw` 2026-03-09 (dry-run 핵심 차단 요인 제외) |
-  | (e) preprocessor ECS RunTask | cluster `portfolio-paper-cluster`<br>TD `portfolio-paper-interest-preprocessor:1`<br>FARGATE<br>awsvpc<br>public-a+public-b<br>`assignPublicIp=ENABLED`<br>SG `sgroup-preprocessor-tasks`<br>lastStatus `STOPPED`<br>stopCode `EssentialContainerExited`<br>container `interest-preprocessor`<br>exitCode 0<br>약 3분 43초<br>DB `updated_at` 2026-06-15 11:03:55+00 (KST 20:03:55) 갱신<br>신규 2026-06-15 feature date 0건 |
+  | (d) non-GUI raw 7종 SQL 점검 | `interest_agency_raw` 2026-06-11 · `interest_news_raw` 2026-06-11 · `interest_commodity_raw` · `interest_foreignindex_raw` · `interest_investorflow_raw` · `interest_marketbreadth_raw` · `interest_price_raw` 모두 2026-06-08 |
+  | (d) non-GUI raw 7종 SQL 점검 (계속) | `interest_ticker_value_raw` 2026-03-09 (dry-run 핵심 차단 요인 제외) |
+  | (e) preprocessor ECS RunTask | cluster `portfolio-paper-cluster` · TD `portfolio-paper-interest-preprocessor:1` · FARGATE · awsvpc · public-a+public-b · `assignPublicIp=ENABLED` · SG `sgroup-preprocessor-tasks` · lastStatus `STOPPED` |
+  | (e) preprocessor ECS RunTask (계속) | stopCode `EssentialContainerExited` · container `interest-preprocessor` · exitCode 0 · 약 3분 43초 · DB `updated_at` 2026-06-15 11:03:55+00 (KST 20:03:55) 갱신 · 신규 2026-06-15 feature date 0건 |
   | (f) Secret / IAM 권한 분리 실증 | MarketConnector EC2 role → preprocessor secret `GetSecretValue` `AccessDeniedException` · 정책 정합성 정상 동작 · 권한 추가 0건 · preprocessor DB 확인은 ECS Task 또는 SSM Port Forwarding · IAM 변경 0건 |
   | (g) 17단계 진행 상태 점검표 | 완료 1·3 · 부분 완료 2 · 미진행 4~7 · 미진행/skip 예정 8~17 · 실제 BUY·SELL·`--execute`·fill·position sync 자동 재시도 0건 · aws-live 0건 |
   | (h) 후속 인계 | non-GUI daily 운영 Task 분리 · raw 최신성 회복 · preprocessor 재실행 + feature date 점검 · dry-run 재개 · 표현 통일 점검 |
@@ -5127,7 +5485,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 항목 | 값 |
   | --- | --- |
-  | 신규 task 범위 | KRX GUI worker 운영 가능 재확인 · KRX raw 최신일 SQL · non-GUI Task Definition · command 분리 후속 · non-GUI raw 최신일 SQL 정기 · raw 최신성 회복 · preprocessor RunTask 절차 · `updated_at` 갱신 확인 · preprocessor 재실행 절차 · raw·feature 최신성 검증 SQL 자동화 · 표현 보정 결정 락 · 17단계 점검표 · Secret·IAM 권한 분리 실증 |
+  | 신규 task 범위 | KRX GUI worker 운영 가능 재확인 · KRX raw 최신일 SQL · non-GUI Task Definition · command 분리 후속 · non-GUI raw 최신일 SQL 정기 · raw 최신성 회복 · preprocessor RunTask 절차 · `updated_at` 갱신 확인 · preprocessor 재실행 절차 · raw·feature 최신성 검증 SQL 자동화 |
+  | 신규 task 범위 (계속) | 표현 보정 결정 락 · 17단계 점검표 · Secret·IAM 권한 분리 실증 |
   | Task Dependency Graph | 70~81 분기 추가 |
   | 2026-06-15 이월 항목 | 7건 요약 추가 |
 
@@ -5146,7 +5505,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | ID | 내용 |
   | --- | --- |
-  | R-DATA-009 신규 | smoke 검증을 daily 데이터 최신성 완료로 오해할 위험 · mitigation = "완료" 표기 규칙 (OD-MS-020 정합) · smoke 통과와 daily raw 최신성 통과 분리 · 문서·보고·슬라이드 표현 통일 점검 · KRX GUI worker 완료와 전체 완료 혼동 <span style="color:#D1242F">**금지**</span> · detection = 잔존 표현 grep · rollback = 보정 표현으로 즉시 수정 · Affected Spec 08·04·09·전체 · Status <span style="color:#BF8700">**Open**</span> |
+  | R-DATA-009 신규 | smoke 검증을 daily 데이터 최신성 완료로 오해할 위험 · mitigation = "완료" 표기 규칙 (OD-MS-020 정합) · smoke 통과와 daily raw 최신성 통과 분리 · 문서·보고·슬라이드 표현 통일 점검 · KRX GUI worker 완료와 전체 완료 혼동 <span style="color:#D1242F">**금지**</span> |
+  | R-DATA-009 신규 (계속) | detection = 잔존 표현 grep · rollback = 보정 표현으로 즉시 수정 · Affected Spec 08·04·09·전체 · Status <span style="color:#BF8700">**Open**</span> |
   | R-DATA-010 신규 | 아래 · 표기 rows 참조 |
   | · 위험 | raw 최신성 부족 상태에서 preprocessor / Research / Decision 이 stale raw 를 입력으로 사용 · 신규 feature date 미생성 · Daily Decision 과거 거래일 기준 산출 · Research backtest 직전 거래일 미반영 |
   | · mitigation | OD-MS-020 · OD-MS-021 정합 · dry-run 진입 시 raw 최신성 검증 SQL 선행 · non-GUI raw 7종 최신일자 정기 확인 · preprocessor 재실행 후 feature max date · `updated_at` 검증 · task 78 자동화 후속 |
@@ -5238,7 +5598,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | Execution Role | `portfolio-paper-research-batch-execution-role` · `AmazonECSTaskExecutionRolePolicy` + research-app secret read inline · ARN 한정 · wildcard 0건 |
   | Job Role | `portfolio-paper-research-job-role` · 최초 smoke 단계 최소 권한 · §11 단계에서 prefix 한정 `s3:PutObject` 권한 추가 · public read 0건 |
   | py_compile smoke SubmitJob | `smoke-strategy-research-import-20260615` · jobId `81ec3581-0204-43ea-8238-a2a6d22f3f28` · 🟢 **SUCCEEDED** · exitCode 0 |
-  | DB smoke SubmitJob | `smoke-strategy-research-db-20260615` · jobId `5399aa10-0fdd-466b-8079-236d3b7e7e37` · 🟢 **SUCCEEDED** · exitCode 0 · `db smoke ok` · `research_app` · `portfolio` · schema `research` · search_path 정합 · image pull · secret injection · log delivery 오류 0건 · secret 노출 0건 |
+  | DB smoke SubmitJob | `smoke-strategy-research-db-20260615` · jobId `5399aa10-0fdd-466b-8079-236d3b7e7e37` · 🟢 **SUCCEEDED** · exitCode 0 · `db smoke ok` · `research_app` · `portfolio` · schema `research` · search_path 정합 · image pull |
+  | DB smoke SubmitJob (계속) | secret injection · log delivery 오류 0건 · secret 노출 0건 |
   | Strategy Common | 별도 컴퓨트 없음 · vendoring 유지 · 정식 package 관리는 후속 |
   | 6/13 후속 회수 | (i) AWS Batch CE · Queue · JD 1차 생성 (ii) Log Group · Secrets Manager · IAM Role 정식 생성 (iii) no-op · import smoke SubmitJob 검증 |
 
@@ -5286,7 +5647,9 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | ID | 변경 |
   | --- | --- |
   | R-AUTO-015 | mitigation·detection 보강 · Status `Open` → 🟢 **Mitigated** 승격 |
-  | R-AUTO-015 보강 근거 | (i) `smoke`/`full` job name prefix 분리 정책<br>smoke 2건 prefix `smoke-strategy-research-*-20260615`<br>BACKTEST_RESEARCH·REPORT 단건은 `full` (ii) JD `attemptDurationSeconds=600`<br>vCPU 1<br>memory 2048<br>`attempts=1` (자동 retry 0건<br>OD-SAFE-004) (iii) 최초 SubmitJob 은 no-op / import smoke 만 (iv) Batch status<br>exitCode<br>Log Stream 정상<br>pull<br>secret injection<br>log delivery 오류 0건 (v) report S3 prefix 한정<br>public read 0건<br>Resource 한정 PutObject |
+  | R-AUTO-015 보강 근거 | (i) `smoke`/`full` job name prefix 분리 정책 · smoke 2건 prefix `smoke-strategy-research-*-20260615` · BACKTEST_RESEARCH·REPORT 단건은 `full` (ii) JD `attemptDurationSeconds=600` · vCPU 1 · memory 2048 |
+  | R-AUTO-015 보강 근거 (계속) | `attempts=1` (자동 retry 0건 · OD-SAFE-004) (iii) 최초 SubmitJob 은 no-op / import smoke 만 (iv) Batch status · exitCode · Log Stream 정상 · pull · secret injection · log delivery 오류 0건 (v) report S3 prefix 한정 · public read 0건 |
+  | R-AUTO-015 보강 근거 (계속) | Resource 한정 PutObject |
   | R-DATA-008 | detection 보강 · Strategy Common 1차 정합성 확인 절차 추가 · Status `Open` 유지 |
   | R-COST-003 신규 | 아래 · 표기 rows 참조 |
   | · 위험 | BACKTEST_REPORT S3 보존 lifecycle 미설정 시 storage · PUT · 잘못된 prefix / bucket · public read 부주의 |
@@ -5301,11 +5664,13 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | 구분 | 내용 |
   | --- | --- |
-  | 1차 완료 범위 | AWS Batch CE / JQ / JD rev1<br>CloudWatch Log Group<br>Secrets Manager<br>IAM Execution + Job Role<br>py_compile smoke + DB smoke<br>Strategy Common 1차 정합성<br>BACKTEST_RESEARCH full + 내부 extended analysis<br>BACKTEST_REPORT 4개 리포트<br>`REPORT_OUTPUT_DIR=/tmp/portfolio-reports`<br>S3 업로드 보강 + Docker rebuild + ECR push + JD rev3 + SubmitJob + S3 4개 객체 확인 |
+  | 1차 완료 범위 | AWS Batch CE / JQ / JD rev1 · CloudWatch Log Group · Secrets Manager · IAM Execution + Job Role · py_compile smoke + DB smoke · Strategy Common 1차 정합성 · BACKTEST_RESEARCH full + 내부 extended analysis |
+  | 1차 완료 범위 (계속) | BACKTEST_REPORT 4개 리포트 · `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` · S3 업로드 보강 + Docker rebuild + ECR push + JD rev3 + SubmitJob + S3 4개 객체 확인 |
   | 결정 락 | OD-MS-019 신규 · OD-MS-008 · OD-MS-018 1차 실증 메모 |
   | 보강·신규 리스크 | R-AUTO-015 🟢 **Mitigated** 승격 · R-DATA-008 detection 보강 · R-COST-003 신규 |
   | 6/13 후속 회수 | 5건 (본 일자 완료) |
-  | 남은 후속 | View Daily Batch 의 BACKTEST_RESEARCH / BACKTEST_REPORT → AWS Batch SubmitJob 매핑 · Step Functions state machine (순서 강제 + 자동 재시도 금지) + EventBridge Scheduler · `block_watch_*` · `block_exception_buy_*` 수동 보조 도구 절차 · Research adapter 3개 → `port_strategy_common` 정식 이동 · common 정식 package · CI/CD OIDC · aws-live cutover |
+  | 남은 후속 | View Daily Batch 의 BACKTEST_RESEARCH / BACKTEST_REPORT → AWS Batch SubmitJob 매핑 · Step Functions state machine (순서 강제 + 자동 재시도 금지) + EventBridge Scheduler · `block_watch_*` · `block_exception_buy_*` 수동 보조 도구 절차 |
+  | 남은 후속 (계속) | Research adapter 3개 → `port_strategy_common` 정식 이동 · common 정식 package · CI/CD OIDC · aws-live cutover |
   | 진행 순서 | 08 → 04 → 05 → 09 → 07 → 10 · 변경 없음 · 09 BACKTEST_RESEARCH / REPORT 1차 실행 검증은 본 일자 완료 |
 
 - 🟢 **`.kiro/specs/_common/ms-aws-service-decision-matrix.md`**
@@ -5370,7 +5735,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | 항목 | 값 |
   | --- | --- |
   | 신규 파일 | 09 spec 의 첫 산출물 · 일자별 누적 운영 노트 |
-  | 기록 형식·안전 원칙 | 02·03·04·06·08 spec operation-notes 와 동일 · `## YYYY-MM-DD <요약>` 헤더 누적 · 결과 = 성공·실패·보류·해당 없음·이월 · docker build · ECR push · CloudWatch 전문 인용 <span style="color:#D1242F">**금지**</span> · IAM 변경 4줄 요약 · Dockerfile · requirements · adapter 본문 인용 <span style="color:#D1242F">**금지**</span> · secret · account-id · 실제 ARN · image digest 평문 0건 · `secretsmanager:GetSecretValue` 운영자 한정 · Kiro 자동 검증은 `DescribeSecret` metadata 만 |
+  | 기록 형식·안전 원칙 | 02·03·04·06·08 spec operation-notes 와 동일 · `## YYYY-MM-DD <요약>` 헤더 누적 · 결과 = 성공·실패·보류·해당 없음·이월 · docker build · ECR push · CloudWatch 전문 인용 <span style="color:#D1242F">**금지**</span> · IAM 변경 4줄 요약 · Dockerfile |
+  | 기록 형식·안전 원칙 (계속) | requirements · adapter 본문 인용 <span style="color:#D1242F">**금지**</span> · secret · account-id · 실제 ARN · image digest 평문 0건 · `secretsmanager:GetSecretValue` 운영자 한정 · Kiro 자동 검증은 `DescribeSecret` metadata 만 |
   | IAM 변경 기록 템플릿 | 포함 |
 
   <details><summary>본 일자 §1~§8 세부</summary>
@@ -5379,11 +5745,14 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | --- | --- |
   | §1 AWS 실행 구조 확인 | As-Is entrypoint 7개 · heavy·light 분리 · 외부·내부 dependency · `research_app` 환경변수 + search_path |
   | §2 Research → Decision 직접 의존 제거 | OD-MS-018 정합 · Research 내부 adapter 3개 신규 · import 변경 3개 파일 · Python patch script (`encoding="utf-8-sig"` 읽기 + `encoding="utf-8"` 저장) · `from port_strategy_decision` 잔존 0건 |
-  | §3 Batch 용 Docker / ECR | Dockerfile + requirements.txt 신규<br>Docker build context `C:\Workspaces`<br>image 포함 = `port_strategy_research` + `port_strategy_common`<br>image 제외 = `port_strategy_decision`<br>local build `portfolio-strategy-research:paper-20260613`<br>`py_compile` smoke + import smoke 통과<br>`/app/port_strategy_decision` 부재 확인<br>ECR repository `portfolio-strategy-research` 신규 + push `paper-20260613`<br>`paper-latest`<br>image size 약 90MB |
+  | §3 Batch 용 Docker / ECR | Dockerfile + requirements.txt 신규 · Docker build context `C:\Workspaces` · image 포함 = `port_strategy_research` + `port_strategy_common` · image 제외 = `port_strategy_decision` |
+  | §3 Batch 용 Docker / ECR (계속) | local build `portfolio-strategy-research:paper-20260613` · `py_compile` smoke + import smoke 통과 · `/app/port_strategy_decision` 부재 확인 · ECR repository `portfolio-strategy-research` 신규 + push `paper-20260613` |
+  | §3 Batch 용 Docker / ECR (계속) | `paper-latest` · image size 약 90MB |
   | §4 ~ §5 AWS Batch 후속 | Compute Environment · Job Queue · Job Definition · CloudWatch Log Group · Secrets Manager · IAM Role · timeout · vCPU · memory · no-op smoke SubmitJob · full backtest 모두 후속 분리 |
   | §6 1차 검증 완료 기준 | 11항목 |
   | §7 본 일자 범위 밖 / 후속 | 9건 |
-  | §8 안전·보안 점검 | secret<br>KIS<br>계좌<br>token<br>account-id<br>ARN<br>image digest<br>IAM access key<br>Batch job ARN 평문 0건<br>`secretsmanager:GetSecretValue` 0건<br>AWS Batch SubmitJob 0건<br>full backtest<br>장시간 research<br>report<br>extended<br>block 계열 0건<br>RDS DDL/DML 0건<br>broker<br>KIS 호출 0건<br>8개 MS 변경 0건<br>Dockerfile<br>requirements.txt<br>adapter 3개<br>import 변경 3개 본문 인용 0건 |
+  | §8 안전·보안 점검 | secret · KIS · 계좌 · token · account-id · ARN · image digest · IAM access key · Batch job ARN 평문 0건 · `secretsmanager:GetSecretValue` 0건 · AWS Batch SubmitJob 0건 · full backtest · 장시간 research · report · extended |
+  | §8 안전·보안 점검 (계속) | block 계열 0건 · RDS DDL/DML 0건 · broker · KIS 호출 0건 · 8개 MS 변경 0건 · Dockerfile · requirements.txt · adapter 3개 · import 변경 3개 본문 인용 0건 |
 
   </details>
 
@@ -5484,7 +5853,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | §2 Dockerfile · requirements.txt | 운영자 직접 신규 · Docker build context `C:\Workspaces` · 소스 vendoring · 1차 dependency `psycopg2-binary` · default CMD 안전한 `py_compile` · 본문 인용 0건 |
   | §3 로컬 build + smoke | `portfolio-strategy-execution:paper-20260613` · `paper-latest` · container `py_compile` smoke + import smoke 통과 (dummy env) |
   | §4 ECR push | repository `portfolio-strategy-execution` · `paper-20260613` · `paper-latest` |
-  | §5 CloudWatch · Secret · IAM | Log Group `/portfolio/paper/strategy-execution` retention 14일 · Secret `/portfolio/paper/rds/execution-app` JSON multi-key · Execution Role `portfolio-paper-ecs-task-execution-role` + execution-app secret read inline (ARN 한정 · wildcard 0건) · Task Role `portfolio-paper-execution-task-role` 확인 |
+  | §5 CloudWatch · Secret · IAM | Log Group `/portfolio/paper/strategy-execution` retention 14일 · Secret `/portfolio/paper/rds/execution-app` JSON multi-key |
+  | §5 CloudWatch · Secret · IAM (계속) | Execution Role `portfolio-paper-ecs-task-execution-role` + execution-app secret read inline (ARN 한정 · wildcard 0건) · Task Role `portfolio-paper-execution-task-role` 확인 |
   | §6 Network | cluster `portfolio-paper-cluster` · public-a + public-b · SG `sgroup-strategy-tasks` · RDS SG inbound + VPC Endpoint SG 443 source 허용 · `assignPublicIp=ENABLED` |
   | §7 Task Definition | `portfolio-paper-strategy-execution` revision 1 ACTIVE · awsvpc · Fargate · cpu 512 · memory 1024 · container `strategy-execution` · `INTEREST_DB_*` 5종 secrets injection · `PORT_ENVIRONMENT=paper` + `PORT_DB_TARGET=aws-paper` |
 
@@ -5532,14 +5902,16 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | 1차 완료 범위 (8종) | Dockerfile · ECR · Log Group · Secret · IAM · Network · Task Definition · RunTask |
   | 결정 락 | OD-MS-017 |
   | 보강·신규 리스크 | R-AUTO-001 · R-AUTO-014 |
-  | 남은 후속 (8건) | Step Functions state machine · EventBridge Scheduler · MarketConnector executor 인계 · `READY -> REQUESTED -> SUBMITTED` end-to-end · View ProcessBuilder → 관제 UI 격상 · state ↔ command allowlist 1:1 표 · `execution_app` GRANT 매트릭스 · 실패·skip·manual approval gate · CI/CD OIDC |
+  | 남은 후속 (8건) | Step Functions state machine · EventBridge Scheduler · MarketConnector executor 인계 · `READY -> REQUESTED -> SUBMITTED` end-to-end · View ProcessBuilder → 관제 UI 격상 · state ↔ command allowlist 1:1 표 |
+  | 남은 후속 (8건) (계속) | `execution_app` GRANT 매트릭스 · 실패·skip·manual approval gate · CI/CD OIDC |
   | 진행 순서 | 08 → 04 → 05 → 09 → 07 → 10 · 변경 없음 |
 
 - 🟢 **`.kiro/specs/_common/risk-register.md`**
 
   | ID | 변경 |
   | --- | --- |
-  | R-AUTO-001 | mitigation·detection 보강 · state machine 리뷰 체크리스트 (a) 각 state Retry 정책 비활성화 (b) command override 명이 7종 allowlist 안 (c) BUY / SELL / fill sync / position 변경 계열 step Retry block 부재 · detection 에 SFN execution history retry attempt · state ↔ command override audit · `connector_order_request` 의 `idempotency_key` / `client_order_id` 중복 row 점검 추가 |
+  | R-AUTO-001 | mitigation·detection 보강 · state machine 리뷰 체크리스트 (a) 각 state Retry 정책 비활성화 (b) command override 명이 7종 allowlist 안 (c) BUY / SELL / fill sync / position 변경 계열 step Retry block 부재 |
+  | R-AUTO-001 (계속) | detection 에 SFN execution history retry attempt · state ↔ command override audit · `connector_order_request` 의 `idempotency_key` / `client_order_id` 중복 row 점검 추가 |
   | R-AUTO-014 신규 | 아래 · 표기 rows 참조 |
   | · 위험 | 단일 Task Definition + command override 오매핑 · 잘못 매핑 시 의도치 않은 entrypoint 실행 |
   | · mitigation | OD-MS-017 · state ↔ command override 1:1 표 정식 정리 · 7종 allowlist · 자동 retry <span style="color:#D1242F">**금지**</span> · View / SFN 호출부 임의 command 거부 · MarketConnector executor 본 TD 포함 <span style="color:#D1242F">**금지**</span> |
@@ -5612,7 +5984,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | 항목 | 값 |
   | --- | --- |
   | 후속 성격 | 같은 일자 앞 섹션 (`execution_app` Python `psycopg2` 접속 1차 실증) 의 추가 client 2종 보강 |
-  | pgAdmin4 조회 가능 확인 | Strategy Execution 핵심 schema/table (`execution.strategy_execution_order`<br>`execution.strategy_execution_plan`<br>`execution.strategy_position_state`<br>`execution.connector_signal_order_map`<br>`connector.connector_account`<br>`connector.connector_order_request`<br>`connector.connector_order_event`<br>`connector.connector_fill`<br>`decision.strategy_daily_position_decision`<br>`decision.strategy_daily_run`) |
+  | pgAdmin4 조회 가능 확인 | Strategy Execution 핵심 schema/table (`execution.strategy_execution_order` · `execution.strategy_execution_plan` · `execution.strategy_position_state` · `execution.connector_signal_order_map` |
+  | pgAdmin4 조회 가능 확인 (계속) | `connector.connector_account` · `connector.connector_order_request` · `connector.connector_order_event` · `connector.connector_fill` · `decision.strategy_daily_position_decision` · `decision.strategy_daily_run`) |
   | 조회 범위 | SELECT 한정 · INSERT · UPDATE · DELETE · DDL 0건 |
   | Strategy Execution 본 phase | Dockerfile · requirements.txt · ECR push · `/portfolio/paper/rds/execution-app` · Task Role · Task Definition · RunTask 단건 검증 모두 후속 분리 |
 
@@ -5644,7 +6017,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | ID | 변경 |
   | --- | --- |
   | R-AUTO-012 | mitigation·detection·rollback 보강 · pgAdmin4 도 같은 SSM tunnel 위 · tunnel 종료 시 pgAdmin4 즉시 단절 · `Connection terminated` · `server closed the connection unexpectedly` 패턴 모니터 · tunnel 재기동 후 자동 복구 · Status 🟢 **Mitigated** 유지 |
-  | R-AUTO-013 | mitigation·detection·rollback 보강<br>PostgreSQL 18 client `C:\Program Files\PostgreSQL\18\bin\psql.exe` 이미 설치<br>full path 직접 실행으로 1차 실증 통과 (client 18.1<br>server 18.4)<br>리스크는 client 미설치가 아니라 일반 `psql` PATH 미등록 문제<br>detection 에 `Get-Item`<br>`$env:Path` 점검<br>rollback 에 `setx PATH ...` 또는 GUI 명시<br>Status 🟢 **Mitigated** 유지 |
+  | R-AUTO-013 | mitigation·detection·rollback 보강 · PostgreSQL 18 client `C:\Program Files\PostgreSQL\18\bin\psql.exe` 이미 설치 · full path 직접 실행으로 1차 실증 통과 (client 18.1 · server 18.4) · 리스크는 client 미설치가 아니라 일반 `psql` PATH 미등록 문제 |
+  | R-AUTO-013 (계속) | detection 에 `Get-Item` · `$env:Path` 점검 · rollback 에 `setx PATH ...` 또는 GUI 명시 · Status 🟢 **Mitigated** 유지 |
 
 - 🟢 **`.kiro/WORKLOG.md`**
 
@@ -5822,7 +6196,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | ID | 값 |
   | --- | --- |
-  | OD-MS-016 | Strategy Execution / MarketConnector 주문 실행 책임 분리<br>Strategy Execution `--execute` = `READY -> REQUESTED`<br>MarketConnector executor `--execute` = `REQUESTED -> SUBMITTED`/`FAILED`<br>SELL `mark_position_sell_ordered()` 는 MarketConnector<br>`connector_order_request_id` 는 Strategy Execution 미생성·미갱신<br>🟠 **잠정** |
+  | OD-MS-016 | Strategy Execution / MarketConnector 주문 실행 책임 분리 · Strategy Execution `--execute` = `READY -> REQUESTED` · MarketConnector executor `--execute` = `REQUESTED -> SUBMITTED`/`FAILED` |
+  | OD-MS-016 (계속) | SELL `mark_position_sell_ordered()` 는 MarketConnector · `connector_order_request_id` 는 Strategy Execution 미생성·미갱신 · 🟠 **잠정** |
   | OD-ENV-006 | Paper 환경 DB source of truth = AWS Paper RDS 단일 · `PORT_ENVIRONMENT=paper` 이면 로컬 실행에서도 AWS Paper RDS 사용 · 🟠 **잠정** |
   | OD-ENV-007 | Local PC → AWS Paper RDS 접속 = SSM Port Forwarding 만 · RDS Private 유지 · paper 주문 실행 guard = `PORT_ENVIRONMENT=paper` + `PORT_DB_TARGET=aws-paper` · 🟠 **잠정** |
   | OD-ENV-008 | Local DB ↔ AWS Paper RDS 동기화 미사용 · `connector_order_request` · `connector_fill` · `strategy_execution_order` · `strategy_position_state` 병합 <span style="color:#D1242F">**금지**</span> · <span style="color:#BF8700">**잠정**</span> |
@@ -5843,10 +6218,14 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | ID | 내용 |
   | --- | --- |
-  | R-DATA-007 신규 | local PostgreSQL ↔ AWS Paper RDS 사이 주문·체결·포지션·strategy execution 상태 데이터 병합·동기화 시 중복 주문·fill 누적·position 상태 충돌·source of truth 정합성 붕괴 · mitigation = OD-ENV-006 · OD-ENV-007 · OD-ENV-008 명문화 + paper guard + DB host 만으로 환경 식별 <span style="color:#D1242F">**금지**</span> · Status <span style="color:#BF8700">**Open**</span> |
-  | R-AUTO-009 신규 | Strategy Execution `--execute` 후 MarketConnector executor `--execute` 를 실제 REQUESTED 주문 row 있는 상태에서 검증 못한 채 운영 진입 · mitigation = 본 일자 정적·dry run 까지만 · 평일/안전 테스트 데이터 end-to-end 후속 · 검증 전 `--execute` 실호출 <span style="color:#D1242F">**금지**</span> · View 신규 step paper 운영 활성화 보류 · Status <span style="color:#BF8700">**Open**</span> |
-  | R-AUTO-010 신규 | MarketConnector executor `--execute` guard 가 잘못된 환경에서 우회되거나 환경변수 누락 시 통과 · 잘못된 broker 주문 위험 · mitigation = guard 코드 환경변수 누락 시 default `--execute` 거부 · 운영자 직접 환경변수 점검 · 비밀번호·계좌·endpoint 평문 출력 <span style="color:#D1242F">**금지**</span> · Status <span style="color:#BF8700">**Open**</span> |
-  | R-AUTO-011 신규 | View 신규 step `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` (order 12) 삽입 · 12~17단계 구간 end-to-end 미검증 · mitigation = `.\mvnw.cmd clean compile` 까지만 · Daily Batch 실행 · Python 주문 스크립트 · DB · AWS 접근 0건 · 운영 직전 평일/안전 환경 end-to-end 후속 · 변경 이전 형상 git 보존 · Status 🟠 **Open** |
+  | R-DATA-007 신규 | local PostgreSQL ↔ AWS Paper RDS 사이 주문·체결·포지션·strategy execution 상태 데이터 병합·동기화 시 중복 주문·fill 누적·position 상태 충돌·source of truth 정합성 붕괴 · mitigation = OD-ENV-006 · OD-ENV-007 |
+  | R-DATA-007 신규 (계속) | OD-ENV-008 명문화 + paper guard + DB host 만으로 환경 식별 <span style="color:#D1242F">**금지**</span> · Status <span style="color:#BF8700">**Open**</span> |
+  | R-AUTO-009 신규 | Strategy Execution `--execute` 후 MarketConnector executor `--execute` 를 실제 REQUESTED 주문 row 있는 상태에서 검증 못한 채 운영 진입 · mitigation = 본 일자 정적·dry run 까지만 · 평일/안전 테스트 데이터 end-to-end 후속 |
+  | R-AUTO-009 신규 (계속) | 검증 전 `--execute` 실호출 <span style="color:#D1242F">**금지**</span> · View 신규 step paper 운영 활성화 보류 · Status <span style="color:#BF8700">**Open**</span> |
+  | R-AUTO-010 신규 | MarketConnector executor `--execute` guard 가 잘못된 환경에서 우회되거나 환경변수 누락 시 통과 · 잘못된 broker 주문 위험 · mitigation = guard 코드 환경변수 누락 시 default `--execute` 거부 · 운영자 직접 환경변수 점검 |
+  | R-AUTO-010 신규 (계속) | 비밀번호·계좌·endpoint 평문 출력 <span style="color:#D1242F">**금지**</span> · Status <span style="color:#BF8700">**Open**</span> |
+  | R-AUTO-011 신규 | View 신규 step `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` (order 12) 삽입 · 12~17단계 구간 end-to-end 미검증 · mitigation = `.\mvnw.cmd clean compile` 까지만 · Daily Batch 실행 · Python 주문 스크립트 · DB · AWS 접근 0건 |
+  | R-AUTO-011 신규 (계속) | 운영 직전 평일/안전 환경 end-to-end 후속 · 변경 이전 형상 git 보존 · Status 🟠 **Open** |
 
 - 🟢 **`.kiro/WORKLOG.md`**
 
@@ -5902,9 +6281,11 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 
   | ID | 값 |
   | --- | --- |
-  | OD-MS-013 | `port_strategy_decision` Task Definition 분리 정책 = 통합 `daily_decision_run.py` 보류<br>Daily Batch 구조 계승<br>buy-signal / position-signal 별도 TD 2개<br>family `portfolio-paper-strategy-decision-buy-signal`<br>`portfolio-paper-strategy-decision-position-signal`<br>command `python -m port_strategy_decision.daily_buy_signal_run`<br>`python -m port_strategy_decision.daily_position_signal_run`<br>🟠 **잠정** |
+  | OD-MS-013 | `port_strategy_decision` Task Definition 분리 정책 = 통합 `daily_decision_run.py` 보류 · Daily Batch 구조 계승 · buy-signal / position-signal 별도 TD 2개 · family `portfolio-paper-strategy-decision-buy-signal` |
+  | OD-MS-013 (계속) | `portfolio-paper-strategy-decision-position-signal` · command `python -m port_strategy_decision.daily_buy_signal_run` · `python -m port_strategy_decision.daily_position_signal_run` · 🟠 **잠정** |
   | OD-MS-014 | `port_strategy_common` 1차 배포 = 1차 ECS smoke image 에서 vendoring · 정식 package/version 관리는 Strategy Common 또는 DevOps 고도화 단계 후속 · 🟠 **잠정** |
-  | OD-MS-015 | KRX GUI crawler 1차 자동화 = SSM RunCommand → `schtasks /Run /TN Portfolio-KRX-Worker-Daily` → Windows Scheduled Task → Administrator interactive session → `run_krx_worker_daily.ps1`<br>SSM 이 wrapper 를 SYSTEM Session 0 / SessionId 0 에서 직접 실행하는 방식은 KRX GUI 로그인 부적합으로 채택 <span style="color:#D1242F">**거부**</span><br><span style="color:#BF8700">**잠정**</span> |
+  | OD-MS-015 | KRX GUI crawler 1차 자동화 = SSM RunCommand → `schtasks /Run /TN Portfolio-KRX-Worker-Daily` → Windows Scheduled Task → Administrator interactive session → `run_krx_worker_daily.ps1` |
+  | OD-MS-015 (계속) | SSM 이 wrapper 를 SYSTEM Session 0 / SessionId 0 에서 직접 실행하는 방식은 KRX GUI 로그인 부적합으로 채택 <span style="color:#D1242F">**거부**</span> · <span style="color:#BF8700">**잠정**</span> |
   | Decision Summary | 전체 65 → 68 · 잠정 20 → 23 |
   | Change Log | 2026-06-13 항목 2건 |
   | OD-MS-009 · OD-MS-012 | 본문 변경 없음 · 자동화 진입점 1단계는 OD-MS-015 로 분리 |
@@ -5935,7 +6316,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
   | SSM 직접 wrapper 실행 부적합 판단 | SessionId 0 vs 2 분리 |
   | Windows Scheduled Task | `Portfolio-KRX-Worker-Daily` 등록 + 1차 trigger 검증 |
   | RDP closed 상태 trigger | SSM RunCommand → `schtasks /Run` · `SUCCESS: Attempted to run the scheduled task` · Task State Running → Ready · 최신 로그 `krx_worker_daily_20260613_021904.log` · `[Collected Date] None` idempotent 정상 완료 |
-  | ECS crawler smoke | `portfolio-paper-interest-crawler:6` · Selenium Chrome smoke RunTask · public-a/public-b + `sgroup-crawler-tasks` + `assignPublicIp=ENABLED` · exitCode 0 · `SELENIUM CHROME SMOKE SUCCESS` · `example.com` · Naver Finance (`Npay 증권`) 도달 · `DRIVER QUIT` · `SELENIUM CHROME SMOKE END` |
+  | ECS crawler smoke | `portfolio-paper-interest-crawler:6` · Selenium Chrome smoke RunTask · public-a/public-b + `sgroup-crawler-tasks` + `assignPublicIp=ENABLED` · exitCode 0 · `SELENIUM CHROME SMOKE SUCCESS` · `example.com` |
+  | ECS crawler smoke (계속) | Naver Finance (`Npay 증권`) 도달 · `DRIVER QUIT` · `SELENIUM CHROME SMOKE END` |
   | Hybrid execution model | 1차 완성 판단 |
   | 후속 인계 | 7건 |
   | 평문 기록 | secret · KRX 로그인 · RDS endpoint · account-id · ARN · image digest · task ARN · instance-id 0건 · KRX 로그인 ID / password 는 "Secrets Manager 에서 주입" 으로만 · wrapper · SSM 응답 · CloudWatch · Selenium · Chrome stdout·stderr 전문 평문 인용 0건 |
@@ -6282,7 +6664,8 @@ Slack webhook URL 은 환경변수명(`SLACK_WEBHOOK_URL`) 까지만 기록. 운
 ### Changed
 
 - `.kiro/AGENTS.md`에 README / CHANGELOG / WORKLOG 관리 규칙을 추가했다. 단, 기존 작업 규칙(범위, 단일 기준 문서, MS별 AGENTS.md 참조, spec 작성, 보안, 실행 규칙)의 의미는 변경하지 않았다.
-- `.kiro/specs/_common/operator-decisions.md`의 구조를 운영자 가독성 중심으로 재정리했다. 실제 결정값(Decision ID, 선택지, 선택값, 비용 영향, 운영 리스크, 후속 spec 영향)은 변경하지 않았고, Status 표시만 한글/색상 라벨(🟢 확정 · 🟡 잠정 · 🔴 미정 · 🔵 보류)을 함께 사용하도록 개선했다. Status Legend, Decision Summary, At a Glance, 카테고리별 상세 결정표, Open · Tentative · Deferred 결정 모음, Decision Update Rules, Change Log 섹션을 추가했다.
+- `.kiro/specs/_common/operator-decisions.md`의 구조를 운영자 가독성 중심으로 재정리했다. · 실제 결정값(Decision ID, 선택지, 선택값, 비용 영향, 운영 리스크, 후속 spec 영향)은 변경하지 않았고, Status 표시만 한글/색상 라벨(🟢 확정 · 🟡 잠정 · 🔴 미정 · 🔵 보류)을 함께 사용하도록 개선했다.
+  Status Legend, Decision Summary, At a Glance, 카테고리별 상세 결정표, Open · Tentative · Deferred 결정 모음, Decision Update Rules, Change Log 섹션을 추가했다.
 
 ### Security
 
