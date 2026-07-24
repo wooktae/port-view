@@ -1,0 +1,55 @@
+version: 0.2
+
+env:
+  shell: bash
+  variables:
+    SERVICE_NAME: port-view
+    EVIDENCE_DIR: evidence
+
+phases:
+  install:
+    commands:
+      - set -euo pipefail
+      - java -version
+      - ./mvnw --version
+      - docker version
+
+  pre_build:
+    commands:
+      - set -euo pipefail
+      - test -f pom.xml
+      - test -f Dockerfile
+      - test -x mvnw
+      - mkdir -p "${EVIDENCE_DIR}"
+      - export SOURCE_SHA="${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}"
+      - export IMAGE_TAG="$(printf '%s' "${SOURCE_SHA}" | cut -c1-12)"
+      - printf 'service=%s\n' "${SERVICE_NAME}" > "${EVIDENCE_DIR}/build.env"
+      - printf 'source_sha=%s\n' "${SOURCE_SHA}" >> "${EVIDENCE_DIR}/build.env"
+      - printf 'image_tag=%s\n' "${IMAGE_TAG}" >> "${EVIDENCE_DIR}/build.env"
+
+  build:
+    commands:
+      - set -euo pipefail
+      - ./mvnw -B -ntp test
+      - ./mvnw -B -ntp -DskipTests clean package
+      - mapfile -t JAR_FILES < <(find target -maxdepth 1 -type f -name '*.jar' ! -name '*.original' | sort)
+      - test "${#JAR_FILES[@]}" -eq 1
+      - printf 'jar_file=%s\n' "${JAR_FILES[0]}" >> "${EVIDENCE_DIR}/build.env"
+      - docker build --tag "${SERVICE_NAME}:${IMAGE_TAG}" .
+      - docker image inspect "${SERVICE_NAME}:${IMAGE_TAG}" --format '{{.Id}}' > "${EVIDENCE_DIR}/image-id.txt"
+
+  post_build:
+    commands:
+      - set -euo pipefail
+      - printf 'result=SUCCESS\n' >> "${EVIDENCE_DIR}/build.env"
+      - cat "${EVIDENCE_DIR}/build.env"
+      - cat "${EVIDENCE_DIR}/image-id.txt"
+
+artifacts:
+  files:
+    - evidence/**/*
+  discard-paths: false
+
+cache:
+  paths:
+    - /root/.m2/**/*
