@@ -463,6 +463,8 @@ cross-service 실행 이력은 길게 복사하지 않는다.
 CHANGELOG는 port-view 코드와 문서의 변경 이력만 기록한다.
 
 - 최신 날짜를 상단에 추가한다.
+- CHANGELOG 업데이트 요청 시 지정 날짜 또는 지정 commit 범위의 Git 이력을 읽기 전용으로 확인한다.
+- Git 이력에서 실제 port-view 코드, 설정, 테스트, 빌드, 문서에 반영된 변경만 기록한다.
 - `Added`, `Changed`, `Fixed`, `Removed`, `Security`를 필요에 따라 사용한다.
 - 다른 MS와 Step Functions 내부 변경은 port-view 코드나 문서가 실제 변경된 경우에만 기록한다.
 - raw log와 일회성 실행 식별자는 기록하지 않는다.
@@ -505,13 +507,25 @@ port-view 코드와 문서의 변경 이력은 `CHANGELOG.md`에 기록하고, �
 
 ## 11. Git 규칙
 
+## 11. Git 규칙
+
 기본적으로 읽기 전용 상태 확인만 허용한다.
 
-| 허용 | 금지 |
+| 허용 | 용도 |
 | --- | --- |
-| `git status --short`<br>`git diff --stat`<br>`git diff --check` | `git add`<br>`git commit`<br>`git push`<br>`git reset`<br>`git restore`<br>`git checkout`<br>`git stash` |
+| `git status --short` | 현재 작업 트리 변경 상태 확인 |
+| `git diff --stat` · `git diff --check` | 수정 범위와 공백 오류 확인 |
+| `git log` · `git show` · `git diff <commit>` | 사용자 요청 범위의 변경 이력과 CHANGELOG 근거 확인 |
 
-사용자가 명시적으로 요청하지 않는 한 commit을 생성하지 않는다.
+아래 Git write 명령은 사용자가 명시적으로 요청하지 않는 한 실행하지 않는다.
+
+- `git add`
+- `git commit`
+- `git push`
+- `git reset`
+- `git restore`
+- `git checkout`
+- `git stash`
 
 ## 12. 완료 보고
 

@@ -13,6 +13,36 @@ port-view 코드와 문서의 주요 변경 이력을 기록한다.
 | 상세 근거 | 필요한 경우 `docs` 또는 commit 참조 |
 | 민감정보 | 실제 계좌번호 · secret · token · ARN · public IP 원문 기록 금지 |
 
+## 2026-07-24 — View CodeBuild CI와 CI 컨텍스트 테스트 격리
+
+### Added
+
+| 파일 | 변경 |
+| --- | --- |
+| `.devops/codebuild/buildspec.yml` | View CodeBuild buildspec 신규 추가 |
+| `.github/workflows/view-codebuild.yml` | `workflow_dispatch`로 CodeBuild를 실행하는 워크플로 추가 |
+| `src/test/resources/application-ci.properties` | H2 기반 `ci` 프로파일 추가 · 외부 실행과 Slack 비활성 |
+| `pom.xml` | test scope H2 의존성 추가 · CI context smoke 전용 |
+
+### Changed
+
+| 파일 | 변경 |
+| --- | --- |
+| `PortViewApplicationTests.java` | `contextLoads`에 `@ActiveProfiles("ci")` 적용 · 외부 DB 의존 제거 |
+| `.devops/codebuild/buildspec.yml` | CodeBuild shell state 보존과 LF 처리 보완 |
+| `.gitattributes` | `*.yml` · `*.yaml` · `.gitattributes` LF 고정 추가 |
+| `mvnw` | CodeBuild 실행을 위한 executable 권한 부여 |
+| `.gitignore` | `/evidence/` 무시 규칙 추가 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| `ci` 프로파일 외부 실행 | snapshot · order · strategy · batch · slack 비활성 확인 |
+| AWS · DB · broker · KIS · Slack 실제 실행 | 0건 |
+| Git write 명령 | 0건 · 읽기 전용 `log` · `show` · `status` · `diff`만 사용 |
+| 민감정보 원문 신규 기록 | 0건 |
+
 ## 2026-07-22 — port-view 문서 기준 재정비
 
 ### Changed
