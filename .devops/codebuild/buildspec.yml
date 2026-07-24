@@ -9,41 +9,94 @@ env:
 phases:
   install:
     commands:
-      - set -euo pipefail
-      - java -version
-      - ./mvnw --version
-      - docker version
+      - |
+        set -euo pipefail
+
+        java -version
+        ./mvnw --version
+        docker version
 
   pre_build:
     commands:
-      - set -euo pipefail
-      - test -f pom.xml
-      - test -f Dockerfile
-      - test -x mvnw
-      - mkdir -p "${EVIDENCE_DIR}"
-      - export SOURCE_SHA="${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}"
-      - export IMAGE_TAG="$(printf '%s' "${SOURCE_SHA}" | cut -c1-12)"
-      - printf 'service=%s\n' "${SERVICE_NAME}" > "${EVIDENCE_DIR}/build.env"
-      - printf 'source_sha=%s\n' "${SOURCE_SHA}" >> "${EVIDENCE_DIR}/build.env"
-      - printf 'image_tag=%s\n' "${IMAGE_TAG}" >> "${EVIDENCE_DIR}/build.env"
+      - |
+        set -euo pipefail
+
+        test -f pom.xml
+        test -f Dockerfile
+        test -x mvnw
+
+        mkdir -p "${EVIDENCE_DIR}"
+
+        SOURCE_SHA="${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}"
+        IMAGE_TAG="$(printf '%s' "${SOURCE_SHA}" | cut -c1-12)"
+
+        export SOURCE_SHA
+        export IMAGE_TAG
+
+        printf 'service=%s\n' "${SERVICE_NAME}" > "${EVIDENCE_DIR}/build.env"
+        printf 'source_sha=%s\n' "${SOURCE_SHA}" >> "${EVIDENCE_DIR}/build.env"
+        printf 'image_tag=%s\n' "${IMAGE_TAG}" >> "${EVIDENCE_DIR}/build.env"
 
   build:
     commands:
-      - set -euo pipefail
-      - ./mvnw -B -ntp test
-      - ./mvnw -B -ntp -DskipTests clean package
-      - mapfile -t JAR_FILES < <(find target -maxdepth 1 -type f -name '*.jar' ! -name '*.original' | sort)
-      - test "${#JAR_FILES[@]}" -eq 1
-      - printf 'jar_file=%s\n' "${JAR_FILES[0]}" >> "${EVIDENCE_DIR}/build.env"
-      - docker build --tag "${SERVICE_NAME}:${IMAGE_TAG}" .
-      - docker image inspect "${SERVICE_NAME}:${IMAGE_TAG}" --format '{{.Id}}' > "${EVIDENCE_DIR}/image-id.txt"
+      - |
+        set -euo pipefail
+
+        ./mvnw -B -ntp test
+        ./mvnw -B -ntp -DskipTests clean package
+
+        mapfile -t JAR_FILES < <(
+          find target \
+            -maxdepth 1 \
+            -type f \
+            -name '*.jar' \
+            ! -name '*.original' \
+            | sort
+        )
+
+        if [ "${#JAR_FILES[@]}" -ne 1 ]; then
+          printf 'Expected exactly one executable JAR, found %s\n' \
+            "${#JAR_FILES[@]}" >&2
+
+          printf '%s\n' "${JAR_FILES[@]:-}" >&2
+          exit 1
+        fi
+
+        JAR_FILE="${JAR_FILES[0]}"
+
+        printf 'jar_file=%s\n' "${JAR_FILE}" \
+          >> "${EVIDENCE_DIR}/build.env"
+
+        docker build \
+          --tag "${SERVICE_NAME}:${IMAGE_TAG}" \
+          .
+
+        docker image inspect \
+          "${SERVICE_NAME}:${IMAGE_TAG}" \
+          --format '{{.Id}}' \
+          > "${EVIDENCE_DIR}/image-id.txt"
 
   post_build:
     commands:
-      - set -euo pipefail
-      - printf 'result=SUCCESS\n' >> "${EVIDENCE_DIR}/build.env"
-      - cat "${EVIDENCE_DIR}/build.env"
-      - cat "${EVIDENCE_DIR}/image-id.txt"
+      - |
+        set -u
+
+        if [ "${CODEBUILD_BUILD_SUCCEEDING:-0}" -eq 1 ]; then
+          printf 'result=SUCCESS\n' >> "${EVIDENCE_DIR}/build.env"
+        else
+          printf 'result=FAILED\n' >> "${EVIDENCE_DIR}/build.env"
+        fi
+
+        printf '%s\n' '--- build evidence ---'
+
+        if [ -f "${EVIDENCE_DIR}/build.env" ]; then
+          cat "${EVIDENCE_DIR}/build.env"
+        fi
+
+        if [ -f "${EVIDENCE_DIR}/image-id.txt" ]; then
+          printf '%s\n' '--- docker image id ---'
+          cat "${EVIDENCE_DIR}/image-id.txt"
+        fi
 
 artifacts:
   files:
