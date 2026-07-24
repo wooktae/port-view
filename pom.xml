@@ -49,6 +49,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- H2: CI context smoke test only -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- AWS SDK v2: Step Functions StartExecution -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
