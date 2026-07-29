@@ -4,6 +4,8 @@ env:
   shell: bash
   variables:
     SERVICE_NAME: port-view
+    ECR_REPOSITORY: portfolio-view
+    AWS_REGION: ap-northeast-2
     EVIDENCE_DIR: evidence
 
 phases:
@@ -15,6 +17,7 @@ phases:
         java -version
         ./mvnw --version
         docker version
+        aws --version
 
   pre_build:
     commands:
@@ -29,13 +32,29 @@ phases:
 
         SOURCE_SHA="${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}"
         IMAGE_TAG="$(printf '%s' "${SOURCE_SHA}" | cut -c1-12)"
+        AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+        ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        ECR_IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
 
         export SOURCE_SHA
         export IMAGE_TAG
+        export AWS_ACCOUNT_ID
+        export ECR_REGISTRY
+        export ECR_IMAGE_URI
 
         printf 'service=%s\n' "${SERVICE_NAME}" > "${EVIDENCE_DIR}/build.env"
         printf 'source_sha=%s\n' "${SOURCE_SHA}" >> "${EVIDENCE_DIR}/build.env"
         printf 'image_tag=%s\n' "${IMAGE_TAG}" >> "${EVIDENCE_DIR}/build.env"
+        printf 'ecr_repository=%s\n' "${ECR_REPOSITORY}" >> "${EVIDENCE_DIR}/build.env"
+        printf 'ecr_image_uri=%s\n' "${ECR_IMAGE_URI}" >> "${EVIDENCE_DIR}/build.env"
+        printf 'codebuild_build_id=%s\n' "${CODEBUILD_BUILD_ID:-unknown}" \
+          >> "${EVIDENCE_DIR}/build.env"
+
+        aws ecr get-login-password \
+          --region "${AWS_REGION}" \
+          | docker login \
+              --username AWS \
+              --password-stdin "${ECR_REGISTRY}"
 
   build:
     commands:
@@ -69,12 +88,32 @@ phases:
 
         docker build \
           --tag "${SERVICE_NAME}:${IMAGE_TAG}" \
+          --tag "${ECR_IMAGE_URI}" \
           .
 
         docker image inspect \
-          "${SERVICE_NAME}:${IMAGE_TAG}" \
+          "${ECR_IMAGE_URI}" \
           --format '{{.Id}}' \
           > "${EVIDENCE_DIR}/image-id.txt"
+
+        docker push "${ECR_IMAGE_URI}" \
+          | tee "${EVIDENCE_DIR}/ecr-push.txt"
+
+        IMAGE_DIGEST="$(
+          awk '/digest: sha256:/ {print $2; exit}' \
+            "${EVIDENCE_DIR}/ecr-push.txt"
+        )"
+
+        if [ -z "${IMAGE_DIGEST}" ]; then
+          printf '%s\n' 'ECR image digest was not found.' >&2
+          exit 1
+        fi
+
+        printf '%s\n' "${IMAGE_DIGEST}" \
+          > "${EVIDENCE_DIR}/image-digest.txt"
+
+        printf 'image_digest=%s\n' "${IMAGE_DIGEST}" \
+          >> "${EVIDENCE_DIR}/build.env"
 
   post_build:
     commands:
@@ -96,6 +135,11 @@ phases:
         if [ -f "${EVIDENCE_DIR}/image-id.txt" ]; then
           printf '%s\n' '--- docker image id ---'
           cat "${EVIDENCE_DIR}/image-id.txt"
+        fi
+
+        if [ -f "${EVIDENCE_DIR}/image-digest.txt" ]; then
+          printf '%s\n' '--- ecr image digest ---'
+          cat "${EVIDENCE_DIR}/image-digest.txt"
         fi
 
 artifacts:
