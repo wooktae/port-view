@@ -12,6 +12,8 @@ Spring MVC와 Thymeleaf 기반의 Portfolio View 마이크로서비스다.
 | --- | --- |
 | 애플리케이션 | 🟢 주요 화면과 AWS Paper DB 조회 검증 완료 |
 | ECS Fargate | 🟢 1차 포팅과 화면 조회 실증 완료 |
+| View CI/CD | 🟢 GitHub Actions · OIDC · CodeBuild · ECR 배포 검증 완료 |
+| 운영 배포 검증 | 🟢 Candidate 검증 · 운영 승격 · Rollback 재승격 확인 |
 | 현재 운영 성격 | 포트폴리오 실증 상태 유지 |
 | 기본 실행 backend | `aws-stepfunctions` |
 | Local File backend | 운영자 로컬 검증과 복구용 |
@@ -349,15 +351,37 @@ OPS Mirror 기준 테이블:
 
 port-view는 ECS Fargate Service 1차 포팅과 AWS Paper 연동 실증을 완료했다.
 
+2026-07-29 기준 GitHub Actions · OIDC · CodeBuild · ECR 기반 배포와 Candidate 검증, 운영 승격, Rollback 재승격까지 검증했다.
+
 현재는 상시 외부 공개 서비스가 아니라 포트폴리오 실증 상태로 유지한다.
 
 ### 배포 흐름
 
-1. `Dockerfile`로 image build
-2. ECR repository push
-3. ECS Task Definition revision 등록
-4. ECS Service rollout
-5. 화면과 Step Functions trigger 확인
+1. GitHub Actions 수동 실행
+2. GitHub OIDC 인증
+3. CodeBuild Maven Test · Package
+4. Docker Image Build
+5. Git Commit SHA 기반 ECR Image Push
+6. Standalone Candidate Task 실행
+7. Candidate 주요 8개 화면 Smoke Test
+8. 수동 승인 후 ECS Service Revision 승격
+9. 운영 주요 8개 화면 Smoke Test
+10. 이전 정상 Revision Rollback
+11. Rollback Smoke Test
+12. 최신 Revision 재승격
+
+### 배포 안전 기준
+
+| 항목 | 값 |
+| --- | --- |
+| Candidate 실행 | 운영 Service와 분리된 Standalone Task |
+| Candidate 배치 · Step Functions | 비활성 |
+| Candidate Paper 주문 · Strategy Execution 제출 | 비활성 |
+| 운영 승격 Task Definition | Candidate Revision 그대로 미사용 |
+| 운영 Revision 구성 | 기존 운영 환경변수와 신규 Image Digest 결합 |
+| Rollback 기준 | 승격 전 이전 정상 Revision 저장 |
+
+> 배포 Slack 알림은 이번 범위에서 미구현이다. 기존 장전 · Daily 검증 · Daily 실행 · 장후 알림과의 채널 분리 검토 후 후순위로 진행한다.
 
 ### Container 설정
 

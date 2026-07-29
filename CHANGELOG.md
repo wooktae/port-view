@@ -13,6 +13,55 @@ port-view 코드와 문서의 주요 변경 이력을 기록한다.
 | 상세 근거 | 필요한 경우 `docs` 또는 commit 참조 |
 | 민감정보 | 실제 계좌번호 · secret · token · ARN · public IP 원문 기록 금지 |
 
+## 2026-07-29 — View ECR 배포와 Candidate 승격·Rollback 검증
+
+### Added
+
+| 파일 | 변경 |
+| --- | --- |
+| `.devops/codebuild/buildspec.yml` | ECR 로그인 추가 |
+| `.devops/codebuild/buildspec.yml` | Git Commit SHA 앞 12자리 기반 Image Tag 생성 |
+| `.devops/codebuild/buildspec.yml` | portfolio-view ECR Repository Push 추가 |
+| `.devops/codebuild/buildspec.yml` | Image Digest와 CodeBuild Build ID Evidence 기록 추가 |
+
+### Changed
+
+| 항목 | 변경 |
+| --- | --- |
+| CodeBuild Service Role | portfolio-view ECR 전용 최소 Push 권한 추가 |
+| Docker Image Build | 로컬 Tag와 ECR Tag 동시 생성 |
+| View 배포 절차 | Candidate 검증 후 수동 운영 승격으로 확정 |
+| Task Definition | Candidate와 운영 승격용 분리 확정 |
+
+### Validation
+
+| 항목 | 결과 |
+| --- | --- |
+| GitHub Actions → OIDC → CodeBuild → ECR Push | 성공 |
+| 신규 Git SHA Image Tag와 Digest 생성 | 확인 |
+| Standalone Candidate Task | RUNNING 확인 |
+| Candidate 주요 8개 화면 | HTTP 200 |
+| 운영 ECS Service 신규 Revision 승격 | 성공 |
+| 운영 주요 8개 화면 | HTTP 200 |
+| 이전 정상 Revision Rollback | 성공 |
+| Rollback 후 주요 8개 화면 | HTTP 200 |
+| 신규 Revision 최종 재승격 | RUNNING 확인 |
+| Candidate Task 정상 종료 | 확인 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| Candidate 배치 실행 | 비활성 |
+| Candidate Step Functions 실행 | 비활성 |
+| Candidate Paper 주문 | 비활성 |
+| Candidate Strategy Execution 제출 | 비활성 |
+| 운영 승격 전 Candidate · 운영 설정 분리 | 확인 |
+| MarketConnector EC2 | 미사용 |
+| DB 직접 접속과 DDL · DML | 미수행 |
+| Slack 배포 알림 | 미전송 |
+| 민감정보 원문 신규 기록 | 0건 |
+
 ## 2026-07-24 — View CodeBuild CI와 CI 컨텍스트 테스트 격리
 
 ### Added

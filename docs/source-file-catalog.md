@@ -27,6 +27,7 @@ repository root 기준 상대 경로를 사용하며 build 결과물과 cache �
 | `pom.xml` | Maven 의존성과 build 설정 |
 | `mvnw` · `mvnw.cmd` | Maven Wrapper |
 | `Dockerfile` | ECS Fargate용 container image build |
+| `.devops/codebuild/buildspec.yml` | CodeBuild Maven Test · Package · Docker build · ECR Push · Evidence 기록 |
 
 ### 변경 시 확인
 
@@ -37,6 +38,7 @@ repository root 기준 상대 경로를 사용하며 build 결과물과 cache �
 | `CHANGELOG.md` | 실제 port-view 변경만 기록 |
 | `pom.xml` | compile · test · package 영향 |
 | `Dockerfile` | runtime · port · profile · build context |
+| `.devops/codebuild/buildspec.yml` | test · package · image · ECR Push · Evidence |
 
 ## Application
 

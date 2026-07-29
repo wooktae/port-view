@@ -127,6 +127,8 @@
 | 문서 | `README.md` · `CHANGELOG.md` · `docs` |
 | 빌드 | `pom.xml` · Maven Wrapper |
 | 컨테이너 | `Dockerfile` 및 배포 관련 파일 |
+| CI/CD | `.devops/codebuild/buildspec.yml` · GitHub Actions workflow |
+| 배포 | ECR · ECS Task Definition · 배포 스크립트 |
 
 현재 요청에 포함되지 않은 파일은 수정하지 않는다.
 
@@ -415,6 +417,28 @@ ARN, task ARN, ENI ID를 운영자가 직접 끼워 넣어야 하는 예시는 �
 - 실패한 명령 뒤에 SUCCESS 또는 DONE marker를 출력하지 않는다.
 - multiline JSON은 파일 기반 전달을 우선한다.
 
+### 8.5 배포와 CI/CD 안전 기준
+
+배포와 CI/CD 관련 파일도 port-view 기본 수정 대상이다.
+
+| 대상 | 파일 |
+| --- | --- |
+| CI Build | `.devops/codebuild/buildspec.yml` |
+| Workflow | GitHub Actions workflow |
+| Image | `Dockerfile` |
+| 배포 | ECR · ECS Task Definition · 배포 스크립트 |
+
+배포 검증 규칙:
+
+- Candidate 검증은 배치 · Step Functions · Paper 주문 · Strategy Execution 제출을 비활성화한 상태에서 수행한다.
+- Candidate Revision을 그대로 운영에 승격하지 않는다.
+- 운영 승격용 Revision은 기존 운영 환경변수와 검증된 Image Digest를 결합해 별도로 만든다.
+- 운영 승격 전 이전 정상 Revision을 Rollback 기준으로 저장한다.
+- Candidate · 운영 · Rollback Smoke Test는 실제 View 메뉴 경로 기준으로 수행한다.
+- 배포 Slack 알림은 현재 필수 완료 기준이 아니며, 별도 채널 정책 확정 후 적용한다.
+
+실제 CI/CD 실행, ECR Push, ECS 승격과 Rollback은 8.2 실행 제한을 따른다. 사용자가 명시적으로 승인한 배포 작업에서만 실행한다.
+
 ## 9. 테스트와 검증
 
 변경 범위에 맞는 최소 검증을 수행한다.
@@ -504,8 +528,6 @@ port-view 코드와 문서의 변경 이력은 `CHANGELOG.md`에 기록하고, �
 운영과 유지보수에 의미 있는 파일, 묶음 경로와 책임만 기록한다.
 
 변경이 없으면 CHANGELOG에 카탈로그 미변경 사실을 반복 기록하지 않는다.
-
-## 11. Git 규칙
 
 ## 11. Git 규칙
 
