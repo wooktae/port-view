@@ -13,6 +13,55 @@ port-view 코드와 문서의 주요 변경 이력을 기록한다.
 | 상세 근거 | 필요한 경우 `docs` 또는 commit 참조 |
 | 민감정보 | 실제 계좌번호 · secret · token · ARN · public IP 원문 기록 금지 |
 
+## 2026-08-11 — Research Version 조회와 View Release Workflow 완성
+
+### Added
+
+| 파일 · 항목 | 변경 |
+| --- | --- |
+| `StrategyReportController.java` | Research Version 선택 리포트 경로 추가 |
+| `ReportService.java` | Research Version 목록과 선택 Version Report 조립 |
+| `ReportRepository.java` | `strategy_config_version` 목록과 선택 Version 최신 run 조회 |
+| `strategy_report.html` | Hero 영역 Research Version Dropdown 추가 |
+| `strategy-report.css` | Research Version Dropdown 스타일 추가 |
+| `.github/workflows/view-codebuild.yml` | main push 기반 Candidate Smoke Workflow 추가 |
+| `.github/workflows/view-codebuild.yml` | `production` 승인 기반 Promotion Workflow 추가 |
+
+### Changed
+
+| 항목 | 변경 |
+| --- | --- |
+| Strategy Report | Strategy Config Version과 Engine Version 표시 의미 분리 |
+| View 배포 흐름 | 수동 Candidate · 승격 중심에서 main push 기반 자동 Candidate 검증과 승인형 Production Promotion으로 확장 |
+
+### Validation
+
+| 항목 | 결과 |
+| --- | --- |
+| `RSCFG-0001` 로컬 Report 조회 | 성공 |
+| Maven Test · Package | 성공 |
+| main push → CodeBuild → ECR | 성공 |
+| Candidate Standalone Fargate 실행 | 성공 |
+| Candidate 주요 화면 HTTP | 200 |
+| Research Version UI Smoke | 성공 |
+| `production` 승인 후 ECS Service Promotion | 성공 |
+| Production 주요 화면 HTTP | 200 |
+| 이전 정상 Revision Rollback | 성공 |
+| Rollback Smoke | 성공 |
+| 최신 정상 Revision 재승격과 Service Stable | 성공 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| Candidate 배치 실행 | 비활성 |
+| Candidate Step Functions 실행 | 비활성 |
+| Candidate Paper 주문 | 비활성 |
+| Candidate Strategy Execution 제출 | 비활성 |
+| Candidate와 Operating 설정 분리 | 유지 |
+| Candidate Task Definition 직접 Production 승격 | 금지 |
+| 민감정보 원문 신규 기록 | 0건 |
+
 ## 2026-07-29 — View ECR 배포와 Candidate 승격·Rollback 검증
 
 ### Added

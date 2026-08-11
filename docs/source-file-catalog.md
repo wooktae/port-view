@@ -28,6 +28,7 @@ repository root 기준 상대 경로를 사용하며 build 결과물과 cache �
 | `mvnw` · `mvnw.cmd` | Maven Wrapper |
 | `Dockerfile` | ECS Fargate용 container image build |
 | `.devops/codebuild/buildspec.yml` | CodeBuild Maven Test · Package · Docker build · ECR Push · Evidence 기록 |
+| `.github/workflows/view-codebuild.yml` | main push/수동 실행 · CodeBuild · Candidate Smoke · 승인형 Production Promotion |
 
 ### 변경 시 확인
 
@@ -39,6 +40,7 @@ repository root 기준 상대 경로를 사용하며 build 결과물과 cache �
 | `pom.xml` | compile · test · package 영향 |
 | `Dockerfile` | runtime · port · profile · build context |
 | `.devops/codebuild/buildspec.yml` | test · package · image · ECR Push · Evidence |
+| `.github/workflows/view-codebuild.yml` | Candidate Smoke · `production` 승인 · Promotion 흐름 |
 
 ## Application
 
@@ -61,7 +63,7 @@ repository root 기준 상대 경로를 사용하며 build 결과물과 cache �
 | `OrderController.java` | `/orders` 목록과 상세 |
 | `DailyBatchController.java` | Daily Batch 조회 · local action · AWS trigger |
 | `StrategyExecutionViewController.java` | 실행 계획 조회와 제출 action |
-| `StrategyReportController.java` | 최신 · 특정 run 리포트 |
+| `StrategyReportController.java` | 최신 · 특정 run · Research Version 선택 리포트 |
 | `controller/*.java` | Strategy Daily 등 화면 Controller 묶음 |
 
 ### 변경 시 확인
@@ -82,7 +84,7 @@ repository root 기준 상대 경로를 사용하며 build 결과물과 cache �
 | `DashboardService.java` | Dashboard DTO 조립 |
 | `PositionService.java` | 포지션 목록과 상세 DTO 조립 |
 | `OrderService.java` | 주문 · 체결 · 이벤트 timeline 조립 |
-| `ReportService.java` | 리포트 summary · stat · detail 조립 |
+| `ReportService.java` | 리포트 summary · stat · detail 조립 · Research Version 목록/선택 Version Report 조립 |
 | `StrategyExecutionViewService.java` | 실행 계획과 주문 후보 조회 |
 | `StrategyExecutionSubmitService.java` | 외부 execution 제출 요청 |
 | `ConnectorSnapshotRefreshService.java` | Local View Snapshot Refresh |
@@ -111,7 +113,7 @@ Service 변경 시 성공, 실패, 차단 경로를 분리해서 확인한다.
 | --- | --- |
 | `repository/*.java` | JPA와 JdbcTemplate 기반 DB 조회 |
 | `ConnectorOrderRequestRepository.java` | 주문 목록 · 상세 · Refresh 대상 |
-| `ReportRepository.java` | 리포트 summary · stat · trade detail |
+| `ReportRepository.java` | 리포트 summary · stat · trade detail · `strategy_config_version` 목록과 선택 Version 최신 run 조회 |
 | Daily Batch repository | `ops` Batch Run과 Step Log 조회 |
 | Strategy repository | `execution` · `decision` · `research` 조회 |
 
@@ -202,6 +204,7 @@ Util 변경 시 전체 화면의 표시값과 CSS class 영향을 확인한다.
 | `templates/pages/orders.html` | Order 목록 |
 | `templates/pages/order-detail.html` | Order 상세 |
 | `templates/pages/daily_batch.html` | Batch 상태와 실행 action |
+| `templates/pages/strategy_report.html` | Strategy Report · Research Version Dropdown |
 | `templates/pages/*.html` | Strategy · Daily · Report 포함 화면 묶음 |
 
 ### 변경 시 확인

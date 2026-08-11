@@ -437,6 +437,16 @@ ARN, task ARN, ENI ID를 운영자가 직접 끼워 넣어야 하는 예시는 �
 - Candidate · 운영 · Rollback Smoke Test는 실제 View 메뉴 경로 기준으로 수행한다.
 - 배포 Slack 알림은 현재 필수 완료 기준이 아니며, 별도 채널 정책 확정 후 적용한다.
 
+main push 기반 Release Workflow 규칙:
+
+- main push 기반 Workflow라도 Production 승격은 `production` 승인 Gate 뒤에서만 수행한다.
+- Candidate Smoke 성공 전 Production Promotion을 수행하지 않는다.
+- Candidate에서 검증한 Artifact와 Production에 사용하는 Image Digest가 동일해야 한다.
+- Promotion 시 현재 Operating Task Definition을 기준으로 운영 설정을 유지한다.
+- Research Version UI 변경 시 Candidate · Production Smoke에서 Strategy Report 경로를 확인한다.
+
+GitHub OIDC Trust Policy, IAM 권한 구성, Environment Required Reviewer 설정과 Runner IP 임시 SG 허용 등 DevOps 심화 구현 상세는 port-devops 책임 범위이며 이 문서에 기록하지 않는다.
+
 실제 CI/CD 실행, ECR Push, ECS 승격과 Rollback은 8.2 실행 제한을 따른다. 사용자가 명시적으로 승인한 배포 작업에서만 실행한다.
 
 ## 9. 테스트와 검증

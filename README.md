@@ -12,8 +12,9 @@ Spring MVC와 Thymeleaf 기반의 Portfolio View 마이크로서비스다.
 | --- | --- |
 | 애플리케이션 | 🟢 주요 화면과 AWS Paper DB 조회 검증 완료 |
 | ECS Fargate | 🟢 1차 포팅과 화면 조회 실증 완료 |
-| View CI/CD | 🟢 GitHub Actions · OIDC · CodeBuild · ECR 배포 검증 완료 |
+| View CI/CD | 🟢 main push 기반 자동 Release Workflow · Candidate Smoke · 승인형 Promotion 검증 완료 |
 | 운영 배포 검증 | 🟢 Candidate 검증 · 운영 승격 · Rollback 재승격 확인 |
+| Research Version 조회 | 🟢 Strategy Report Research Version Dropdown 구현 완료 |
 | 현재 운영 성격 | 포트폴리오 실증 상태 유지 |
 | 기본 실행 backend | `aws-stepfunctions` |
 | Local File backend | 운영자 로컬 검증과 복구용 |
@@ -61,7 +62,7 @@ Spring MVC와 Thymeleaf 기반의 Portfolio View 마이크로서비스다.
 | Positions | 보유 종목 목록과 상세 조회 |
 | Orders | 주문 요청 · 주문 체인 · 이벤트 · 체결 조회 |
 | Strategy Execution | 실행 계획과 주문 후보 조회 |
-| Strategy Report | 백테스트 리포트 · 통계 · 거래 상세 |
+| Strategy Report | 백테스트 리포트 · 통계 · 거래 상세 · Research Strategy Config Version 선택 조회 |
 | Strategy Daily | Daily Run · signal · position decision |
 | Daily Batch | Batch Run · Step 결과 · 상태 · 로그 조회 |
 
@@ -70,6 +71,14 @@ Daily Batch 화면은 AWS Step Functions 실행 요청 UI를 제공한다.
 - Step 1~11은 safe trigger로 분리한다.
 - Step 12~17은 approval trigger와 Paper 주문 gate 뒤에서만 허용한다.
 - `local-file` 실행과 Slack 테스트 기능은 운영자 로컬 검증과 복구 범위에서만 사용한다.
+
+Strategy Report 최신 화면은 백테스트 리포트 조회뿐 아니라 Research Strategy Config Version 선택 조회를 지원한다.
+
+- Hero 영역의 Research Version Dropdown에서 Strategy Config Version을 선택한다.
+- Dropdown 목록은 `research.strategy_backtest_run`에 존재하는 `strategy_config_version` 기준으로 동작한다.
+- 선택한 Version 기준 최신 Backtest Run을 조회한다.
+- Strategy Config Version과 Research Engine Version 표시 의미를 분리한다.
+- 현재 검증된 예시 Version은 `RSCFG-0001`이다.
 
 ## View 책임 경계
 
@@ -351,24 +360,28 @@ OPS Mirror 기준 테이블:
 
 port-view는 ECS Fargate Service 1차 포팅과 AWS Paper 연동 실증을 완료했다.
 
-2026-07-29 기준 GitHub Actions · OIDC · CodeBuild · ECR 기반 배포와 Candidate 검증, 운영 승격, Rollback 재승격까지 검증했다.
+GitHub Actions · OIDC · CodeBuild · ECR 기반 배포와 Candidate 검증, 운영 승격, Rollback 재승격까지 검증했다.
+
+현재는 main push 기반 자동 Release Workflow로 Candidate 검증을 수행하고 `production` 승인 뒤 운영에 Promotion한다. `workflow_dispatch` 수동 실행도 유지한다.
 
 현재는 상시 외부 공개 서비스가 아니라 포트폴리오 실증 상태로 유지한다.
 
 ### 배포 흐름
 
-1. GitHub Actions 수동 실행
-2. GitHub OIDC 인증
+1. main push 또는 `workflow_dispatch`
+2. GitHub Actions OIDC 인증
 3. CodeBuild Maven Test · Package
-4. Docker Image Build
-5. Git Commit SHA 기반 ECR Image Push
-6. Standalone Candidate Task 실행
-7. Candidate 주요 8개 화면 Smoke Test
-8. 수동 승인 후 ECS Service Revision 승격
-9. 운영 주요 8개 화면 Smoke Test
-10. 이전 정상 Revision Rollback
-11. Rollback Smoke Test
-12. 최신 Revision 재승격
+4. Docker Image Build와 Git SHA 기반 ECR Push
+5. Standalone Candidate Task 자동 실행
+6. Candidate 주요 화면 HTTP/UI Smoke와 Research Version 화면 검증
+7. `production` 승인
+8. 검증 Image Digest 기반 신규 Operating Revision 생성
+9. ECS Service Promotion
+10. Production Smoke Test
+11. 이전 정상 Revision Rollback 검증
+12. 최신 정상 Revision 재승격
+
+GitHub OIDC · IAM · Security Group 등 내부 구현 상세는 port-devops 책임 범위이며 이 문서에 기록하지 않는다.
 
 ### 배포 안전 기준
 
@@ -377,9 +390,12 @@ port-view는 ECS Fargate Service 1차 포팅과 AWS Paper 연동 실증을 완�
 | Candidate 실행 | 운영 Service와 분리된 Standalone Task |
 | Candidate 배치 · Step Functions | 비활성 |
 | Candidate Paper 주문 · Strategy Execution 제출 | 비활성 |
+| Candidate 종료 | HTTP/UI Smoke 이후 Task 종료 |
 | 운영 승격 Task Definition | Candidate Revision 그대로 미사용 |
-| 운영 Revision 구성 | 기존 운영 환경변수와 신규 Image Digest 결합 |
+| 운영 Revision 구성 | 기존 운영 환경변수와 검증 Image Digest 결합 |
+| Promotion Gate | Candidate Smoke 성공과 `production` 승인 이후 |
 | Rollback 기준 | 승격 전 이전 정상 Revision 저장 |
+| Smoke 범위 | Candidate · Production · Rollback 모두 수행 |
 
 > 배포 Slack 알림은 이번 범위에서 미구현이다. 기존 장전 · Daily 검증 · Daily 실행 · 장후 알림과의 채널 분리 검토 후 후순위로 진행한다.
 
