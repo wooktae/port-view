@@ -441,3 +441,191 @@ jobs:
           fi
 
           exit 0
+
+  promote-production:
+    name: Promote View Production
+    needs: candidate-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CODEBUILD_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-port-view-production
+
+      - name: Resolve tested image digest
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          IMAGE_TAG="${GITHUB_SHA:0:12}"
+
+          IMAGE_DIGEST="$(
+            aws ecr describe-images \
+              --repository-name "${ECR_REPOSITORY}" \
+              --image-ids imageTag="${IMAGE_TAG}" \
+              --query 'imageDetails[0].imageDigest' \
+              --output text
+          )"
+
+          test -n "${IMAGE_DIGEST}"
+          test "${IMAGE_DIGEST}" != "None"
+
+          IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}@${IMAGE_DIGEST}"
+
+          echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+          echo "image_digest=${IMAGE_DIGEST}" >> "${GITHUB_OUTPUT}"
+          echo "Production image: ${IMAGE_URI}"
+
+      - name: Resolve current operating task definition
+        id: operating
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OPERATING_TASK_DEFINITION_ARN="$(
+            aws ecs describe-services \
+              --cluster "${ECS_CLUSTER}" \
+              --services portfolio-view-service \
+              --query 'services[0].taskDefinition' \
+              --output text
+          )"
+
+          test -n "${OPERATING_TASK_DEFINITION_ARN}"
+          test "${OPERATING_TASK_DEFINITION_ARN}" != "None"
+
+          echo "operating_task_definition_arn=${OPERATING_TASK_DEFINITION_ARN}" >> "${GITHUB_OUTPUT}"
+          echo "previous_task_definition_arn=${OPERATING_TASK_DEFINITION_ARN}" >> "${GITHUB_OUTPUT}"
+
+          echo "Current operating task definition: ${OPERATING_TASK_DEFINITION_ARN}"
+
+      - name: Register new operating task definition
+        id: register
+        shell: bash
+        env:
+          OPERATING_TASK_DEFINITION_ARN: ${{ steps.operating.outputs.operating_task_definition_arn }}
+          IMAGE_URI: ${{ steps.image.outputs.image_uri }}
+        run: |
+          set -euo pipefail
+
+          aws ecs describe-task-definition \
+            --task-definition "${OPERATING_TASK_DEFINITION_ARN}" \
+            --query 'taskDefinition' \
+            --output json \
+            > operating-template.json
+
+          jq \
+            --arg image "${IMAGE_URI}" \
+            '
+            del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy,
+              .deregisteredAt
+            )
+            | .containerDefinitions[0].image = $image
+            ' \
+            operating-template.json \
+            > operating-register.json
+
+          NEW_OPERATING_TASK_DEFINITION_ARN="$(
+            aws ecs register-task-definition \
+              --cli-input-json file://operating-register.json \
+              --query 'taskDefinition.taskDefinitionArn' \
+              --output text
+          )"
+
+          test -n "${NEW_OPERATING_TASK_DEFINITION_ARN}"
+          test "${NEW_OPERATING_TASK_DEFINITION_ARN}" != "None"
+
+          echo "new_operating_task_definition_arn=${NEW_OPERATING_TASK_DEFINITION_ARN}" >> "${GITHUB_OUTPUT}"
+          echo "NEW_OPERATING_TASK_DEFINITION_ARN=${NEW_OPERATING_TASK_DEFINITION_ARN}" >> "${GITHUB_ENV}"
+
+          echo "New operating task definition: ${NEW_OPERATING_TASK_DEFINITION_ARN}"
+
+      - name: Verify operating safety boundary
+        shell: bash
+        env:
+          TASK_DEFINITION_ARN: ${{ steps.register.outputs.new_operating_task_definition_arn }}
+        run: |
+          set -euo pipefail
+
+          ENV_JSON="$(
+            aws ecs describe-task-definition \
+              --task-definition "${TASK_DEFINITION_ARN}" \
+              --query 'taskDefinition.containerDefinitions[0].environment' \
+              --output json
+          )"
+
+          require_true() {
+            local name="$1"
+            local value
+
+            value="$(
+              jq -r \
+                --arg name "${name}" \
+                '.[] | select(.name == $name) | .value' \
+                <<< "${ENV_JSON}"
+            )"
+
+            if [ "${value}" != "true" ]; then
+              echo "Operating boundary failed: ${name}=${value:-MISSING}" >&2
+              exit 1
+            fi
+
+            echo "${name}=true"
+          }
+
+          require_true PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_START_ENABLED
+          require_true PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_STEP_START_ENABLED
+          require_true PORTFOLIO_BATCH_EXECUTION_ENABLED
+          require_true PORTFOLIO_BATCH_PAPER_ORDER_ENABLED
+          require_true PORTFOLIO_BATCH_FULL_PIPELINE_EXECUTION_ENABLED
+          require_true PORTFOLIO_STRATEGY_EXECUTION_SUBMIT_ENABLED
+
+          echo "VIEW_OPERATING_BOUNDARY_VERIFY=SUCCESS"
+
+      - name: Update ECS service
+        shell: bash
+        env:
+          TASK_DEFINITION_ARN: ${{ steps.register.outputs.new_operating_task_definition_arn }}
+        run: |
+          set -euo pipefail
+
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service portfolio-view-service \
+            --task-definition "${TASK_DEFINITION_ARN}" \
+            --query 'service.{serviceName:serviceName,taskDefinition:taskDefinition,desiredCount:desiredCount}' \
+            --output json
+
+          echo "VIEW_PRODUCTION_SERVICE_UPDATE=SUCCESS"
+
+      - name: Show promotion evidence
+        shell: bash
+        env:
+          PREVIOUS_TASK_DEFINITION_ARN: ${{ steps.operating.outputs.previous_task_definition_arn }}
+          NEW_TASK_DEFINITION_ARN: ${{ steps.register.outputs.new_operating_task_definition_arn }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "### View Production Promotion"
+            echo
+            echo "- Source SHA: \`${GITHUB_SHA}\`"
+            echo "- Tested image digest: \`${IMAGE_DIGEST}\`"
+            echo "- Previous operating TaskDef: \`${PREVIOUS_TASK_DEFINITION_ARN}\`"
+            echo "- New operating TaskDef: \`${NEW_TASK_DEFINITION_ARN}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          echo "VIEW_PRODUCTION_PROMOTION=SUCCESS"
