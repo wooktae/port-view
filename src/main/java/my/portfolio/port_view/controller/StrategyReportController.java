@@ -5,6 +5,9 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
 
 import my.portfolio.port_view.common.ViewNames;
 import my.portfolio.port_view.dto.strategy.ReportStrategyPageDto;
@@ -21,10 +24,26 @@ public class StrategyReportController {
     }
 
     @GetMapping("/latest")
-    public String latest(Model model) {
-        ReportStrategyPageDto page = reportService.getLatestReport();
+    public String latest(
+            @RequestParam(name = "version", required = false) String version,
+            Model model
+    ) {
+        List<String> versions = reportService.getStrategyConfigVersions();
+
+        String selectedVersion = version;
+        if (selectedVersion == null || selectedVersion.isBlank()) {
+            selectedVersion = versions.isEmpty() ? null : versions.get(0);
+        } else {
+            selectedVersion = selectedVersion.trim();
+        }
+
+        ReportStrategyPageDto page = selectedVersion == null
+                ? reportService.getLatestReport()
+                : reportService.getLatestReportByStrategyConfigVersion(selectedVersion);
 
         model.addAttribute("page", page);
+        model.addAttribute("versions", versions);
+        model.addAttribute("selectedVersion", selectedVersion);
         model.addAttribute("pageTitle", "백테스트 리포트");
 
         return ViewNames.STRATEGY_REPORT;

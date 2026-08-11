@@ -76,6 +76,82 @@
     font-weight: 900;
 }
 
+.report-hero-side {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.report-version-form {
+    min-width: 180px;
+}
+
+.report-version-form label {
+    display: block;
+    margin: 0 0 6px;
+    font-size: 10px;
+    line-height: 1.2;
+    color: #94a3b8;
+    font-weight: 950;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.report-version-select-wrap {
+    position: relative;
+}
+
+.report-version-select {
+    width: 100%;
+    min-height: 42px;
+    padding: 0 38px 0 13px;
+    border-radius: 14px;
+    border: 1px solid #dbe3ec;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 950;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        background 0.15s ease;
+}
+
+.report-version-select:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
+.report-version-select:focus {
+    border-color: #94a3b8;
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.18);
+}
+
+.report-version-select:disabled {
+    color: #94a3b8;
+    background: #f8fafc;
+    cursor: default;
+}
+
+.report-version-select-wrap::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid #64748b;
+    border-bottom: 2px solid #64748b;
+    transform: translateY(-68%) rotate(45deg);
+    pointer-events: none;
+}
+
 .report-hero-badges {
     display: flex;
     align-items: center;
@@ -652,6 +728,11 @@
         align-items: flex-start;
     }
 
+    .report-hero-side {
+        width: 100%;
+        justify-content: space-between;
+    }
+
     .report-hero-badges {
         justify-content: flex-start;
     }
@@ -671,6 +752,21 @@
 }
 
 @media (max-width: 760px) {
+    .report-hero-side {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .report-version-form {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .report-hero-badges {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
     .report-info-card {
         grid-template-columns: 1fr;
     }

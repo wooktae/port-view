@@ -46,7 +46,7 @@
                             <div class="section-label">최신 백테스트</div>
                             <h2 th:text="${page.summary().strategyName()}">strategy_ai</h2>
                             <p>
-                                전략 버전:
+                                Engine:
                                 <strong th:text="${page.summary().engineVersion()}">RESEARCH_V3_EXIT_SOFTENED</strong>
                                 <br>
                                 구간:
@@ -56,16 +56,42 @@
                             </p>
                         </div>
 
-                        <div class="report-hero-badges">
-                            <span class="report-sharpe-badge">
-                                <em>Sharpe</em>
-                                <strong th:text="${page.summary().sharpeRatio() == null ? '-' : #numbers.formatDecimal(page.summary().sharpeRatio(), 1, 2)}">
-                                    2.68
-                                </strong>
-                            </span>
-                            <span class="soft-badge badge-count">
-                                거래 <strong th:text="${page.summary().totalTrades()}">0</strong>건
-                            </span>
+                        <div class="report-hero-side">
+                            <form method="get"
+                                  action="/strategy/reports/latest"
+                                  class="report-version-form">
+                                <label for="strategyVersion">Research Version</label>
+                                <div class="report-version-select-wrap">
+                                    <select id="strategyVersion"
+                                            name="version"
+                                            class="report-version-select"
+                                            th:disabled="${versions == null or #lists.isEmpty(versions)}"
+                                            onchange="this.form.submit()">
+                                        <option th:if="${versions == null or #lists.isEmpty(versions)}"
+                                                value="">
+                                            사용 가능한 버전 없음
+                                        </option>
+                                        <option th:each="version : ${versions}"
+                                                th:value="${version}"
+                                                th:text="${version}"
+                                                th:selected="${version == selectedVersion}">
+                                            RSCFG-0001
+                                        </option>
+                                    </select>
+                                </div>
+                            </form>
+
+                            <div class="report-hero-badges">
+                                <span class="report-sharpe-badge">
+                                    <em>Sharpe</em>
+                                    <strong th:text="${page.summary().sharpeRatio() == null ? '-' : #numbers.formatDecimal(page.summary().sharpeRatio(), 1, 2)}">
+                                        2.68
+                                    </strong>
+                                </span>
+                                <span class="soft-badge badge-count">
+                                    거래 <strong th:text="${page.summary().totalTrades()}">0</strong>건
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </section>

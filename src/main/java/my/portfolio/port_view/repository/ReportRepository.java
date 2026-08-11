@@ -48,6 +48,46 @@ public class ReportRepository {
         return rows.stream().findFirst();
     }
 
+    public List<String> findStrategyConfigVersions() {
+        String sql = """
+                SELECT DISTINCT strategy_config_version
+                FROM strategy_backtest_run
+                WHERE strategy_config_version IS NOT NULL
+                  AND BTRIM(strategy_config_version) <> ''
+                ORDER BY strategy_config_version DESC
+                """;
+
+        return jdbcTemplate.queryForList(sql, String.class);
+    }
+
+    public Optional<BacktestRunRow> findLatestBacktestRunByStrategyConfigVersion(String strategyConfigVersion) {
+        String sql = """
+                SELECT
+                    NULL::bigint AS id,
+                    run_id::text AS run_id,
+                    strategy_name,
+                    strategy_version AS engine_version,
+                    backtest_start_date AS start_date,
+                    backtest_end_date AS end_date,
+                    total_return AS cumulative_return,
+                    mdd AS max_drawdown,
+                    sharpe AS sharpe_ratio,
+                    trade_count AS total_trades,
+                    started_at AS created_at
+                FROM strategy_backtest_run
+                WHERE strategy_config_version = ?
+                ORDER BY started_at DESC, run_id DESC
+                LIMIT 1
+                """;
+
+        List<BacktestRunRow> rows = jdbcTemplate.query(
+                sql,
+                this::mapBacktestRunRow,
+                strategyConfigVersion
+        );
+        return rows.stream().findFirst();
+    }
+
     public Optional<BacktestRunRow> findBacktestRunByRunId(String runId) {
         String sql = """
                 SELECT

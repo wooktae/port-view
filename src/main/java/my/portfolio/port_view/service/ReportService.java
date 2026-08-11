@@ -40,6 +40,26 @@ public class ReportService {
         return buildReport(run);
     }
 
+    public List<String> getStrategyConfigVersions() {
+        return reportRepository.findStrategyConfigVersions();
+    }
+
+    public ReportStrategyPageDto getLatestReportByStrategyConfigVersion(String strategyConfigVersion) {
+        if (strategyConfigVersion == null || strategyConfigVersion.isBlank()) {
+            return getLatestReport();
+        }
+
+        String normalizedVersion = strategyConfigVersion.trim();
+
+        BacktestRunRow run = reportRepository
+                .findLatestBacktestRunByStrategyConfigVersion(normalizedVersion)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "백테스트 리포트를 찾을 수 없습니다. strategyConfigVersion=" + normalizedVersion
+                ));
+
+        return buildReport(run);
+    }
+
     public ReportStrategyPageDto getReportByRunId(String runId) {
         BacktestRunRow run = reportRepository.findBacktestRunByRunId(runId)
                 .orElseThrow(() -> new IllegalArgumentException("백테스트 리포트를 찾을 수 없습니다. runId=" + runId));
