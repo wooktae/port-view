@@ -1,4 +1,4 @@
-name: View CodeBuild
+﻿name: View CodeBuild
 
 on:
   push:
@@ -16,7 +16,13 @@ concurrency:
 
 env:
   AWS_REGION: ap-northeast-2
+  AWS_ACCOUNT_ID: "309011444323"
   CODEBUILD_PROJECT_NAME: portfolio-view-build
+  ECR_REPOSITORY: portfolio-view
+  ECS_CLUSTER: portfolio-paper-cluster
+  CANDIDATE_TEMPLATE_TASK_DEFINITION: portfolio-view:4
+  CANDIDATE_SECURITY_GROUP: sg-0c8da03d883d1284e
+  CANDIDATE_SUBNETS: subnet-0cf35c54a9933a25d,subnet-0b4ab98b1f0ee2d9c
 
 jobs:
   build:
@@ -114,3 +120,324 @@ jobs:
               logs:logs.deepLink
             }' \
             --output table
+
+  candidate-smoke:
+    name: View Candidate Smoke
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CODEBUILD_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-port-view-candidate
+
+      - name: Resolve built image digest
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          IMAGE_TAG="${GITHUB_SHA:0:12}"
+
+          IMAGE_DIGEST="$(
+            aws ecr describe-images \
+              --repository-name "${ECR_REPOSITORY}" \
+              --image-ids imageTag="${IMAGE_TAG}" \
+              --query 'imageDetails[0].imageDigest' \
+              --output text
+          )"
+
+          test -n "${IMAGE_DIGEST}"
+          test "${IMAGE_DIGEST}" != "None"
+
+          IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}@${IMAGE_DIGEST}"
+
+          echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+          echo "Candidate image: ${IMAGE_URI}"
+
+      - name: Register candidate task definition
+        id: taskdef
+        shell: bash
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.image_uri }}
+        run: |
+          set -euo pipefail
+
+          aws ecs describe-task-definition \
+            --task-definition "${CANDIDATE_TEMPLATE_TASK_DEFINITION}" \
+            --query 'taskDefinition' \
+            --output json \
+            > candidate-template.json
+
+          jq \
+            --arg image "${IMAGE_URI}" \
+            '
+            del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy,
+              .deregisteredAt
+            )
+            | .containerDefinitions[0].image = $image
+            ' \
+            candidate-template.json \
+            > candidate-register.json
+
+          CANDIDATE_TASK_DEFINITION_ARN="$(
+            aws ecs register-task-definition \
+              --cli-input-json file://candidate-register.json \
+              --query 'taskDefinition.taskDefinitionArn' \
+              --output text
+          )"
+
+          test -n "${CANDIDATE_TASK_DEFINITION_ARN}"
+          test "${CANDIDATE_TASK_DEFINITION_ARN}" != "None"
+
+          echo "candidate_task_definition_arn=${CANDIDATE_TASK_DEFINITION_ARN}" >> "${GITHUB_OUTPUT}"
+          echo "CANDIDATE_TASK_DEFINITION_ARN=${CANDIDATE_TASK_DEFINITION_ARN}" >> "${GITHUB_ENV}"
+
+      - name: Verify candidate safety gates
+        shell: bash
+        env:
+          TASK_DEFINITION_ARN: ${{ steps.taskdef.outputs.candidate_task_definition_arn }}
+        run: |
+          set -euo pipefail
+
+          ENV_JSON="$(
+            aws ecs describe-task-definition \
+              --task-definition "${TASK_DEFINITION_ARN}" \
+              --query 'taskDefinition.containerDefinitions[0].environment' \
+              --output json
+          )"
+
+          require_false() {
+            local name="$1"
+            local value
+
+            value="$(
+              jq -r \
+                --arg name "${name}" \
+                '.[] | select(.name == $name) | .value' \
+                <<< "${ENV_JSON}"
+            )"
+
+            if [ "${value}" != "false" ]; then
+              echo "Candidate safety gate failed: ${name}=${value:-MISSING}" >&2
+              exit 1
+            fi
+
+            echo "${name}=false"
+          }
+
+          require_false PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_START_ENABLED
+          require_false PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_STEP_START_ENABLED
+          require_false PORTFOLIO_BATCH_EXECUTION_ENABLED
+          require_false PORTFOLIO_BATCH_PAPER_ORDER_ENABLED
+          require_false PORTFOLIO_BATCH_FULL_PIPELINE_EXECUTION_ENABLED
+          require_false PORTFOLIO_STRATEGY_EXECUTION_SUBMIT_ENABLED
+
+          echo "VIEW_CANDIDATE_SAFETY_GATES=SUCCESS"
+
+      - name: Allow runner HTTP smoke ingress
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RUNNER_IP="$(curl --fail --silent --show-error https://api.ipify.org)"
+          RUNNER_CIDR="${RUNNER_IP}/32"
+
+          aws ec2 authorize-security-group-ingress \
+            --group-id "${CANDIDATE_SECURITY_GROUP}" \
+            --protocol tcp \
+            --port 8080 \
+            --cidr "${RUNNER_CIDR}"
+
+          echo "RUNNER_CIDR=${RUNNER_CIDR}" >> "${GITHUB_ENV}"
+          echo "RUNNER_INGRESS_ADDED=true" >> "${GITHUB_ENV}"
+
+      - name: Run standalone candidate
+        shell: bash
+        env:
+          TASK_DEFINITION_ARN: ${{ steps.taskdef.outputs.candidate_task_definition_arn }}
+        run: |
+          set -euo pipefail
+
+          CANDIDATE_TASK_ARN="$(
+            aws ecs run-task \
+              --cluster "${ECS_CLUSTER}" \
+              --launch-type FARGATE \
+              --platform-version LATEST \
+              --task-definition "${TASK_DEFINITION_ARN}" \
+              --network-configuration "awsvpcConfiguration={subnets=[${CANDIDATE_SUBNETS}],securityGroups=[${CANDIDATE_SECURITY_GROUP}],assignPublicIp=ENABLED}" \
+              --query 'tasks[0].taskArn' \
+              --output text
+          )"
+
+          test -n "${CANDIDATE_TASK_ARN}"
+          test "${CANDIDATE_TASK_ARN}" != "None"
+
+          echo "CANDIDATE_TASK_ARN=${CANDIDATE_TASK_ARN}" >> "${GITHUB_ENV}"
+
+          aws ecs wait tasks-running \
+            --cluster "${ECS_CLUSTER}" \
+            --tasks "${CANDIDATE_TASK_ARN}"
+
+          echo "VIEW_CANDIDATE_TASK_RUNNING=SUCCESS"
+
+      - name: Resolve candidate public IP
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ENI_ID="$(
+            aws ecs describe-tasks \
+              --cluster "${ECS_CLUSTER}" \
+              --tasks "${CANDIDATE_TASK_ARN}" \
+              --query "tasks[0].attachments[0].details[?name=='networkInterfaceId'].value | [0]" \
+              --output text
+          )"
+
+          test -n "${ENI_ID}"
+          test "${ENI_ID}" != "None"
+
+          PUBLIC_IP="$(
+            aws ec2 describe-network-interfaces \
+              --network-interface-ids "${ENI_ID}" \
+              --query 'NetworkInterfaces[0].Association.PublicIp' \
+              --output text
+          )"
+
+          test -n "${PUBLIC_IP}"
+          test "${PUBLIC_IP}" != "None"
+
+          echo "CANDIDATE_PUBLIC_IP=${PUBLIC_IP}" >> "${GITHUB_ENV}"
+          echo "Candidate public IP: ${PUBLIC_IP}"
+
+      - name: Wait for candidate application
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          URL="http://${CANDIDATE_PUBLIC_IP}:8080/strategy/reports/latest"
+
+          for attempt in {1..30}; do
+            HTTP_CODE="$(
+              curl \
+                --silent \
+                --show-error \
+                --location \
+                --output /dev/null \
+                --write-out '%{http_code}' \
+                --connect-timeout 5 \
+                --max-time 15 \
+                "${URL}" || true
+            )"
+
+            echo "Candidate readiness attempt ${attempt}/30: HTTP ${HTTP_CODE}"
+
+            if [ "${HTTP_CODE}" = "200" ]; then
+              echo "VIEW_CANDIDATE_READY=SUCCESS"
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          exit 1
+
+      - name: Candidate HTTP and UI smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_URL="http://${CANDIDATE_PUBLIC_IP}:8080"
+
+          URLS=(
+            "/"
+            "/dashboard"
+            "/balance-summary"
+            "/positions"
+            "/orders"
+            "/strategy/execution/plans"
+            "/strategy/reports/latest"
+            "/strategy/reports/latest?version=RSCFG-0001"
+            "/daily-batch"
+          )
+
+          for path in "${URLS[@]}"; do
+            HTTP_CODE="$(
+              curl \
+                --silent \
+                --show-error \
+                --location \
+                --output /tmp/view-smoke.html \
+                --write-out '%{http_code}' \
+                --connect-timeout 5 \
+                --max-time 30 \
+                "${BASE_URL}${path}"
+            )"
+
+            echo "${path} -> HTTP ${HTTP_CODE}"
+
+            if [ "${HTTP_CODE}" != "200" ]; then
+              echo "Candidate smoke failed: ${path}" >&2
+              exit 1
+            fi
+          done
+
+          RESEARCH_HTML="$(
+            curl \
+              --fail \
+              --silent \
+              --show-error \
+              --location \
+              --connect-timeout 5 \
+              --max-time 30 \
+              "${BASE_URL}/strategy/reports/latest?version=RSCFG-0001"
+          )"
+
+          grep -q 'Research Version' <<< "${RESEARCH_HTML}"
+          grep -q 'RSCFG-0001' <<< "${RESEARCH_HTML}"
+
+          echo "VIEW_CANDIDATE_HTTP_SMOKE=SUCCESS"
+          echo "VIEW_RESEARCH_VERSION_UI_SMOKE=SUCCESS"
+
+      - name: Stop candidate task
+        if: always()
+        shell: bash
+        run: |
+          set +e
+
+          if [ -n "${CANDIDATE_TASK_ARN:-}" ]; then
+            aws ecs stop-task \
+              --cluster "${ECS_CLUSTER}" \
+              --task "${CANDIDATE_TASK_ARN}" \
+              --reason "GitHub candidate smoke complete" \
+              >/dev/null
+          fi
+
+          exit 0
+
+      - name: Revoke runner HTTP smoke ingress
+        if: always()
+        shell: bash
+        run: |
+          set +e
+
+          if [ "${RUNNER_INGRESS_ADDED:-false}" = "true" ] && [ -n "${RUNNER_CIDR:-}" ]; then
+            aws ec2 revoke-security-group-ingress \
+              --group-id "${CANDIDATE_SECURITY_GROUP}" \
+              --protocol tcp \
+              --port 8080 \
+              --cidr "${RUNNER_CIDR}"
+          fi
+
+          exit 0
