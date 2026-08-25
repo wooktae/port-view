@@ -17,9 +17,6 @@ import my.portfolio.port_view.service.OperatingResearchVersionProvider;
 import my.portfolio.port_view.service.ReportService;
 import my.portfolio.port_view.service.ResearchChampionPromotionService;
 
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-
 @Controller
 @RequestMapping("/strategy/reports")
 public class StrategyReportController {
