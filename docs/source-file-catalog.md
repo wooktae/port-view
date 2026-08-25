@@ -63,7 +63,7 @@ repository root 기준 상대 경로를 사용하며 build 결과물과 cache �
 | `OrderController.java` | `/orders` 목록과 상세 |
 | `DailyBatchController.java` | Daily Batch 조회 · local action · AWS trigger |
 | `StrategyExecutionViewController.java` | 실행 계획 조회와 제출 action |
-| `StrategyReportController.java` | 최신 · 특정 run · Research Version 선택 리포트 |
+| `StrategyReportController.java` | 최신 · 특정 run · Research Version 선택 리포트 · 운영 Version 선택 action |
 | `controller/*.java` | Strategy Daily 등 화면 Controller 묶음 |
 
 ### 변경 시 확인
@@ -85,6 +85,8 @@ repository root 기준 상대 경로를 사용하며 build 결과물과 cache �
 | `PositionService.java` | 포지션 목록과 상세 DTO 조립 |
 | `OrderService.java` | 주문 · 체결 · 이벤트 timeline 조립 |
 | `ReportService.java` | 리포트 summary · stat · detail 조립 · Research Version 목록/선택 Version Report 조립 |
+| `OperatingResearchVersionProvider.java` | Production Step4 → Batch Job Definition command 기준 실제 OPERATING RSCFG 조회 |
+| `ResearchChampionPromotionService.java` | RSCFG 운영 승격 Plan · Job Definition Revision 생성 · dual State Machine preflight/promotion/after-check/rollback |
 | `StrategyExecutionViewService.java` | 실행 계획과 주문 후보 조회 |
 | `StrategyExecutionSubmitService.java` | 외부 execution 제출 요청 |
 | `ConnectorSnapshotRefreshService.java` | Local View Snapshot Refresh |
@@ -104,6 +106,8 @@ repository root 기준 상대 경로를 사용하며 build 결과물과 cache �
 | `DailyBatchService` | local-file 검증과 복구용 |
 | Connector Refresh Service | Local View에서만 subprocess 사용 가능 |
 | Submit · Slack Service | 실제 외부 요청 가능 · 임의 실행 금지 |
+| `OperatingResearchVersionProvider` | 운영 RSCFG read-only 조회 · Production runtime source of truth |
+| `ResearchChampionPromotionService` | 운영자 승인형 RSCFG 승격 · `--strategy-config-version` 외 Runtime Contract 유지 · 임의 실행 금지 |
 
 Service 변경 시 성공, 실패, 차단 경로를 분리해서 확인한다.
 
@@ -204,7 +208,7 @@ Util 변경 시 전체 화면의 표시값과 CSS class 영향을 확인한다.
 | `templates/pages/orders.html` | Order 목록 |
 | `templates/pages/order-detail.html` | Order 상세 |
 | `templates/pages/daily_batch.html` | Batch 상태와 실행 action |
-| `templates/pages/strategy_report.html` | Strategy Report · Research Version Dropdown |
+| `templates/pages/strategy_report.html` | Strategy Report · Research Version Dropdown · OPERATING 표시 · 비운영 Version 운영 선택 버튼 |
 | `templates/pages/*.html` | Strategy · Daily · Report 포함 화면 묶음 |
 
 ### 변경 시 확인

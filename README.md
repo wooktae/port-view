@@ -14,7 +14,7 @@ Spring MVC와 Thymeleaf 기반의 Portfolio View 마이크로서비스다.
 | ECS Fargate | 🟢 1차 포팅과 화면 조회 실증 완료 |
 | View CI/CD | 🟢 main push 기반 자동 Release Workflow · Candidate Smoke · 승인형 Promotion 검증 완료 |
 | 운영 배포 검증 | 🟢 Candidate 검증 · 운영 승격 · Rollback 재승격 확인 |
-| Research Version 조회 | 🟢 Strategy Report Research Version Dropdown 구현 완료 |
+| Research Version 조회 · 운영 선택 | 🟢 OPERATING 표시 · 운영 Version 선택(Champion Promotion) 구현·검증 완료 |
 | 현재 운영 성격 | 포트폴리오 실증 상태 유지 |
 | 기본 실행 backend | `aws-stepfunctions` |
 | Local File backend | 운영자 로컬 검증과 복구용 |
@@ -62,7 +62,7 @@ Spring MVC와 Thymeleaf 기반의 Portfolio View 마이크로서비스다.
 | Positions | 보유 종목 목록과 상세 조회 |
 | Orders | 주문 요청 · 주문 체인 · 이벤트 · 체결 조회 |
 | Strategy Execution | 실행 계획과 주문 후보 조회 |
-| Strategy Report | 백테스트 리포트 · 통계 · 거래 상세 · Research Strategy Config Version 선택 조회 |
+| Strategy Report | 백테스트 리포트 · 통계 · 거래 상세 · Research Strategy Config Version 선택 조회와 운영 선택 |
 | Strategy Daily | Daily Run · signal · position decision |
 | Daily Batch | Batch Run · Step 결과 · 상태 · 로그 조회 |
 
@@ -72,13 +72,18 @@ Daily Batch 화면은 AWS Step Functions 실행 요청 UI를 제공한다.
 - Step 12~17은 approval trigger와 Paper 주문 gate 뒤에서만 허용한다.
 - `local-file` 실행과 Slack 테스트 기능은 운영자 로컬 검증과 복구 범위에서만 사용한다.
 
-Strategy Report 최신 화면은 백테스트 리포트 조회뿐 아니라 Research Strategy Config Version 선택 조회를 지원한다.
+Strategy Report 최신 화면은 백테스트 리포트 조회뿐 아니라 Research Strategy Config Version 선택 조회와 제한된 운영 선택을 지원한다.
 
 - Hero 영역의 Research Version Dropdown에서 Strategy Config Version을 선택한다.
 - Dropdown 목록은 `research.strategy_backtest_run`에 존재하는 `strategy_config_version` 기준으로 동작한다.
+- 현재 운영 Version은 DB status가 아니라 실제 Production runtime 기준으로 판정해 `RSCFG-xxxx · OPERATING`으로 표시한다.
+- 최초 진입 시 최신 Version이 아니라 실제 OPERATING Version을 기본 선택한다.
 - 선택한 Version 기준 최신 Backtest Run을 조회한다.
+- 비운영 Version을 선택하면 "운영으로 선택" 버튼이 나타난다.
+- 운영 선택은 선택 RSCFG를 신규 Research Batch Job Definition Revision으로 승격하고, Production Step4와 Step4-only 두 State Machine을 동시에 전환한다.
+- 양방향 승격과 Rollback 전환을 검증했다.
 - Strategy Config Version과 Research Engine Version 표시 의미를 분리한다.
-- 현재 검증된 예시 Version은 `RSCFG-0001`이다.
+- 현재 검증된 예시 Version은 `RSCFG-0001`과 `RSCFG-0002`이며 최종 운영 Version은 `RSCFG-0001`이다.
 
 ## View 책임 경계
 
@@ -91,6 +96,9 @@ Strategy Report 최신 화면은 백테스트 리포트 조회뿐 아니라 Rese
 | Safe trigger | AWS Step 1~11 실행 요청 |
 | Approval trigger | AWS Step 12~17 승인 실행 요청 |
 | Gate | 실행 가능 범위와 Paper 주문 허용 상태 표시 |
+| Research 운영 선택 | 운영자 승인형 Research Strategy Config Version 승격 요청·수행 |
+
+View는 운영자의 명시적 승인 action을 받아 Research Strategy Config Version의 제한된 운영 승격을 요청·수행하는 operator control UI 역할을 가진다. 이 승격은 `--strategy-config-version` 값만 교체하고 나머지 Runtime Contract는 유지한다. Step Functions 전체 orchestration을 View가 소유하는 것은 아니다.
 
 ### 직접 담당하지 않는 범위
 

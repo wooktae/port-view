@@ -73,13 +73,31 @@
                                         </option>
                                         <option th:each="version : ${versions}"
                                                 th:value="${version}"
-                                                th:text="${version}"
+                                                th:text="${version == operatingVersion ? version + ' · OPERATING' : version}"
                                                 th:selected="${version == selectedVersion}">
                                             RSCFG-0001
                                         </option>
                                     </select>
                                 </div>
                             </form>
+                            
+                            <div th:if="${selectedVersion != null
+                                        and operatingVersion != null
+                                        and selectedVersion != operatingVersion}"
+                                class="mt-2">
+
+                                <form method="post"
+                                    action="/strategy/reports/promote">
+                                    <input type="hidden"
+                                        name="version"
+                                        th:value="${selectedVersion}">
+
+                                    <button type="submit"
+                                            class="btn btn-sm btn-primary">
+                                        운영으로 선택
+                                    </button>
+                                </form>
+                            </div>
 
                             <div class="report-hero-badges">
                                 <span class="report-sharpe-badge">

@@ -178,6 +178,20 @@ port-view는 조회, 승인, 트리거 UI를 담당하는 Spring MVC 기반 View
 
 View 코드 안에 다른 MS의 핵심 비즈니스 로직을 복제하지 않는다.
 
+### 2.3 Research Strategy Config Version Promotion
+
+Research Strategy Config Version Promotion은 예외적으로 허용된 운영자 승인형 control action이다.
+
+| 항목 | 기준 |
+| --- | --- |
+| 성격 | 운영자 명시 승인 기반 제한된 운영 승격 |
+| 판단 로직 | Strategy 판단·백테스트 로직 자체는 View에 복제하지 않음 |
+| 운영 source of truth | DB status가 아니라 Production Step4가 참조하는 Batch Job Definition command |
+| Runtime Contract | `--strategy-config-version` 외 항목을 임의 변경하지 않음 |
+| 안전 장치 | dual target preflight · running execution 확인 · fail-closed · after-check · rollback 유지 |
+| endpoint | 운영 전환 endpoint를 일반 조회 endpoint와 명확히 분리 |
+| 민감정보 | 실제 ARN · account-id · digest를 코드 설명이나 문서에 기록하지 않음 |
+
 ## 3. 기술 기준
 
 | 항목 | 기준 |

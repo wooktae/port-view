@@ -13,6 +13,44 @@ port-view 코드와 문서의 주요 변경 이력을 기록한다.
 | 상세 근거 | 필요한 경우 `docs` 또는 commit 참조 |
 | 민감정보 | 실제 계좌번호 · secret · token · ARN · public IP 원문 기록 금지 |
 
+## 2026-08-25 — Research Operating Version 선택과 Champion Promotion
+
+### Added
+
+| 파일 · 항목 | 변경 |
+| --- | --- |
+| `OperatingResearchVersionProvider.java` | Production Step4 → Batch Job Definition command 기준 실제 OPERATING RSCFG 조회 |
+| `ResearchChampionPromotionService.java` | RSCFG 운영 승격 · Job Definition Revision 생성 · dual State Machine 전환 |
+| `StrategyReportController.java` | 운영 선택 `POST /strategy/reports/promote` endpoint 추가 |
+| `strategy_report.html` | 비운영 Version "운영으로 선택" 버튼 추가 |
+
+### Changed
+
+| 항목 | 변경 |
+| --- | --- |
+| Strategy Report 기본 선택 | 최신 Version 대신 실제 OPERATING Version 기준으로 변경 |
+| Version Dropdown | 현재 운영 Version을 `RSCFG-xxxx · OPERATING`으로 표시 |
+| 운영 승격 | 선택 RSCFG를 신규 Batch Job Definition Revision으로 승격 |
+| 전환 대상 | Production Step4와 Step4-only 두 State Machine 동시 전환 |
+
+### Validation
+
+| 항목 | 결과 |
+| --- | --- |
+| `RSCFG-0001` → `RSCFG-0002` 승격 | 성공 |
+| `RSCFG-0002` → `RSCFG-0001` rollback | 성공 |
+| 두 State Machine 동일 Revision 참조 | 확인 |
+| Batch command target RSCFG | 확인 |
+| Maven compile | 성공 |
+
+### Security
+
+| 항목 | 결과 |
+| --- | --- |
+| 실제 ARN · account-id · digest 문서 기록 | 0건 |
+| 다른 Research 비즈니스 로직 View 복제 | 없음 |
+| running execution · preflight · fail-closed · rollback guard | 유지 |
+
 ## 2026-08-11 — Research Version 조회와 View Release Workflow 완성
 
 ### Added
