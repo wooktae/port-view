@@ -43,13 +43,13 @@ public class PositionRowDTO {
     private String profitClass;
 
     /**
-     * CSS width 값으로 사용.
-     * 예: 42 -> width: 42%
+     * Used as a CSS width value.
+     * Example: 42 -> width: 42%
      */
     private int weightBarWidth;
 
     /**
-     * 수익률 bar width.
+     * Return bar width.
      */
     private int profitBarWidth;
 

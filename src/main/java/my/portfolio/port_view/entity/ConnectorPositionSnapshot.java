@@ -12,8 +12,8 @@ import java.time.OffsetDateTime;
 /**
  * connector_position_snapshot
  *
- * Connector MS가 수집한 보유종목 스냅샷.
- * View MS에서는 보유 종목 카드/테이블 표시용으로 사용.
+ * Position Snapshot collected by the Connector MS.
+ * Used by the View MS to display Position cards and tables.
  */
 @Getter
 @Setter

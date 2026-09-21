@@ -12,8 +12,8 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 /**
- * 보유 종목 목록 화면에 필요한 요약 카드, 수익률 표시값, 종목 row를 담는 View DTO.
- * 금액/수익률 문구와 CSS class는 Service에서 계산해 Thymeleaf가 그대로 표시한다.
+ * View DTO containing the summary cards, Return display values, and Stock rows required by the Positions view.
+ * The Service calculates the amount/Return text and CSS classes for Thymeleaf to display directly.
  */
 public class PositionPageDTO {
 

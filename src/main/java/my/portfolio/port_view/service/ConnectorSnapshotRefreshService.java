@@ -17,9 +17,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 잔고/대시보드/보유 종목 화면에서 필요한 최신 Connector 잔고 스냅샷을 갱신한다.
- * 외부 Python 스크립트를 실행하므로 작업 디렉터리, 실행 파일, timeout 설정에 의존한다.
- * 중복 실행은 인스턴스 내부 AtomicBoolean으로 방지한다.
+ * Refreshes the latest Connector Balance Snapshot required by the Balance, Dashboard, and Positions views.
+ * Because this runs an external Python script, it depends on working-directory, executable, and timeout settings.
+ * An instance-local AtomicBoolean prevents duplicate execution.
  */
 @Service
 public class ConnectorSnapshotRefreshService {
@@ -28,8 +28,8 @@ public class ConnectorSnapshotRefreshService {
     private final SnapshotRefreshProperties properties;
 
     /**
-     * View 최초 접속/화면 이동 시 connector_balance.py 중복 실행 방지용.
-     * 단일 port-view 인스턴스 기준으로 충분함.
+     * Prevents duplicate connector_balance.py execution during initial View access and navigation.
+     * Sufficient for a single port-view instance.
      */
     private final AtomicBoolean running = new AtomicBoolean(false);
 
@@ -42,7 +42,7 @@ public class ConnectorSnapshotRefreshService {
     }
 
     /**
-     * 최신 스냅샷이 stale 기준을 넘은 경우에만 Connector 잔고 스크립트를 실행한다.
+     * Runs the Connector Balance script only when the latest Snapshot exceeds the stale threshold.
      */
     public void refreshIfStale(String accountNo) {
         if (!properties.isEnabled()) {
@@ -90,7 +90,7 @@ public class ConnectorSnapshotRefreshService {
     }
 
     /**
-     * 화면 진입 시 stale 여부와 무관하게 Connector 잔고 스크립트를 즉시 실행한다.
+     * Runs the Connector Balance script immediately on view entry, regardless of stale state.
      */
     public void refreshNow(String accountNo) {
         System.out.println("[ConnectorSnapshotRefreshService] refreshNow called. accountNo=" + accountNo);
@@ -196,8 +196,8 @@ public class ConnectorSnapshotRefreshService {
             }
 
             /*
-             * 화면 접속 자체를 막지 않기 위해 여기서는 예외를 삼킨다.
-             * refresh 실패 시 기존 최신 snapshot 기준으로 화면 표시.
+             * Swallow the exception here so it does not block access to the view itself.
+             * If Refresh fails, display the view using the existing latest Snapshot.
              */
             System.err.println("[ConnectorSnapshotRefreshService] refresh failed: " + e.getMessage());
         }

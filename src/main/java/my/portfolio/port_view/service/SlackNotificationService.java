@@ -69,8 +69,8 @@ public class SlackNotificationService {
                         "Daily Batch 실행 정보를 찾을 수 없음. batchRunId=" + batchRunId
                 ));
 
-        // 핵심 수정:
-        // RUNNING / PENDING 등 최종 상태가 아닌 경우 Slack 전송하지 않음
+        // Key fix:
+        // Do not send Slack notifications for non-terminal states such as RUNNING or PENDING.
         if (!run.isSuccess() && !run.isFailed()) {
             log.info(
                     "Slack Daily Batch summary skipped. batchRunId={}, runStatus={}",

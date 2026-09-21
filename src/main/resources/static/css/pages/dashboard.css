@@ -1,6 +1,6 @@
 /* Dashboard v7: dynamic dashboard + corrected holdings 10 columns + full-width action card */
 
-/* 대시보드와 공용 metric 카드의 손익 색상 및 화면별 레이아웃을 정의한다. */
+/* Defines profit/loss colors and view-specific layouts for the Dashboard and shared metric cards. */
 
 body.app-body .app-shell .dashboard-main,
 body.app-body .app-shell main.app-main.dashboard-main {

@@ -12,8 +12,8 @@ import java.time.OffsetDateTime;
 /**
  * connector_order_request
  *
- * Connector MS의 주문 요청 원장.
- * BUY / SELL / MODIFY / CANCEL 요청의 중심 테이블.
+ * System of record for Order Requests in the Connector MS.
+ * Primary table for BUY / SELL / MODIFY / CANCEL requests.
  */
 @Getter
 @Setter
@@ -45,7 +45,7 @@ public class ConnectorOrderRequest {
     private String requestType;
 
     /**
-     * LIMIT / MARKET 등
+     * LIMIT / MARKET, etc.
      */
     @Column(name = "order_method", nullable = false, length = 32)
     private String orderMethod;
@@ -87,7 +87,7 @@ public class ConnectorOrderRequest {
     private BigDecimal signalPositionSize;
 
     /**
-     * REQUESTED / ACCEPTED / FILLED / CANCELED / CANCEL_ACCEPTED / REJECTED 등
+     * REQUESTED / ACCEPTED / FILLED / CANCELED / CANCEL_ACCEPTED / REJECTED, etc.
      */
     @Column(name = "request_status", nullable = false, length = 32)
     private String requestStatus;

@@ -10,9 +10,9 @@ import java.util.List;
 public interface ConnectorOrderEventRepository extends JpaRepository<ConnectorOrderEvent, Long> {
 
     /**
-     * 주문 상세 timeline.
+     * Order Details timeline.
      *
-     * chain에 포함된 request id 기준으로 event를 조회.
+     * Queries Events by the request IDs included in the chain.
      */
     @Query(
             value = """
@@ -31,7 +31,7 @@ public interface ConnectorOrderEventRepository extends JpaRepository<ConnectorOr
 
     /**
      * fallback:
-     * order_request_id 연결이 누락된 이벤트까지 보고 싶을 때 broker_order_no 기준 보완.
+     * Uses broker_order_no to include Events with a missing order_request_id link.
      */
     @Query(
             value = """

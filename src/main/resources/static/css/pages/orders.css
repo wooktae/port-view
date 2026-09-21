@@ -332,7 +332,7 @@
     }
 }
 
-/* 일자별 매매 내역 스크롤 영역 */
+/* Scrollable Daily Trading History area */
 .order-history-section {
     padding-bottom: 16px;
 }
@@ -345,7 +345,7 @@
     scroll-behavior: smooth;
 }
 
-/* 스크롤바 디자인 */
+/* Scrollbar design */
 .order-day-list::-webkit-scrollbar {
     width: 8px;
 }
@@ -364,7 +364,7 @@
     border-radius: 999px;
 }
 
-/* 날짜 헤더가 스크롤 중에도 위에 살짝 붙어 보이게 */
+/* Keep the date header lightly pinned to the top while scrolling */
 .order-day-header {
     position: sticky;
     top: 0;
@@ -374,7 +374,7 @@
     padding-bottom: 4px;
 }
 
-/* 스크롤 안쪽 카드가 오른쪽 스크롤바와 너무 붙지 않게 */
+/* Keep cards inside the scroll area from sitting too close to the right scrollbar */
 .order-line-card {
     margin-right: 2px;
 }

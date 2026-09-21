@@ -14,10 +14,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * 주문 목록과 주문 상세 화면을 제공하는 Spring MVC Controller.
+ * Spring MVC Controller that provides Order list and Order Details views.
  *
- * AWS Paper local verification에서는 조회-only가 기본이다.
- * connector order refresh는 portfolio.order-refresh.enabled=true일 때만 실행한다.
+ * Read-only is the default during AWS Paper local validation.
+ * Connector Order Refresh runs only when portfolio.order-refresh.enabled=true.
  */
 @Controller
 public class OrderController {

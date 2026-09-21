@@ -24,8 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 대시보드 화면에 표시할 잔고, 보유 종목, 최근 주문, 수익률 지표를 조립한다.
- * Connector 스냅샷과 주문/포지션 repository 결과를 화면 전용 DTO로 변환한다.
+ * Assembles the Balance, Positions, recent Orders, and Return metrics displayed on the Dashboard.
+ * Converts Connector Snapshot and Order/Position Repository results into view-specific DTOs.
  */
 @Service
 public class DashboardService {
@@ -85,12 +85,12 @@ public class DashboardService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             /*
-            * 화면 표시용 현금.
+            * Cash displayed in the view.
             *
-            * KIS cash_balance(dnca_tot_amt)는 주식 매수 후에도 예수금 성격으로 크게 남아 보일 수 있음.
-            * 대시보드에서는 사용자가 기대하는 "총 평가금액에서 현재 주식 평가금액을 제외한 현금성 금액"을 표시.
+            * KIS cash_balance(dnca_tot_amt) may appear high after a Stock purchase because it retains deposit-like semantics.
+            * The Dashboard displays the expected cash-like amount: total valuation minus current Stock valuation.
             *
-            * 예: 2026-05-27
+            * Example: 2026-05-27
             * totalEvalAmount 9,931,122 - stockEvalAmount 1,859,060 = 8,072,062
             */
             BigDecimal cashBalance = totalEvalAmount.subtract(stockEvalAmount);
@@ -143,8 +143,8 @@ public class DashboardService {
             BigDecimal evalProfit = nvl(p.getEvalProfit());
 
             /*
-             * 화면 수익률은 DB eval_profit_rate보다 eval_profit / buy_amount 기준으로 계산.
-             * DB scale 변경 이슈가 있어도 화면은 안정적으로 표시 가능.
+             * Calculate the view Return from eval_profit / buy_amount instead of DB eval_profit_rate.
+             * This keeps the view stable even if the DB scale changes.
              */
             BigDecimal evalProfitRatePercent = safeRate(nvl(p.getEvalProfit()), nvl(p.getBuyAmount()));
 

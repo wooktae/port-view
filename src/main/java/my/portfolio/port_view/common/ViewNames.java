@@ -1,12 +1,12 @@
 package my.portfolio.port_view.common;
 
 /**
- * Thymeleaf view template name 상수 모음.
+ * Collection of Thymeleaf view template name constants.
  *
- * 목적:
- * - Controller에서 문자열 template name 하드코딩 제거
- * - html 파일명 변경 시 한 곳에서 관리
- * - 오타로 인한 template resolve 오류 방지
+ * Purpose:
+ * - Eliminate hard-coded string template names in Controllers
+ * - Manage html filename changes in one place
+ * - Prevent template resolution errors caused by typos
  */
 public final class ViewNames {
 

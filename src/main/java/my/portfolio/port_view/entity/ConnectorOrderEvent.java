@@ -12,8 +12,8 @@ import java.time.OffsetDateTime;
 /**
  * connector_order_event
  *
- * 주문 요청 이후 발생한 broker/order lifecycle event.
- * Step4 주문 상세 화면의 timeline에 사용.
+ * Broker/Order Lifecycle Event generated after an Order Request.
+ * Used in the timeline on the Step4 Order Details view.
  */
 @Getter
 @Setter

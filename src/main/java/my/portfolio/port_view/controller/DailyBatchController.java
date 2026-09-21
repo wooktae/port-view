@@ -29,7 +29,7 @@ public class DailyBatchController {
     private final DailyBatchProperties batchProperties;
 
     /**
-     * Daily Batch 최신 실행 화면.
+     * Latest Daily Batch execution view.
      */
     @GetMapping("/daily-batch")
     public String dailyBatch(
@@ -46,7 +46,7 @@ public class DailyBatchController {
     }
 
     /**
-     * 특정 Daily Batch 실행 상세 화면.
+     * Details view for a specific Daily Batch execution.
      */
     @GetMapping("/daily-batch/{batchRunId}")
     public String dailyBatchDetail(
@@ -64,10 +64,10 @@ public class DailyBatchController {
     }
 
     /**
-     * Daily Pipeline 전체 수동 실행.
+     * Manually executes the complete Daily Pipeline.
      *
-     * 2차 로컬 실행 검증에서는 기본 비활성.
-     * 전체 1~17 실행은 portfolio.batch.full-pipeline-execution-enabled=true일 때만 허용한다.
+     * Disabled by default during the second local execution validation.
+     * Complete Steps 1~17 execution is allowed only when portfolio.batch.full-pipeline-execution-enabled=true.
      */
     @PostMapping("/daily-batch/run")
     public String runDailyBatch(
@@ -107,13 +107,13 @@ public class DailyBatchController {
     }
 
     /**
-     * Daily Pipeline step 범위 실행.
+     * Executes a range of Daily Pipeline steps.
      *
-     * 예:
-     * - Step 1 단독: CONNECTOR_BALANCE ~ CONNECTOR_BALANCE
-     * - Step 1~11: CONNECTOR_BALANCE ~ DAILY_AUTO_BUY
+     * Examples:
+     * - Step 1 only: CONNECTOR_BALANCE ~ CONNECTOR_BALANCE
+     * - Steps 1~11: CONNECTOR_BALANCE ~ DAILY_AUTO_BUY
      *
-     * Service 레벨에서 허용 step 범위와 Paper 주문 gate를 다시 확인한다.
+     * The Service layer rechecks the allowed step range and Paper order gate.
      */
     @PostMapping("/daily-batch/run-range")
     public String runDailyBatchRange(
@@ -163,8 +163,8 @@ public class DailyBatchController {
     /**
      * AWS Step Functions Daily Pipeline range StartExecution.
      *
-     * 기존 local-file ProcessBuilder 실행과 분리한다.
-     * 1차 연결에서는 Step 1~11 safe range만 사용한다.
+     * Separated from the existing local-file ProcessBuilder execution path.
+     * The initial integration uses only the Steps 1~11 safe range.
      */
     @PostMapping("/daily-batch/aws-stepfunctions/start-range")
     public String startAwsStepfunctionsRange(
@@ -211,8 +211,8 @@ public class DailyBatchController {
     /**
      * AWS Step Functions Daily Pipeline approval range StartExecution.
      *
-     * 기존 Step 1~11 safe trigger와 분리한다.
-     * Step 12~17 주문성 구간은 paper-order gate와 step range gate를 통과해야 실행한다.
+     * Separated from the existing Steps 1~11 safe trigger.
+     * The order-related Steps 12~17 range must pass the paper-order gate and step range gate.
      */
     @PostMapping("/daily-batch/aws-stepfunctions/start-approval-range")
     public String startAwsStepfunctionsApprovalRange(
@@ -258,7 +258,7 @@ public class DailyBatchController {
     }
 
     /**
-     * Slack 테스트 메시지 전송.
+     * Sends a Slack test message.
      */
     @PostMapping("/daily-batch/slack-test")
     public String sendSlackTestMessage(
@@ -295,8 +295,8 @@ public class DailyBatchController {
     }
 
     /**
-     * 기존 Daily Batch 실행 결과를 Slack으로 재전송.
-     * 전체 Daily Batch를 다시 돌리지 않고 Slack 메시지 포맷만 확인할 때 사용.
+     * Resends an existing Daily Batch execution result to Slack.
+     * Use this to check Slack message formatting without rerunning the complete Daily Batch.
      */
     @PostMapping("/daily-batch/{batchRunId}/slack-summary-test")
     public String sendDailyBatchSlackSummaryTest(
@@ -334,12 +334,12 @@ public class DailyBatchController {
     }
 
     /**
-     * 장중 포지션 수동 점검.
+     * Manually checks Intraday Positions.
      *
-     * - 현재가 조회
-     * - 진입가 대비 손익률 계산
-     * - -10% hard stop 후보 감지
-     * - 주문 후보 생성은 하지 않음
+     * - Query the current price
+     * - Calculate Return relative to the Entry Price
+     * - Detect -10% hard stop Candidates
+     * - Do not create Order Candidates
      */
     @PostMapping("/daily-batch/intraday-monitor/run")
     public String runIntradayPositionMonitor(
@@ -376,10 +376,10 @@ public class DailyBatchController {
     }
 
     /**
-     * Daily Pipeline 특정 step부터 부분 재실행.
+     * Partially reruns the Daily Pipeline from a specific step.
      *
-     * 기존 화면 호환용 endpoint.
-     * 신규 2차 검증에서는 /daily-batch/run-range 사용을 우선한다.
+     * Endpoint retained for compatibility with the existing view.
+     * Prefer /daily-batch/run-range in the new second validation.
      */
     @PostMapping("/daily-batch/run-from-step")
     public String runDailyBatchFromStep(
@@ -420,7 +420,7 @@ public class DailyBatchController {
     }
 
     /**
-     * 실패한 Daily Pipeline을 첫 FAILED step부터 재실행.
+     * Reruns a failed Daily Pipeline from its first FAILED step.
      */
     @PostMapping("/daily-batch/{batchRunId}/rerun-failed")
     public String rerunFailedDailyBatch(

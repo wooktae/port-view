@@ -28,8 +28,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 보유 종목 목록/상세 화면의 평가금액, 수익률, 리서치 보조 정보를 조립한다.
- * Connector 포지션 스냅샷과 리서치 insight 조회 결과를 화면 표시용 DTO로 변환한다.
+ * Assembles valuation amounts, Returns, and supporting Research information for Position list/detail views.
+ * Converts Connector Position Snapshots and Research Insight query results into display DTOs.
  */
 @Service
 public class PositionService {
@@ -411,8 +411,8 @@ public class PositionService {
             return recalculated;
         }
 
-        // raw가 0.8395 형태(=83.95%)인지,
-        // 이미 83.95 형태인지 자동 판별
+        // Detect whether raw uses the 0.8395 form (=83.95%)
+        // or is already in the 83.95 form.
         BigDecimal rawAsPercent = raw.multiply(HUNDRED);
 
         BigDecimal diffRaw = raw.subtract(recalculated).abs();

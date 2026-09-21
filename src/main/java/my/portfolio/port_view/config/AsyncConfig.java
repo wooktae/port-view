@@ -15,9 +15,9 @@ public class AsyncConfig {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
 
         /*
-         * Daily Batch는 로컬 운영 파이프라인 성격이 강함.
-         * 동시에 여러 개 돌릴 이유가 없고, DB에서도 RUNNING 중복 실행을 막고 있으므로
-         * Thread Pool도 1개로 제한한다.
+         * Daily Batch is primarily a local production pipeline.
+         * There is no reason to run multiple instances concurrently, and the DB also prevents
+         * duplicate RUNNING executions, so the Thread Pool is limited to one thread.
          */
         executor.setCorePoolSize(1);
         executor.setMaxPoolSize(1);

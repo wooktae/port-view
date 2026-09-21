@@ -11,8 +11,8 @@ import java.time.OffsetDateTime;
 /**
  * connector_fill
  *
- * 실제 체결 내역.
- * 주문 상세 화면 하단의 체결 테이블에 사용.
+ * Actual Fill History.
+ * Used in the Fill table at the bottom of the Order Details view.
  */
 @Getter
 @Setter
@@ -57,7 +57,7 @@ public class ConnectorFill {
 
     /**
      * DB generated column.
-     * View MS에서는 읽기만 함.
+     * Read-only in the View MS.
      */
     @Column(name = "fill_amount", precision = 20, scale = 2, insertable = false, updatable = false)
     private BigDecimal fillAmount;

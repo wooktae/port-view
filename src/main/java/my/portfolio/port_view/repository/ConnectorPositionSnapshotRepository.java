@@ -11,12 +11,12 @@ import java.util.Optional;
 public interface ConnectorPositionSnapshotRepository extends JpaRepository<ConnectorPositionSnapshot, Long> {
 
     /**
-     * 계좌별 최신 잔고 기준의 현재 보유 종목 전체 조회.
+     * Queries all current Positions for an account using the latest Balance date.
      *
-     * 중요:
-     * - connector_position_snapshot의 MAX(as_of_date)를 최신 보유 기준으로 쓰면 안 됨.
-     * - 현재 보유종목이 0건이면 connector_position_snapshot에는 최신 날짜 row가 없을 수 있음.
-     * - 따라서 최신 connector_balance_snapshot의 as_of_date와 같은 날짜의 position row만 현재 보유로 인정.
+     * Important:
+     * - Do not use MAX(as_of_date) from connector_position_snapshot as the latest Position baseline.
+     * - When there are no current Positions, connector_position_snapshot may have no row for the latest date.
+     * - Therefore, only Position rows with the same as_of_date as the latest connector_balance_snapshot are current.
      */
     @Query(
             value = """
@@ -45,10 +45,10 @@ public interface ConnectorPositionSnapshotRepository extends JpaRepository<Conne
     List<ConnectorPositionSnapshot> findLatestPositionsByAccountNo(@Param("accountNo") String accountNo);
 
     /**
-     * 계좌 + 종목코드 기준 최신 잔고 기준의 현재 보유 종목 1건 조회.
+     * Queries one current Position for an account and Ticker using the latest Balance date.
      *
-     * /positions/{tickerCode} 상세 화면에서 사용.
-     * 최신 balance 기준일에 해당 종목이 없으면 현재 미보유로 간주.
+     * Used by the /positions/{tickerCode} Details view.
+     * The Position is not currently held when the Ticker is absent on the latest Balance date.
      */
     @Query(
             value = """
@@ -82,8 +82,8 @@ public interface ConnectorPositionSnapshotRepository extends JpaRepository<Conne
     );
 
     /**
-     * 계좌별 전체 보유 스냅샷 이력 조회.
-     * 이력 화면용이므로 과거 row를 그대로 보여줘도 됨.
+     * Queries the complete Position Snapshot history for an account.
+     * Historical rows may be displayed directly because this is a history view.
      */
     @Query(
             value = """

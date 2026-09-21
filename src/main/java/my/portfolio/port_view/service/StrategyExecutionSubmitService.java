@@ -223,13 +223,13 @@ public class StrategyExecutionSubmitService {
         Map<String, Object> payload = new LinkedHashMap<>();
 
         /*
-         * connector_app.py 기준 실제 사용 필드:
+         * Fields actually used by connector_app.py:
          * - stock_code
          * - qty
          * - order_method
          * - order_price
          * - stock_name
-         * - parent_order_request_id : SELL에서만 사용 가능
+         * - parent_order_request_id : available only for SELL
          * - strategy_name
          * - strategy_version
          * - strategy_run_id
@@ -260,8 +260,8 @@ public class StrategyExecutionSubmitService {
         payload.put("signal_position_size", order.signalPositionSize());
 
         /*
-         * 아래 필드는 Connector가 직접 쓰지는 않지만,
-         * request_payload에 남겨두면 View/DB 추적에 유용함.
+         * Connector does not use the following fields directly,
+         * but retaining them in request_payload is useful for View/DB traceability.
          */
         payload.put("view_execution_order_id", order.id());
         payload.put("view_execution_plan_id", order.executionPlanId());
@@ -481,8 +481,8 @@ public class StrategyExecutionSubmitService {
     }
 
     /*
-     * Jackson 없이 jsonb 저장용 JSON 문자열 생성.
-     * 현재 payload는 Map / String / Number / Boolean / null 중심이라 충분함.
+     * Creates a JSON string for jsonb storage without Jackson.
+     * This is sufficient because the current payload primarily contains Map / String / Number / Boolean / null.
      */
     private String toJson(Object value) {
         if (value == null) {

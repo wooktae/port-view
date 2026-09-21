@@ -3,9 +3,9 @@ package my.portfolio.port_view.dto.dailybatch;
 import java.time.OffsetDateTime;
 
 /**
- * strategy_daily_batch_step_log 화면 표시용 DTO.
+ * DTO for displaying strategy_daily_batch_step_log in the view.
  *
- * Daily Pipeline 내부 step 하나의 실행 결과를 표현한다.
+ * Represents the result of one step within a Daily Pipeline execution.
  */
 public record DailyBatchStepLogDto(
         Long id,
