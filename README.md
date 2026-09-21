@@ -364,6 +364,20 @@ OPS Mirror baseline tables:
 
 When adding or changing a configuration key, verify the properties, `@ConfigurationProperties`, README, and deployment environment-variable names together.
 
+## Localization Infrastructure
+
+| Item | Value |
+| --- | --- |
+| Default locale | English (`en`) |
+| Alternate locale | Korean (`ko`) |
+| Locale query parameter | `lang` |
+| Persistence | `PORT_VIEW_LOCALE` cookie with a one-year maximum age |
+| Message bundles | `messages.properties` · `messages_en.properties` · `messages_ko.properties` |
+
+`LocaleConfig` provides the Spring `MessageSource`, cookie-backed locale resolution, and `LocaleChangeInterceptor`.
+
+Task 1.3 adds infrastructure only. Existing Class B UI text remains unchanged, and no language switch is present until the later UI migration tasks.
+
 ## ECS Fargate
 
 port-view has completed its initial ECS Fargate Service port and AWS Paper integration validation.

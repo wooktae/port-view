@@ -13,6 +13,31 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
+## 2026-09-21 — View i18n Infrastructure
+
+### Added
+
+| File · Item | Change |
+| --- | --- |
+| `LocaleConfig.java` | Added Spring `MessageSource`, `lang` locale interceptor, English default, and cookie-backed locale persistence |
+| `messages*.properties` | Added default, English, and Korean message-bundle infrastructure without migrating UI text |
+
+### Changed
+
+| File | Change |
+| --- | --- |
+| `README.md` | Documented locale defaults, query parameter, persistence, and bundle structure |
+| `docs/source-file-catalog.md` | Added the locale configuration and message-bundle responsibilities |
+
+### Validation
+
+| Item | Result |
+| --- | --- |
+| Maven compile | Successful · 95 Java sources |
+| CI-profile context test | Successful · 1 test, 0 failures |
+| Class B UI text migration | Not performed |
+| AWS · DB · broker · Slack · deployment operations | 0 occurrences |
+
 ## 2026-08-25 — Research Operating Version Selection and Champion Promotion
 
 ### Added

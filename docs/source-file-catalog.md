@@ -171,6 +171,7 @@ Keep display-only values in DTOs and do not expose Entities directly.
 | File · Path | Responsibility |
 | --- | --- |
 | `AsyncConfig.java` | Asynchronous executor |
+| `LocaleConfig.java` | MessageSource · `lang` locale interceptor · cookie-backed locale persistence · English default |
 | `ConnectorProperties.java` | Connector URL and API configuration |
 | `DailyBatchProperties.java` | backend · gate · Step Functions configuration |
 | `PortfolioViewProperties.java` | Default account and view limits |
@@ -243,6 +244,9 @@ When changing a Template class, verify the corresponding CSS.
 | `application.properties` | Common server · DB · View · Connector · Batch · Slack configuration |
 | `application-aws-paper.properties` | AWS Paper profile overrides |
 | `application-local.properties.example` | Local configuration example without sensitive information |
+| `messages.properties` | Default English-first MessageSource bundle |
+| `messages_en.properties` | English localization bundle |
+| `messages_ko.properties` | Korean localization bundle |
 | `src/main/resources/*` | Profile-specific configuration and View resources |
 
 ### Primary Configuration Categories
