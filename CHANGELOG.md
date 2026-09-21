@@ -13,7 +13,7 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
-## 2026-09-21 — View i18n Infrastructure
+## 2026-09-21 — View i18n Infrastructure and Language Switch
 
 ### Added
 
@@ -21,13 +21,15 @@ This document records major changes to port-view code and documentation.
 | --- | --- |
 | `LocaleConfig.java` | Added Spring `MessageSource`, `lang` locale interceptor, English default, and cookie-backed locale persistence |
 | `messages*.properties` | Added default, English, and Korean message-bundle infrastructure without migrating UI text |
+| `sidebar.html` | Added the `EN | KO` switch using the existing `lang` locale query parameter |
+| `app-layout.css` | Added desktop and compact-sidebar styles for the language switch |
 
 ### Changed
 
 | File | Change |
 | --- | --- |
-| `README.md` | Documented locale defaults, query parameter, persistence, and bundle structure |
-| `docs/source-file-catalog.md` | Added the locale configuration and message-bundle responsibilities |
+| `README.md` | Documented locale defaults, query parameter, persistence, bundle structure, and the language switch |
+| `docs/source-file-catalog.md` | Added locale configuration, message-bundle, and language-switch responsibilities |
 
 ### Validation
 
@@ -35,6 +37,7 @@ This document records major changes to port-view code and documentation.
 | --- | --- |
 | Maven compile | Successful · 95 Java sources |
 | CI-profile context test | Successful · 1 test, 0 failures |
+| Language switch scope | Shared sidebar only · `?lang=en` and `?lang=ko` |
 | Class B UI text migration | Not performed |
 | AWS · DB · broker · Slack · deployment operations | 0 occurrences |
 

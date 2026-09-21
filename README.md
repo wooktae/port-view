@@ -376,7 +376,9 @@ When adding or changing a configuration key, verify the properties, `@Configurat
 
 `LocaleConfig` provides the Spring `MessageSource`, cookie-backed locale resolution, and `LocaleChangeInterceptor`.
 
-Task 1.3 adds infrastructure only. Existing Class B UI text remains unchanged, and no language switch is present until the later UI migration tasks.
+The shared sidebar provides an `EN | KO` switch through `?lang=en` and `?lang=ko`. The selected locale persists through the locale cookie across View navigation.
+
+Existing Class B UI text remains unchanged until the later UI migration task.
 
 ## ECS Fargate
 

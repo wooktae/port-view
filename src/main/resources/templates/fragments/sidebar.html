@@ -74,6 +74,20 @@
 
     <div class="sidebar-spacer"></div>
 
+    <div class="sidebar-language-switch" role="group" aria-label="EN / KO">
+        <a class="sidebar-language-link"
+           href="?lang=en"
+           lang="en"
+           hreflang="en"
+           th:classappend="${#locale.language == 'en'} ? ' active' : ''">EN</a>
+        <span class="sidebar-language-separator" aria-hidden="true">|</span>
+        <a class="sidebar-language-link"
+           href="?lang=ko"
+           lang="ko"
+           hreflang="ko"
+           th:classappend="${#locale.language == 'ko'} ? ' active' : ''">KO</a>
+    </div>
+
     <div class="sidebar-card">
         <div class="sidebar-card-kicker">SNAPSHOT REFRESH</div>
         <strong>운영 콘솔 v2</strong>

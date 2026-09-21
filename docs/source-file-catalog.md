@@ -201,7 +201,7 @@ Do not expose account numbers verbatim in views or logs.
 
 | File · Path | Responsibility |
 | --- | --- |
-| `templates/fragments/sidebar.html` | Common navigation |
+| `templates/fragments/sidebar.html` | Common navigation and `EN | KO` language switch |
 | `templates/pages/dashboard.html` | Dashboard |
 | `templates/pages/balance-summary.html` | Balance |
 | `templates/pages/positions.html` | Position list |
@@ -229,7 +229,7 @@ Do not arbitrarily click execution buttons in `daily_batch.html` for view valida
 
 | Path | Responsibility |
 | --- | --- |
-| `static/css/layout/app-layout.css` | Common layout |
+| `static/css/layout/app-layout.css` | Common layout and sidebar language-switch styles |
 | `static/css/pages/*.css` | View-specific card · grid · status styles |
 | `static/*` | Static resource group |
 
