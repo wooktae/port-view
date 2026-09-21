@@ -14,6 +14,7 @@ import my.portfolio.port_view.util.OrderLabelUtils;
 import my.portfolio.port_view.util.ViewFormatUtils;
 import my.portfolio.port_view.util.ProfitClassUtils;
 import my.portfolio.port_view.util.ViewTextUtils;
+import my.portfolio.port_view.util.ViewMessages;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -223,28 +224,28 @@ public class DashboardService {
         List<DashboardMetricDTO> metrics = new ArrayList<>();
 
         metrics.add(new DashboardMetricDTO(
-                "총 평가금액",
+                ViewMessages.text("dashboard.totalEvaluation"),
                 dashboard.getTotalEvalAmountText(),
-                "현금 + 주식 평가금액",
+                ViewMessages.text("dashboard.cashPlusStocks"),
                 "primary"
         ));
 
         metrics.add(new DashboardMetricDTO(
-                "현금",
+                ViewMessages.text("dashboard.cash"),
                 dashboard.getCashBalanceText(),
-                "주문 가능 재원",
+                ViewMessages.text("dashboard.orderableResources"),
                 "cash"
         ));
 
         metrics.add(new DashboardMetricDTO(
-                "주식 평가금액",
+                ViewMessages.text("dashboard.stockEvaluation"),
                 dashboard.getStockEvalAmountText(),
-                "현재 보유종목 기준",
+                ViewMessages.text("dashboard.currentPositionsBased"),
                 "stock"
         ));
 
         metrics.add(new DashboardMetricDTO(
-                "평가손익",
+                ViewMessages.text("dashboard.evaluationProfit"),
                 dashboard.getEvalProfitText(),
                 dashboard.getTotalProfitRateText(),
                 dashboard.getProfitClass()

@@ -378,7 +378,9 @@ When adding or changing a configuration key, verify the properties, `@Configurat
 
 The shared sidebar provides an `EN | KO` switch through `?lang=en` and `?lang=ko`. The selected locale persists through the locale cookie across View navigation.
 
-Existing Class B UI text remains unchanged until the later UI migration task.
+Task 1.5 migrates unambiguous Class B text in shared navigation, Dashboard, Balance, Positions, and Orders surfaces. Display-only Java status and unit mappings resolve through the same EN/KO bundles.
+
+Report presentation, Slack messages, raw-domain values, persisted evidence, and mixed operational messages remain unchanged for their dedicated review tasks.
 
 ## ECS Fargate
 

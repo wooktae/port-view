@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>대시보드</title>
+    <title th:text="#{page.dashboard.title}">Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
@@ -18,79 +18,76 @@
 
     <main class="app-main dashboard-main">
         <header class="dashboard-page-title">
-            <h1>대시보드</h1>
-            <p>화면 진입 시 AWS Paper 계좌 스냅샷을 갱신하고, 최신 잔고·보유 종목·전략 실행 계획·백테스트 성과를 한 번에 확인하는 메인 화면.</p>
+            <h1 th:text="#{page.dashboard.title}">Dashboard</h1>
+            <p th:text="#{dashboard.description}">Review the latest portfolio data in one place.</p>
         </header>
 
         <section class="dashboard-stage">
 
-            <!-- 데이터 없음 -->
+            <!-- No data -->
             <section class="dashboard-section account-section"
                      th:if="${dashboard == null or !dashboard.hasBalance}">
                 <div class="account-hero-card">
                     <div class="account-hero-main">
-                        <div class="section-label">계좌</div>
+                        <div class="section-label" th:text="#{label.account}">Account</div>
                         <h2 th:text="${resolvedAccountNo}">-</h2>
-                        <p>
-                            해당 계좌의 최신 AWS Paper 잔고 스냅샷이 없음.
-                            화면 진입 시 Snapshot Refresh를 시도한 뒤 저장된 AWS Paper DB 기준으로 표시함.
-                        </p>
+                        <p th:text="#{dashboard.noBalance}">No latest Balance Snapshot was found.</p>
                     </div>
 
                     <div class="account-badges">
                         <span class="soft-badge badge-live">AWS Paper</span>
-                        <span class="soft-badge badge-connector">Snapshot 기준</span>
+                        <span class="soft-badge badge-connector" th:text="#{dashboard.snapshotBased}">Snapshot Based</span>
                         <span class="soft-badge badge-count">Refresh enabled</span>
-                        <span class="soft-badge badge-count">보유 <strong>0</strong> 종목</span>
+                        <span class="soft-badge badge-count" th:text="#{dashboard.positionCount(0)}">Positions: 0</span>
                     </div>
                 </div>
             </section>
 
             <th:block th:if="${dashboard != null and dashboard.hasBalance}">
 
-                <!-- 계좌 -->
+                <!-- Account -->
                 <section class="dashboard-section account-section">
                     <div class="account-hero-card">
                         <div class="account-hero-main">
-                            <div class="section-label">계좌</div>
+                            <div class="section-label" th:text="#{label.account}">Account</div>
                             <h2 th:text="${dashboard.accountNo}">-</h2>
                             <p>
-                                기준일:
+                                <span th:text="#{dashboard.asOfDate}">As-of Date</span>:
                                 <span th:text="${dashboard.asOfDate}">-</span>
                                 /
-                                갱신시각:
+                                <span>Updated:</span>
                                 <span th:text="${dashboard.asOfTs}">-</span>
                             </p>
                         </div>
 
                         <div class="account-badges">
                             <span class="soft-badge badge-live">AWS Paper</span>
-                            <span class="soft-badge badge-connector">Snapshot 기준</span>
+                            <span class="soft-badge badge-connector" th:text="#{dashboard.snapshotBased}">Snapshot Based</span>
                             <span class="soft-badge badge-count">Refresh enabled</span>
-                            <span class="soft-badge badge-count">
-                                보유 <strong th:text="${dashboard.positionCount}">0</strong> 종목
-                            </span>
+                            <span class="soft-badge badge-count"
+                                  th:text="#{dashboard.positionCount(${dashboard.positionCount})}">Positions: 0</span>
                         </div>
                     </div>
                 </section>
 
-                <!-- 잔고 -->
+                <!-- Balance -->
                 <section class="dashboard-section balance-section">
                     <div class="section-head">
                         <div>
-                            <div class="section-label">잔고</div>
-                            <h2>잔고 요약</h2>
+                            <div class="section-label" th:text="#{page.balance.title}">Balance</div>
+                            <h2 th:text="#{dashboard.balanceSummary}">Balance Summary</h2>
                         </div>
                         <a class="section-link"
-                           th:href="@{/balance-summary(accountNo=${dashboard.accountNo})}">
-                            상세 보기 →
+                           th:href="@{/balance-summary(accountNo=${dashboard.accountNo})}"
+                           th:text="#{action.viewDetails}">
+                            View Details
                         </a>
                     </div>
 
                     <div class="metric-grid" th:if="${!#lists.isEmpty(dashboard.metrics)}">
                         <article th:each="metric : ${dashboard.metrics}"
                                  th:class="'metric-card metric-' + ${metric.type}">
-                            <div class="metric-title" th:text="${metric.title}">총 평가금액</div>
+                            <div class="metric-title" th:text="${metric.title}">Total Valuation</div>
                             <div class="metric-value" th:text="${metric.value}">-</div>
                             <div class="metric-subtitle" th:text="${metric.subtitle}">-</div>
                         </article>
@@ -98,57 +95,58 @@
 
                     <div class="metric-grid" th:if="${#lists.isEmpty(dashboard.metrics)}">
                         <article class="metric-card metric-primary">
-                            <div class="metric-title">총 평가금액</div>
+                            <div class="metric-title" th:text="#{dashboard.totalEvaluation}">Total Valuation</div>
                             <div class="metric-value">-</div>
-                            <div class="metric-subtitle">현금 + 주식 평가금액</div>
+                            <div class="metric-subtitle" th:text="#{dashboard.cashPlusStocks}">Cash + Stock Valuation</div>
                         </article>
 
                         <article class="metric-card metric-cash">
-                            <div class="metric-title">현금</div>
+                            <div class="metric-title" th:text="#{dashboard.cash}">Cash</div>
                             <div class="metric-value">-</div>
-                            <div class="metric-subtitle">주문 가능 재원</div>
+                            <div class="metric-subtitle" th:text="#{dashboard.orderableResources}">Available Order Resources</div>
                         </article>
 
                         <article class="metric-card metric-stock">
-                            <div class="metric-title">주식 평가금액</div>
+                            <div class="metric-title" th:text="#{dashboard.stockEvaluation}">Stock Valuation</div>
                             <div class="metric-value">-</div>
-                            <div class="metric-subtitle">현재 보유종목 기준</div>
+                            <div class="metric-subtitle" th:text="#{dashboard.currentPositionsBased}">Based on Current Positions</div>
                         </article>
 
                         <article class="metric-card metric-neutral">
-                            <div class="metric-title">평가손익</div>
+                            <div class="metric-title" th:text="#{dashboard.evaluationProfit}">Valuation Profit/Loss</div>
                             <div class="metric-value">-</div>
                             <div class="metric-subtitle">-</div>
                         </article>
                     </div>
                 </section>
 
-                <!-- 보유 종목 -->
+                <!-- Positions -->
                 <section class="dashboard-section holdings-section">
                     <div class="section-head">
                         <div>
-                            <div class="section-label">보유 종목</div>
-                            <h2>현재 보유 종목</h2>
+                            <div class="section-label" th:text="#{page.positions.title}">Positions</div>
+                            <h2 th:text="#{dashboard.currentPositions}">Current Positions</h2>
                         </div>
                         <a class="section-link"
-                           th:href="@{/positions(accountNo=${dashboard.accountNo})}">
-                            상세 보기 →
+                           th:href="@{/positions(accountNo=${dashboard.accountNo})}"
+                           th:text="#{action.viewDetails}">
+                            View Details
                         </a>
                     </div>
 
                     <article class="holdings-card">
                         <div class="holding-table">
                             <div class="holding-row holding-head">
-                                <div>종목</div>
-                                <div class="text-end">기준일</div>
-                                <div class="text-end">보유 수량</div>
-                                <div class="text-end">매도 가능</div>
-                                <div class="text-end">평균단가</div>
-                                <div class="text-end">현재가</div>
-                                <div class="text-end">매수 금액</div>
-                                <div class="text-end">평가금액</div>
-                                <div class="text-end">수익률</div>
-                                <div class="text-end">수익 금액</div>
+                                <div th:text="#{label.stockName}">Stock</div>
+                                <div class="text-end" th:text="#{dashboard.asOfDate}">As-of Date</div>
+                                <div class="text-end" th:text="#{dashboard.heldQuantity}">Held Quantity</div>
+                                <div class="text-end" th:text="#{dashboard.sellable}">Sellable</div>
+                                <div class="text-end" th:text="#{dashboard.averagePrice}">Average Price</div>
+                                <div class="text-end" th:text="#{dashboard.currentPrice}">Current Price</div>
+                                <div class="text-end" th:text="#{dashboard.buyAmount}">Buy Amount</div>
+                                <div class="text-end" th:text="#{dashboard.evaluationAmount}">Valuation Amount</div>
+                                <div class="text-end" th:text="#{label.return}">Return</div>
+                                <div class="text-end" th:text="#{dashboard.profitAmount}">Profit/Loss Amount</div>
                             </div>
 
                             <a class="holding-row"
@@ -161,8 +159,8 @@
                                 </div>
 
                                 <div class="text-end muted-cell" th:text="${p.asOfDate}">-</div>
-                                <div class="text-end" th:text="${p.quantity == null ? '-' : p.quantity + '주'}">-</div>
-                                <div class="text-end" th:text="${p.sellableQuantity == null ? '-' : p.sellableQuantity + '주'}">-</div>
+                                <div class="text-end" th:text="${p.quantity == null ? '-' : #messages.msg('unit.shares', p.quantity)}">-</div>
+                                <div class="text-end" th:text="${p.sellableQuantity == null ? '-' : #messages.msg('unit.shares', p.sellableQuantity)}">-</div>
                                 <div class="text-end amount" th:text="${p.avgBuyPriceText}">-</div>
                                 <div class="text-end amount" th:text="${p.currentPriceText}">-</div>
                                 <div class="text-end amount" th:text="${p.buyAmountText}">-</div>
@@ -185,8 +183,8 @@
 
                             <div class="holding-row" th:if="${#lists.isEmpty(dashboard.positions)}">
                                 <div class="holding-stock">
-                                    <strong>보유 종목 없음</strong>
-                                    <span>현재 계좌에 표시할 보유 종목이 없음</span>
+                                    <strong th:text="#{dashboard.noPositions}">No Positions</strong>
+                                    <span th:text="#{dashboard.noPositionsDescription}">There are no Positions to display.</span>
                                 </div>
                                 <div class="text-end muted-cell">-</div>
                                 <div class="text-end">-</div>
@@ -202,15 +200,15 @@
                     </article>
                 </section>
 
-                <!-- 전략 실행 계획 -->
+                <!-- Strategy Execution Plan -->
                 <section class="dashboard-section plan-section">
                     <div class="section-head">
                         <div>
-                            <div class="section-label">전략 실행 계획</div>
-                            <h2>최신 전략 실행 계획</h2>
+                            <div class="section-label" th:text="#{dashboard.executionPlan}">Strategy Execution Plan</div>
+                            <h2 th:text="#{dashboard.latestExecutionPlan}">Latest Strategy Execution Plan</h2>
                         </div>
-                        <a class="section-link" th:href="@{/strategy/execution/plans}">
-                            상세 보기 →
+                        <a class="section-link" th:href="@{/strategy/execution/plans}" th:text="#{action.viewDetails}">
+                            View Details
                         </a>
                     </div>
 
@@ -236,50 +234,50 @@
                             <div class="dashboard-plan-status">
                                 <span th:class="'status-pill ' + (${latestExecutionPlan.marketSignal() == 'BLOCK'} ? 'blocked' : 'empty')"
                                       th:text="${latestExecutionPlan.marketSignalLabel()}">
-                                    매매 차단
+                                    New Buys Blocked
                                 </span>
 
                                 <span class="status-pill empty"
                                       th:text="${latestExecutionPlan.planStatusLabel()}">
-                                    후보 없음
+                                    No Candidates
                                 </span>
                             </div>
 
                             <div class="dashboard-plan-counts">
                                 <div>
-                                    <span>후보</span>
+                                    <span th:text="#{dashboard.candidates}">Candidates</span>
                                     <strong th:text="${latestExecutionPlan.totalCandidateCount() == null ? 0 : latestExecutionPlan.totalCandidateCount()}">0</strong>
                                 </div>
                                 <div>
-                                    <span>주문 가능</span>
+                                    <span th:text="#{dashboard.orderable}">Orderable</span>
                                     <strong th:text="${latestExecutionPlan.readyOrderCount() == null ? 0 : latestExecutionPlan.readyOrderCount()}">0</strong>
                                 </div>
                                 <div>
-                                    <span>차단</span>
+                                    <span th:text="#{dashboard.blocked}">Blocked</span>
                                     <strong th:text="${latestExecutionPlan.blockedOrderCount() == null ? 0 : latestExecutionPlan.blockedOrderCount()}">0</strong>
                                 </div>
                                 <div>
-                                    <span>제외</span>
+                                    <span th:text="#{dashboard.excluded}">Excluded</span>
                                     <strong th:text="${latestExecutionPlan.skippedOrderCount() == null ? 0 : latestExecutionPlan.skippedOrderCount()}">0</strong>
                                 </div>
                             </div>
 
                             <div class="dashboard-plan-money">
                                 <div>
-                                    <span>목표금액</span>
-                                    <strong th:text="${latestExecutionPlan.totalTargetAmount() == null ? '-' : #numbers.formatDecimal(latestExecutionPlan.totalTargetAmount(), 1, 'COMMA', 0, 'POINT') + '원'}">
-                                        0원
+                                    <span th:text="#{dashboard.targetAmount}">Target Amount</span>
+                                    <strong th:text="${latestExecutionPlan.totalTargetAmount() == null ? '-' : #messages.msg('unit.money', #numbers.formatDecimal(latestExecutionPlan.totalTargetAmount(), 1, 'COMMA', 0, 'POINT'))}">
+                                        0 KRW
                                     </strong>
                                 </div>
                                 <div>
-                                    <span>가용현금</span>
-                                    <strong th:text="${latestExecutionPlan.availableCash() == null ? '-' : #numbers.formatDecimal(latestExecutionPlan.availableCash(), 1, 'COMMA', 0, 'POINT') + '원'}">
+                                    <span th:text="#{dashboard.availableCash}">Available Cash</span>
+                                    <strong th:text="${latestExecutionPlan.availableCash() == null ? '-' : #messages.msg('unit.money', #numbers.formatDecimal(latestExecutionPlan.availableCash(), 1, 'COMMA', 0, 'POINT'))}">
                                         -
                                     </strong>
                                 </div>
                                 <div>
-                                    <span>최대주문</span>
-                                    <strong th:text="${latestExecutionPlan.maxOrderAmount() == null ? '-' : #numbers.formatDecimal(latestExecutionPlan.maxOrderAmount(), 1, 'COMMA', 0, 'POINT') + '원'}">
+                                    <span th:text="#{dashboard.maxOrder}">Maximum Order</span>
+                                    <strong th:text="${latestExecutionPlan.maxOrderAmount() == null ? '-' : #messages.msg('unit.money', #numbers.formatDecimal(latestExecutionPlan.maxOrderAmount(), 1, 'COMMA', 0, 'POINT'))}">
                                         -
                                     </strong>
                                 </div>
@@ -290,7 +288,7 @@
                                       th:text="${latestExecutionPlan.accountNo() == null ? dashboard.accountNo : latestExecutionPlan.accountNo()}">
                                     -
                                 </span>
-                                <span class="detail-arrow">보기 →</span>
+                                <span class="detail-arrow" th:text="#{dashboard.view}">View →</span>
                             </div>
                         </a>
                     </article>
@@ -300,40 +298,40 @@
                         <a class="dashboard-action-row" th:href="@{/strategy/execution/plans}">
                             <div class="dashboard-action-main">
                                 <div class="plan-id">
-                                    <strong>최근 전략 판단 없음</strong>
+                                    <strong th:text="#{dashboard.noRecentDecision}">No Recent Strategy Decision</strong>
                                     <span>Daily Signal / Execution Plan</span>
                                 </div>
 
                                 <div class="plan-strategy">
-                                    <strong>전략 및 실행 계획 화면에서 최신 계획 확인</strong>
-                                    <span>최신 계획 ID, 시장상태, 주문 후보, 차단/제외 사유는 상세 화면 기준</span>
+                                    <strong th:text="#{dashboard.checkStrategyPlans}">Review the latest Plan in Strategy Operations.</strong>
+                                    <span th:text="#{dashboard.planDetailDescription}">Use the details view for Plan details.</span>
                                 </div>
                             </div>
 
                             <div class="dashboard-action-side">
-                                <span class="status-pill empty">상세 화면 연동</span>
+                                <span class="status-pill empty" th:text="#{dashboard.detailsLinked}">Details View Linked</span>
                                 <span class="dashboard-action-account" th:text="${dashboard.accountNo}">-</span>
-                                <span class="detail-arrow">보기 →</span>
+                                <span class="detail-arrow" th:text="#{dashboard.view}">View →</span>
                             </div>
                         </a>
                     </article>
                 </section>              
 
-                <!-- 백테스트 요약 -->
+                <!-- Backtest Summary -->
                 <section class="dashboard-section backtest-section">
                     <div class="section-head compact-head">
                         <div>
-                            <div class="section-label">백테스트 요약</div>
-                            <h2>최신 전략 성과</h2>
+                            <div class="section-label" th:text="#{dashboard.backtestSummary}">Backtest Summary</div>
+                            <h2 th:text="#{dashboard.latestPerformance}">Latest Strategy Performance</h2>
                         </div>
-                        <a class="section-link" th:href="@{/strategy/reports/latest}">
-                            리포트 보기 →
+                        <a class="section-link" th:href="@{/strategy/reports/latest}" th:text="#{dashboard.viewReport}">
+                            View Report →
                         </a>
                     </div>
 
                     <article class="backtest-line-card" th:if="${latestBacktestSummary != null}">
                         <div class="backtest-item wide">
-                            <span>전략 / 엔진</span>
+                            <span th:text="#{dashboard.strategyEngine}">Strategy / Engine</span>
                             <strong>
                                 <span th:text="${latestBacktestSummary.strategyName()}">strategy_ai</span>
                                 /
@@ -342,7 +340,7 @@
                         </div>
 
                         <div class="backtest-item">
-                            <span>기간</span>
+                            <span th:text="#{dashboard.period}">Period</span>
                             <strong>
                                 <span th:text="${latestBacktestSummary.startDate()}">2023-01-27</span>
                                 ~
@@ -351,7 +349,7 @@
                         </div>
 
                         <div class="backtest-item">
-                            <span>누적 수익률</span>
+                            <span th:text="#{dashboard.cumulativeReturn}">Cumulative Return</span>
                             <strong th:class="${latestBacktestSummary.cumulativeReturn() != null and latestBacktestSummary.cumulativeReturn().signum() < 0 ? 'loss-blue' : 'profit-red'}">
                                 <span th:text="${latestBacktestSummary.cumulativeReturn() == null ? '-' : #numbers.formatDecimal(latestBacktestSummary.cumulativeReturn() * 100, 1, 'COMMA', 2, 'POINT') + '%'}">
                                     465.59%
@@ -385,11 +383,11 @@
 
                     <article class="backtest-line-card" th:if="${latestBacktestSummary == null}">
                         <div class="backtest-item wide">
-                            <span>전략 / 엔진</span>
+                            <span th:text="#{dashboard.strategyEngine}">Strategy / Engine</span>
                             <strong>-</strong>
                         </div>
                         <div class="backtest-item">
-                            <span>기간</span>
+                            <span th:text="#{dashboard.period}">Period</span>
                             <strong>-</strong>
                         </div>
                         <div class="backtest-item">

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<!-- 보유 종목 화면: 계좌별 포지션 스냅샷을 평가손익 카드와 종목 목록으로 표시한다. -->
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<!-- Positions view: displays account Position Snapshots as valuation cards and a Stock list. -->
+<html lang="en" th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>보유 종목</title>
+    <title th:text="#{page.positions.title}">Positions</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
@@ -20,8 +20,8 @@
 
     <main class="app-main dashboard-main positions-main">
         <header class="dashboard-page-title">
-            <h1>보유 종목</h1>
-            <p>화면 진입 시 AWS Paper 계좌 스냅샷을 갱신하고, 현재 보유 종목·평가금액·수익률·포트폴리오 비중을 확인하는 화면.</p>
+            <h1 th:text="#{page.positions.title}">Positions</h1>
+            <p th:text="#{positions.description}">Review current Positions, valuation, Returns, and portfolio weights.</p>
         </header>
 
         <section class="dashboard-stage">
@@ -32,11 +32,8 @@
                 <div class="positions-empty-card">
                     <div class="empty-mark">!</div>
                     <div>
-                        <h2>현재 보유 종목 없음</h2>
-                        <p>
-                            현재 계좌에 표시할 보유 종목이 없음.
-                            화면 진입 시 Snapshot Refresh를 시도한 뒤 저장된 AWS Paper DB 기준으로 표시함.
-                        </p>
+                        <h2 th:text="#{positions.emptyTitle}">No Current Positions</h2>
+                        <p th:text="#{positions.emptyDescription}">There are no Positions to display for this account.</p>
                     </div>
                 </div>
             </section>
@@ -47,25 +44,23 @@
                 <section class="dashboard-section account-section">
                     <div class="account-hero-card">
                         <div class="account-hero-main">
-                            <div class="section-label">계좌</div>
+                            <div class="section-label" th:text="#{label.account}">Account</div>
                             <h2 th:text="${page.accountNo != null ? page.accountNo : resolvedAccountNo}">
                                 -
                             </h2>
                             <p>
-                                기준일:
+                                <span th:text="#{dashboard.asOfDate}">As-of Date</span>:
                                 <span th:text="${page.asOfDate}">2026-05-08</span>
                                 /
-                                갱신시각:
+                                <span th:text="#{label.updatedAt}">Updated At</span>:
                                 <span th:text="${page.asOfTs}">2026-05-08 09:39:49</span>
                             </p>
                         </div>
 
                         <div class="account-badges">
-                            <span class="soft-badge badge-live">모의투자</span>
-                            <span class="soft-badge badge-connector">커넥터</span>
-                            <span class="soft-badge badge-count">
-                                보유 <strong th:text="${page.positionCount}">2</strong> 종목
-                            </span>
+                            <span class="soft-badge badge-live" th:text="#{orders.paper}">Paper Trading</span>
+                            <span class="soft-badge badge-connector">Connector</span>
+                            <span class="soft-badge badge-count" th:text="#{dashboard.positionCount(${page.positionCount})}">Positions: 2</span>
                         </div>
                     </div>
                 </section>
@@ -74,30 +69,30 @@
                 <section class="dashboard-section positions-summary-section">
                     <div class="section-head">
                         <div>
-                            <div class="section-label">보유 종목</div>
-                            <h2>보유 종목 요약</h2>
+                            <div class="section-label" th:text="#{page.positions.title}">Positions</div>
+                            <h2 th:text="#{positions.summary}">Position Summary</h2>
                         </div>
                     </div>
 
                     <div class="metric-grid">
                         <article class="metric-card metric-cash">
-                            <div class="metric-title">총 매수금액</div>
+                            <div class="metric-title" th:text="#{positions.totalBuyAmount}">Total Buy Amount</div>
                             <div class="metric-value" th:text="${page.totalBuyAmountText}">
                                 3,236,250원
                             </div>
-                            <div class="metric-subtitle">보유종목 원금 기준</div>
+                            <div class="metric-subtitle" th:text="#{positions.principalBased}">Based on Position Principal</div>
                         </article>
 
                         <article class="metric-card metric-stock">
-                            <div class="metric-title">총 평가금액</div>
+                            <div class="metric-title" th:text="#{positions.totalEvaluation}">Total Valuation</div>
                             <div class="metric-value" th:text="${page.totalEvalAmountText}">
                                 5,677,500원
                             </div>
-                            <div class="metric-subtitle">현재가 기준 평가액</div>
+                            <div class="metric-subtitle" th:text="#{positions.currentPriceBased}">Based on Current Prices</div>
                         </article>
 
                         <article th:class="'metric-card ' + (${page.pageProfitClass == 'profit' ? 'metric-profit' : (page.pageProfitClass == 'loss' ? 'metric-loss' : 'metric-neutral')})">
-                            <div class="metric-title">총 평가손익</div>
+                            <div class="metric-title" th:text="#{positions.totalProfit}">Total Valuation Profit/Loss</div>
                             <div class="metric-value"
                                 th:text="${page.totalEvalProfitText}">
                                 -66,440원
@@ -111,8 +106,8 @@
 
                         <article th:class="'metric-card ' + (${page.bestPositionProfitClass == 'profit' ? 'metric-profit' : (page.bestPositionProfitClass == 'loss' ? 'metric-loss' : 'metric-neutral')})">
                             <div class="metric-title"
-                                th:text="${page.bestPositionTitleText != null ? page.bestPositionTitleText : '최고 수익 종목'}">
-                                최고 수익 종목
+                                th:text="${page.bestPositionTitleText != null ? page.bestPositionTitleText : #messages.msg('positions.best')}">
+                                Best-Performing Position
                             </div>
                             <div class="metric-value best-stock-name" th:text="${page.bestPositionName}">
                                 SK하이닉스
@@ -130,8 +125,8 @@
                 <section class="dashboard-section positions-list-section">
                     <div class="section-head">
                         <div>
-                            <div class="section-label">상세</div>
-                            <h2>현재 보유 종목</h2>
+                            <div class="section-label" th:text="#{label.details}">Details</div>
+                            <h2 th:text="#{dashboard.currentPositions}">Current Positions</h2>
                         </div>
                     </div>
 
@@ -151,8 +146,8 @@
                                     </a>
                                     <span th:text="${row.tickerCode}">000660</span>
                                     <small>
-                                        보유 <b th:text="${row.quantity}">3</b>주 /
-                                        매도가능 <b th:text="${row.sellableQuantity}">3</b>주
+                                        <span th:text="#{positions.held}">Held</span> <b th:text="${row.quantity}">3</b> /
+                                        <span th:text="#{positions.sellable}">Sellable</span> <b th:text="${row.sellableQuantity}">3</b>
                                     </small>
                                 </div>
                             </div>
@@ -166,26 +161,26 @@
 
                             <div class="position-line-metrics">
                                 <div>
-                                    <span>평균단가</span>
+                                    <span th:text="#{dashboard.averagePrice}">Average Price</span>
                                     <strong th:text="${row.avgBuyPriceText}">885,000원</strong>
                                 </div>
                                 <div>
-                                    <span>현재가</span>
+                                    <span th:text="#{dashboard.currentPrice}">Current Price</span>
                                     <strong th:text="${row.currentPriceText}">1,628,000원</strong>
                                 </div>
                                 <div>
-                                    <span>평가금액</span>
+                                    <span th:text="#{dashboard.evaluationAmount}">Valuation Amount</span>
                                     <strong th:text="${row.evalAmountText}">4,884,000원</strong>
                                 </div>
                                 <div>
-                                    <span>평가손익</span>
+                                    <span th:text="#{dashboard.evaluationProfit}">Valuation Profit/Loss</span>
                                     <strong th:classappend="${row.profitClass == 'profit' ? ' profit-red' : (row.profitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
                                             th:text="${row.evalProfitText}">
                                         +2,229,000원
                                     </strong>
                                 </div>
                                 <div>
-                                    <span>비중</span>
+                                    <span th:text="#{positions.weight}">Weight</span>
                                     <strong th:text="${row.weightRateText}">86.02%</strong>
                                 </div>
                             </div>
@@ -197,8 +192,8 @@
                 <section class="dashboard-section positions-combined-chart-section">
                     <div class="section-head">
                         <div>
-                            <div class="section-label">수익률 그래프</div>
-                            <h2>일자별 누적 수익률</h2>
+                            <div class="section-label" th:text="#{positions.returnChart}">Return Chart</div>
+                            <h2 th:text="#{positions.cumulativeReturn}">Daily Cumulative Return</h2>
                         </div>
                     </div>
 

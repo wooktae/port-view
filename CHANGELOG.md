@@ -13,7 +13,7 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
-## 2026-09-21 — View i18n Infrastructure and Language Switch
+## 2026-09-21 — View i18n Infrastructure, Language Switch, and Safe UI Migration
 
 ### Added
 
@@ -23,13 +23,17 @@ This document records major changes to port-view code and documentation.
 | `messages*.properties` | Added default, English, and Korean message-bundle infrastructure without migrating UI text |
 | `sidebar.html` | Added the `EN | KO` switch using the existing `lang` locale query parameter |
 | `app-layout.css` | Added desktop and compact-sidebar styles for the language switch |
+| `ViewMessages.java` | Added locale-context message lookup for display-only Java labels and units |
+| `messages*.properties` | Added paired English/Korean Class B presentation keys |
 
 ### Changed
 
 | File | Change |
 | --- | --- |
-| `README.md` | Documented locale defaults, query parameter, persistence, bundle structure, and the language switch |
-| `docs/source-file-catalog.md` | Added locale configuration, message-bundle, and language-switch responsibilities |
+| `README.md` | Documented locale defaults, query parameter, persistence, bundle structure, language switch, and safe UI migration scope |
+| `docs/source-file-catalog.md` | Added locale configuration, message-bundle, language-switch, and locale-aware utility responsibilities |
+| Shared navigation and primary query views | Replaced unambiguous static labels with EN/KO message keys |
+| Display-only DTO and label utilities | Localized status labels, action labels, and presentation units without changing stored values |
 
 ### Validation
 
@@ -38,7 +42,8 @@ This document records major changes to port-view code and documentation.
 | Maven compile | Successful · 95 Java sources |
 | CI-profile context test | Successful · 1 test, 0 failures |
 | Language switch scope | Shared sidebar only · `?lang=en` and `?lang=ko` |
-| Class B UI text migration | Not performed |
+| Class B UI text migration | Safe navigation, Dashboard, Balance, Positions, and Orders presentation migrated |
+| Preserved deferred text | Report · Slack · raw-domain · persisted evidence · mixed operational messages |
 | AWS · DB · broker · Slack · deployment operations | 0 occurrences |
 
 ## 2026-08-25 — Research Operating Version Selection and Champion Promotion

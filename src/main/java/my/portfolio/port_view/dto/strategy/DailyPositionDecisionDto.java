@@ -1,6 +1,7 @@
 package my.portfolio.port_view.dto.strategy;
 
 import my.portfolio.port_view.util.StrategyExecutionLabelUtils;
+import my.portfolio.port_view.util.ViewMessages;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -78,21 +79,21 @@ public record DailyPositionDecisionDto(
 
     public String decisionTypeLabel() {
         return switch (upper(decisionType)) {
-            case "SELL" -> "매도";
-            case "HOLD" -> "보유";
-            case "SKIP" -> "건너뜀";
+            case "SELL" -> ViewMessages.text("action.sell");
+            case "HOLD" -> ViewMessages.text("action.hold");
+            case "SKIP" -> ViewMessages.text("action.skip");
             default -> fallback(decisionType);
         };
     }
 
     public String decisionStatusLabel() {
         return switch (upper(decisionStatus)) {
-            case "CREATED" -> "생성됨";
-            case "READY" -> "실행 준비";
-            case "EXECUTION_CREATED" -> "실행 주문 생성";
-            case "SKIPPED" -> "건너뜀";
-            case "FAILED" -> "실패";
-            case "ERROR" -> "오류";
+            case "CREATED" -> ViewMessages.text("status.created");
+            case "READY" -> ViewMessages.text("status.executionReady");
+            case "EXECUTION_CREATED" -> ViewMessages.text("status.executionCreated");
+            case "SKIPPED" -> ViewMessages.text("status.skipped");
+            case "FAILED" -> ViewMessages.text("status.failed");
+            case "ERROR" -> ViewMessages.text("status.error");
             default -> fallback(decisionStatus);
         };
     }

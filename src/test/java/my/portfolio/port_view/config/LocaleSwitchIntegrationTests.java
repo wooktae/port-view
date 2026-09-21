@@ -16,9 +16,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.LocaleResolver;
 
+import my.portfolio.port_view.util.ViewMessages;
+
 class LocaleSwitchIntegrationTests {
 
     private static final String LOCALE_PROBE_PATH = "/locale-probe";
+    private static final String MESSAGE_PROBE_PATH = "/message-probe";
 
     @Test
     void selectsPersistsAndChangesLocaleThroughTheMvcRequestFlow() throws Exception {
@@ -44,6 +47,10 @@ class LocaleSwitchIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(content().string("ko"));
 
+        mockMvc.perform(get(MESSAGE_PROBE_PATH).cookie(koreanCookie))
+                .andExpect(status().isOk())
+                .andExpect(content().string("대시보드"));
+
         MvcResult englishSelection = mockMvc.perform(
                         get(LOCALE_PROBE_PATH)
                                 .cookie(koreanCookie)
@@ -56,6 +63,10 @@ class LocaleSwitchIntegrationTests {
         Cookie englishCookie = englishSelection.getResponse().getCookie(LocaleConfig.LOCALE_COOKIE_NAME);
         assertNotNull(englishCookie);
         assertEquals("en", englishCookie.getValue());
+
+        mockMvc.perform(get(MESSAGE_PROBE_PATH).cookie(englishCookie))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Dashboard"));
     }
 
     @RestController
@@ -64,6 +75,11 @@ class LocaleSwitchIntegrationTests {
         @GetMapping(LOCALE_PROBE_PATH)
         String currentLocale() {
             return LocaleContextHolder.getLocale().getLanguage();
+        }
+
+        @GetMapping(value = MESSAGE_PROBE_PATH, produces = "text/plain;charset=UTF-8")
+        String localizedMessage() {
+            return ViewMessages.text("nav.dashboard");
         }
     }
 }

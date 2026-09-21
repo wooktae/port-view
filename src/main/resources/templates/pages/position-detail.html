@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>보유 종목 상세</title>
+    <title th:text="#{page.positionDetail.title}">Position Details</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
@@ -23,9 +23,7 @@
                 <span th:text="${page.stockName}">SK하이닉스</span>
                 <small th:text="|(${page.tickerCode})|">(000660)</small>
             </h1>
-            <p>
-                현재 보유 포지션 기준 정보와 최근 7일 증권사 리포트, 뉴스 감성 흐름을 함께 확인하는 화면.
-            </p>
+            <p th:text="#{positionDetail.description}">Review the current Position and recent Research.</p>
         </header>
 
         <section class="dashboard-stage">
@@ -33,29 +31,29 @@
             <section class="dashboard-section account-section">
                 <div class="account-hero-card">
                     <div class="account-hero-main">
-                        <div class="section-label">종목 상세</div>
+                        <div class="section-label" th:text="#{positionDetail.stockDetails}">Stock Details</div>
                         <h2 th:text="${page.stockName}">SK하이닉스</h2>
                         <p>
-                            종목코드:
+                            <span th:text="#{label.ticker}">Ticker</span>:
                             <span th:text="${page.tickerCode}">000660</span>
                             /
-                            포지션 기준일:
+                            <span th:text="#{positionDetail.positionDate}">Position Date</span>:
                             <span th:text="${page.asOfDate}">2026-05-12</span>
                             /
-                            포지션 갱신시각:
+                            <span th:text="#{positionDetail.positionUpdatedAt}">Position Updated At</span>:
                             <span th:text="${page.asOfTs}">2026-05-12 11:21:07</span>
                             <br>
-                            리포트/뉴스 기준:
-                            <span>최근 7일</span>
+                            <span th:text="#{positionDetail.researchWindow}">Report/News Window</span>:
+                            <span th:text="#{positionDetail.lastSevenDays}">Last 7 Days</span>
                         </p>
                     </div>
 
                     <div class="account-badges">
                         <a class="soft-badge badge-connector detail-back-link"
                            th:href="@{/positions(accountNo=${resolvedAccountNo})}">
-                            ← 보유 종목
+                            <span th:text="#{positionDetail.back}">← Positions</span>
                         </a>
-                        <span class="soft-badge badge-live">모의투자</span>
+                        <span class="soft-badge badge-live" th:text="#{orders.paper}">Paper Trading</span>
                         <span class="soft-badge badge-count" th:text="${page.market != null ? page.market : '-'}">KOSPI</span>
                     </div>
                 </div>
@@ -66,10 +64,8 @@
                 <div class="positions-empty-card">
                     <div class="empty-mark">!</div>
                     <div>
-                        <h2>현재 보유 스냅샷이 없어</h2>
-                        <p>
-                            이 종목의 리포트/뉴스는 조회했지만, 현재 계좌의 최신 보유 종목 스냅샷에서는 찾지 못했음.
-                        </p>
+                        <h2 th:text="#{positionDetail.noSnapshot}">No Current Position Snapshot</h2>
+                        <p th:text="#{positionDetail.noSnapshotDescription}">This Stock was not found in the latest Position Snapshot.</p>
                     </div>
                 </div>
             </section>
@@ -77,38 +73,38 @@
             <section class="dashboard-section positions-summary-section">
                 <div class="section-head">
                     <div>
-                        <div class="section-label">보유 정보</div>
-                        <h2>현재 포지션</h2>
+                        <div class="section-label" th:text="#{positionDetail.positionInformation}">Position Information</div>
+                        <h2 th:text="#{positionDetail.currentPosition}">Current Position</h2>
                     </div>
                 </div>
 
                 <div class="metric-grid position-detail-metric-grid">
                     <article class="metric-card metric-cash">
-                        <div class="metric-title">보유수량</div>
+                        <div class="metric-title" th:text="#{positionDetail.heldQuantity}">Held Quantity</div>
                         <div class="metric-value" th:text="${page.quantityText}">3주</div>
                         <div class="metric-subtitle">
-                            매도가능 <span th:text="${page.sellableQuantityText}">3주</span>
+                            <span th:text="#{positions.sellable}">Sellable</span> <span th:text="${page.sellableQuantityText}">3 shares</span>
                         </div>
                     </article>
 
                     <article class="metric-card metric-stock">
-                        <div class="metric-title">평균단가 / 현재가</div>
+                        <div class="metric-title" th:text="#{positionDetail.averageCurrentPrice}">Average / Current Price</div>
                         <div class="metric-value compact-metric" th:text="${page.currentPriceText}">1,628,000원</div>
                         <div class="metric-subtitle">
-                            평균단가 <span th:text="${page.avgBuyPriceText}">885,000원</span>
+                            <span th:text="#{dashboard.averagePrice}">Average Price</span> <span th:text="${page.avgBuyPriceText}">885,000 KRW</span>
                         </div>
                     </article>
 
                     <article class="metric-card metric-primary">
-                        <div class="metric-title">평가금액</div>
+                        <div class="metric-title" th:text="#{dashboard.evaluationAmount}">Valuation Amount</div>
                         <div class="metric-value" th:text="${page.evalAmountText}">4,884,000원</div>
                         <div class="metric-subtitle">
-                            매수금액 <span th:text="${page.buyAmountText}">2,655,000원</span>
+                            <span th:text="#{positionDetail.buyAmount}">Buy Amount</span> <span th:text="${page.buyAmountText}">2,655,000 KRW</span>
                         </div>
                     </article>
 
                     <article class="metric-card metric-profit">
-                        <div class="metric-title">평가손익</div>
+                        <div class="metric-title" th:text="#{dashboard.evaluationProfit}">Valuation Profit/Loss</div>
                         <div class="metric-value"
                              th:classappend="${page.profitClass == 'profit' ? ' profit-red' : (page.profitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
                              th:text="${page.evalProfitText}">
@@ -126,50 +122,50 @@
             <section class="dashboard-section position-insight-summary-section">
                 <div class="section-head">
                     <div>
-                        <div class="section-label">최근 7일</div>
-                        <h2>리포트 / 뉴스 요약</h2>
+                        <div class="section-label" th:text="#{positionDetail.lastSevenDays}">Last 7 Days</div>
+                        <h2 th:text="#{positionDetail.recentSummary}">Report / News Summary</h2>
                     </div>
                 </div>
 
                 <div class="metric-grid position-insight-metric-grid">
                     <article class="metric-card metric-primary">
-                        <div class="metric-title">증권사 리포트</div>
+                        <div class="metric-title" th:text="#{positionDetail.brokerReports}">Broker Reports</div>
                         <div class="metric-value" th:text="${page.summary.reportCountText}">0건</div>
-                        <div class="metric-subtitle">최근 7일 발행 기준</div>
+                        <div class="metric-subtitle" th:text="#{positionDetail.reportsRecent}">Published in the last 7 days</div>
                     </article>
 
                     <article class="metric-card metric-cash">
-                        <div class="metric-title">평균 리포트 점수</div>
+                        <div class="metric-title" th:text="#{positionDetail.averageReportScore}">Average Report Score</div>
                         <div class="metric-value" th:text="${page.summary.avgRecommendationScoreText}">-</div>
-                        <div class="metric-subtitle">매수 5 / 중립 3 / 매도 1</div>
+                        <div class="metric-subtitle" th:text="#{positionDetail.reportScoreScale}">Buy 5 / Neutral 3 / Sell 1</div>
                     </article>
 
                     <article class="metric-card metric-stock">
-                        <div class="metric-title">평균 목표가</div>
+                        <div class="metric-title" th:text="#{positionDetail.averageTargetPrice}">Average Target Price</div>
                         <div class="metric-value compact-metric" th:text="${page.summary.avgTargetPriceText}">-</div>
-                        <div class="metric-subtitle">최근 리포트 목표가 평균</div>
+                        <div class="metric-subtitle" th:text="#{positionDetail.targetPriceAverage}">Average target price from recent Reports</div>
                     </article>
 
                     <article class="metric-card metric-profit">
-                        <div class="metric-title">뉴스 감성 평균</div>
+                        <div class="metric-title" th:text="#{positionDetail.averageNewsSentiment}">Average News Sentiment</div>
                         <div class="metric-value" th:text="${page.summary.avgSentimentScoreText}">-</div>
                         <div class="metric-subtitle">
-                            높을수록 긍정 · 신뢰도
+                            <span th:text="#{positionDetail.sentimentConfidence}">Higher is more positive · Confidence</span>
                             <span th:text="${page.summary.avgConfidenceScoreText}">-</span>
                         </div>
                     </article>
 
                     <article class="metric-card metric-primary">
-                        <div class="metric-title">뉴스 분포</div>
+                        <div class="metric-title" th:text="#{positionDetail.newsDistribution}">News Distribution</div>
                         <div class="metric-value compact-metric">
                             <span th:text="${page.summary.newsCountText}">0건</span>
                         </div>
                         <div class="metric-subtitle">
-                            긍정 <span th:text="${page.summary.positiveNewsCountText}">0건</span>
+                            <span th:text="#{positionDetail.positive}">Positive</span> <span th:text="${page.summary.positiveNewsCountText}">0 items</span>
                             /
-                            부정 <span th:text="${page.summary.negativeNewsCountText}">0건</span>
+                            <span th:text="#{positionDetail.negative}">Negative</span> <span th:text="${page.summary.negativeNewsCountText}">0 items</span>
                             /
-                            중립 <span th:text="${page.summary.neutralNewsCountText}">0건</span>
+                            <span th:text="#{positionDetail.neutral}">Neutral</span> <span th:text="${page.summary.neutralNewsCountText}">0 items</span>
                         </div>
                     </article>
                 </div>
@@ -178,13 +174,13 @@
             <section class="dashboard-section position-reports-section">
                 <div class="section-head">
                     <div>
-                        <div class="section-label">증권사 리포트</div>
-                        <h2>최신 증권사 리포트</h2>
+                        <div class="section-label" th:text="#{positionDetail.brokerReports}">Broker Reports</div>
+                        <h2 th:text="#{positionDetail.latestReports}">Latest Broker Reports</h2>
                     </div>
                 </div>
 
                 <div class="insight-empty-card" th:if="${page.reports == null or #lists.isEmpty(page.reports)}">
-                    최근 7일 내 증권사 리포트가 없어.
+                    <span th:text="#{positionDetail.noReports}">No Broker Reports were published in the last 7 days.</span>
                 </div>
 
                 <div class="insight-list" th:if="${page.reports != null and !#lists.isEmpty(page.reports)}">
@@ -210,7 +206,7 @@
                         </p>
 
                         <div class="insight-meta-row">
-                            <span>목표가</span>
+                            <span th:text="#{positionDetail.targetPrice}">Target Price</span>
                             <strong th:text="${report.targetPriceText}">120,000원</strong>
                         </div>
                     </article>
@@ -220,13 +216,13 @@
             <section class="dashboard-section position-news-section">
                 <div class="section-head">
                     <div>
-                        <div class="section-label">뉴스 감성</div>
-                        <h2>최신 뉴스와 감성 지수</h2>
+                        <div class="section-label" th:text="#{positionDetail.newsSentiment}">News Sentiment</div>
+                        <h2 th:text="#{positionDetail.latestNews}">Latest News and Sentiment Score</h2>
                     </div>
                 </div>
 
                 <div class="insight-empty-card" th:if="${page.news == null or #lists.isEmpty(page.news)}">
-                    최근 7일 내 감성 분석된 뉴스가 없어.
+                    <span th:text="#{positionDetail.noNews}">No sentiment-analyzed News was found in the last 7 days.</span>
                 </div>
 
                 <div class="insight-list" th:if="${page.news != null and !#lists.isEmpty(page.news)}">
@@ -257,14 +253,14 @@
                         </div>
 
                         <div class="news-keywords">
-                            <span>키워드</span>
+                            <span th:text="#{positionDetail.keywords}">Keywords</span>
                             <strong th:text="${news.keywordsText != null and !#strings.isEmpty(news.keywordsText) ? news.keywordsText : '-'}">
                                 투자, 강세
                             </strong>
                         </div>
 
                         <div class="insight-meta-row">
-                            <span>신뢰도</span>
+                            <span th:text="#{positionDetail.confidence}">Confidence</span>
                             <strong th:text="${news.confidenceScoreText}">0.90</strong>
                         </div>
                     </article>

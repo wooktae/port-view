@@ -191,7 +191,8 @@ When changing configuration, verify the following together.
 
 | Path | Responsibility |
 | --- | --- |
-| `src/main/java/my/portfolio/port_view/util/*.java` | Amount · date · label · CSS class · account resolution |
+| `src/main/java/my/portfolio/port_view/util/*.java` | Amount · date · locale-aware label · CSS class · account resolution |
+| `ViewMessages.java` | Locale-context lookup for display-only Java text in the EN/KO message bundles |
 
 When changing a Util, verify the impact on display values and CSS classes across all views.
 
@@ -244,9 +245,9 @@ When changing a Template class, verify the corresponding CSS.
 | `application.properties` | Common server · DB · View · Connector · Batch · Slack configuration |
 | `application-aws-paper.properties` | AWS Paper profile overrides |
 | `application-local.properties.example` | Local configuration example without sensitive information |
-| `messages.properties` | Default English-first MessageSource bundle |
-| `messages_en.properties` | English localization bundle |
-| `messages_ko.properties` | Korean localization bundle |
+| `messages.properties` | Default English-first MessageSource bundle and Class B UI keys |
+| `messages_en.properties` | English locale marker; inherits default English values |
+| `messages_ko.properties` | Korean localization values for Class B UI keys |
 | `src/main/resources/*` | Profile-specific configuration and View resources |
 
 ### Primary Configuration Categories

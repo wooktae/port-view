@@ -14,6 +14,7 @@ import my.portfolio.port_view.repository.ConnectorOrderEventRepository;
 import my.portfolio.port_view.repository.ConnectorOrderRequestRepository;
 import my.portfolio.port_view.util.OrderLabelUtils;
 import my.portfolio.port_view.util.ViewFormatUtils;
+import my.portfolio.port_view.util.ViewMessages;
 import my.portfolio.port_view.util.ViewTextUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,7 +79,7 @@ public class OrderService {
 
         if (current == null) {
             page.setFound(false);
-            page.setTitleText("주문을 찾을 수 없음");
+            page.setTitleText(ViewMessages.text("orderDetail.notFound"));
             page.setLifecycleText("-");
             page.setFinalStatusText("-");
             return page;

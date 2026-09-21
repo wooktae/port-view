@@ -1,6 +1,7 @@
 package my.portfolio.port_view.dto.dailybatch;
 
 import my.portfolio.port_view.util.StrategyExecutionLabelUtils;
+import my.portfolio.port_view.util.ViewMessages;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -35,7 +36,9 @@ public record IntradayPositionCheckDto(
     }
     
     public String shouldStopLabel() {
-        return Boolean.TRUE.equals(shouldStop) ? "손절 후보" : "정상";
+        return Boolean.TRUE.equals(shouldStop)
+                ? ViewMessages.text("intraday.stopCandidate")
+                : ViewMessages.text("intraday.normal");
     }
 
     public String shouldStopClass() {
@@ -48,7 +51,9 @@ public record IntradayPositionCheckDto(
 
     public String warningLabel() {
         int count = warningCount == null ? 0 : warningCount;
-        return count <= 0 ? "없음" : count + "건";
+        return count <= 0
+                ? ViewMessages.text("label.none")
+                : ViewMessages.text("unit.items", count);
     }
 
     public String executionOrderText() {

@@ -14,13 +14,13 @@
         </div>
     </div>
 
-    <nav class="sidebar-nav" aria-label="주요 메뉴">
+    <nav class="sidebar-nav" aria-label="Primary Navigation" th:aria-label="#{nav.primary}">
         <a class="sidebar-link"
            th:if="${@environment.getProperty('portfolio.view.menu.dashboard-enabled', 'true') == 'true'}"
            th:classappend="${activeMenu == 'dashboard'} ? ' active' : ''"
            th:href="@{/dashboard(accountNo=${accountNo})}">
             <span class="sidebar-icon">⌂</span>
-            <span class="sidebar-text">대시보드</span>
+            <span class="sidebar-text" th:text="#{nav.dashboard}">Dashboard</span>
         </a>
 
         <a class="sidebar-link"
@@ -28,7 +28,7 @@
            th:classappend="${activeMenu == 'balance'} ? ' active' : ''"
            th:href="@{/balance-summary(accountNo=${accountNo})}">
             <span class="sidebar-icon">₩</span>
-            <span class="sidebar-text">잔고</span>
+            <span class="sidebar-text" th:text="#{nav.balance}">Balance</span>
         </a>
 
         <a class="sidebar-link"
@@ -36,7 +36,7 @@
            th:classappend="${activeMenu == 'positions'} ? ' active' : ''"
            th:href="@{/positions(accountNo=${accountNo})}">
             <span class="sidebar-icon">▦</span>
-            <span class="sidebar-text">보유 종목</span>
+            <span class="sidebar-text" th:text="#{nav.positions}">Positions</span>
         </a>
 
         <a class="sidebar-link"
@@ -44,7 +44,7 @@
            th:classappend="${activeMenu == 'orders'} ? ' active' : ''"
            th:href="@{/orders(accountNo=${accountNo})}">
             <span class="sidebar-icon">↕</span>
-            <span class="sidebar-text">매매 내역</span>
+            <span class="sidebar-text" th:text="#{nav.orders}">Orders</span>
         </a>
 
         <a class="sidebar-link"
@@ -52,7 +52,7 @@
            th:classappend="${activeMenu == 'strategy'} ? ' active' : ''"
            th:href="@{/strategy/execution/plans}">
             <span class="sidebar-icon">◇</span>
-            <span class="sidebar-text">전략 운영</span>
+            <span class="sidebar-text" th:text="#{nav.strategy}">Strategy Operations</span>
         </a>
 
         <a class="sidebar-link"
@@ -60,7 +60,7 @@
            th:classappend="${activeMenu == 'daily-batch'} ? ' active' : ''"
            th:href="@{/daily-batch(accountNo=${accountNo})}">
             <span class="sidebar-icon">⟳</span>
-            <span class="sidebar-text">Daily 배치</span>
+            <span class="sidebar-text" th:text="#{nav.dailyBatch}">Daily Batch</span>
         </a>
 
         <a class="sidebar-link"
@@ -68,7 +68,7 @@
            th:classappend="${activeMenu == 'report'} ? ' active' : ''"
            th:href="@{/strategy/reports/latest}">
             <span class="sidebar-icon">⌁</span>
-            <span class="sidebar-text">백테스트 리포트</span>
+            <span class="sidebar-text" th:text="#{nav.report}">Backtest Report</span>
         </a>
     </nav>
 
@@ -90,8 +90,8 @@
 
     <div class="sidebar-card">
         <div class="sidebar-card-kicker">SNAPSHOT REFRESH</div>
-        <strong>운영 콘솔 v2</strong>
-        <p>Dashboard·잔고·보유 종목 진입 시 AWS Paper 계좌 스냅샷을 갱신하고 DB 기준으로 표시.</p>
+        <strong th:text="#{sidebar.console}">Operations Console v2</strong>
+        <p th:text="#{sidebar.snapshotDescription}">Refreshes the AWS Paper account Snapshot and displays DB-backed data.</p>
     </div>
 </aside>
 </body>

@@ -8,15 +8,14 @@ public final class ConnectorLabelUtils {
     public static String orderMethodLabel(Object value) {
         String normalized = normalize(value);
         if (normalized == null) {
-            return "미확인";
+            return ViewMessages.text("label.unknown");
         }
-
         return switch (normalized) {
-            case "MARKET" -> "시장가";
-            case "LIMIT" -> "지정가";
-            case "BEST" -> "최유리";
-            case "MOC" -> "장마감 시장가";
-            case "LOC" -> "장마감 지정가";
+            case "MARKET" -> ViewMessages.text("order.method.market");
+            case "LIMIT" -> ViewMessages.text("order.method.limit");
+            case "BEST" -> ViewMessages.text("order.method.best");
+            case "MOC" -> ViewMessages.text("order.method.moc");
+            case "LOC" -> ViewMessages.text("order.method.loc");
             default -> String.valueOf(value);
         };
     }
@@ -24,14 +23,13 @@ public final class ConnectorLabelUtils {
     public static String requestTypeLabel(Object value) {
         String normalized = normalize(value);
         if (normalized == null) {
-            return "미확인";
+            return ViewMessages.text("label.unknown");
         }
-
         return switch (normalized) {
-            case "BUY" -> "매수";
-            case "SELL" -> "매도";
-            case "MODIFY" -> "정정";
-            case "CANCEL" -> "취소";
+            case "BUY" -> ViewMessages.text("action.buy");
+            case "SELL" -> ViewMessages.text("action.sell");
+            case "MODIFY" -> ViewMessages.text("action.modify");
+            case "CANCEL" -> ViewMessages.text("action.cancel");
             default -> String.valueOf(value);
         };
     }
@@ -39,13 +37,12 @@ public final class ConnectorLabelUtils {
     public static String sideLabel(Object value) {
         String normalized = normalize(value);
         if (normalized == null) {
-            return "미확인";
+            return ViewMessages.text("label.unknown");
         }
-
         return switch (normalized) {
-            case "BUY", "매수" -> "매수";
-            case "SELL", "매도" -> "매도";
-            case "UNKNOWN" -> "미확인";
+            case "BUY", "매수" -> ViewMessages.text("action.buy");
+            case "SELL", "매도" -> ViewMessages.text("action.sell");
+            case "UNKNOWN" -> ViewMessages.text("label.unknown");
             default -> String.valueOf(value);
         };
     }
@@ -53,23 +50,21 @@ public final class ConnectorLabelUtils {
     public static String requestStatusLabel(Object value) {
         String normalized = normalize(value);
         if (normalized == null) {
-            return "미확인";
+            return ViewMessages.text("label.unknown");
         }
-
         return switch (normalized) {
-            case "PENDING" -> "대기";
-            case "READY" -> "준비";
-            case "SUBMITTED" -> "전송 완료";
-            case "SENT" -> "전송 완료";
-            case "ACCEPTED" -> "접수 완료";
-            case "ORDER_ACCEPTED" -> "주문 접수";
-            case "PARTIAL_FILLED" -> "부분 체결";
-            case "FILLED" -> "체결 완료";
-            case "REJECTED" -> "거절";
-            case "CANCELED", "CANCELLED" -> "취소 완료";
-            case "CANCEL_ACCEPTED" -> "취소 접수";
-            case "MODIFIED" -> "정정 완료";
-            case "MODIFY_ACCEPTED" -> "정정 접수";
+            case "PENDING" -> ViewMessages.text("status.pending");
+            case "READY" -> ViewMessages.text("status.ready");
+            case "SUBMITTED", "SENT" -> ViewMessages.text("status.submitted");
+            case "ACCEPTED" -> ViewMessages.text("status.accepted");
+            case "ORDER_ACCEPTED" -> ViewMessages.text("status.orderAccepted");
+            case "PARTIAL_FILLED" -> ViewMessages.text("status.partialFilled");
+            case "FILLED" -> ViewMessages.text("status.filled");
+            case "REJECTED" -> ViewMessages.text("status.rejected");
+            case "CANCELED", "CANCELLED" -> ViewMessages.text("status.canceled");
+            case "CANCEL_ACCEPTED" -> ViewMessages.text("status.cancelAccepted");
+            case "MODIFIED" -> ViewMessages.text("status.modified");
+            case "MODIFY_ACCEPTED" -> ViewMessages.text("status.modifyAccepted");
             default -> String.valueOf(value);
         };
     }
@@ -77,21 +72,20 @@ public final class ConnectorLabelUtils {
     public static String eventTypeLabel(Object value) {
         String normalized = normalize(value);
         if (normalized == null) {
-            return "미확인";
+            return ViewMessages.text("label.unknown");
         }
-
         return switch (normalized) {
-            case "ORDER_ACCEPTED" -> "주문 접수";
-            case "SUMMARY_ONLY_ORDER_ACCEPTED" -> "요약 기준 주문 접수";
-            case "FILLED" -> "체결 완료";
-            case "SUMMARY_ONLY_FILLED" -> "요약 기준 체결 완료";
-            case "PARTIAL_FILLED" -> "부분 체결";
-            case "SUMMARY_ONLY_PARTIAL_FILLED" -> "요약 기준 부분 체결";
-            case "CANCELED", "CANCELLED" -> "취소 완료";
-            case "CANCEL_ACCEPTED" -> "취소 접수";
-            case "SUMMARY_ONLY_CANCEL_ACCEPTED" -> "요약 기준 취소 접수";
-            case "MODIFIED" -> "정정 완료";
-            case "MODIFY_ACCEPTED" -> "정정 접수";
+            case "ORDER_ACCEPTED" -> ViewMessages.text("status.orderAccepted");
+            case "SUMMARY_ONLY_ORDER_ACCEPTED" -> ViewMessages.text("status.summaryOrderAccepted");
+            case "FILLED" -> ViewMessages.text("status.filled");
+            case "SUMMARY_ONLY_FILLED" -> ViewMessages.text("status.summaryFilled");
+            case "PARTIAL_FILLED" -> ViewMessages.text("status.partialFilled");
+            case "SUMMARY_ONLY_PARTIAL_FILLED" -> ViewMessages.text("status.summaryPartialFilled");
+            case "CANCELED", "CANCELLED" -> ViewMessages.text("status.canceled");
+            case "CANCEL_ACCEPTED" -> ViewMessages.text("status.cancelAccepted");
+            case "SUMMARY_ONLY_CANCEL_ACCEPTED" -> ViewMessages.text("status.summaryCancelAccepted");
+            case "MODIFIED" -> ViewMessages.text("status.modified");
+            case "MODIFY_ACCEPTED" -> ViewMessages.text("status.modifyAccepted");
             default -> String.valueOf(value);
         };
     }
@@ -99,19 +93,17 @@ public final class ConnectorLabelUtils {
     public static String executionStatusLabel(Object value) {
         String normalized = normalize(value);
         if (normalized == null) {
-            return "미확인";
+            return ViewMessages.text("label.unknown");
         }
-
         return switch (normalized) {
-            case "CANDIDATE" -> "후보";
-            case "READY" -> "주문 대기";
-            case "SUBMITTED" -> "전송 완료";
-            case "SENT" -> "전송 완료";
-            case "ACCEPTED" -> "접수 완료";
-            case "FILLED" -> "체결 완료";
-            case "BLOCKED" -> "차단";
-            case "SKIPPED" -> "제외";
-            case "FAILED" -> "실패";
+            case "CANDIDATE" -> ViewMessages.text("status.candidate");
+            case "READY" -> ViewMessages.text("status.orderPending");
+            case "SUBMITTED", "SENT" -> ViewMessages.text("status.submitted");
+            case "ACCEPTED" -> ViewMessages.text("status.accepted");
+            case "FILLED" -> ViewMessages.text("status.filled");
+            case "BLOCKED" -> ViewMessages.text("status.blocked");
+            case "SKIPPED" -> ViewMessages.text("status.skipped");
+            case "FAILED" -> ViewMessages.text("status.failed");
             default -> String.valueOf(value);
         };
     }
@@ -119,14 +111,13 @@ public final class ConnectorLabelUtils {
     public static String positionStatusLabel(Object value) {
         String normalized = normalize(value);
         if (normalized == null) {
-            return "미확인";
+            return ViewMessages.text("label.unknown");
         }
-
         return switch (normalized) {
-            case "OPEN" -> "보유 중";
-            case "SELL_READY" -> "매도 준비";
-            case "SELL_ORDERED" -> "매도 주문 중";
-            case "CLOSED" -> "청산 완료";
+            case "OPEN" -> ViewMessages.text("status.openHolding");
+            case "SELL_READY" -> ViewMessages.text("status.sellReady");
+            case "SELL_ORDERED" -> ViewMessages.text("status.sellOrdered");
+            case "CLOSED" -> ViewMessages.text("status.closed");
             default -> String.valueOf(value);
         };
     }
@@ -134,18 +125,17 @@ public final class ConnectorLabelUtils {
     public static String sourceTypeLabel(Object value) {
         String normalized = normalize(value);
         if (normalized == null) {
-            return "미확인";
+            return ViewMessages.text("label.unknown");
         }
-
         return switch (normalized) {
-            case "TRADE_LOG_BUY" -> "전략 매수 후보";
-            case "TRADE_LOG_SELL" -> "전략 매도 후보";
-            case "POSITION_SELL" -> "수동 포지션 매도";
-            case "DAILY_SIGNAL_BUY" -> "Daily 매수 신호";
-            case "DAILY_POSITION_SELL" -> "Daily 포지션 매도";
-            case "INTRADAY_STOP_SELL" -> "장중 손절 매도";
-            case "MANUAL_TEST" -> "수동 테스트";
-            case "STRATEGY_SIGNAL" -> "전략 신호";
+            case "TRADE_LOG_BUY" -> ViewMessages.text("source.strategyBuyCandidate");
+            case "TRADE_LOG_SELL" -> ViewMessages.text("source.strategySellCandidate");
+            case "POSITION_SELL" -> ViewMessages.text("source.manualPositionSell");
+            case "DAILY_SIGNAL_BUY" -> ViewMessages.text("source.dailyBuy");
+            case "DAILY_POSITION_SELL" -> ViewMessages.text("signal.dailyPositionSell");
+            case "INTRADAY_STOP_SELL" -> ViewMessages.text("signal.intradayStopSell");
+            case "MANUAL_TEST" -> ViewMessages.text("signal.manualTest");
+            case "STRATEGY_SIGNAL" -> ViewMessages.text("source.strategySignal");
             default -> String.valueOf(value);
         };
     }
@@ -154,12 +144,10 @@ public final class ConnectorLabelUtils {
         if (value == null) {
             return null;
         }
-
         String text = String.valueOf(value).trim();
         if (text.isBlank() || "-".equals(text)) {
             return null;
         }
-
         return text.toUpperCase();
     }
 }

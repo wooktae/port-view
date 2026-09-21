@@ -1,5 +1,7 @@
 package my.portfolio.port_view.dto.dailybatch;
 
+import my.portfolio.port_view.util.ViewMessages;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -47,7 +49,7 @@ public record BlockWatchCandidateDto(
 
     public String watchReasonLabel() {
         if ("BLOCK_STRONG_EXCEPTION_WATCH".equalsIgnoreCase(watchReason)) {
-            return "BLOCK 강한 예외 관찰";
+            return ViewMessages.text("watch.blockStrongException");
         }
 
         return watchReason == null || watchReason.isBlank() ? "-" : watchReason;
