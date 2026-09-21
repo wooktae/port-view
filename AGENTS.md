@@ -1,140 +1,140 @@
-# port-view 작업 규칙
+# port-view Working Rules
 
-이 문서는 `port-view` 마이크로서비스의 코드, 설정, 화면, 테스트, 문서를 수정할 때 적용하는 기준이다.
+This document defines the standards for modifying the code, configuration, views, tests, and documentation of the `port-view` microservice.
 
-`port-view` 관련 작업은 이 문서만 읽어도 범위, 책임 경계, 안전 기준, 문서 작성 방식과 검증 원칙을 이해할 수 있어야 한다.
+A contributor should be able to understand the scope, responsibility boundaries, safety standards, documentation practices, and validation principles for `port-view` by reading this document alone.
 
-## 0. 최우선 문서 가독성 규칙
+## 0. Highest-Priority Documentation Readability Rules
 
-모든 문서 작업에서 본 섹션을 최우선으로 적용한다.
+Apply this section before all other rules for documentation work.
 
-### 0.0 적용 범위 제한
+### 0.0 Scope Limitation
 
-가독성 규칙은 이번 작업에서 새로 작성하거나 직접 수정하는 부분에만 적용한다.
+The readability rules apply only to content newly written or directly modified in the current task.
 
-사용자가 문서 전체 정리나 전수 점검을 명시하지 않은 경우 아래 작업은 수행하지 않는다.
+Unless the user explicitly requests a full-document cleanup or comprehensive review, do not perform the following work.
 
-| 항목 | 기본 처리 |
+| Item | Default Handling |
 | --- | --- |
-| 기존 문서 전체 전수 스캔 | 수행하지 않음 |
-| README 전체 재구성 | 수행하지 않음 |
-| CHANGELOG 과거 이력 대량 정리 | 수행하지 않음 |
-| 신규 scanner · audit 도구 작성 | 수행하지 않음 |
-| sub-agent · orchestrator 생성 | 수행하지 않음 |
+| Full scan of existing documentation | Do not perform |
+| Complete README restructuring | Do not perform |
+| Large-scale cleanup of historical CHANGELOG entries | Do not perform |
+| Creation of a new scanner or audit tool | Do not perform |
+| Creation of a sub-agent or orchestrator | Do not perform |
 
-변경 인접부는 같은 표 행, 같은 bullet 묶음, 같은 짧은 문단까지만 본다.
+For adjacent content, review only the same table row, bullet group, or short paragraph.
 
-범위 밖의 기존 위반은 원본을 유지하고 필요 시 후속 후보로만 남긴다.
+Preserve existing out-of-scope violations and, when necessary, list them only as follow-up candidates.
 
-### 0.1 표 작성 규칙
+### 0.1 Table Rules
 
-새로 만드는 독립 요약 표는 기본적으로 2컬럼으로 작성한다.
+New standalone summary tables should use two columns by default.
 
-기본 헤더는 `항목 / 값`이다.
+The default headers are `Item / Value`.
 
-아래 상황에서는 더 구체적인 2컬럼 헤더를 사용할 수 있다.
+More specific two-column headers may be used in the following situations.
 
-| 상황 | 우선 헤더 |
+| Situation | Preferred Headers |
 | --- | --- |
-| 검증 결과 | `항목 / 결과` |
-| 파일별 변경 | `파일 / 변경` |
-| 화면별 설명 | `화면 / 내용` |
-| 설정 정리 | `설정 / 값` |
-| endpoint 정리 | `경로 / 역할` |
-| 테스트 결과 | `테스트 / 결과` |
+| Validation results | `Item / Result` |
+| Changes by file | `File / Change` |
+| Description by view | `View / Content` |
+| Configuration summary | `Setting / Value` |
+| Endpoint summary | `Path / Responsibility` |
+| Test results | `Test / Result` |
 
-기존 표에 행을 추가하는 경우 기존 컬럼 구조를 유지한다.
+When adding a row to an existing table, preserve its existing column structure.
 
-3컬럼 이상 표는 다음 경우에만 허용한다.
+Tables with three or more columns are allowed only in the following cases.
 
-| 조건 | 처리 |
+| Condition | Handling |
 | --- | --- |
-| 사용자가 명시적으로 요청 | 요청 구조 사용 |
-| 기존 표 보존이 더 안전 | 기존 구조 유지 |
-| 비교 구조상 2컬럼 변환 시 의미 손실 | 예외 허용 |
+| Explicitly requested by the user | Use the requested structure |
+| Preserving the existing table is safer | Keep the existing structure |
+| Converting a comparison to two columns would lose meaning | Allow an exception |
 
-### 0.2 표 셀과 문장 길이
+### 0.2 Table Cell and Sentence Length
 
-- 표 셀은 2문장 이하로 유지한다.
-- 한 셀에 여러 값이 있으면 `<br>`로 나눈다.
-- 한 셀에 3개 이상의 사실을 장문으로 넣지 않는다.
-- 긴 근거는 표 밖 설명이나 관련 문서 링크로 분리한다.
-- 300자 초과 셀과 500자 초과 라인을 만들지 않는다.
-- raw log, 전체 SQL 출력, 전체 AWS 응답을 문서에 붙이지 않는다.
+- Keep table cells to no more than two sentences.
+- Separate multiple values in one cell with `<br>`.
+- Do not place three or more facts in a long sentence within one cell.
+- Move lengthy evidence outside the table or link to the relevant document.
+- Do not create cells longer than 300 characters or lines longer than 500 characters.
+- Do not paste raw logs, complete SQL output, or complete AWS responses into documentation.
 
-### 0.3 문서 밀도
+### 0.3 Documentation Density
 
-문서 작성 우선순위는 아래를 따른다.
+Use the following priority when writing documentation.
 
-1. 짧은 Summary
-2. 짧은 2컬럼 표
-3. 짧은 bullet
-4. 상세 문서 링크
-5. 긴 본문
+1. Short summary
+2. Short two-column table
+3. Short bullets
+4. Link to detailed documentation
+5. Long-form text
 
-같은 사실을 README, CHANGELOG, worklog, 상세 문서에 장문으로 반복하지 않는다.
+Do not repeat the same facts at length across the README, CHANGELOG, worklog, and detailed documentation.
 
-### 0.4 상태 표시
+### 0.4 Status Indicators
 
-상태 배지는 아래 5종만 사용한다.
+Use only the following five status indicators.
 
-| 배지 | 의미 |
+| Indicator | Meaning |
 | --- | --- |
-| 🔴 | 금지 · live · 고위험 |
-| 🟠 | 대기 · 관찰 · 미확정 |
-| 🟢 | 완료 · 성공 · ENABLED |
-| 🔵 | 참고 · 정보 · evidence |
-| ⚫ | 해당 없음 |
+| 🔴 | Prohibited · live · high risk |
+| 🟠 | Pending · observing · unconfirmed |
+| 🟢 | Complete · successful · ENABLED |
+| 🔵 | Reference · information · evidence |
+| ⚫ | Not applicable |
 
-상태 배지로 충분하면 HTML 색상을 추가하지 않는다.
+Do not add HTML colors when a status indicator is sufficient.
 
-### 0.5 작업 방식 제한
+### 0.5 Work Method Restrictions
 
-문서 작업은 아래 순서로 진행한다.
+Perform documentation work in the following order.
 
-1. 요청 범위 확인
-2. 대상 파일 직접 읽기
-3. 필요한 부분만 수정
-4. UTF-8 No BOM 저장
-5. 짧은 after-check
-6. 변경 요약 보고
+1. Confirm the requested scope
+2. Read the target file directly
+3. Modify only the necessary sections
+4. Save as UTF-8 without BOM
+5. Perform a short after-check
+6. Report a change summary
 
-사용자가 명시적으로 요청하지 않는 한 아래 방식은 사용하지 않는다.
+Unless explicitly requested by the user, do not use the following methods.
 
-- 전체 workspace 전수 스캔
-- sub-agent
-- orchestrator
-- 신규 scanner
-- content hash matrix
-- workspace 밖 임시 파일
-- 과도한 자동화 스크립트
+- Full workspace scan
+- Sub-agent
+- Orchestrator
+- New scanner
+- Content hash matrix
+- Temporary files outside the workspace
+- Excessive automation scripts
 
 ## 1. Scope
 
-### 1.1 기본 작업 디렉터리
+### 1.1 Default Working Directory
 
 `C:\Workspaces\port-view`
 
-### 1.2 기본 수정 대상
+### 1.2 Default Modification Targets
 
-| 구분 | 대상 |
+| Category | Target |
 | --- | --- |
 | Java | `src/main/java` |
-| 설정 | `src/main/resources/*.properties` |
-| 화면 | `src/main/resources/templates` |
-| CSS · 정적 파일 | `src/main/resources/static` |
-| 테스트 | `src/test` |
-| 문서 | `README.md` · `CHANGELOG.md` · `docs` |
-| 빌드 | `pom.xml` · Maven Wrapper |
-| 컨테이너 | `Dockerfile` 및 배포 관련 파일 |
+| Configuration | `src/main/resources/*.properties` |
+| Views | `src/main/resources/templates` |
+| CSS · static files | `src/main/resources/static` |
+| Tests | `src/test` |
+| Documentation | `README.md` · `CHANGELOG.md` · `docs` |
+| Build | `pom.xml` · Maven Wrapper |
+| Container | `Dockerfile` and deployment-related files |
 | CI/CD | `.devops/codebuild/buildspec.yml` · GitHub Actions workflow |
-| 배포 | ECR · ECS Task Definition · 배포 스크립트 |
+| Deployment | ECR · ECS Task Definition · deployment scripts |
 
-현재 요청에 포함되지 않은 파일은 수정하지 않는다.
+Do not modify files that are not included in the current request.
 
-### 1.3 다른 마이크로서비스
+### 1.3 Other Microservices
 
-아래 프로젝트는 port-view의 외부 의존 모듈이다.
+The following projects are external dependencies of port-view.
 
 - `port-marketconnector`
 - `port-interest-crawler`
@@ -144,57 +144,57 @@
 - `port_strategy_research`
 - `port_strategy_execution`
 
-현재 작업이 명시적으로 요구하지 않는 한 다른 MS의 코드와 문서는 수정하지 않는다.
+Do not modify code or documentation in another microservice unless the current task explicitly requires it.
 
-`.kiro`의 cross-service spec도 port-view 작업 범위에 자동 포함하지 않는다.
+Cross-service specs under `.kiro` are not automatically included in the port-view work scope.
 
-## 2. port-view 책임 경계
+## 2. port-view Responsibility Boundary
 
-port-view는 조회, 승인, 트리거 UI를 담당하는 Spring MVC 기반 View 마이크로서비스다.
+port-view is a Spring MVC-based View microservice responsible for query, approval, and trigger UI functions.
 
-### 2.1 담당 범위
+### 2.1 Responsibilities
 
-| 항목 | 내용 |
+| Item | Content |
 | --- | --- |
-| Dashboard | 계좌 · 주문 · 포지션 · 전략 결과 요약 |
-| Balance | 잔고와 평가금액 조회 |
-| Positions | 보유 종목 목록과 상세 조회 |
-| Orders | 주문 요청 · 체결 · 이벤트 조회 |
-| Strategy | 실행 계획 · Daily Run · Report 조회 |
-| Daily Batch | 실행 이력과 Step 결과 조회 |
-| Trigger UI | Step Functions 실행 요청 |
-| Approval UI | Paper 주문성 구간 승인 트리거 |
+| Dashboard | Account · order · position · strategy result summary |
+| Balance | Balance and valuation amount queries |
+| Positions | Position list and detail queries |
+| Orders | Order request · fill · event queries |
+| Strategy | Execution plan · Daily Run · Report queries |
+| Daily Batch | Run history and Step result queries |
+| Trigger UI | Step Functions execution requests |
+| Approval UI | Approval trigger for the Paper order-related range |
 
-### 2.2 직접 담당하지 않는 범위
+### 2.2 Excluded Responsibilities
 
-- broker 주문 제출 로직
-- 전략 판단 로직
-- 데이터 수집과 전처리
-- Step Functions 내부 orchestration
-- EventBridge Scheduler 자동 실행
-- MarketConnector EC2 내부 명령
-- KRX crawler 실행
-- aws-live 자동 BUY/SELL
+- Broker order submission logic
+- Strategy decision logic
+- Data collection and preprocessing
+- Internal Step Functions orchestration
+- EventBridge Scheduler automated execution
+- Internal MarketConnector EC2 commands
+- KRX crawler execution
+- aws-live automated BUY/SELL
 
-View 코드 안에 다른 MS의 핵심 비즈니스 로직을 복제하지 않는다.
+Do not duplicate core business logic from another microservice inside View code.
 
 ### 2.3 Research Strategy Config Version Promotion
 
-Research Strategy Config Version Promotion은 예외적으로 허용된 운영자 승인형 control action이다.
+Research Strategy Config Version Promotion is an exceptionally permitted operator-approved control action.
 
-| 항목 | 기준 |
+| Item | Standard |
 | --- | --- |
-| 성격 | 운영자 명시 승인 기반 제한된 운영 승격 |
-| 판단 로직 | Strategy 판단·백테스트 로직 자체는 View에 복제하지 않음 |
-| 운영 source of truth | DB status가 아니라 Production Step4가 참조하는 Batch Job Definition command |
-| Runtime Contract | `--strategy-config-version` 외 항목을 임의 변경하지 않음 |
-| 안전 장치 | dual target preflight · running execution 확인 · fail-closed · after-check · rollback 유지 |
-| endpoint | 운영 전환 endpoint를 일반 조회 endpoint와 명확히 분리 |
-| 민감정보 | 실제 ARN · account-id · digest를 코드 설명이나 문서에 기록하지 않음 |
+| Nature | Limited production promotion based on explicit operator approval |
+| Decision logic | Do not duplicate Strategy decision or backtest logic in View |
+| Production source of truth | Batch Job Definition command referenced by Production Step4, not DB status |
+| Runtime Contract | Do not change any item other than `--strategy-config-version` |
+| Safety controls | dual target preflight · running execution check · fail-closed · after-check · rollback retained |
+| endpoint | Clearly separate the production transition endpoint from general query endpoints |
+| Sensitive information | Do not record actual ARN · account-id · digest values in code descriptions or documentation |
 
-## 3. 기술 기준
+## 3. Technical Standards
 
-| 항목 | 기준 |
+| Item | Standard |
 | --- | --- |
 | Java | 25 |
 | Spring Boot | 4.1.0-SNAPSHOT |
@@ -203,46 +203,46 @@ Research Strategy Config Version Promotion은 예외적으로 허용된 운영�
 | Persistence | Spring Data JPA · JdbcTemplate |
 | Database | PostgreSQL |
 | Build | Maven Wrapper |
-| Container | Docker · ECS Fargate 실증 구성 |
+| Container | Docker · validated ECS Fargate configuration |
 
-기존 코드의 패키지 구조와 네이밍을 우선 유지한다.
+Preserve the existing package structure and naming conventions.
 
-불필요한 프레임워크 도입과 대규모 구조 변경은 하지 않는다.
+Do not introduce unnecessary frameworks or large-scale structural changes.
 
-## 4. 운영 AS-IS 기준
+## 4. Production AS-IS Baseline
 
-### 4.1 현재 상태
+### 4.1 Current State
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| ECS Fargate | 1차 포팅과 화면 조회 실증 완료 |
-| 현재 운영 성격 | 포트폴리오 실증 상태 유지 |
-| 기본 backend | `aws-stepfunctions` |
-| Local File backend | 운영자 로컬 검증 · 복구용 |
-| Step 1~11 | safe trigger 분리 |
-| Step 12~17 | approval trigger 분리 |
-| P2 고도화 | 미수행 · 범위 제외 |
-| aws-live | 미진행 |
+| ECS Fargate | Initial port and view-query validation complete |
+| Current production profile | Portfolio validation state retained |
+| Default backend | `aws-stepfunctions` |
+| Local File backend | For operator local validation and recovery |
+| Step 1~11 | Separated as safe triggers |
+| Step 12~17 | Separated as approval triggers |
+| P2 enhancement | Not performed · out of scope |
+| aws-live | Not started |
 
-ALB, HTTPS, Route53, 인증, Auto Scaling, Blue/Green, 외부 공개는 현재 완료 상태로 쓰지 않는다.
+ALB, HTTPS, Route53, authentication, Auto Scaling, Blue/Green, and public exposure are not currently complete.
 
-외부 공개 또는 다중 사용자 운영이 필요할 때 재검토 대상으로 기록한다.
+Record them as items to reconsider when public exposure or multi-user operation is required.
 
-### 4.2 실행 backend
+### 4.2 Execution Backends
 
-| backend | 역할 |
+| backend | Responsibility |
 | --- | --- |
-| `aws-stepfunctions` | ECS Fargate와 운영자 View의 기본 실행 경로 |
-| `local-file` | 로컬 검증과 복구용 |
-| View subprocess | Fargate 운영 경로에서 사용하지 않음 |
+| `aws-stepfunctions` | Default execution path for ECS Fargate and the operator View |
+| `local-file` | Local validation and recovery |
+| View subprocess | Not used in the Fargate production path |
 
-Fargate에서 로컬 절대 경로나 다른 MS source directory를 직접 실행하지 않는다.
+Do not directly execute local absolute paths or source directories from other microservices in the Fargate production path.
 
-### 4.3 Paper 주문 gate
+### 4.3 Paper Order Gates
 
-Step 12 이상은 Paper 주문이 발생할 수 있는 구간이다.
+Step 12 and later may submit Paper orders.
 
-아래 gate를 우회하거나 기본값을 느슨하게 변경하지 않는다.
+Do not bypass or loosen the defaults of the following gates.
 
 - `portfolio.batch.execution-enabled`
 - `portfolio.batch.local-file-execution-enabled`
@@ -253,56 +253,56 @@ Step 12 이상은 Paper 주문이 발생할 수 있는 구간이다.
 - `portfolio.batch.aws-stepfunctions-start-enabled`
 - `portfolio.batch.aws-stepfunctions-step-start-enabled`
 
-승인 endpoint와 일반 endpoint의 책임을 합치지 않는다.
+Do not combine the responsibilities of approval endpoints and general endpoints.
 
-## 5. Spring 코드 작성 규칙
+## 5. Spring Code Rules
 
 ### 5.1 Controller
 
-- 요청 파라미터 해석과 Model 조립에 집중한다.
-- 비즈니스 로직을 Controller에 직접 넣지 않는다.
-- 기존 endpoint 이름과 URL 호환성을 우선한다.
-- 실행 endpoint는 gate와 running 상태를 먼저 검증한다.
-- 사용자 화면에 민감정보를 출력하지 않는다.
+- Focus on interpreting request parameters and assembling the Model.
+- Do not place business logic directly in a Controller.
+- Prefer compatibility with existing endpoint names and URLs.
+- Validate gates and running state before an execution endpoint proceeds.
+- Do not expose sensitive information in the user interface.
 
 ### 5.2 Service
 
-- 화면 DTO 조립과 application workflow를 담당한다.
-- 외부 모듈 로직을 복제하지 않는다.
-- 실패를 성공으로 변환하지 않는다.
-- AWS SDK 호출과 local-file 실행 경로를 명확히 분리한다.
-- Paper 주문성 동작은 명시적인 승인 gate를 요구한다.
+- Assemble view DTOs and application workflows.
+- Do not duplicate logic from external modules.
+- Do not convert failures into successes.
+- Clearly separate AWS SDK calls from the local-file execution path.
+- Require an explicit approval gate for Paper order-related behavior.
 
-### 5.3 Repository와 SQL
+### 5.3 Repository and SQL
 
-- JPA와 JdbcTemplate 기존 사용 방식을 존중한다.
-- 추정 컬럼명으로 SQL을 작성하지 않는다.
-- SQL 수정 전 entity, repository, migration 문서 또는 `information_schema.columns` 기준으로 실제 컬럼을 확인한다.
-- 여러 schema에 같은 이름의 테이블이 있을 수 있으므로 신규 운영 SQL은 가능한 한 schema-qualified 이름을 사용한다.
-- 기존 unqualified SQL은 datasource `search_path`와 정합성을 확인한다.
+- Respect the existing use of JPA and JdbcTemplate.
+- Do not write SQL using assumed column names.
+- Before modifying SQL, verify actual columns through entities, repositories, migration documentation, or `information_schema.columns`.
+- Because multiple schemas may contain tables with the same name, use schema-qualified names for new production SQL whenever possible.
+- Confirm that existing unqualified SQL is consistent with the datasource `search_path`.
 
-### 5.4 DTO와 Entity
+### 5.4 DTO and Entity
 
-- 기존 Lombok class DTO와 Java record 사용 패턴을 유지한다.
-- 화면 전용 값은 DTO에 둔다.
-- Entity를 화면 Model로 직접 노출하지 않는다.
-- DB schema와 불일치하는 필드를 추정해서 추가하지 않는다.
+- Preserve the existing patterns for Lombok class DTOs and Java records.
+- Keep display-only values in DTOs.
+- Do not expose Entities directly as view Models.
+- Do not add fields based on assumptions that conflict with the DB schema.
 
-### 5.5 Thymeleaf와 CSS
+### 5.5 Thymeleaf and CSS
 
-- 기존 page layout과 fragment 구조를 우선 사용한다.
-- 상태 표시는 기존 badge 또는 status class 체계를 재사용한다.
-- 실행 버튼은 backend와 gate 상태를 명확히 표시한다.
-- 위험한 실행 버튼은 일반 조회 버튼과 시각적으로 구분한다.
-- 계좌번호, ARN, public IP 등 민감정보를 렌더링하지 않는다.
+- Prefer the existing page layout and fragment structure.
+- Reuse the existing badge or status class system for status presentation.
+- Clearly indicate backend and gate state on execution buttons.
+- Visually distinguish dangerous execution buttons from general query buttons.
+- Do not render sensitive information such as account numbers, ARNs, or public IPs.
 
-## 6. DB와 설정 기준
+## 6. Database and Configuration Standards
 
 ### 6.1 Database
 
-기본 database는 `portfolio`다.
+The default database is `portfolio`.
 
-주요 domain schema는 아래와 같다.
+The primary domain schemas are:
 
 - `ops`
 - `execution`
@@ -315,24 +315,24 @@ Step 12 이상은 Paper 주문이 발생할 수 있는 구간이다.
 - `legacy`
 - `public`
 
-port-view datasource는 여러 domain schema를 조회한다.
+The port-view datasource queries multiple domain schemas.
 
-`search_path` 변경 시 Dashboard, Balance, Positions, Orders, Strategy, Daily Batch 화면 영향을 함께 확인한다.
+When changing the `search_path`, verify the impact on the Dashboard, Balance, Positions, Orders, Strategy, and Daily Batch views.
 
-### 6.2 DB user
+### 6.2 DB Users
 
-| 용도 | user |
+| Purpose | user |
 | --- | --- |
 | Spring View datasource | `view_app` |
 | MarketConnector subprocess | `marketconnector_app` |
 
-`view_app`에 connector 쓰기 권한을 임의로 추가하지 않는다.
+Do not arbitrarily grant connector write permissions to `view_app`.
 
-### 6.3 환경변수
+### 6.3 Environment Variables
 
-실제 값은 저장소에 기록하지 않는다.
+Do not record actual values in the repository.
 
-주요 설정 범주는 아래와 같다.
+Primary configuration categories include:
 
 - `INTEREST_DB_*`
 - `PORTFOLIO_DB_NAME`
@@ -340,230 +340,230 @@ port-view datasource는 여러 domain schema를 조회한다.
 - `PORTFOLIO_BATCH_*`
 - `PORTFOLIO_SNAPSHOT_REFRESH_*`
 - `SPRING_PROFILES_ACTIVE`
-- AWS region과 Step Functions ARN
-- Slack 설정
-- 기본 계좌번호
+- AWS region and Step Functions ARN
+- Slack configuration
+- Default account number
 
-설정 키를 추가하거나 변경하면 아래 항목을 함께 확인한다.
+When adding or changing a configuration key, also verify:
 
 1. `application.properties`
-2. profile별 properties
+2. Profile-specific properties
 3. `@ConfigurationProperties`
-4. README 확인
-5. 배포 환경변수 이름
+4. README
+5. Deployment environment-variable names
 
-## 7. Snapshot Refresh 규칙
+## 7. Snapshot Refresh Rules
 
-Snapshot Refresh는 실행 환경별 책임을 구분한다.
+Separate Snapshot Refresh responsibilities by execution environment.
 
-| 환경 | 처리 |
+| Environment | Handling |
 | --- | --- |
-| Local View | MarketConnector subprocess 사용 가능 |
-| ECS Fargate | 로컬 subprocess 사용 금지 |
-| Fargate 조회 | DB에 적재된 Snapshot 조회 중심 |
-| 원격 refresh | AWS orchestration 또는 Connector 경로 사용 |
+| Local View | May use the MarketConnector subprocess |
+| ECS Fargate | Local subprocess prohibited |
+| Fargate queries | Primarily query Snapshots stored in the DB |
+| Remote refresh | Use AWS orchestration or the Connector path |
 
-Fargate에서 `C:/Workspaces/...` 같은 로컬 경로를 운영 경로로 사용하지 않는다.
+Do not use a local path such as `C:/Workspaces/...` as a production path in Fargate.
 
-## 8. AWS와 보안 규칙
+## 8. AWS and Security Rules
 
-### 8.1 민감정보
+### 8.1 Sensitive Information
 
-아래 값은 코드, 문서, 예시, 로그에 원문으로 기록하지 않는다.
+Do not record the following values verbatim in code, documentation, examples, or logs.
 
 - secret
 - password
 - token
 - KIS app key · app secret
 - Slack webhook URL
-- 계좌번호
+- account number
 - AWS account-id
-- 실제 ARN
+- actual ARN
 - public IP
-- broker 주문번호
-- image digest full SHA256
+- broker order number
+- full SHA256 image digest
 
-필요한 경우 아래 placeholder를 사용한다.
+Use the following placeholders when needed.
 
-| Placeholder | 용도 |
+| Placeholder | Purpose |
 | --- | --- |
-| `[REDACTED]` | 일반 민감정보 |
-| `[REDACTED_ACCOUNT_NO]` | 계좌번호 |
+| `[REDACTED]` | General sensitive information |
+| `[REDACTED_ACCOUNT_NO]` | Account number |
 | `[REDACTED_ARN]` | ARN |
-| `[REDACTED_SECRET_ARN]` | secret ARN |
+| `[REDACTED_SECRET_ARN]` | Secret ARN |
 | `[REDACTED_TASK_ARN]` | ECS task ARN |
-| `[REDACTED_PUBLIC_IP]` | public IP |
-| `[REDACTED_BROKER_ORDER_NO]` | broker 주문번호 |
+| `[REDACTED_PUBLIC_IP]` | Public IP |
+| `[REDACTED_BROKER_ORDER_NO]` | Broker order number |
 | `<ECR_IMAGE_URI>` | ECR image URI |
-| `<ALB_ENDPOINT>` | 향후 ALB endpoint |
+| `<ALB_ENDPOINT>` | Future ALB endpoint |
 
-### 8.2 실행 제한
+### 8.2 Execution Restrictions
 
-사용자가 명시적으로 요청하지 않는 한 아래 작업을 수행하지 않는다.
+Do not perform the following work unless explicitly requested by the user.
 
-| 구분 | 금지 작업 |
+| Category | Prohibited Work |
 | --- | --- |
-| AWS | 리소스 생성 · 수정 · 삭제 |
-| DB | DDL · DML · psql 실행 |
-| Broker | 주문 제출 |
-| KIS | 외부 API 호출 |
-| Slack | 실제 webhook 전송 |
-| 운영 | Scheduler · Step Functions · ECS 실행 |
+| AWS | Create · modify · delete resources |
+| DB | DDL · DML · psql execution |
+| Broker | Submit orders |
+| KIS | Call external APIs |
+| Slack | Deliver an actual webhook |
+| Production | Execute Scheduler · Step Functions · ECS |
 | Git | add · commit · push · reset · restore |
 
-읽기 전용 검증 명령도 사용자 요청 범위에서만 실행한다.
+Run read-only validation commands only within the user-requested scope.
 
-### 8.3 AWS 명령 예시
+### 8.3 AWS Command Examples
 
-AWS CLI 예시를 작성할 때는 아래 흐름을 사용한다.
+When writing AWS CLI examples, use the following flow.
 
-1. `list` 또는 `describe`
-2. 식별자 변수 추출
-3. 후속 `describe`
-4. 상태 검증
+1. `list` or `describe`
+2. Extract identifiers into variables
+3. Run a subsequent `describe`
+4. Validate state
 
-ARN, task ARN, ENI ID를 운영자가 직접 끼워 넣어야 하는 예시는 피한다.
+Avoid examples that require the operator to manually insert an ARN, task ARN, or ENI ID.
 
-### 8.4 PowerShell과 인코딩
+### 8.4 PowerShell and Encoding
 
-- 한글 포함 파일은 UTF-8 No BOM으로 저장한다.
-- native command 결과는 `$LASTEXITCODE`로 확인한다.
-- 실패한 명령 뒤에 SUCCESS 또는 DONE marker를 출력하지 않는다.
-- multiline JSON은 파일 기반 전달을 우선한다.
+- Save files containing Korean as UTF-8 without BOM.
+- Check native command results with `$LASTEXITCODE`.
+- Do not print a SUCCESS or DONE marker after a failed command.
+- Prefer file-based input for multiline JSON.
 
-### 8.5 배포와 CI/CD 안전 기준
+### 8.5 Deployment and CI/CD Safety Standards
 
-배포와 CI/CD 관련 파일도 port-view 기본 수정 대상이다.
+Deployment and CI/CD files are also valid port-view modification targets.
 
-| 대상 | 파일 |
+| Target | File |
 | --- | --- |
 | CI Build | `.devops/codebuild/buildspec.yml` |
 | Workflow | GitHub Actions workflow |
 | Image | `Dockerfile` |
-| 배포 | ECR · ECS Task Definition · 배포 스크립트 |
+| Deployment | ECR · ECS Task Definition · deployment scripts |
 
-배포 검증 규칙:
+Deployment validation rules:
 
-- Candidate 검증은 배치 · Step Functions · Paper 주문 · Strategy Execution 제출을 비활성화한 상태에서 수행한다.
-- Candidate Revision을 그대로 운영에 승격하지 않는다.
-- 운영 승격용 Revision은 기존 운영 환경변수와 검증된 Image Digest를 결합해 별도로 만든다.
-- 운영 승격 전 이전 정상 Revision을 Rollback 기준으로 저장한다.
-- Candidate · 운영 · Rollback Smoke Test는 실제 View 메뉴 경로 기준으로 수행한다.
-- 배포 Slack 알림은 현재 필수 완료 기준이 아니며, 별도 채널 정책 확정 후 적용한다.
+- Run Candidate validation with Batch · Step Functions · Paper orders · Strategy Execution submission disabled.
+- Do not promote the Candidate Revision directly to production.
+- Create a separate production promotion Revision by combining the existing production environment variables with the validated Image Digest.
+- Save the previous known-good Revision as the Rollback baseline before production promotion.
+- Perform Candidate · production · Rollback Smoke Tests against actual View menu paths.
+- Deployment Slack notifications are not a current completion requirement and are deferred until a separate channel policy is defined.
 
-main push 기반 Release Workflow 규칙:
+Rules for the main-push Release Workflow:
 
-- main push 기반 Workflow라도 Production 승격은 `production` 승인 Gate 뒤에서만 수행한다.
-- Candidate Smoke 성공 전 Production Promotion을 수행하지 않는다.
-- Candidate에서 검증한 Artifact와 Production에 사용하는 Image Digest가 동일해야 한다.
-- Promotion 시 현재 Operating Task Definition을 기준으로 운영 설정을 유지한다.
-- Research Version UI 변경 시 Candidate · Production Smoke에서 Strategy Report 경로를 확인한다.
+- Even with a main-push Workflow, perform Production promotion only after the `production` approval Gate.
+- Do not perform Production Promotion before Candidate Smoke succeeds.
+- The Artifact validated in Candidate and the Image Digest used in Production must be identical.
+- Preserve production configuration by basing Promotion on the current Operating Task Definition.
+- When changing the Research Version UI, verify the Strategy Report path in Candidate and Production Smoke Tests.
 
-GitHub OIDC Trust Policy, IAM 권한 구성, Environment Required Reviewer 설정과 Runner IP 임시 SG 허용 등 DevOps 심화 구현 상세는 port-devops 책임 범위이며 이 문서에 기록하지 않는다.
+Detailed DevOps implementation such as GitHub OIDC Trust Policy, IAM permissions, Environment Required Reviewer settings, and temporary Runner IP access through an SG remains the responsibility of port-devops and is not documented here.
 
-실제 CI/CD 실행, ECR Push, ECS 승격과 Rollback은 8.2 실행 제한을 따른다. 사용자가 명시적으로 승인한 배포 작업에서만 실행한다.
+Actual CI/CD execution, ECR Push, ECS promotion, and Rollback are subject to the execution restrictions in section 8.2. Perform them only during explicitly approved deployment work.
 
-## 9. 테스트와 검증
+## 9. Tests and Validation
 
-변경 범위에 맞는 최소 검증을 수행한다.
+Perform the minimum validation appropriate to the change scope.
 
-| 변경 대상 | 최소 검증 |
+| Change Target | Minimum Validation |
 | --- | --- |
-| Java | compile 또는 관련 test |
-| Controller | endpoint mapping · gate 조건 |
-| Service | 성공 · 실패 · 차단 경로 |
-| Repository | query 문법 · schema · mapping |
-| Thymeleaf | template parse · 변수명 정합 |
-| Properties | binding 이름 · 기본값 |
-| README · CHANGELOG | 링크 · 사실 정합 · 가독성 |
-| Docker | build context와 runtime 설정 |
+| Java | Compile or relevant test |
+| Controller | Endpoint mapping · gate conditions |
+| Service | Success · failure · blocked paths |
+| Repository | Query syntax · schema · mapping |
+| Thymeleaf | Template parsing · variable consistency |
+| Properties | Binding names · defaults |
+| README · CHANGELOG | Links · factual consistency · readability |
+| Docker | Build context and runtime configuration |
 
-전체 테스트가 과도한 경우 관련 모듈 테스트부터 수행한다.
+If full testing is excessive, run the relevant module tests first.
 
-실행하지 못한 검증은 완료로 쓰지 않고 미수행 사유를 남긴다.
+Do not report validations that could not be run as complete; record the reason they were not run.
 
-## 10. 문서 관리 규칙
+## 10. Documentation Management Rules
 
 ### 10.1 README.md
 
-README는 port-view의 현재 구조와 사용 방법을 설명한다.
+The README describes the current structure and usage of port-view.
 
-README에 포함할 내용:
+It should include:
 
-- 기술 스택
-- 주요 화면
-- 책임 경계
-- 현재 운영 AS-IS
-- 실행 backend
-- 설정
-- DB와 schema
-- 로컬 실행
-- ECS Fargate 실증 상태
-- 보안과 안전 gate
-- 상세 문서 링크
+- Technical stack
+- Primary views
+- Responsibility boundaries
+- Current production AS-IS
+- Execution backends
+- Configuration
+- Database and schemas
+- Local execution
+- ECS Fargate validation status
+- Security and safety gates
+- Links to detailed documentation
 
-cross-service 실행 이력은 길게 복사하지 않는다.
+Do not copy lengthy cross-service execution history into the README.
 
-현재 port-view에 직접 영향을 주는 결과만 짧게 반영한다.
+Include only results that directly affect port-view, and keep them concise.
 
 ### 10.2 CHANGELOG.md
 
-CHANGELOG는 port-view 코드와 문서의 변경 이력만 기록한다.
+The CHANGELOG records only changes to port-view code, documentation, configuration, tests, and builds.
 
-- 최신 날짜를 상단에 추가한다.
-- CHANGELOG 업데이트 요청 시 지정 날짜 또는 지정 commit 범위의 Git 이력을 읽기 전용으로 확인한다.
-- Git 이력에서 실제 port-view 코드, 설정, 테스트, 빌드, 문서에 반영된 변경만 기록한다.
-- `Added`, `Changed`, `Fixed`, `Removed`, `Security`를 필요에 따라 사용한다.
-- 다른 MS와 Step Functions 내부 변경은 port-view 코드나 문서가 실제 변경된 경우에만 기록한다.
-- raw log와 일회성 실행 식별자는 기록하지 않는다.
-- 새 섹션부터 2컬럼 표 중심으로 작성한다.
-- 과거 이력은 별도 요청이 없으면 원본을 유지한다.
+- Add the latest date at the top.
+- When a CHANGELOG update is requested, inspect Git history for the specified date or commit range using read-only commands.
+- Record only changes actually reflected in port-view code, configuration, tests, builds, or documentation.
+- Use `Added`, `Changed`, `Fixed`, `Removed`, and `Security` as needed.
+- Record changes in other microservices or internal Step Functions behavior only when port-view code or documentation actually changed.
+- Do not record raw logs or one-time execution identifiers.
+- Use primarily two-column tables in new sections.
+- Preserve historical entries unless explicitly requested otherwise.
 
 ### 10.3 docs
 
-상세 설명은 아래 문서로 분리한다.
+Keep detailed explanations in the following document.
 
-| 문서 | 역할 |
+| Document | Responsibility |
 | --- | --- |
-| `docs/source-file-catalog.md` | 주요 파일과 디렉터리의 역할 |
+| `docs/source-file-catalog.md` | Responsibilities of primary files and directories |
 
-새 문서를 만들기 전에 기존 문서에 흡수 가능한지 먼저 확인한다.
+Before creating a new document, first determine whether the content can be incorporated into an existing document.
 
-날짜별 `docs/worklog/*.md`는 새로 만들지 않는다.
+Do not create date-specific `docs/worklog/*.md` files.
 
-port-view 코드와 문서의 변경 이력은 `CHANGELOG.md`에 기록하고, 상세 설계나 운영 기준은 해당 `docs` 문서에 반영한다.
+Record port-view code and documentation changes in `CHANGELOG.md`, and place detailed design or production standards in the relevant `docs` document.
 
-### 10.4 source-file-catalog.md 자동 갱신
+### 10.4 Automatic source-file-catalog.md Updates
 
-아래 변경이 발생하면 같은 작업에서 `docs/source-file-catalog.md` 갱신 여부를 반드시 확인한다.
+When one of the following changes occurs, determine within the same task whether `docs/source-file-catalog.md` must be updated.
 
-| 변경 | 처리 |
+| Change | Handling |
 | --- | --- |
-| 주요 Java 파일 신규 생성 · 삭제 · 이름 변경 | 카탈로그 갱신 |
-| Controller · Service · Repository 책임 변경 | 역할과 주의사항 갱신 |
-| package 또는 디렉터리 구조 변경 | 경로와 구조 설명 갱신 |
-| 주요 template · CSS 파일 신규 생성 · 삭제 | 화면 파일 목록 갱신 |
-| properties · Docker · build 파일 역할 변경 | 설정과 빌드 항목 갱신 |
-| 문서 파일 신규 생성 · 삭제 · 역할 변경 | Documents 항목 갱신 |
-| 내부 구현만 변경되고 파일 책임이 동일 | 갱신 생략 가능 |
+| Create · delete · rename a primary Java file | Update the catalog |
+| Change Controller · Service · Repository responsibility | Update responsibilities and cautions |
+| Change a package or directory structure | Update paths and structure descriptions |
+| Create · delete a primary template or CSS file | Update the view file list |
+| Change the responsibility of properties · Docker · build files | Update configuration and build sections |
+| Create · delete a documentation file or change its responsibility | Update the Documents section |
+| Change only internal implementation without changing file responsibility | The update may be omitted |
 
-카탈로그는 모든 파일을 나열하는 inventory가 아니다.
+The catalog is not an inventory of every file.
 
-운영과 유지보수에 의미 있는 파일, 묶음 경로와 책임만 기록한다.
+Record only files, grouped paths, and responsibilities meaningful to production and maintenance.
 
-변경이 없으면 CHANGELOG에 카탈로그 미변경 사실을 반복 기록하지 않는다.
+When there is no catalog change, do not repeatedly record that fact in the CHANGELOG.
 
-## 11. Git 규칙
+## 11. Git Rules
 
-기본적으로 읽기 전용 상태 확인만 허용한다.
+Only read-only status inspection is allowed by default.
 
-| 허용 | 용도 |
+| Allowed | Purpose |
 | --- | --- |
-| `git status --short` | 현재 작업 트리 변경 상태 확인 |
-| `git diff --stat` · `git diff --check` | 수정 범위와 공백 오류 확인 |
-| `git log` · `git show` · `git diff <commit>` | 사용자 요청 범위의 변경 이력과 CHANGELOG 근거 확인 |
+| `git status --short` | Inspect current working-tree changes |
+| `git diff --stat` · `git diff --check` | Check change scope and whitespace errors |
+| `git log` · `git show` · `git diff <commit>` | Inspect change history and CHANGELOG evidence within the requested scope |
 
-아래 Git write 명령은 사용자가 명시적으로 요청하지 않는 한 실행하지 않는다.
+Do not run the following Git write commands unless explicitly requested by the user.
 
 - `git add`
 - `git commit`
@@ -573,36 +573,36 @@ port-view 코드와 문서의 변경 이력은 `CHANGELOG.md`에 기록하고, �
 - `git checkout`
 - `git stash`
 
-## 12. 완료 보고
+## 12. Completion Report
 
-작업 완료 시 아래만 짧게 보고한다.
+At completion, report only the following and keep it concise.
 
-| 항목 | 내용 |
+| Item | Content |
 | --- | --- |
-| 변경 파일 | 실제 수정한 파일 |
-| 핵심 변경 | 기능 또는 문서 변경 요약 |
-| 검증 | 실행한 test · compile · diff check |
-| 미수행 | 실행하지 못한 검증 |
-| 보안 | 민감정보 원문 기록 여부 |
-| 후속 | 실제로 남은 항목만 기록 |
+| Changed files | Files actually modified |
+| Key changes | Summary of functional or documentation changes |
+| Validation | Tests · compilation · diff checks performed |
+| Not performed | Validation that could not be run |
+| Security | Whether sensitive values were recorded verbatim |
+| Follow-up | Only items that actually remain |
 
-운영자가 수행한 작업과 Kiro가 수행한 작업을 구분한다.
+Distinguish work performed by the operator from documentation work performed by Kiro.
 
-## 13. 완료 체크리스트
+## 13. Completion Checklist
 
-- [ ] 요청된 port-view 파일만 수정했는가?
-- [ ] 다른 MS와 `.kiro` 파일을 불필요하게 수정하지 않았는가?
-- [ ] 최우선 문서 가독성 규칙을 적용했는가?
-- [ ] 신규 독립 표를 기본 2컬럼으로 작성했는가?
-- [ ] 긴 셀과 긴 라인을 만들지 않았는가?
-- [ ] port-view 책임 경계를 유지했는가?
-- [ ] Fargate와 local-file backend를 혼동하지 않았는가?
-- [ ] Step 12~17 Paper 주문 gate를 우회하지 않았는가?
-- [ ] schema와 DB user 정합을 확인했는가?
-- [ ] 민감정보 원문을 기록하지 않았는가?
-- [ ] 실패를 성공으로 기록하지 않았는가?
-- [ ] 변경 범위에 맞는 검증을 수행했는가?
-- [ ] 파일 구조나 책임이 바뀌었다면 `docs/source-file-catalog.md`를 갱신했는가?
-- [ ] 날짜별 `docs/worklog/*.md`를 새로 만들지 않았는가?
-- [ ] UTF-8 No BOM으로 저장했는가?
-- [ ] 실제 수정 내용만 README와 CHANGELOG에 반영했는가?
+- [ ] Were only the requested port-view files modified?
+- [ ] Were other microservices and `.kiro` files left unchanged unless needed?
+- [ ] Were the highest-priority documentation readability rules applied?
+- [ ] Do new standalone tables use two columns by default?
+- [ ] Were long cells and lines avoided?
+- [ ] Was the port-view responsibility boundary preserved?
+- [ ] Were Fargate and local-file backends kept distinct?
+- [ ] Were the Step 12~17 Paper order gates preserved?
+- [ ] Were schema and DB user consistency verified?
+- [ ] Were sensitive values kept out of the documentation?
+- [ ] Were failures not reported as successes?
+- [ ] Was validation appropriate to the change scope performed?
+- [ ] If file structure or responsibility changed, was `docs/source-file-catalog.md` updated?
+- [ ] Were no date-specific `docs/worklog/*.md` files created?
+- [ ] Were files saved as UTF-8 without BOM?
+- [ ] Were only actual changes reflected in the README and CHANGELOG?

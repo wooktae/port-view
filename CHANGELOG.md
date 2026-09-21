@@ -1,393 +1,393 @@
 # CHANGELOG
 
-port-view 코드와 문서의 주요 변경 이력을 기록한다.
+This document records major changes to port-view code and documentation.
 
-## 작성 원칙
+## Recording Rules
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 기록 범위 | port-view 코드 · 설정 · 화면 · 테스트 · 문서 변경 |
-| 제외 범위 | 다른 MS 내부 구현 · Step Functions 내부 세부 이력 · 일회성 운영 로그 |
-| 정렬 | 최신 날짜를 상단에 추가 |
-| 분류 | Added · Changed · Fixed · Removed · Security |
-| 상세 근거 | 필요한 경우 `docs` 또는 commit 참조 |
-| 민감정보 | 실제 계좌번호 · secret · token · ARN · public IP 원문 기록 금지 |
+| Included scope | port-view code · configuration · views · tests · documentation changes |
+| Excluded scope | Internal changes in other microservices · internal Step Functions history · one-time production logs |
+| Sort order | Add the latest date at the top |
+| Categories | Added · Changed · Fixed · Removed · Security |
+| Detailed evidence | Reference `docs` or commits when needed |
+| Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
-## 2026-08-25 — Research Operating Version 선택과 Champion Promotion
+## 2026-08-25 — Research Operating Version Selection and Champion Promotion
 
 ### Added
 
-| 파일 · 항목 | 변경 |
+| File · Item | Change |
 | --- | --- |
-| `OperatingResearchVersionProvider.java` | Production Step4 → Batch Job Definition command 기준 실제 OPERATING RSCFG 조회 |
-| `ResearchChampionPromotionService.java` | RSCFG 운영 승격 · Job Definition Revision 생성 · dual State Machine 전환 |
-| `StrategyReportController.java` | 운영 선택 `POST /strategy/reports/promote` endpoint 추가 |
-| `strategy_report.html` | 비운영 Version "운영으로 선택" 버튼 추가 |
+| `OperatingResearchVersionProvider.java` | Query the actual OPERATING RSCFG from the Production Step4 → Batch Job Definition command |
+| `ResearchChampionPromotionService.java` | RSCFG production promotion · Job Definition Revision creation · dual State Machine transition |
+| `StrategyReportController.java` | Added production-selection endpoint `POST /strategy/reports/promote` |
+| `strategy_report.html` | Added "Select for Production" button for non-production Versions |
 
 ### Changed
 
-| 항목 | 변경 |
+| Item | Change |
 | --- | --- |
-| Strategy Report 기본 선택 | 최신 Version 대신 실제 OPERATING Version 기준으로 변경 |
-| Version Dropdown | 현재 운영 Version을 `RSCFG-xxxx · OPERATING`으로 표시 |
-| 운영 승격 | 선택 RSCFG를 신규 Batch Job Definition Revision으로 승격 |
-| 전환 대상 | Production Step4와 Step4-only 두 State Machine 동시 전환 |
+| Default Strategy Report selection | Changed from the latest Version to the actual OPERATING Version |
+| Version Dropdown | Display the current production Version as `RSCFG-xxxx · OPERATING` |
+| Production promotion | Promote the selected RSCFG to a new Batch Job Definition Revision |
+| Transition targets | Transition both the Production Step4 and Step4-only State Machines |
 
 ### Validation
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| `RSCFG-0001` → `RSCFG-0002` 승격 | 성공 |
-| `RSCFG-0002` → `RSCFG-0001` rollback | 성공 |
-| 두 State Machine 동일 Revision 참조 | 확인 |
-| Batch command target RSCFG | 확인 |
-| Maven compile | 성공 |
+| `RSCFG-0001` → `RSCFG-0002` promotion | Successful |
+| `RSCFG-0002` → `RSCFG-0001` rollback | Successful |
+| Both State Machines reference the same Revision | Confirmed |
+| Batch command target RSCFG | Confirmed |
+| Maven compile | Successful |
 
 ### Security
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| 실제 ARN · account-id · digest 문서 기록 | 0건 |
-| 다른 Research 비즈니스 로직 View 복제 | 없음 |
-| running execution · preflight · fail-closed · rollback guard | 유지 |
+| Actual ARN · account-id · digest recorded in documentation | 0 occurrences |
+| Other Research business logic duplicated in View | None |
+| running execution · preflight · fail-closed · rollback guards | Retained |
 
-## 2026-08-11 — Research Version 조회와 View Release Workflow 완성
+## 2026-08-11 — Research Version Queries and View Release Workflow Completion
 
 ### Added
 
-| 파일 · 항목 | 변경 |
+| File · Item | Change |
 | --- | --- |
-| `StrategyReportController.java` | Research Version 선택 리포트 경로 추가 |
-| `ReportService.java` | Research Version 목록과 선택 Version Report 조립 |
-| `ReportRepository.java` | `strategy_config_version` 목록과 선택 Version 최신 run 조회 |
-| `strategy_report.html` | Hero 영역 Research Version Dropdown 추가 |
-| `strategy-report.css` | Research Version Dropdown 스타일 추가 |
-| `.github/workflows/view-codebuild.yml` | main push 기반 Candidate Smoke Workflow 추가 |
-| `.github/workflows/view-codebuild.yml` | `production` 승인 기반 Promotion Workflow 추가 |
+| `StrategyReportController.java` | Added Report path for Research Version selection |
+| `ReportService.java` | Assemble Research Version list and selected Version Report |
+| `ReportRepository.java` | Query `strategy_config_version` list and latest run for selected Version |
+| `strategy_report.html` | Added Research Version Dropdown to the Hero area |
+| `strategy-report.css` | Added Research Version Dropdown styles |
+| `.github/workflows/view-codebuild.yml` | Added main-push Candidate Smoke Workflow |
+| `.github/workflows/view-codebuild.yml` | Added `production` approval-gated Promotion Workflow |
 
 ### Changed
 
-| 항목 | 변경 |
+| Item | Change |
 | --- | --- |
-| Strategy Report | Strategy Config Version과 Engine Version 표시 의미 분리 |
-| View 배포 흐름 | 수동 Candidate · 승격 중심에서 main push 기반 자동 Candidate 검증과 승인형 Production Promotion으로 확장 |
+| Strategy Report | Separated the display meanings of Strategy Config Version and Engine Version |
+| View deployment flow | Expanded from manual Candidate/promotion to automatic main-push Candidate validation and approval-gated Production Promotion |
 
 ### Validation
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| `RSCFG-0001` 로컬 Report 조회 | 성공 |
-| Maven Test · Package | 성공 |
-| main push → CodeBuild → ECR | 성공 |
-| Candidate Standalone Fargate 실행 | 성공 |
-| Candidate 주요 화면 HTTP | 200 |
-| Research Version UI Smoke | 성공 |
-| `production` 승인 후 ECS Service Promotion | 성공 |
-| Production 주요 화면 HTTP | 200 |
-| 이전 정상 Revision Rollback | 성공 |
-| Rollback Smoke | 성공 |
-| 최신 정상 Revision 재승격과 Service Stable | 성공 |
+| Local `RSCFG-0001` Report query | Successful |
+| Maven Test · Package | Successful |
+| Main push → CodeBuild → ECR | Successful |
+| Candidate Standalone Fargate execution | Successful |
+| Candidate primary-view HTTP | 200 |
+| Research Version UI Smoke | Successful |
+| ECS Service Promotion after `production` approval | Successful |
+| Production primary-view HTTP | 200 |
+| Rollback to previous known-good Revision | Successful |
+| Rollback Smoke | Successful |
+| Latest known-good Revision re-promotion and Service Stable | Successful |
 
 ### Security
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| Candidate 배치 실행 | 비활성 |
-| Candidate Step Functions 실행 | 비활성 |
-| Candidate Paper 주문 | 비활성 |
-| Candidate Strategy Execution 제출 | 비활성 |
-| Candidate와 Operating 설정 분리 | 유지 |
-| Candidate Task Definition 직접 Production 승격 | 금지 |
-| 민감정보 원문 신규 기록 | 0건 |
+| Candidate Batch execution | Disabled |
+| Candidate Step Functions execution | Disabled |
+| Candidate Paper orders | Disabled |
+| Candidate Strategy Execution submission | Disabled |
+| Candidate and Operating configuration separation | Retained |
+| Direct Production promotion of Candidate Task Definition | Prohibited |
+| Newly recorded sensitive values | 0 occurrences |
 
-## 2026-07-29 — View ECR 배포와 Candidate 승격·Rollback 검증
+## 2026-07-29 — View ECR Deployment and Candidate Promotion/Rollback Validation
 
 ### Added
 
-| 파일 | 변경 |
+| File | Change |
 | --- | --- |
-| `.devops/codebuild/buildspec.yml` | ECR 로그인 추가 |
-| `.devops/codebuild/buildspec.yml` | Git Commit SHA 앞 12자리 기반 Image Tag 생성 |
-| `.devops/codebuild/buildspec.yml` | portfolio-view ECR Repository Push 추가 |
-| `.devops/codebuild/buildspec.yml` | Image Digest와 CodeBuild Build ID Evidence 기록 추가 |
+| `.devops/codebuild/buildspec.yml` | Added ECR login |
+| `.devops/codebuild/buildspec.yml` | Added an Image Tag based on the first 12 characters of the Git Commit SHA |
+| `.devops/codebuild/buildspec.yml` | Added push to the portfolio-view ECR Repository |
+| `.devops/codebuild/buildspec.yml` | Added Image Digest and CodeBuild Build ID Evidence recording |
 
 ### Changed
 
-| 항목 | 변경 |
+| Item | Change |
 | --- | --- |
-| CodeBuild Service Role | portfolio-view ECR 전용 최소 Push 권한 추가 |
-| Docker Image Build | 로컬 Tag와 ECR Tag 동시 생성 |
-| View 배포 절차 | Candidate 검증 후 수동 운영 승격으로 확정 |
-| Task Definition | Candidate와 운영 승격용 분리 확정 |
+| CodeBuild Service Role | Added least-privilege Push permissions for portfolio-view ECR only |
+| Docker Image Build | Create local and ECR Tags together |
+| View deployment procedure | Finalized manual production promotion after Candidate validation |
+| Task Definition | Separated Candidate and production promotion definitions |
 
 ### Validation
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| GitHub Actions → OIDC → CodeBuild → ECR Push | 성공 |
-| 신규 Git SHA Image Tag와 Digest 생성 | 확인 |
-| Standalone Candidate Task | RUNNING 확인 |
-| Candidate 주요 8개 화면 | HTTP 200 |
-| 운영 ECS Service 신규 Revision 승격 | 성공 |
-| 운영 주요 8개 화면 | HTTP 200 |
-| 이전 정상 Revision Rollback | 성공 |
-| Rollback 후 주요 8개 화면 | HTTP 200 |
-| 신규 Revision 최종 재승격 | RUNNING 확인 |
-| Candidate Task 정상 종료 | 확인 |
+| GitHub Actions → OIDC → CodeBuild → ECR Push | Successful |
+| New Git SHA Image Tag and Digest creation | Confirmed |
+| Standalone Candidate Task | RUNNING confirmed |
+| Eight primary Candidate views | HTTP 200 |
+| Production ECS Service promotion to new Revision | Successful |
+| Eight primary production views | HTTP 200 |
+| Rollback to previous known-good Revision | Successful |
+| Eight primary views after Rollback | HTTP 200 |
+| Final re-promotion of new Revision | RUNNING confirmed |
+| Normal Candidate Task termination | Confirmed |
 
 ### Security
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| Candidate 배치 실행 | 비활성 |
-| Candidate Step Functions 실행 | 비활성 |
-| Candidate Paper 주문 | 비활성 |
-| Candidate Strategy Execution 제출 | 비활성 |
-| 운영 승격 전 Candidate · 운영 설정 분리 | 확인 |
-| MarketConnector EC2 | 미사용 |
-| DB 직접 접속과 DDL · DML | 미수행 |
-| Slack 배포 알림 | 미전송 |
-| 민감정보 원문 신규 기록 | 0건 |
+| Candidate Batch execution | Disabled |
+| Candidate Step Functions execution | Disabled |
+| Candidate Paper orders | Disabled |
+| Candidate Strategy Execution submission | Disabled |
+| Candidate and production configuration separation before promotion | Confirmed |
+| MarketConnector EC2 | Not used |
+| Direct DB connection and DDL · DML | Not performed |
+| Slack deployment notification | Not sent |
+| Newly recorded sensitive values | 0 occurrences |
 
-## 2026-07-24 — View CodeBuild CI와 CI 컨텍스트 테스트 격리
+## 2026-07-24 — View CodeBuild CI and CI Context Test Isolation
 
 ### Added
 
-| 파일 | 변경 |
+| File | Change |
 | --- | --- |
-| `.devops/codebuild/buildspec.yml` | View CodeBuild buildspec 신규 추가 |
-| `.github/workflows/view-codebuild.yml` | `workflow_dispatch`로 CodeBuild를 실행하는 워크플로 추가 |
-| `src/test/resources/application-ci.properties` | H2 기반 `ci` 프로파일 추가 · 외부 실행과 Slack 비활성 |
-| `pom.xml` | test scope H2 의존성 추가 · CI context smoke 전용 |
+| `.devops/codebuild/buildspec.yml` | Added View CodeBuild buildspec |
+| `.github/workflows/view-codebuild.yml` | Added workflow that executes CodeBuild through `workflow_dispatch` |
+| `src/test/resources/application-ci.properties` | Added H2-based `ci` profile · disabled external execution and Slack |
+| `pom.xml` | Added test-scope H2 dependency for CI context smoke only |
 
 ### Changed
 
-| 파일 | 변경 |
+| File | Change |
 | --- | --- |
-| `PortViewApplicationTests.java` | `contextLoads`에 `@ActiveProfiles("ci")` 적용 · 외부 DB 의존 제거 |
-| `.devops/codebuild/buildspec.yml` | CodeBuild shell state 보존과 LF 처리 보완 |
-| `.gitattributes` | `*.yml` · `*.yaml` · `.gitattributes` LF 고정 추가 |
-| `mvnw` | CodeBuild 실행을 위한 executable 권한 부여 |
-| `.gitignore` | `/evidence/` 무시 규칙 추가 |
+| `PortViewApplicationTests.java` | Applied `@ActiveProfiles("ci")` to `contextLoads` · removed external DB dependency |
+| `.devops/codebuild/buildspec.yml` | Improved CodeBuild shell-state retention and LF handling |
+| `.gitattributes` | Added LF enforcement for `*.yml` · `*.yaml` · `.gitattributes` |
+| `mvnw` | Added executable permission for CodeBuild execution |
+| `.gitignore` | Added ignore rule for `/evidence/` |
 
 ### Security
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| `ci` 프로파일 외부 실행 | snapshot · order · strategy · batch · slack 비활성 확인 |
-| AWS · DB · broker · KIS · Slack 실제 실행 | 0건 |
-| Git write 명령 | 0건 · 읽기 전용 `log` · `show` · `status` · `diff`만 사용 |
-| 민감정보 원문 신규 기록 | 0건 |
+| External execution in `ci` profile | Snapshot · order · strategy · batch · Slack disabled |
+| Actual AWS · DB · broker · KIS · Slack execution | 0 occurrences |
+| Git write commands | 0 occurrences · only read-only `log` · `show` · `status` · `diff` used |
+| Newly recorded sensitive values | 0 occurrences |
 
-## 2026-07-22 — port-view 문서 기준 재정비
+## 2026-07-22 — port-view Documentation Standards Restructuring
 
 ### Changed
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| `AGENTS.md` | `.kiro` 전용 규칙을 제거하고 port-view 전용 작업 규칙으로 전면 재작성 |
-| 작업 범위 | Java · 설정 · Thymeleaf · CSS · 테스트 · 문서 · Docker 기준 명확화 |
-| 책임 경계 | 조회 · 승인 · Step Functions 트리거 UI로 한정 |
-| 실행 backend | Fargate는 `aws-stepfunctions` · `local-file`은 로컬 검증과 복구용으로 구분 |
-| Paper 주문 gate | Step 1~11 safe trigger와 Step 12~17 approval trigger 분리 원칙 명시 |
-| DB 기준 | `view_app` · `marketconnector_app` 역할과 schema-per-domain 주의사항 정리 |
-| 문서 기준 | 신규 독립 표 2컬럼 기본 · 국소 수정 · 긴 셀 금지 · UTF-8 No BOM 명시 |
-| `AGENTS.md` 판정 | 단독으로 port-view 코드와 문서 작업 기준을 충족하도록 확정 |
-| `README.md` | 삭제된 docs로 향하던 링크 제거 · 상세 문서 목록을 실제 존재 문서로 축소 |
-| `docs/source-file-catalog.md` | Documents 목록을 유지 중인 4개 문서로 정리 · 삭제 문서 참조 제거 |
-| 문서 구조 | README · CHANGELOG · `docs/source-file-catalog.md` 중심으로 단순화 |
-| `CHANGELOG.md` | 중복 이력과 반복 Notes를 정리하고 날짜별 핵심 변경 중심으로 전면 재구성 |
+| `AGENTS.md` | Removed `.kiro`-specific rules and rewrote as port-view-specific working rules |
+| Work scope | Clarified standards for Java · configuration · Thymeleaf · CSS · tests · documentation · Docker |
+| Responsibility boundary | Limited to query · approval · Step Functions trigger UI |
+| Execution backends | Distinguished Fargate `aws-stepfunctions` from `local-file` for local validation and recovery |
+| Paper order gates | Documented separation between Steps 1~11 safe triggers and Steps 12~17 approval triggers |
+| DB standards | Documented `view_app` · `marketconnector_app` responsibilities and schema-per-domain cautions |
+| Documentation standards | Defined two-column default for new standalone tables · local edits · no long cells · UTF-8 without BOM |
+| `AGENTS.md` assessment | Confirmed as independently sufficient for port-view code and documentation work |
+| `README.md` | Removed links to deleted docs · reduced detailed-document list to files that exist |
+| `docs/source-file-catalog.md` | Reduced Documents list to four maintained documents · removed references to deleted documents |
+| Documentation structure | Simplified around README · CHANGELOG · `docs/source-file-catalog.md` |
+| `CHANGELOG.md` | Removed duplicate history and repetitive Notes; reorganized around key changes by date |
 
 ### Removed
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상세 docs | architecture · configuration · daily-batch · security · refactoring · unused 후보 문서 제거 |
-| worklog | `docs/worklog` 디렉터리와 날짜별 파일 제거 · 신규 생성 중단 |
+| Detailed docs | Removed architecture · configuration · daily-batch · security · refactoring · unused-candidate documents |
+| worklog | Removed `docs/worklog` directory and date-specific files · stopped creating new files |
 
 ### Security
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| 코드 변경 | 없음 |
-| AWS · DB · broker · KIS · Slack 실행 | 0건 |
-| Git write 명령 | 0건 |
-| 민감정보 원문 신규 기록 | 0건 |
+| Code changes | None |
+| AWS · DB · broker · KIS · Slack execution | 0 occurrences |
+| Git write commands | 0 occurrences |
+| Newly recorded sensitive values | 0 occurrences |
 
-## 2026-07-01 — View 책임 경계와 Fargate 문서화
+## 2026-07-01 — View Responsibility Boundary and Fargate Documentation
 
 ### Added
 
-| 파일 | 변경 |
+| File | Change |
 | --- | --- |
-| `README.md` | View 책임 경계와 ECS Fargate 배포 관점 추가 |
-| `docs/architecture.md` | 조회 흐름과 Step Functions `StartExecution` 트리거 흐름 정리 |
-| `docs/configuration.md` | Fargate 안전 기본값과 ARN placeholder 정리 |
-| `docs/daily-batch.md` | safe · approval endpoint와 payload 타입 정합 설명 |
-| `docs/worklog/2026-07-01.md` | port-view 문서 최신화 작업 기록 |
+| `README.md` | Added View responsibility boundary and ECS Fargate deployment perspective |
+| `docs/architecture.md` | Documented query flow and Step Functions `StartExecution` trigger flow |
+| `docs/configuration.md` | Documented Fargate safe defaults and ARN placeholders |
+| `docs/daily-batch.md` | Documented safe/approval endpoints and payload type consistency |
+| `docs/worklog/2026-07-01.md` | Recorded port-view documentation update work |
 
 ### Changed
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| View 책임 | 조회 · 승인 · 트리거 UI |
-| 실제 실행 책임 | Step Functions · EventBridge Scheduler · ECS · SSM · AWS Batch · Lambda |
-| Fargate 안전 기본값 | `aws-stepfunctions` · local-file 비활성 · Paper 주문 비활성 · 최대 Step 11 |
-| 로컬 경로 | Fargate 운영 경로에서 사용하지 않음 |
+| View responsibility | Query · approval · trigger UI |
+| Actual execution responsibility | Step Functions · EventBridge Scheduler · ECS · SSM · AWS Batch · Lambda |
+| Fargate safe defaults | `aws-stepfunctions` · local-file disabled · Paper orders disabled · maximum Step 11 |
+| Local paths | Not used in the Fargate production path |
 
 ### Security
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| 애플리케이션 코드 변경 | 없음 |
-| AWS · DB · 외부 API 실행 | 0건 |
-| 민감정보 원문 신규 기록 | 0건 |
+| Application code changes | None |
+| AWS · DB · external API execution | 0 occurrences |
+| Newly recorded sensitive values | 0 occurrences |
 
-## 2026-06-29 — AWS Step Functions backend와 승인 실행 UI
+## 2026-06-29 — AWS Step Functions Backend and Approved Execution UI
 
 ### Added
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 실행 backend | `aws-stepfunctions` 모드 |
+| Execution backend | `aws-stepfunctions` mode |
 | Safe endpoint | `POST /daily-batch/aws-stepfunctions/start-range` |
 | Approval endpoint | `POST /daily-batch/aws-stepfunctions/start-approval-range` |
-| 화면 | Step 1~11 safe 버튼과 Step 12~17 승인 버튼 |
-| 설정 | 일반 workflow ARN과 approval workflow ARN 분리 |
-| 로컬 도구 | Local File용과 Step Functions용 wrapper 분리 |
+| View | Steps 1~11 safe button and Steps 12~17 approval button |
+| Configuration | Separated general workflow ARN and approval workflow ARN |
+| Local tools | Separated Local File and Step Functions wrappers |
 
 ### Changed
 
-| 파일 · 영역 | 변경 |
+| File · Area | Change |
 | --- | --- |
-| `pom.xml` | AWS SDK v2 Step Functions 의존성 반영 |
-| `DailyBatchProperties` | backend · ARN · 실행 gate 설정 추가 |
-| `StepFunctionsDailyBatchExecutionService` | safe와 approval 실행 경로 분리 |
-| `DailyBatchController` | safe · approval endpoint 처리 추가 |
-| `daily_batch.html` | backend와 gate별 실행 버튼 노출 |
-| `application-aws-paper.properties` | Step Functions 관련 환경변수 placeholder 추가 |
-| StartExecution payload | boolean · numeric · string 타입 구분 |
-| 실행일 | Asia/Seoul 기준 `runDate` 포함 |
+| `pom.xml` | Added AWS SDK v2 Step Functions dependency |
+| `DailyBatchProperties` | Added backend · ARN · execution gate configuration |
+| `StepFunctionsDailyBatchExecutionService` | Separated safe and approval execution paths |
+| `DailyBatchController` | Added safe and approval endpoint handling |
+| `daily_batch.html` | Display execution buttons by backend and gate |
+| `application-aws-paper.properties` | Added Step Functions environment-variable placeholders |
+| StartExecution payload | Distinguished boolean · numeric · string types |
+| Run date | Added Asia/Seoul-based `runDate` |
 
 ### Fixed
 
-| 문제 | 해결 |
+| Problem | Resolution |
 | --- | --- |
-| `runDate` 누락으로 Step 11 이후 `States.Runtime` 발생 | View input에 KST 기준 `runDate` 추가 |
-| approval boolean이 문자열로 전달됨 | JSON boolean으로 변경 |
-| Step order가 문자열로 전달됨 | JSON numeric으로 변경 |
-| approval 버튼이 일반 workflow ARN 호출 | approval 전용 ARN 사용 |
-| 로컬 wrapper에 safe-only gate 잔존 | backend별 wrapper 분리 |
+| `States.Runtime` after Step 11 because `runDate` was missing | Added KST-based `runDate` to View input |
+| Approval boolean passed as a string | Changed to JSON boolean |
+| Step order passed as a string | Changed to JSON numeric |
+| Approval button called the general workflow ARN | Used approval-specific ARN |
+| Safe-only gate remained in local wrapper | Separated wrappers by backend |
 
 ### Validation
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| Step 1~11 | `StartExecution` 후 approval-required 경로 통과 |
-| Step 12~17 | approval gate 통과와 execution 성공 확인 |
-| 주문 발생 | 검증 회차 신규 broker 주문 없음 |
-| 참조 commit | `e72de6f` |
+| Steps 1~11 | Passed approval-required path after `StartExecution` |
+| Steps 12~17 | Approval gate passed and execution succeeded |
+| Orders created | No new broker orders in the validation run |
+| Reference commit | `e72de6f` |
 
 ### Security
 
-| 항목 | 결과 |
+| Item | Result |
 | --- | --- |
-| 계좌번호 화면 노출 | redaction 유지 |
-| ARN · account-id 문서 기록 | placeholder만 사용 |
-| 추가 운영 실행 | 문서 정리 회차에서 0건 |
+| Account number exposure in view | Redaction retained |
+| ARN · account-id recorded in documentation | Placeholders only |
+| Additional production execution | 0 occurrences during documentation cleanup |
 
-## 2026-06-29 — Snapshot Refresh와 Daily Batch 화면 정비
+## 2026-06-29 — Snapshot Refresh and Daily Batch View Improvements
 
 ### Added
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| AWS Paper Local View | 실행 전제와 starter 사용 방법 문서화 |
-| Snapshot Refresh | Dashboard · Balance · Positions 동작 설명 |
-| Daily Batch UI | 실행 이력 카드와 status 표시 개선 |
+| AWS Paper Local View | Documented execution prerequisites and starter usage |
+| Snapshot Refresh | Documented Dashboard · Balance · Positions behavior |
+| Daily Batch UI | Improved execution history cards and status display |
 
 ### Changed
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| `aws-paper` profile | Snapshot Refresh 설정을 env override 기준으로 정리 |
-| Spring datasource | `view_app` 사용 |
-| Connector subprocess | `marketconnector_app` 사용 |
-| Daily Batch 화면 | Step Logs · Payload · 실행 모드 표시 보강 |
+| `aws-paper` profile | Organized Snapshot Refresh settings around environment overrides |
+| Spring datasource | Uses `view_app` |
+| Connector subprocess | Uses `marketconnector_app` |
+| Daily Batch view | Improved Step Logs · Payload · execution mode display |
 
 ### Fixed
 
-| 문제 | 해결 |
+| Problem | Resolution |
 | --- | --- |
-| `connector_balance.py`가 `view_app`으로 실행 | subprocess DB user를 `marketconnector_app`으로 분리 |
-| 실행 이력과 status pill 스타일 부족 | 화면 CSS 보강 |
+| `connector_balance.py` executed as `view_app` | Separated subprocess DB user as `marketconnector_app` |
+| Insufficient execution-history and status-pill styling | Improved view CSS |
 
-## 2026-05-28 — 소스 파일 카탈로그와 설명 보강
+## 2026-05-28 — Source File Catalog and Documentation Improvements
 
 ### Added
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| `docs/source-file-catalog.md` | 주요 Java · 설정 · 문서 파일 역할 정리 |
-| 소스 설명 | Connector · Dashboard · Position · Report 관련 한글 주석 보강 |
+| `docs/source-file-catalog.md` | Documented responsibilities of primary Java · configuration · documentation files |
+| Source documentation | Added Korean comments for Connector · Dashboard · Position · Report areas |
 
 ### Changed
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| `README.md` | 소스 파일 카탈로그 링크 추가 |
-| 문서 범위 | 2026-05-27 이후 변경사항 정리 |
+| `README.md` | Added Source File Catalog link |
+| Documentation scope | Organized changes since 2026-05-27 |
 
-## 2026-05-27 — schema-per-domain 전환 문서화
+## 2026-05-27 — schema-per-domain Transition Documentation
 
 ### Added
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| Database | PostgreSQL 단일 DB `portfolio` |
-| Schema | domain별 schema 구조 |
-| View SQL | Hikari `search_path` 기반 조회 |
+| Database | Single PostgreSQL database `portfolio` |
+| Schema | Domain-specific schema structure |
+| View SQL | Queries based on Hikari `search_path` |
 
 ### Changed
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| datasource 설정 | `INTEREST_DB_*` 환경변수 기반 |
-| DB name 기본값 | `portfolio` |
-| 검증 화면 | Dashboard · Balance · Holdings · Strategy Plan · Daily Batch · Report |
+| Datasource configuration | Based on `INTEREST_DB_*` environment variables |
+| Default DB name | `portfolio` |
+| Validated views | Dashboard · Balance · Holdings · Strategy Plan · Daily Batch · Report |
 
-## 2026-05-26 — 장 시작 전 자동 매수 차단
+## 2026-05-26 — Block Automated Buy Before Market Open
 
 ### Changed
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 대상 Step | `DAILY_AUTO_BUY` |
-| 기준 시각 | 09:00 KST 이전 |
-| 처리 | 실제 자동 매수 스크립트 호출 없이 보류 |
-| 결과 성격 | `NO_TARGET` |
+| Target Step | `DAILY_AUTO_BUY` |
+| Time threshold | Before 09:00 KST |
+| Handling | Deferred without calling the actual automated Buy script |
+| Result type | `NO_TARGET` |
 
-## 2026-05-23 — 미사용 View 구조 정리
+## 2026-05-23 — Unused View Structure Cleanup
 
 ### Added
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| `docs/unused-view-file-candidates.md` | 미사용 View 파일 후보 분석 |
+| `docs/unused-view-file-candidates.md` | Analysis of unused View file candidates |
 
 ### Changed
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| Template · CSS | `templates/pages` · `static/css/pages` 구조로 정리 |
-| Controller | 삭제된 화면과 연결된 과거 URL 제거 |
-| Service · Repository | 미사용 메서드와 구현 제거 |
-| DTO | 기능별 하위 패키지로 정리 |
-| 설정 | 미사용 `connector.api.*`와 일부 `portfolio.view.*` 제거 |
+| Template · CSS | Organized into `templates/pages` · `static/css/pages` structure |
+| Controller | Removed legacy URLs linked to deleted views |
+| Service · Repository | Removed unused methods and implementations |
+| DTO | Organized into feature-specific subpackages |
+| Configuration | Removed unused `connector.api.*` and selected `portfolio.view.*` settings |
 
 ### Fixed
 
-| 문제 | 해결 |
+| Problem | Resolution |
 | --- | --- |
-| 삭제된 template 반환 가능성 | 관련 Controller와 View 상수 제거 |
-| compile 정합 | `mvnw.cmd clean compile` 성공 |
+| Possible return of a deleted template | Removed related Controller and View constants |
+| Compile consistency | `mvnw.cmd clean compile` successful |
