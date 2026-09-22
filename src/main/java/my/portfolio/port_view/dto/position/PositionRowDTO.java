@@ -16,6 +16,8 @@ public class PositionRowDTO {
 
     private String tickerCode;
     private String stockName;
+    private String stockDisplayName;
+    private boolean showSeparateTicker;
     private String market;
 
     private int quantity;

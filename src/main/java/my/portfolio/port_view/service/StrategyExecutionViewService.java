@@ -6,6 +6,7 @@ import my.portfolio.port_view.dto.strategy.StrategyExecutionPlanDto;
 import my.portfolio.port_view.dto.strategy.StrategyExecutionPlanPageDto;
 import my.portfolio.port_view.dto.strategy.StrategyMarketBlockReasonDto;
 import my.portfolio.port_view.repository.StrategyExecutionQueryRepository;
+import my.portfolio.port_view.util.ConnectorLabelUtils;
 import my.portfolio.port_view.util.ViewFormatUtils;
 import my.portfolio.port_view.util.ViewMessages;
 import my.portfolio.port_view.util.ViewTextUtils;
@@ -257,7 +258,14 @@ public class StrategyExecutionViewService {
     }
 
     public List<Map<String, Object>> getPositionStates(Long planId) {
-        return repository.findPositionStatesByPlanId(planId);
+        List<Map<String, Object>> positionStates = repository.findPositionStatesByPlanId(planId);
+        for (Map<String, Object> ps : positionStates) {
+            Object status = ps.get("position_status");
+            // Display-only label; the raw position_status value is preserved unchanged.
+            ps.put("position_status_label",
+                    status != null ? ConnectorLabelUtils.positionStatusLabel(status) : "-");
+        }
+        return positionStates;
     }
 
     public List<Map<String, Object>> getConnectorOrders(Long planId) {

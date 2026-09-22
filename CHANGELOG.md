@@ -13,6 +13,34 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
+## 2026-09-22 — Task 1.11 View Validation and Residual UI Remediation
+
+### Changed
+
+| File · Area | Change |
+| --- | --- |
+| `daily_batch.html` | Localized runtime-visible operational presentation while preserving every execution gate and Step target |
+| `strategy_plans.html` | Localized Strategy Plan, Position summary, history, count, amount, and navigation presentation |
+| `strategy_detail.html` | Localized Plan, Market explanation, Candidate, Position, and Connector presentation |
+| `messages.properties` · `messages_ko.properties` | Added paired Daily Batch and Strategy remedial presentation keys |
+| Locale metadata | Added dynamic `th:lang` to all three remediated pages |
+| `README.md` · Source File Catalog | Documented completed EN/KO presentation and unchanged operational contracts |
+
+### Validation
+
+| Item | Result |
+| --- | --- |
+| Message bundles | 848 matching keys · no duplicates · compatible placeholders |
+| Template key resolution | 483 references across 11 templates · 0 missing · EN/KO values non-empty |
+| Locale metadata | All 10 page templates use dynamic `th:lang` |
+| Residual presentation | Unexplained runtime-visible Korean 0 in the three remediated pages |
+| Preserved raw fallback | Two `종목명` company-name samples intentionally retained |
+| Template contracts | `th:action` · `th:href` · `th:disabled` · conditions · input elements unchanged |
+| Maven clean compile | Successful · 96 Java sources |
+| Repository-safe tests | Successful · 2 tests, 0 failures |
+| Encoding · Diff | UTF-8 No BOM · no trailing whitespace · `git diff --check` successful |
+| Operational side effects | AWS · DB · broker · KIS · Step Functions · Slack · deployment operations 0 |
+
 ## 2026-09-22 — Task 1.10 Class D/E/F Preservation Audit
 
 ### Validation

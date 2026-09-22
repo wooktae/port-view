@@ -16,6 +16,8 @@ public class PositionDetailPageDTO {
     private String accountNo;
     private String tickerCode;
     private String stockName;
+    private String stockDisplayName;
+    private boolean showSeparateTicker;
     private String market;
 
     private boolean hasPosition;

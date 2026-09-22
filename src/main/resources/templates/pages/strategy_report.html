@@ -546,8 +546,8 @@
                     <div class="trade-detail-list">
                         <article class="trade-detail-row" th:each="trade : ${page.tradeDetails()}">
                             <div class="trade-stock-main">
-                                <strong th:text="${T(my.portfolio.port_view.util.ViewMessages).stockDisplayName(trade.tickerCode(), trade.companyName())}">종목명</strong>
-                                <span th:if="${#locale.language == 'ko' and T(my.portfolio.port_view.util.ViewMessages).hasOriginalStockName(trade.companyName())}"
+                                <strong th:text="${trade.stockDisplayName()}">종목명</strong>
+                                <span th:if="${trade.showSeparateTicker()}"
                                       th:text="${trade.tickerCode()}">000000</span>
                                 <small th:text="#{report.tradeNumber(${trade.id()})}">Trade #1</small>
                             </div>

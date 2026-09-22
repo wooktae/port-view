@@ -1,5 +1,7 @@
 package my.portfolio.port_view.dto.strategy;
 
+import my.portfolio.port_view.util.ViewMessages;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -41,4 +43,12 @@ public record ReportTradeDetailDto(
         List<String> buyReasonLines,
         List<String> sellReasonLines
 ) {
+
+    public String stockDisplayName() {
+        return ViewMessages.stockDisplayName(tickerCode, companyName);
+    }
+
+    public boolean showSeparateTicker() {
+        return ViewMessages.showSeparateTicker(companyName);
+    }
 }

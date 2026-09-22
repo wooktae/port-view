@@ -199,6 +199,8 @@ public class PositionService {
         page.setAccountNo(accountNo);
         page.setTickerCode(position.getTickerCode());
         page.setStockName(ViewFormatUtils.emptyIfNull(position.getStockName()));
+        page.setStockDisplayName(ViewMessages.stockDisplayName(position.getTickerCode(), position.getStockName()));
+        page.setShowSeparateTicker(ViewMessages.showSeparateTicker(position.getStockName()));
         page.setMarket(position.getMarket());
         page.setHasPosition(true);
 
@@ -236,6 +238,8 @@ public class PositionService {
         page.setAccountNo(accountNo);
         page.setTickerCode(tickerCode);
         page.setStockName(tickerCode);
+        page.setStockDisplayName(ViewMessages.stockDisplayName(tickerCode, tickerCode));
+        page.setShowSeparateTicker(ViewMessages.showSeparateTicker(tickerCode));
         page.setMarket("-");
         page.setHasPosition(false);
 
@@ -273,6 +277,8 @@ public class PositionService {
 
             row.setTickerCode(p.getTickerCode());
             row.setStockName(ViewFormatUtils.emptyIfNull(p.getStockName()));
+            row.setStockDisplayName(ViewMessages.stockDisplayName(p.getTickerCode(), p.getStockName()));
+            row.setShowSeparateTicker(ViewMessages.showSeparateTicker(p.getStockName()));
             row.setMarket(p.getMarket());
 
             row.setQuantity(nvlInt(p.getQuantity()));

@@ -1,6 +1,7 @@
 package my.portfolio.port_view.dto.strategy;
 
 import my.portfolio.port_view.util.StrategyExecutionLabelUtils;
+import my.portfolio.port_view.util.ViewFormatUtils;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -41,5 +42,13 @@ public record StrategyExecutionPlanDto(
 
     public String riskRegimeLabel() {
         return StrategyExecutionLabelUtils.riskRegimeLabel(riskRegime);
+    }
+
+    public String createdAtText() {
+        return ViewFormatUtils.formatDateTime(createdAt);
+    }
+
+    public String updatedAtText() {
+        return ViewFormatUtils.formatDateTime(updatedAt);
     }
 }

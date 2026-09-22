@@ -141,10 +141,10 @@
                                 <div>
                                     <a class="position-stock-link"
                                     th:href="@{/positions/{tickerCode}(tickerCode=${row.tickerCode}, accountNo=${resolvedAccountNo})}"
-                                    th:text="${T(my.portfolio.port_view.util.ViewMessages).stockDisplayName(row.tickerCode, row.stockName)}">
+                                    th:text="${row.stockDisplayName}">
                                         SK하이닉스
                                     </a>
-                                    <span th:if="${#locale.language == 'ko' and T(my.portfolio.port_view.util.ViewMessages).hasOriginalStockName(row.stockName)}"
+                                    <span th:if="${row.showSeparateTicker}"
                                           th:text="${row.tickerCode}">000660</span>
                                     <small>
                                         <span th:text="#{positions.held}">Held</span> <b th:text="${row.quantity}">3</b> /
@@ -204,7 +204,7 @@
                                  th:each="row, stat : ${page.rows}"
                                  th:style="|--series-color: var(--series-color-${(stat.index % 6) + 1})|">
                                 <span></span>
-                                <strong th:text="${T(my.portfolio.port_view.util.ViewMessages).stockDisplayName(row.tickerCode, row.stockName)}">SK하이닉스</strong>
+                                <strong th:text="${row.stockDisplayName}">SK하이닉스</strong>
                                 <small th:text="${row.evalProfitRateText}">+83.95%</small>
                             </div>
                         </div>
@@ -236,7 +236,7 @@
                             <div class="combined-chart-source d-none">
                                 <div class="chart-series-source"
                                      th:each="row, stat : ${page.rows}"
-                                     th:attr="data-name=${T(my.portfolio.port_view.util.ViewMessages).stockDisplayName(row.tickerCode, row.stockName)},
+                                     th:attr="data-name=${row.stockDisplayName},
                                               data-code=${row.tickerCode},
                                               data-color-index=${(stat.index % 6) + 1}">
                                     <span class="chart-point-source-item"

@@ -45,6 +45,14 @@ public record StrategyExecutionOrderDto(
         OffsetDateTime updatedAt
 ) {
 
+    public String stockDisplayName() {
+        return ViewMessages.stockDisplayName(tickerCode, stockName);
+    }
+
+    public boolean showSeparateTicker() {
+        return ViewMessages.showSeparateTicker(stockName);
+    }
+
     public String actionTypeLabel() {
         return StrategyExecutionLabelUtils.actionTypeLabel(actionType);
     }

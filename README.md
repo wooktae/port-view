@@ -390,6 +390,8 @@ Task 1.8 localizes application-owned Local View Slack messages through `SLACK_LO
 
 Task 1.9 traces Class C consumers and localizes only presentation wrappers. MVC flash prefixes, Intraday completion text, and non-persistent Strategy market explanations are localized; persisted Daily Batch evidence, matching phrases, Strategy submission payload errors, raw timeline fields, template source samples, and uncaught exceptions remain preserved or explicitly deferred.
 
+Task 1.11 remediation completes message-backed Class B presentation for Daily Batch, Strategy Execution Plans, and Strategy Execution Plan Details. All page templates now use dynamic locale metadata; execution gates, endpoint paths, enablement conditions, codes, and raw/persisted values remain unchanged.
+
 ## ECS Fargate
 
 port-view has completed its initial ECS Fargate Service port and AWS Paper integration validation.

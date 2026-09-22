@@ -54,6 +54,11 @@ public final class ViewMessages {
         return hasDisplayValue(originalName);
     }
 
+    public static boolean showSeparateTicker(String originalName) {
+        return Locale.KOREAN.getLanguage().equals(LocaleContextHolder.getLocale().getLanguage())
+                && hasOriginalStockName(originalName);
+    }
+
     private static boolean hasDisplayValue(String value) {
         return value != null && !value.trim().isEmpty() && !"-".equals(value.trim());
     }

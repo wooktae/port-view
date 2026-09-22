@@ -151,6 +151,8 @@ public class DashboardService {
 
             dto.setTickerCode(p.getTickerCode());
             dto.setStockName(ViewFormatUtils.emptyIfNull(p.getStockName()));
+            dto.setStockDisplayName(ViewMessages.stockDisplayName(p.getTickerCode(), p.getStockName()));
+            dto.setShowSeparateTicker(ViewMessages.showSeparateTicker(p.getStockName()));
             dto.setQuantity(p.getQuantity());
             dto.setSellableQuantity(p.getSellableQuantity());
             dto.setAvgBuyPrice(p.getAvgBuyPrice());

@@ -209,7 +209,9 @@ Do not expose account numbers verbatim in views or logs.
 | `templates/pages/position-detail.html` | Position details |
 | `templates/pages/orders.html` | Order list |
 | `templates/pages/order-detail.html` | Order details |
-| `templates/pages/daily_batch.html` | Batch status and execution actions |
+| `templates/pages/daily_batch.html` | EN/KO Batch status and execution actions with unchanged server-side gates |
+| `templates/pages/strategy_plans.html` | EN/KO Strategy Execution Plan list and Position summary |
+| `templates/pages/strategy_detail.html` | EN/KO Plan, Candidate, Position, and Connector linkage details with unchanged submission conditions |
 | `templates/pages/strategy_report.html` | EN/KO Strategy Report presentation · Research Version Dropdown · OPERATING display · production selection button for non-production Versions |
 | `templates/pages/*.html` | View group including Strategy · Daily · Report |
 
