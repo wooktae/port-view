@@ -13,6 +13,31 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
+## 2026-09-22 — Task 1.10 Class D/E/F Preservation Audit
+
+### Validation
+
+| Item | Result |
+| --- | --- |
+| Baseline scope | 9 Englishization commits · 77 changed files reviewed against `portfolio-pre-englishization-2026-09-21` |
+| Class D | 11 Korean recommendation aliases and 19 Daily Batch no-target matchers preserved exactly |
+| Class E | 16 raw bindings and 7 representative company/report/news/source samples preserved |
+| Repository · Entity | 11 files have no executable or SQL drift after comment normalization |
+| High-risk Services | 4 files have no executable drift after comment normalization |
+| API paths | 25 Controller routes and 30 baseline URL literals preserved without removal or rename |
+| Config · Environment | No original key removed; only approved `slack.locale` and `SLACK_LOCALE` additions |
+| Runtime literals | 18 status/runtime and 229 reason/JSON-like literals preserved without removal |
+| Version identifiers | RSCFG and Research runtime identifiers preserved |
+| Message bundles | 679 matching keys · no duplicates · compatible placeholders |
+| Maven validation | Clean compile successful for 96 sources · 2 tests passed |
+| Operational side effects | AWS · DB · broker · KIS · Step Functions · Slack · deployment operations 0 |
+
+### Changed
+
+| File | Change |
+| --- | --- |
+| `CHANGELOG.md` | Recorded the read-only preservation audit; no application source was changed |
+
 ## 2026-09-22 — Task 1.9 View Class C Consumer Tracing
 
 ### Changed
