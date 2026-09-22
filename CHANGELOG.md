@@ -13,6 +13,28 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
+## 2026-09-22 — Task 1.5 Residual View Localization
+
+### Fixed
+
+| File | Change |
+| --- | --- |
+| `balance-summary.html` | Translated residual HTML comments and localized the hard-coded count unit with the existing `unit.items` key |
+| `order-detail.html` | Translated residual HTML comments and localized Broker, Executed Quantity, and Fill Amount labels |
+| `dashboard.html` | Localized Refresh Enabled, Updated, Daily Signal / Execution Plan, Cumulative Return, and Run ID presentation text |
+| `messages.properties` · `messages_ko.properties` | Added matching English/Korean Dashboard keys while reusing existing Order and unit keys |
+
+### Validation
+
+| Item | Result |
+| --- | --- |
+| Message bundles | 355 matching keys · no duplicates · compatible numbered placeholders |
+| Maven clean compile | Successful · 96 Java sources |
+| CI-profile context test | Successful · 1 test, 0 failures |
+| Invariant terms | `AWS Paper` · `MDD` · `Sharpe` intentionally preserved |
+| Deferred scope | Dynamic template fallback samples remain assigned to Task 1.9 |
+| AWS · DB · broker · KIS · Step Functions · Slack · deployment operations | 0 occurrences |
+
 ## 2026-09-21 — View i18n Infrastructure, Language Switch, and Safe UI Migration
 
 ### Added

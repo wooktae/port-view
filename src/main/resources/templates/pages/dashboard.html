@@ -37,7 +37,7 @@
                     <div class="account-badges">
                         <span class="soft-badge badge-live">AWS Paper</span>
                         <span class="soft-badge badge-connector" th:text="#{dashboard.snapshotBased}">Snapshot Based</span>
-                        <span class="soft-badge badge-count">Refresh enabled</span>
+                        <span class="soft-badge badge-count" th:text="#{dashboard.refreshEnabled}">Refresh enabled</span>
                         <span class="soft-badge badge-count" th:text="#{dashboard.positionCount(0)}">Positions: 0</span>
                     </div>
                 </div>
@@ -55,7 +55,7 @@
                                 <span th:text="#{dashboard.asOfDate}">As-of Date</span>:
                                 <span th:text="${dashboard.asOfDate}">-</span>
                                 /
-                                <span>Updated:</span>
+                                <span th:text="#{dashboard.updated}">Updated</span>:
                                 <span th:text="${dashboard.asOfTs}">-</span>
                             </p>
                         </div>
@@ -63,7 +63,7 @@
                         <div class="account-badges">
                             <span class="soft-badge badge-live">AWS Paper</span>
                             <span class="soft-badge badge-connector" th:text="#{dashboard.snapshotBased}">Snapshot Based</span>
-                            <span class="soft-badge badge-count">Refresh enabled</span>
+                            <span class="soft-badge badge-count" th:text="#{dashboard.refreshEnabled}">Refresh enabled</span>
                             <span class="soft-badge badge-count"
                                   th:text="#{dashboard.positionCount(${dashboard.positionCount})}">Positions: 0</span>
                         </div>
@@ -299,7 +299,7 @@
                             <div class="dashboard-action-main">
                                 <div class="plan-id">
                                     <strong th:text="#{dashboard.noRecentDecision}">No Recent Strategy Decision</strong>
-                                    <span>Daily Signal / Execution Plan</span>
+                                    <span th:text="#{dashboard.dailySignalExecutionPlan}">Daily Signal / Execution Plan</span>
                                 </div>
 
                                 <div class="plan-strategy">
@@ -315,7 +315,7 @@
                             </div>
                         </a>
                     </article>
-                </section>              
+                </section>
 
                 <!-- Backtest Summary -->
                 <section class="dashboard-section backtest-section">
@@ -374,7 +374,7 @@
                         </div>
 
                         <div class="backtest-item">
-                            <span>Run ID</span>
+                            <span th:text="#{dashboard.runId}">Run ID</span>
                             <strong th:text="${latestBacktestSummary.runId() == null ? '-' : #strings.substring(latestBacktestSummary.runId(), 0, 8)}">
                                 5a047258
                             </strong>
@@ -391,7 +391,7 @@
                             <strong>-</strong>
                         </div>
                         <div class="backtest-item">
-                            <span>Total Return</span>
+                            <span th:text="#{dashboard.cumulativeReturn}">Cumulative Return</span>
                             <strong>-</strong>
                         </div>
                         <div class="backtest-item">
@@ -403,7 +403,7 @@
                             <strong>-</strong>
                         </div>
                         <div class="backtest-item">
-                            <span>Run</span>
+                            <span th:text="#{dashboard.runId}">Run ID</span>
                             <strong>-</strong>
                         </div>
                     </article>

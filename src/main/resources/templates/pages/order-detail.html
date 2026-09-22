@@ -39,7 +39,7 @@
 
             <th:block th:if="${page != null and page.found}">
 
-                <!-- 현재 주문 요약 -->
+                <!-- Current order summary -->
                 <section class="dashboard-section order-current-section">
                     <div class="order-current-hero">
                         <div class="order-current-main">
@@ -68,7 +68,7 @@
                     </div>
                 </section>
 
-                <!-- 핵심 카드 -->
+                <!-- Core information cards -->
                 <section class="dashboard-section order-summary-section">
                     <div class="section-head">
                         <div>
@@ -152,7 +152,7 @@
                     </div>
                 </section>
 
-                <!-- 주문 연결 흐름 -->
+                <!-- Order link flow -->
                 <section class="dashboard-section order-chain-section">
                     <div class="section-head">
                         <div>
@@ -225,7 +225,7 @@
                     </div>
                 </section>
 
-                <!-- 이벤트 타임라인 -->
+                <!-- Event timeline -->
                 <section class="dashboard-section order-event-section">
                     <div class="section-head">
                         <div>
@@ -299,7 +299,7 @@
                     </div>
                 </section>
 
-                <!-- 체결 내역 -->
+                <!-- Fill history -->
                 <section class="dashboard-section order-fill-section">
                     <div class="section-head">
                         <div>
@@ -329,11 +329,11 @@
 
                             <div class="fill-info-grid">
                                 <div>
-                                    <span>브로커</span>
+                                    <span th:text="#{orderDetail.broker}">Broker</span>
                                     <strong th:text="${fill.brokerOrderNo}">-</strong>
                                 </div>
                                 <div>
-                                    <span>체결수량</span>
+                                    <span th:text="#{orderDetail.executedQuantity}">Executed Quantity</span>
                                     <strong th:text="${fill.fillQtyText}">-</strong>
                                 </div>
                                 <div>
@@ -341,7 +341,7 @@
                                     <strong th:text="${fill.fillPriceText}">-</strong>
                                 </div>
                                 <div>
-                                    <span>체결금액</span>
+                                    <span th:text="#{orderDetail.fillAmount}">Fill Amount</span>
                                     <strong th:text="${fill.fillAmountText}">-</strong>
                                 </div>
                                 <div>

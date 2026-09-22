@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 잔고 요약 화면: Connector 잔고 스냅샷과 보유 종목 평가금액을 조합해 계좌 구성과 손익을 표시한다. -->
+<!-- Balance summary view: combines the Connector Balance Snapshot with Position valuations to show account composition and profit/loss. -->
 <html lang="en" th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
@@ -39,7 +39,7 @@
 
         <section class="dashboard-stage">
 
-            <!-- 계좌 -->
+            <!-- Account -->
             <section class="dashboard-section account-section">
                 <div class="account-hero-card">
                     <div class="account-hero-main">
@@ -53,8 +53,7 @@
                             <span th:text="${b != null and b.asOfDate != null ? b.asOfDate : '-'}">-</span>
                             /
                             <span th:text="#{balance.positionCount}">Positions</span>:
-                            <span th:text="${resolvedHoldingCount}">0</span>
-                            건
+                            <span th:text="${#messages.msg('unit.items', resolvedHoldingCount)}">0 items</span>
                         </p>
                     </div>
 
@@ -68,7 +67,7 @@
                 </div>
             </section>
 
-            <!-- 잔고 요약 -->
+            <!-- Balance summary -->
             <section class="dashboard-section balance-section">
                 <div class="section-head">
                     <div>
@@ -153,7 +152,7 @@
                 </div>
             </section>
 
-            <!-- 잔고 그래프 -->
+            <!-- Balance chart -->
             <section th:if="${b != null}" class="dashboard-section balance-chart-section">
                 <div class="section-head">
                     <div>
@@ -216,7 +215,7 @@
                 </article>
             </section>
 
-            <!-- 오늘 거래 요약 -->
+            <!-- Today's trading summary -->
             <section th:if="${b != null}" class="dashboard-section balance-detail-section">
                 <div class="section-head">
                     <div>
