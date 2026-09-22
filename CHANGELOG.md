@@ -13,6 +13,32 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
+## 2026-09-22 — Task 1.8 Local View Slack Localization
+
+### Changed
+
+| File · Area | Change |
+| --- | --- |
+| `SlackNotificationService.java` | Localized application-owned test and Daily Batch message construction for English and Korean |
+| `SlackProperties.java` · `application.properties` | Added `SLACK_LOCALE` selection with English default and Korean option |
+| `ViewMessages.java` | Added explicit-locale lookup while retaining request-locale behavior for View rendering |
+| `messages.properties` · `messages_ko.properties` | Added 83 paired Slack message keys |
+| `README.md` · Source File Catalog | Documented locale selection, ownership, and delivery boundaries |
+
+### Validation
+
+| Item | Result |
+| --- | --- |
+| Message bundles | 625 matching keys · 83 Slack keys · no duplicates · compatible placeholders |
+| Slack key references | 83 references resolved · 0 missing · 0 unused |
+| Static rendering | Five EN/KO samples rendered · no unresolved placeholders · webhook calls 0 |
+| Preserved contracts | IDs · status/action codes · raw values · gates · limits · KST · repository reads unchanged |
+| Delivery boundary | `SlackClient`, webhook URL handling, enabled gates, and AWS/Lambda integration unchanged |
+| Deferred Class C | One Slack exception string remains unchanged for Task 1.9 tracing |
+| Maven clean compile | Successful · 96 Java sources |
+| Repository-safe tests | Successful · 2 tests, 0 failures |
+| AWS · DB · broker · KIS · Step Functions · Slack · deployment operations | 0 occurrences |
+
 ## 2026-09-22 — Task 1.7 Backtest Report Localization
 
 ### Changed

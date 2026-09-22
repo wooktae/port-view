@@ -94,7 +94,7 @@ When changing `ViewNames`, verify Controller return values and template paths to
 | `DailyBatchService.java` | local-file execution and Step Log queries |
 | `DailyBatchAsyncService.java` | Delegate asynchronous local-file execution |
 | `StepFunctionsDailyBatchExecutionService.java` | AWS Step Functions `StartExecution` |
-| `SlackNotificationService.java` | Assemble Local View Slack messages |
+| `SlackNotificationService.java` | Assemble locale-aware Local View Slack messages while preserving IDs, codes, and raw values |
 | `SlackClient.java` | Send Slack webhook HTTP requests |
 | `service/*.java` | View application service group |
 
@@ -175,7 +175,7 @@ Keep display-only values in DTOs and do not expose Entities directly.
 | `ConnectorProperties.java` | Connector URL and API configuration |
 | `DailyBatchProperties.java` | backend · gate · Step Functions configuration |
 | `PortfolioViewProperties.java` | Default account and view limits |
-| `SlackProperties.java` | Slack enablement and webhook configuration |
+| `SlackProperties.java` | Slack enablement · webhook configuration · English/Korean message locale selection |
 | `SnapshotRefreshProperties.java` | Snapshot Refresh configuration |
 | `config/*.java` | Typed configuration group |
 
@@ -192,7 +192,7 @@ When changing configuration, verify the following together.
 | Path | Responsibility |
 | --- | --- |
 | `src/main/java/my/portfolio/port_view/util/*.java` | Amount · date · locale-aware label · dynamic Stock display fallback · CSS class · account resolution |
-| `ViewMessages.java` | Locale-context lookup for display-only Java text and non-persistent `ticker · original source name` formatting |
+| `ViewMessages.java` | Request- or explicit-locale lookup for View, Report, and Slack text plus non-persistent Stock display formatting |
 
 When changing a Util, verify the impact on display values and CSS classes across all views.
 
@@ -242,12 +242,12 @@ When changing a Template class, verify the corresponding CSS.
 
 | File · Path | Responsibility |
 | --- | --- |
-| `application.properties` | Common server · DB · View · Connector · Batch · Slack configuration |
+| `application.properties` | Common server · DB · View · Connector · Batch · Slack gate/webhook/locale configuration |
 | `application-aws-paper.properties` | AWS Paper profile overrides |
 | `application-local.properties.example` | Local configuration example without sensitive information |
-| `messages.properties` | Default English-first MessageSource bundle for Class B UI and Report presentation |
+| `messages.properties` | Default English-first MessageSource bundle for Class B UI, Report, and Slack presentation |
 | `messages_en.properties` | English locale marker; inherits default English values |
-| `messages_ko.properties` | Korean localization values for Class B UI and Report presentation |
+| `messages_ko.properties` | Korean localization values for Class B UI, Report, and Slack presentation |
 | `src/main/resources/*` | Profile-specific configuration and View resources |
 
 ### Primary Configuration Categories

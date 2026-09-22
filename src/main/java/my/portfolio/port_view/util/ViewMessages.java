@@ -14,7 +14,11 @@ public final class ViewMessages {
     }
 
     public static String text(String key, Object... arguments) {
-        Locale requestLocale = LocaleContextHolder.getLocale();
+        return text(LocaleContextHolder.getLocale(), key, arguments);
+    }
+
+    public static String text(Locale locale, String key, Object... arguments) {
+        Locale requestLocale = locale == null ? Locale.ROOT : locale;
         Locale bundleLocale = Locale.KOREAN.getLanguage().equals(requestLocale.getLanguage())
                 ? Locale.KOREAN
                 : Locale.ROOT;

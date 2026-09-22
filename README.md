@@ -386,7 +386,9 @@ No verified English company-name mapping is currently available, so Task 1.6 doe
 
 Task 1.7 localizes Backtest Report titles, sections, labels, visible units, empty states, insights, and rationale through the same EN/KO presentation bundles. Run IDs, versions, metrics, reason/status codes, raw company and trading names, stored buckets, and Report query contracts remain unchanged.
 
-Slack messages, persisted evidence, mixed operational messages, and Class C Report exceptions remain unchanged for their dedicated review tasks.
+Task 1.8 localizes application-owned Local View Slack messages through `SLACK_LOCALE` (`en` by default, `ko` optional). Status/action codes, IDs, raw names, errors, webhook configuration, delivery gates, and AWS/Lambda Slack integration remain unchanged.
+
+Persisted evidence, mixed operational messages, and Class C exceptions remain unchanged for their dedicated review tasks.
 
 ## ECS Fargate
 
@@ -466,7 +468,15 @@ If ALB is introduced later, apply source IP restrictions or an authentication ga
 - Strategy Execution summary
 - Balance and Position summary
 
-Cross-service workflows and Lambda own primary responsibility for automated production Slack notifications.
+| Setting | Value |
+| --- | --- |
+| `SLACK_LOCALE` | `en` default · `ko` alternate |
+| `SLACK_ENABLED` | Existing delivery gate · unchanged |
+| `SLACK_WEBHOOK_URL` | Existing secret injection · unchanged |
+
+Locale selection changes application-owned message labels and narrative only. IDs, status/action codes, account/ticker/company values, raw errors, metrics, timestamps, and execution gates remain unchanged.
+
+Cross-service workflows and Lambda own primary responsibility for automated production Slack notifications. Task 1.8 does not change that integration or send a live message.
 
 Inject the Webhook URL through an environment variable or local configuration; never record it in the repository.
 
