@@ -388,7 +388,7 @@ Task 1.7 localizes Backtest Report titles, sections, labels, visible units, empt
 
 Task 1.8 localizes application-owned Local View Slack messages through `SLACK_LOCALE` (`en` by default, `ko` optional). Status/action codes, IDs, raw names, errors, webhook configuration, delivery gates, and AWS/Lambda Slack integration remain unchanged.
 
-Persisted evidence, mixed operational messages, and Class C exceptions remain unchanged for their dedicated review tasks.
+Task 1.9 traces Class C consumers and localizes only presentation wrappers. MVC flash prefixes, Intraday completion text, and non-persistent Strategy market explanations are localized; persisted Daily Batch evidence, matching phrases, Strategy submission payload errors, raw timeline fields, template source samples, and uncaught exceptions remain preserved or explicitly deferred.
 
 ## ECS Fargate
 

@@ -13,6 +13,40 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
+## 2026-09-22 — Task 1.9 View Class C Consumer Tracing
+
+### Changed
+
+| File · Area | Change |
+| --- | --- |
+| Daily Batch and Strategy Controllers | Localized MVC flash wrappers while preserving raw exception details and identifiers |
+| `DailyBatchService.java` | Localized only four non-persistent Intraday completion results |
+| `StrategyExecutionViewService.java` | Localized non-persistent Market explanation headline, summary, and reason lines |
+| `daily_batch.html` · `strategy_detail.html` | Localized safe flash labels and natural-template fallbacks |
+| `messages.properties` · `messages_ko.properties` | Added 54 paired presentation-wrapper keys |
+| `README.md` · Source File Catalog | Documented Class C consumer decisions and preservation boundaries |
+
+### Decisions
+
+| Item | Decision |
+| --- | --- |
+| API and JSON errors | No production inbound JSON error API found; outbound Connector/persisted errors preserved |
+| Order timeline | Typed DB fields and raw values preserved; no free-form JSON timeline message exists |
+| Daily Batch evidence | Persisted payloads, stdout/stderr/errors, skip reasons, and no-target matching phrases preserved |
+| Strategy Execution | MVC wrappers and View explanations localized; persisted submit errors preserved |
+| Template fallbacks | Safe flash fallbacks localized; raw-domain and technical samples preserved |
+| Exposed exceptions | Uncaught or persisted exception text explicitly deferred with `REVIEW-REQUIRED` |
+
+### Validation
+
+| Item | Result |
+| --- | --- |
+| Message bundles | 679 matching keys · 54 Task 1.9 keys · no duplicates · compatible placeholders |
+| Contract checks | Daily Batch persistence/matchers · Strategy thresholds/codes · paths and repositories unchanged |
+| Maven clean compile | Successful · 96 Java sources |
+| Repository-safe tests | Successful · 2 tests, 0 failures |
+| AWS · DB · broker · KIS · Step Functions · Slack · deployment operations | 0 occurrences |
+
 ## 2026-09-22 — Task 1.8 Local View Slack Localization
 
 ### Changed

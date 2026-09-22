@@ -61,8 +61,8 @@ When changing `ViewNames`, verify Controller return values and template paths to
 | `DashboardController.java` | `/` · `/dashboard` consolidated view |
 | `PositionController.java` | `/positions` list and details |
 | `OrderController.java` | `/orders` list and details |
-| `DailyBatchController.java` | Daily Batch queries · local actions · AWS triggers |
-| `StrategyExecutionViewController.java` | Execution Plan queries and submission actions |
+| `DailyBatchController.java` | Daily Batch queries · local/AWS actions · locale-aware flash wrappers with raw error details preserved |
+| `StrategyExecutionViewController.java` | Execution Plan queries · submission actions · locale-aware result wrappers |
 | `StrategyReportController.java` | Latest · specific run · Research Version-selected Report · localized page title · production Version selection action |
 | `controller/*.java` | View Controller group including Strategy Daily |
 
@@ -87,11 +87,11 @@ When changing `ViewNames`, verify Controller return values and template paths to
 | `ReportService.java` | Assemble locale-aware Report summary · statistics · insights · rationale · Research Version list/selected Version Report |
 | `OperatingResearchVersionProvider.java` | Query actual OPERATING RSCFG from Production Step4 → Batch Job Definition command |
 | `ResearchChampionPromotionService.java` | RSCFG production promotion Plan · Job Definition Revision creation · dual State Machine preflight/promotion/after-check/rollback |
-| `StrategyExecutionViewService.java` | Query Execution Plans and Order Candidates |
-| `StrategyExecutionSubmitService.java` | Submit external execution requests |
+| `StrategyExecutionViewService.java` | Query Execution Plans and Orders · assemble locale-aware non-persistent Market explanations |
+| `StrategyExecutionSubmitService.java` | Submit external execution requests · persist request/result and failure evidence unchanged |
 | `ConnectorSnapshotRefreshService.java` | Local View Snapshot Refresh |
 | `ConnectorOrderRefreshService.java` | Local View Order Status Refresh |
-| `DailyBatchService.java` | local-file execution and Step Log queries |
+| `DailyBatchService.java` | local-file execution · persisted Step evidence · non-persistent locale-aware Intraday completion text |
 | `DailyBatchAsyncService.java` | Delegate asynchronous local-file execution |
 | `StepFunctionsDailyBatchExecutionService.java` | AWS Step Functions `StartExecution` |
 | `SlackNotificationService.java` | Assemble locale-aware Local View Slack messages while preserving IDs, codes, and raw values |
@@ -245,9 +245,9 @@ When changing a Template class, verify the corresponding CSS.
 | `application.properties` | Common server · DB · View · Connector · Batch · Slack gate/webhook/locale configuration |
 | `application-aws-paper.properties` | AWS Paper profile overrides |
 | `application-local.properties.example` | Local configuration example without sensitive information |
-| `messages.properties` | Default English-first MessageSource bundle for Class B UI, Report, and Slack presentation |
+| `messages.properties` | Default English-first bundle for UI, Report, Slack, and Class C presentation wrappers |
 | `messages_en.properties` | English locale marker; inherits default English values |
-| `messages_ko.properties` | Korean localization values for Class B UI, Report, and Slack presentation |
+| `messages_ko.properties` | Korean values for UI, Report, Slack, and Class C presentation wrappers |
 | `src/main/resources/*` | Profile-specific configuration and View resources |
 
 ### Primary Configuration Categories

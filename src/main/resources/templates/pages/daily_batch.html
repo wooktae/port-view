@@ -37,13 +37,13 @@
             <section class="dashboard-section batch-message-section"
                      th:if="${successMessage != null or errorMessage != null}">
                 <div class="batch-message success" th:if="${successMessage != null}">
-                    <strong>성공</strong>
-                    <span th:text="${successMessage}">성공 메시지</span>
+                    <strong th:text="#{label.success}">Success</strong>
+                    <span th:text="${successMessage}">Success message</span>
                 </div>
 
                 <div class="batch-message error" th:if="${errorMessage != null}">
-                    <strong>실패</strong>
-                    <span th:text="${errorMessage}">실패 메시지</span>
+                    <strong th:text="#{label.failure}">Failure</strong>
+                    <span th:text="${errorMessage}">Failure message</span>
                 </div>
             </section>
 
@@ -150,7 +150,6 @@
                                 </button>
                             </form>
 
-                            
                             <form th:action="@{/daily-batch/aws-stepfunctions/start-range}"
                                   method="post"
                                   class="batch-run-form">

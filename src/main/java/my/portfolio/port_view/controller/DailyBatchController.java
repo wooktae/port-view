@@ -9,6 +9,7 @@ import my.portfolio.port_view.service.DailyBatchService;
 import my.portfolio.port_view.service.SlackNotificationService;
 import my.portfolio.port_view.service.StepFunctionsDailyBatchExecutionService;
 import my.portfolio.port_view.util.AccountNoResolver;
+import my.portfolio.port_view.util.ViewMessages;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -79,7 +80,7 @@ public class DailyBatchController {
         if (!canRunFullLocalFilePipeline()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    dailyBatchBlockedMessage("Daily Pipeline 전체 실행")
+                    dailyBatchBlockedMessage(ViewMessages.text("daily.action.fullRun"))
             );
 
             return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
@@ -92,14 +93,22 @@ public class DailyBatchController {
 
             redirectAttributes.addFlashAttribute(
                     "successMessage",
-                    "Daily Pipeline 전체 실행 시작: #" + batchRunId
+                    ViewMessages.text(
+                            "daily.flash.started",
+                            ViewMessages.text("daily.action.fullRun"),
+                            batchRunId
+                    )
             );
 
             return "redirect:/daily-batch/" + batchRunId + "?accountNo=" + resolvedAccountNo;
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "Daily Pipeline 전체 실행 시작 실패: " + e.getMessage()
+                    ViewMessages.text(
+                            "daily.flash.failed",
+                            ViewMessages.text("daily.action.fullRun"),
+                            e.getMessage()
+                    )
             );
 
             return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
@@ -127,7 +136,7 @@ public class DailyBatchController {
         if (!canRunLocalFileBatch()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    dailyBatchBlockedMessage("Daily Pipeline 범위 실행")
+                    dailyBatchBlockedMessage(ViewMessages.text("daily.action.rangeRun"))
             );
 
             return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
@@ -140,19 +149,24 @@ public class DailyBatchController {
 
             redirectAttributes.addFlashAttribute(
                     "successMessage",
-                    "Daily Pipeline 범위 실행 시작: #"
-                            + batchRunId
-                            + " / 시작 단계="
-                            + fromStepCode
-                            + " / 종료 단계="
-                            + toStepCode
+                    ViewMessages.text(
+                            "daily.flash.rangeStarted",
+                            ViewMessages.text("daily.action.rangeRun"),
+                            batchRunId,
+                            fromStepCode,
+                            toStepCode
+                    )
             );
 
             return "redirect:/daily-batch/" + batchRunId + "?accountNo=" + resolvedAccountNo;
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "Daily Pipeline 범위 실행 시작 실패: " + e.getMessage()
+                    ViewMessages.text(
+                            "daily.flash.failed",
+                            ViewMessages.text("daily.action.rangeRun"),
+                            e.getMessage()
+                    )
             );
 
             return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
@@ -178,7 +192,11 @@ public class DailyBatchController {
         if (!batchProperties.canStartAwsStepfunctions()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "AWS Step Functions 실행은 현재 비활성화되어 있습니다. " + currentModeText()
+                    ViewMessages.text(
+                            "daily.flash.disabled",
+                            ViewMessages.text("daily.action.awsSafeRun"),
+                            currentModeText()
+                    )
             );
 
             return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
@@ -194,15 +212,21 @@ public class DailyBatchController {
 
             redirectAttributes.addFlashAttribute(
                     "successMessage",
-                    "AWS Step Functions 실행 시작: "
-                            + result.executionName()
-                            + " / executionArn="
-                            + result.redactedExecutionArn()
+                    ViewMessages.text(
+                            "daily.flash.awsStarted",
+                            ViewMessages.text("daily.action.awsSafeRun"),
+                            result.executionName(),
+                            result.redactedExecutionArn()
+                    )
             );
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "AWS Step Functions 실행 시작 실패: " + e.getMessage()
+                    ViewMessages.text(
+                            "daily.flash.failed",
+                            ViewMessages.text("daily.action.awsSafeRun"),
+                            e.getMessage()
+                    )
             );
         }
 
@@ -226,7 +250,11 @@ public class DailyBatchController {
         if (!canStartAwsStepfunctionsApproval()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "AWS Step Functions 승인형 Step 12~17 실행은 현재 비활성화되어 있습니다. " + currentModeText()
+                    ViewMessages.text(
+                            "daily.flash.disabled",
+                            ViewMessages.text("daily.action.awsApprovalRun"),
+                            currentModeText()
+                    )
             );
 
             return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
@@ -242,15 +270,21 @@ public class DailyBatchController {
 
             redirectAttributes.addFlashAttribute(
                     "successMessage",
-                    "AWS Step Functions 승인형 Step 12~17 실행 시작: "
-                            + result.executionName()
-                            + " / executionArn="
-                            + result.redactedExecutionArn()
+                    ViewMessages.text(
+                            "daily.flash.awsStarted",
+                            ViewMessages.text("daily.action.awsApprovalRun"),
+                            result.executionName(),
+                            result.redactedExecutionArn()
+                    )
             );
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "AWS Step Functions 승인형 Step 12~17 실행 시작 실패: " + e.getMessage()
+                    ViewMessages.text(
+                            "daily.flash.failed",
+                            ViewMessages.text("daily.action.awsApprovalRun"),
+                            e.getMessage()
+                    )
             );
         }
 
@@ -270,8 +304,11 @@ public class DailyBatchController {
         if (!batchProperties.isSlackActionEnabled()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "Slack 테스트 메시지 전송은 현재 비활성화되어 있습니다. "
-                            + currentModeText()
+                    ViewMessages.text(
+                            "daily.flash.disabled",
+                            ViewMessages.text("daily.action.slackTest"),
+                            currentModeText()
+                    )
             );
 
             return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
@@ -282,12 +319,19 @@ public class DailyBatchController {
 
             redirectAttributes.addFlashAttribute(
                     "successMessage",
-                    "Slack 테스트 메시지 전송 완료"
+                    ViewMessages.text(
+                            "daily.flash.completed",
+                            ViewMessages.text("daily.action.slackTest")
+                    )
             );
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "Slack 테스트 메시지 전송 실패: " + e.getMessage()
+                    ViewMessages.text(
+                            "daily.flash.failed",
+                            ViewMessages.text("daily.action.slackTest"),
+                            e.getMessage()
+                    )
             );
         }
 
@@ -309,8 +353,11 @@ public class DailyBatchController {
         if (!batchProperties.isSlackActionEnabled()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "Daily Batch Slack 요약 재전송은 현재 비활성화되어 있습니다. "
-                            + currentModeText()
+                    ViewMessages.text(
+                            "daily.flash.disabled",
+                            ViewMessages.text("daily.action.slackSummary"),
+                            currentModeText()
+                    )
             );
 
             return "redirect:/daily-batch/" + batchRunId + "?accountNo=" + resolvedAccountNo;
@@ -321,12 +368,20 @@ public class DailyBatchController {
 
             redirectAttributes.addFlashAttribute(
                     "successMessage",
-                    "Daily Batch Slack 요약 메시지 전송 완료: #" + batchRunId
+                    ViewMessages.text(
+                            "daily.flash.completedWithId",
+                            ViewMessages.text("daily.action.slackSummary"),
+                            batchRunId
+                    )
             );
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "Daily Batch Slack 요약 메시지 전송 실패: " + e.getMessage()
+                    ViewMessages.text(
+                            "daily.flash.failed",
+                            ViewMessages.text("daily.action.slackSummary"),
+                            e.getMessage()
+                    )
             );
         }
 
@@ -351,8 +406,11 @@ public class DailyBatchController {
         if (!canRunIntradayMonitor()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "장중 포지션 점검은 현재 비활성화되어 있습니다. "
-                            + currentModeText()
+                    ViewMessages.text(
+                            "daily.flash.disabled",
+                            ViewMessages.text("daily.action.intradayMonitor"),
+                            currentModeText()
+                    )
             );
 
             return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
@@ -368,7 +426,11 @@ public class DailyBatchController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "장중 포지션 점검 실패: " + e.getMessage()
+                    ViewMessages.text(
+                            "daily.flash.failed",
+                            ViewMessages.text("daily.action.intradayMonitor"),
+                            e.getMessage()
+                    )
             );
         }
 
@@ -392,7 +454,7 @@ public class DailyBatchController {
         if (!canRunLocalFileBatch()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    dailyBatchBlockedMessage("Daily Pipeline 부분 실행")
+                    dailyBatchBlockedMessage(ViewMessages.text("daily.action.partialRun"))
             );
 
             return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
@@ -405,14 +467,23 @@ public class DailyBatchController {
 
             redirectAttributes.addFlashAttribute(
                     "successMessage",
-                    "Daily Pipeline 부분 실행 시작: #" + batchRunId + " / 시작 단계=" + fromStepCode
+                    ViewMessages.text(
+                            "daily.flash.partialStarted",
+                            ViewMessages.text("daily.action.partialRun"),
+                            batchRunId,
+                            fromStepCode
+                    )
             );
 
             return "redirect:/daily-batch/" + batchRunId + "?accountNo=" + resolvedAccountNo;
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "Daily Pipeline 부분 실행 시작 실패: " + e.getMessage()
+                    ViewMessages.text(
+                            "daily.flash.failed",
+                            ViewMessages.text("daily.action.partialRun"),
+                            e.getMessage()
+                    )
             );
 
             return "redirect:/daily-batch?accountNo=" + resolvedAccountNo;
@@ -433,7 +504,7 @@ public class DailyBatchController {
         if (!canRunLocalFileBatch()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    dailyBatchBlockedMessage("실패 단계부터 재실행")
+                    dailyBatchBlockedMessage(ViewMessages.text("daily.action.retryFailed"))
             );
 
             return "redirect:/daily-batch/" + batchRunId + "?accountNo=" + resolvedAccountNo;
@@ -446,14 +517,23 @@ public class DailyBatchController {
 
             redirectAttributes.addFlashAttribute(
                     "successMessage",
-                    "실패 단계부터 재실행 시작: #" + retryBatchRunId + " / 원본 실행 #" + batchRunId
+                    ViewMessages.text(
+                            "daily.flash.retryStarted",
+                            ViewMessages.text("daily.action.retryFailed"),
+                            retryBatchRunId,
+                            batchRunId
+                    )
             );
 
             return "redirect:/daily-batch/" + retryBatchRunId + "?accountNo=" + resolvedAccountNo;
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "실패 단계부터 재실행 시작 실패: " + e.getMessage()
+                    ViewMessages.text(
+                            "daily.flash.failed",
+                            ViewMessages.text("daily.action.retryFailed"),
+                            e.getMessage()
+                    )
             );
 
             return "redirect:/daily-batch/" + batchRunId + "?accountNo=" + resolvedAccountNo;
@@ -539,9 +619,7 @@ public class DailyBatchController {
     }
 
     private String dailyBatchBlockedMessage(String actionName) {
-        return actionName + "은 현재 비활성화되어 있습니다. "
-                + "2차 AWS Paper 로컬 실행 검증에서는 허용된 step 범위와 Paper 주문 gate를 서버단에서 확인합니다. "
-                + currentModeText();
+        return ViewMessages.text("daily.flash.blocked", actionName, currentModeText());
     }
 
     private String currentModeText() {

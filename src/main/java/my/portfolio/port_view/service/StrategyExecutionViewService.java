@@ -7,6 +7,7 @@ import my.portfolio.port_view.dto.strategy.StrategyExecutionPlanPageDto;
 import my.portfolio.port_view.dto.strategy.StrategyMarketBlockReasonDto;
 import my.portfolio.port_view.repository.StrategyExecutionQueryRepository;
 import my.portfolio.port_view.util.ViewFormatUtils;
+import my.portfolio.port_view.util.ViewMessages;
 import my.portfolio.port_view.util.ViewTextUtils;
 import org.springframework.stereotype.Service;
 
@@ -104,38 +105,38 @@ public class StrategyExecutionViewService {
         return switch (signal) {
             case "AGGRESSIVE" -> {
                 if (gt(reason.marketRegimeScore(), "0.30") || gt(reason.flowPressureScore(), "0.30")) {
-                    yield "시장 조건이 좋아 공격 운용 가능한 구간임";
+                    yield ViewMessages.text("strategy.market.headline.aggressiveStrong");
                 }
-                yield "시장 흐름이 우호적이라 적극 진입을 검토하는 구간임";
+                yield ViewMessages.text("strategy.market.headline.aggressive");
             }
 
             case "NEUTRAL" -> {
                 if (gt(reason.breadthPressureScore(), "0") && lt(reason.flowPressureScore(), "0")) {
-                    yield "일부 지표는 양호하지만 수급 확인이 필요한 선별 진입 구간임";
+                    yield ViewMessages.text("strategy.market.headline.neutralFlow");
                 }
-                yield "시장 조건이 중립이라 좋은 후보만 선별하는 구간임";
+                yield ViewMessages.text("strategy.market.headline.neutral");
             }
 
             case "DEFENSIVE" -> {
                 if (lt(reason.flowPressureScore(), "0")) {
-                    yield "수급 압력이 약해 방어 운용이 필요한 구간임";
+                    yield ViewMessages.text("strategy.market.headline.defensiveFlow");
                 }
-                yield "시장 리스크가 커져 보수적으로 운용하는 구간임";
+                yield ViewMessages.text("strategy.market.headline.defensive");
             }
 
             case "BLOCK" -> {
                 if (lt(reason.flowPressureScore(), "-0.30")) {
-                    yield "시장 수급 압력이 약해서 신규 매수를 차단했음";
+                    yield ViewMessages.text("strategy.market.headline.blockFlow");
                 }
 
                 if (lt(reason.marketRegimeScore(), "0")) {
-                    yield "시장 종합 점수가 방어 구간이라 신규 매수를 멈췄음";
+                    yield ViewMessages.text("strategy.market.headline.blockScore");
                 }
 
-                yield "전략이 위험 관리 우선 구간으로 판단했음";
+                yield ViewMessages.text("strategy.market.headline.block");
             }
 
-            default -> "시장 판단 상태를 확인 중임";
+            default -> ViewMessages.text("strategy.market.headline.unknown");
         };
     }
 
@@ -143,20 +144,11 @@ public class StrategyExecutionViewService {
         String signal = reason.marketSignal() == null ? "" : reason.marketSignal().toUpperCase();
 
         return switch (signal) {
-            case "AGGRESSIVE" ->
-                    "시장 종합 점수와 수급 흐름이 우호적이라 신규 매수 후보를 적극적으로 검토할 수 있는 상태. 다만 종목별 점수와 변동성 조건은 그대로 확인 필요.";
-
-            case "NEUTRAL" ->
-                    "시장 방향성이 강하지 않아 모든 종목을 공격적으로 사기보다는, 수급·점수·가격흐름이 좋은 후보만 선별하는 상태.";
-
-            case "DEFENSIVE" ->
-                    "시장 리스크가 커지고 있어 신규 매수는 줄이고, 기존 포지션의 손익과 수급 약화를 더 엄격하게 보는 상태.";
-
-            case "BLOCK" ->
-                    "지수 자체보다 수급 쪽 약세가 핵심으로 보임. 외국인 수급과 시장 수급 강도가 약해서 전략이 신규 진입보다 현금 방어를 우선한 상태.";
-
-            default ->
-                    "시장 판단 데이터가 부족해서 상세 해석은 제한적임.";
+            case "AGGRESSIVE" -> ViewMessages.text("strategy.market.summary.aggressive");
+            case "NEUTRAL" -> ViewMessages.text("strategy.market.summary.neutral");
+            case "DEFENSIVE" -> ViewMessages.text("strategy.market.summary.defensive");
+            case "BLOCK" -> ViewMessages.text("strategy.market.summary.block");
+            default -> ViewMessages.text("strategy.market.summary.unknown");
         };
     }
 
@@ -164,51 +156,81 @@ public class StrategyExecutionViewService {
         List<String> lines = new ArrayList<>();
 
         if (lt(reason.marketRegimeScore(), "0")) {
-            lines.add("시장 종합 점수가 " + fmt(reason.marketRegimeScore()) + "로 음수권이라 전체 시장 판단이 방어 쪽으로 기울었음.");
+            lines.add(ViewMessages.text(
+                    "strategy.market.reason.regimeNegative",
+                    fmt(reason.marketRegimeScore())
+            ));
         } else if (reason.marketRegimeScore() != null) {
-            lines.add("시장 종합 점수는 " + fmt(reason.marketRegimeScore()) + "로 크게 나쁘진 않지만, 다른 위험 지표와 함께 보수적으로 해석됨.");
+            lines.add(ViewMessages.text(
+                    "strategy.market.reason.regimeMixed",
+                    fmt(reason.marketRegimeScore())
+            ));
         }
 
         if (lt(reason.flowPressureScore(), "-0.30")) {
-            lines.add("수급 압력 점수가 " + fmt(reason.flowPressureScore()) + "로 낮아서 매수세 유입보다 이탈 압력이 더 크게 반영됨.");
+            lines.add(ViewMessages.text(
+                    "strategy.market.reason.flowPressure",
+                    fmt(reason.flowPressureScore())
+            ));
         }
 
         if (lt(reason.marketFlowStrengthScore(), "-0.30")) {
-            lines.add("시장 수급 강도도 " + fmt(reason.marketFlowStrengthScore()) + "로 약해서 신규 매수 후보를 만들기 어려운 환경임.");
+            lines.add(ViewMessages.text(
+                    "strategy.market.reason.flowStrength",
+                    fmt(reason.marketFlowStrengthScore())
+            ));
         }
 
         if (lt(reason.marketForeignNetRatio5d(), "0")) {
-            lines.add("외국인 5일 순매수 비율이 " + pct(reason.marketForeignNetRatio5d()) + "로 음수라 최근 외국인 수급이 약했음.");
+            lines.add(ViewMessages.text(
+                    "strategy.market.reason.foreignFlow",
+                    pct(reason.marketForeignNetRatio5d())
+            ));
         }
 
         if (reason.marketInstitutionNetRatio5d() != null) {
             if (gt(reason.marketInstitutionNetRatio5d(), "0")) {
-                lines.add("기관 5일 수급은 " + pct(reason.marketInstitutionNetRatio5d()) + "로 일부 방어했지만, 외국인/전체 수급 약세를 뒤집기엔 부족했음.");
+                lines.add(ViewMessages.text(
+                        "strategy.market.reason.institutionPositive",
+                        pct(reason.marketInstitutionNetRatio5d())
+                ));
             } else {
-                lines.add("기관 5일 수급도 " + pct(reason.marketInstitutionNetRatio5d()) + "라 수급 방어력이 강하지 않았음.");
+                lines.add(ViewMessages.text(
+                        "strategy.market.reason.institutionWeak",
+                        pct(reason.marketInstitutionNetRatio5d())
+                ));
             }
         }
 
         if (reason.breadthPressureScore() != null) {
             if (lt(reason.breadthPressureScore(), "0")) {
-                lines.add("시장 폭/확산도 점수도 " + fmt(reason.breadthPressureScore()) + "로 약해서 상승 종목 확산이 부족했음.");
+                lines.add(ViewMessages.text(
+                        "strategy.market.reason.breadthWeak",
+                        fmt(reason.breadthPressureScore())
+                ));
             } else {
-                lines.add("시장 폭/확산도는 " + fmt(reason.breadthPressureScore()) + "로 일부 양호했지만, 수급 압력 약세가 더 크게 작용했음.");
+                lines.add(ViewMessages.text(
+                        "strategy.market.reason.breadthPositive",
+                        fmt(reason.breadthPressureScore())
+                ));
             }
         }
 
         if (reason.featureRiskRegime() != null && !reason.featureRiskRegime().isBlank()) {
             if ("RISK_ON".equalsIgnoreCase(reason.featureRiskRegime())) {
-                lines.add("피처 기준 위험 상태는 RISK_ON으로 계산되어 시장 위험 선호는 살아 있지만, 다른 수급/확산 지표와 함께 최종 운용 상태가 결정됨.");
+                lines.add(ViewMessages.text("strategy.market.reason.riskOn"));
             } else if ("RISK_OFF".equalsIgnoreCase(reason.featureRiskRegime())) {
-                lines.add("피처 기준 위험 상태는 RISK_OFF로 계산되어 시장 리스크 관리가 필요한 구간으로 해석됨.");
+                lines.add(ViewMessages.text("strategy.market.reason.riskOff"));
             } else {
-                lines.add("피처 기준 위험 상태는 " + reason.featureRiskRegime() + "로 계산되어 중립적인 시장 환경으로 해석됨.");
+                lines.add(ViewMessages.text(
+                        "strategy.market.reason.riskNeutral",
+                        reason.featureRiskRegime()
+                ));
             }
         }
 
         if (lines.isEmpty()) {
-            lines.add("세부 시장 피처가 부족해서 정량 사유는 제한적이지만, 실행 계획의 시장 상태에 따라 운용 강도를 조절했음.");
+            lines.add(ViewMessages.text("strategy.market.reason.insufficient"));
         }
 
         return lines;

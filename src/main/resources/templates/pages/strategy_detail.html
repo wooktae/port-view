@@ -30,13 +30,13 @@
             <section class="dashboard-section strategy-message-section"
                      th:if="${successMessage != null or errorMessage != null}">
                 <div class="strategy-message success" th:if="${successMessage != null}">
-                    <strong>성공</strong>
-                    <span th:text="${successMessage}">Connector 주문 전송 완료</span>
+                    <strong th:text="#{label.success}">Success</strong>
+                    <span th:text="${successMessage}">Connector Order submitted</span>
                 </div>
 
                 <div class="strategy-message error" th:if="${errorMessage != null}">
-                    <strong>실패</strong>
-                    <span th:text="${errorMessage}">Connector 주문 전송 실패</span>
+                    <strong th:text="#{label.failure}">Failure</strong>
+                    <span th:text="${errorMessage}">Connector Order submission failed</span>
                 </div>
             </section>
 
@@ -124,7 +124,7 @@
                     </article>
                 </div>
             </section>
-            
+
             <!-- 시장 운용 판단 분석 -->
             <section class="dashboard-section strategy-market-reason-section"
                     th:if="${marketBlockReason != null and marketBlockReason.hasData()}">
