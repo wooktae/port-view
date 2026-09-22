@@ -136,8 +136,9 @@
                                     </span>
 
                                     <div class="order-stock">
-                                        <strong th:text="${order.stockName}">삼성전자</strong>
-                                        <span th:text="${order.tickerCode}">005930</span>
+                                        <strong th:text="${T(my.portfolio.port_view.util.ViewMessages).stockDisplayName(order.tickerCode, order.stockName)}">삼성전자</strong>
+                                        <span th:if="${#locale.language == 'ko' and T(my.portfolio.port_view.util.ViewMessages).hasOriginalStockName(order.stockName)}"
+                                              th:text="${order.tickerCode}">005930</span>
                                     </div>
                                 </div>
 

@@ -63,7 +63,7 @@ When changing `ViewNames`, verify Controller return values and template paths to
 | `OrderController.java` | `/orders` list and details |
 | `DailyBatchController.java` | Daily Batch queries · local actions · AWS triggers |
 | `StrategyExecutionViewController.java` | Execution Plan queries and submission actions |
-| `StrategyReportController.java` | Latest · specific run · Research Version-selected Report · production Version selection action |
+| `StrategyReportController.java` | Latest · specific run · Research Version-selected Report · localized page title · production Version selection action |
 | `controller/*.java` | View Controller group including Strategy Daily |
 
 ### Change Checks
@@ -84,7 +84,7 @@ When changing `ViewNames`, verify Controller return values and template paths to
 | `DashboardService.java` | Assemble Dashboard DTOs |
 | `PositionService.java` | Assemble Position list and detail DTOs |
 | `OrderService.java` | Assemble Order · Fill · event timeline |
-| `ReportService.java` | Assemble Report summary · statistics · details · Research Version list/selected Version Report |
+| `ReportService.java` | Assemble locale-aware Report summary · statistics · insights · rationale · Research Version list/selected Version Report |
 | `OperatingResearchVersionProvider.java` | Query actual OPERATING RSCFG from Production Step4 → Batch Job Definition command |
 | `ResearchChampionPromotionService.java` | RSCFG production promotion Plan · Job Definition Revision creation · dual State Machine preflight/promotion/after-check/rollback |
 | `StrategyExecutionViewService.java` | Query Execution Plans and Order Candidates |
@@ -191,8 +191,8 @@ When changing configuration, verify the following together.
 
 | Path | Responsibility |
 | --- | --- |
-| `src/main/java/my/portfolio/port_view/util/*.java` | Amount · date · locale-aware label · CSS class · account resolution |
-| `ViewMessages.java` | Locale-context lookup for display-only Java text in the EN/KO message bundles |
+| `src/main/java/my/portfolio/port_view/util/*.java` | Amount · date · locale-aware label · dynamic Stock display fallback · CSS class · account resolution |
+| `ViewMessages.java` | Locale-context lookup for display-only Java text and non-persistent `ticker · original source name` formatting |
 
 When changing a Util, verify the impact on display values and CSS classes across all views.
 
@@ -210,7 +210,7 @@ Do not expose account numbers verbatim in views or logs.
 | `templates/pages/orders.html` | Order list |
 | `templates/pages/order-detail.html` | Order details |
 | `templates/pages/daily_batch.html` | Batch status and execution actions |
-| `templates/pages/strategy_report.html` | Strategy Report · Research Version Dropdown · OPERATING display · production selection button for non-production Versions |
+| `templates/pages/strategy_report.html` | EN/KO Strategy Report presentation · Research Version Dropdown · OPERATING display · production selection button for non-production Versions |
 | `templates/pages/*.html` | View group including Strategy · Daily · Report |
 
 ### Change Checks
@@ -245,9 +245,9 @@ When changing a Template class, verify the corresponding CSS.
 | `application.properties` | Common server · DB · View · Connector · Batch · Slack configuration |
 | `application-aws-paper.properties` | AWS Paper profile overrides |
 | `application-local.properties.example` | Local configuration example without sensitive information |
-| `messages.properties` | Default English-first MessageSource bundle and Class B UI keys |
+| `messages.properties` | Default English-first MessageSource bundle for Class B UI and Report presentation |
 | `messages_en.properties` | English locale marker; inherits default English values |
-| `messages_ko.properties` | Korean localization values for Class B UI keys |
+| `messages_ko.properties` | Korean localization values for Class B UI and Report presentation |
 | `src/main/resources/*` | Profile-specific configuration and View resources |
 
 ### Primary Configuration Categories

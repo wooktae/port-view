@@ -85,8 +85,9 @@
                         <article class="order-summary-card stock">
                             <div class="metric-title" th:text="#{label.stockName}">Stock</div>
                             <div class="order-summary-main">
-                                <strong th:text="${page.currentOrder.stockName}">기업은행</strong>
-                                <span th:text="${page.currentOrder.tickerCode}">024110</span>
+                                <strong th:text="${T(my.portfolio.port_view.util.ViewMessages).stockDisplayName(page.currentOrder.tickerCode, page.currentOrder.stockName)}">기업은행</strong>
+                                <span th:if="${#locale.language == 'ko' and T(my.portfolio.port_view.util.ViewMessages).hasOriginalStockName(page.currentOrder.stockName)}"
+                                      th:text="${page.currentOrder.tickerCode}">024110</span>
                             </div>
                         </article>
 

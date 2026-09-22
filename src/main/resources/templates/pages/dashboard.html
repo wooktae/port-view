@@ -154,8 +154,9 @@
                                th:href="@{/positions/{tickerCode}(tickerCode=${p.tickerCode}, accountNo=${dashboard.accountNo})}">
 
                                 <div class="holding-stock">
-                                    <strong th:text="${p.stockName}">-</strong>
-                                    <span th:text="${p.tickerCode}">-</span>
+                                    <strong th:text="${T(my.portfolio.port_view.util.ViewMessages).stockDisplayName(p.tickerCode, p.stockName)}">-</strong>
+                                    <span th:if="${#locale.language == 'ko' and T(my.portfolio.port_view.util.ViewMessages).hasOriginalStockName(p.stockName)}"
+                                          th:text="${p.tickerCode}">-</span>
                                 </div>
 
                                 <div class="text-end muted-cell" th:text="${p.asOfDate}">-</div>

@@ -13,6 +13,55 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
+## 2026-09-22 — Task 1.7 Backtest Report Localization
+
+### Changed
+
+| File · Area | Change |
+| --- | --- |
+| `messages.properties` · `messages_ko.properties` | Added 187 paired Report presentation keys for EN/KO rendering |
+| `strategy_report.html` | Localized titles, sections, labels, units, empty states, table headings, and presentation-only fallbacks |
+| `ReportService.java` | Localized generated insights, rationale, labels, badges, market/day labels, and Exit Reason descriptions |
+| `StrategyReportController.java` | Resolved the Report page title through the locale-aware message bundle |
+| `README.md` · Source File Catalog | Documented Report localization and contract-preservation boundaries |
+
+### Validation
+
+| Item | Result |
+| --- | --- |
+| Message bundles | 542 matching keys · 187 Report keys · no duplicates · compatible placeholders |
+| Report key references | 187 references resolved · 0 missing |
+| Preserved contracts | 22 reason codes · 5 thresholds · Report paths · DTO/SQL shapes unchanged |
+| Preserved raw values | Run/version/metric values · company and trading names · stored bucket values unchanged |
+| Deferred Class C | Three Report exception strings remain unchanged for Task 1.9 tracing |
+| Maven clean compile | Successful · 96 Java sources |
+| Repository-safe tests | Successful · 2 tests, 0 failures |
+| AWS · DB · broker · KIS · Step Functions · Slack · deployment operations | 0 occurrences |
+
+## 2026-09-22 — Task 1.6 Dynamic Domain-Data Display
+
+### Changed
+
+| File · Area | Change |
+| --- | --- |
+| `ViewMessages.java` | Added locale-aware, non-persistent Stock display formatting without translating source names |
+| Position and Order presentation | English displays `ticker · original source name`; Korean retains the original name and separate ticker |
+| Strategy presentation | Applied the same fallback to Execution Order Candidates and Backtest Trade Details |
+| `PositionService.java` | Applied the formatter only to the display-only best-position summary |
+| `README.md` · Source File Catalog | Documented the raw-domain preservation and fallback policy |
+
+### Validation
+
+| Item | Result |
+| --- | --- |
+| Raw-domain values | Original company names remain unchanged in entities, DTO fields, and template fallback samples |
+| Verified English names | No mapping added because no verified source exists |
+| Missing-name fallback | Unchanged ticker, then `-` when both ticker and name are absent |
+| Maven clean compile | Successful · 96 Java sources |
+| Repository-safe tests | Successful · 2 tests, 0 failures |
+| `git diff --check` | Successful |
+| AWS · DB · broker · KIS · Step Functions · Slack · deployment operations | 0 occurrences |
+
 ## 2026-09-22 — Task 1.5 Residual View Localization
 
 ### Fixed

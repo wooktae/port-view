@@ -322,10 +322,11 @@
                              th:each="order : ${orders}">
 
                         <div class="order-stock-main">
-                            <strong th:text="${order.stockName() != null and !#strings.isEmpty(order.stockName()) ? order.stockName() : '-'}">
+                            <strong th:text="${T(my.portfolio.port_view.util.ViewMessages).stockDisplayName(order.tickerCode(), order.stockName())}">
                                 종목명
                             </strong>
-                            <span th:text="${order.tickerCode() != null and !#strings.isEmpty(order.tickerCode()) ? order.tickerCode() : '-'}">
+                            <span th:if="${#locale.language == 'ko' and T(my.portfolio.port_view.util.ViewMessages).hasOriginalStockName(order.stockName())}"
+                                  th:text="${order.tickerCode() != null and !#strings.isEmpty(order.tickerCode()) ? order.tickerCode() : '-'}">
                                 000000
                             </span>
                             <small>

@@ -143,7 +143,9 @@ public class PositionService {
                 ? ViewMessages.text("positions.best")
                 : ViewMessages.text("positions.leastLoss"));
 
-        page.setBestPositionName(best == null ? "-" : ViewFormatUtils.emptyIfNull(best.getStockName()));
+        page.setBestPositionName(best == null
+                ? "-"
+                : ViewMessages.stockDisplayName(best.getTickerCode(), best.getStockName()));
         page.setBestPositionRateText(best == null ? "-" : best.getEvalProfitRateText());
         page.setBestPositionProfitClass(best == null ? "neutral" : best.getProfitClass());
 

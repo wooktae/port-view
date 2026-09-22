@@ -20,8 +20,9 @@
     <main class="app-main dashboard-main positions-main position-detail-main">
         <header class="dashboard-page-title">
             <h1>
-                <span th:text="${page.stockName}">SK하이닉스</span>
-                <small th:text="|(${page.tickerCode})|">(000660)</small>
+                <span th:text="${T(my.portfolio.port_view.util.ViewMessages).stockDisplayName(page.tickerCode, page.stockName)}">SK하이닉스</span>
+                <small th:if="${#locale.language == 'ko' and T(my.portfolio.port_view.util.ViewMessages).hasOriginalStockName(page.stockName)}"
+                       th:text="|(${page.tickerCode})|">(000660)</small>
             </h1>
             <p th:text="#{positionDetail.description}">Review the current Position and recent Research.</p>
         </header>
@@ -32,7 +33,7 @@
                 <div class="account-hero-card">
                     <div class="account-hero-main">
                         <div class="section-label" th:text="#{positionDetail.stockDetails}">Stock Details</div>
-                        <h2 th:text="${page.stockName}">SK하이닉스</h2>
+                        <h2 th:text="${T(my.portfolio.port_view.util.ViewMessages).stockDisplayName(page.tickerCode, page.stockName)}">SK하이닉스</h2>
                         <p>
                             <span th:text="#{label.ticker}">Ticker</span>:
                             <span th:text="${page.tickerCode}">000660</span>
