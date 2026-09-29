@@ -2,1373 +2,1373 @@
 
 ## Purpose
 
-본 문서는 PORT-STRATEGY-AI AWS Migration의 운영자 결정을 관리하는 단일 진실원이다.
+This document is the single source of truth managing the operator decisions of the PORT-STRATEGY-AI AWS Migration.
 
-한 번 부여한 Decision ID는 재사용하거나 재번호를 부여하지 않는다.
+A Decision ID, once assigned, is not reused or renumbered.
 
-각 결정은 `상태 / 결정 / 선택값 / 다음 검토 / 비용 영향 / 운영 주의 / 관련 spec`을 기본으로 하는 2열 표로 관리한다.
+Each decision is managed in a 2-column table based by default on `Status / Decision / Selected value / Next review / Cost impact / Operational note / Related spec`.
 
-날짜별 검증 이력, executionName, ARN, commandId, revision, SHA256, DB 수치와 raw log는 본 문서에 누적하지 않는다.
+Per-date validation history, executionName, ARN, commandId, revision, SHA256, DB figures, and raw log are not accumulated in this document.
 
-상세 실행 근거는 각 spec의 `operation-notes.md`, 작업 이력은 `WORKLOG.md`, 리스크는 `risk-register.md`에서 관리한다.
+Detailed execution evidence is managed in each spec's `operation-notes.md`, work history in `WORKLOG.md`, and risks in `risk-register.md`.
 
-민감정보 원문은 기록하지 않고 `[REDACTED]` 계열 placeholder만 사용한다.
+Sensitive information originals are not recorded; only `[REDACTED]`-family placeholders are used.
 
 ## Status Legend
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 🟢 확정 | 후속 spec의 기준값으로 사용 |
-| 🟡 잠정 | 현재 채택했지만 후속 검증 후 변경 가능 |
-| 🔴 미정 | 운영자 결정 필요 |
-| 🔵 보류 | 별도 phase 또는 조건 충족 후 재검토 |
+| 🟢 확정 | Used as the reference value for follow-up specs |
+| 🟡 잠정 | Currently adopted but changeable after follow-up validation |
+| 🔴 미정 | Operator decision needed |
+| 🔵 보류 | Re-review after a separate phase or condition is met |
 
 ## Decision Dashboard
 
-### 상태 요약
+### Status summary
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 전체 | 100건 |
-| 🟢 확정 | 55건 |
-| 🟡 잠정 | 42건 |
-| 🔴 미정 | 2건 |
-| 🔵 보류 | 1건 |
-| 집계 기준 | 고유 Decision ID |
+| Total | 100 |
+| 🟢 확정 | 55 |
+| 🟡 잠정 | 42 |
+| 🔴 미정 | 2 |
+| 🔵 보류 | 1 |
+| Aggregation basis | Unique Decision ID |
 
-### 영역별 현황
+### Status by area
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| Environment | 8건 |
-| Network | 11건 |
-| RDS | 9건 |
-| Database | 12건 |
-| Compute / Service | 40건 |
-| Security / IAM | 8건 |
-| Observability | 4건 |
-| Cutover | 4건 |
-| Safety | 4건 |
+| Environment | 8 |
+| Network | 11 |
+| RDS | 9 |
+| Database | 12 |
+| Compute / Service | 40 |
+| Security / IAM | 8 |
+| Observability | 4 |
+| Cutover | 4 |
+| Safety | 4 |
 
 ## At a Glance
 
-### 핵심 환경·네트워크·RDS
+### Key environment·network·RDS
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| OD-ENV-001 | AWS dev 환경 구축 여부 · 미구축 · 🟢 확정 |
-| OD-ENV-003 | AWS 1차 구축 환경 · aws-paper · 🟢 확정 |
-| OD-NET-001 | NAT Gateway 사용 (aws-paper) · 미사용 · 🟢 확정 |
-| OD-NET-002 | NAT Gateway 사용 (aws-live) · 미사용(기본안) · 🟢 확정 |
-| OD-NET-005 | VPC Endpoint 활성 항목 · 기본 세트(S3 GW + ECR api+dkr + Secrets + Logs) · SSM 선택형 · 🟢 확정 |
-| OD-NET-009 | 운영자 접근 방식 · SSM Session Manager만 사용 · 🟢 확정 |
-| OD-RDS-001 | aws-paper RDS 인스턴스 · db.t4g.small single-AZ · 🟢 확정 |
-| OD-RDS-003 | aws-live RDS 안정성 우선안 · multi-AZ · 🟢 확정 |
-| OD-CUT-001 | cutover 방식 · pg_dump+pg_restore 1순위 · 🟢 확정 |
+| OD-ENV-001 | Whether to build an AWS dev environment · not built · 🟢 확정 |
+| OD-ENV-003 | AWS first-build environment · aws-paper · 🟢 확정 |
+| OD-NET-001 | NAT Gateway use (aws-paper) · not used · 🟢 확정 |
+| OD-NET-002 | NAT Gateway use (aws-live) · not used (default plan) · 🟢 확정 |
+| OD-NET-005 | VPC Endpoint active items · default set (S3 GW + ECR api+dkr + Secrets + Logs) · SSM optional · 🟢 확정 |
+| OD-NET-009 | Operator access method · use SSM Session Manager only · 🟢 확정 |
+| OD-RDS-001 | aws-paper RDS instance · db.t4g.small single-AZ · 🟢 확정 |
+| OD-RDS-003 | aws-live RDS stability-first plan · multi-AZ · 🟢 확정 |
+| OD-CUT-001 | cutover method · pg_dump+pg_restore first priority · 🟢 확정 |
 
-### 핵심 자동화 안전
+### Key automation safety
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| OD-SAFE-001 | aws-paper 자동 BUY/SELL E2E · 초기 차단 → 검증 후 허용 · 🟢 확정 |
-| OD-SAFE-002 | aws-live 자동 BUY · 후보+수동 승인 우선, 검증 후 단계적 · 🟢 확정 |
-| OD-SAFE-003 | aws-live 자동 SELL · OD-SAFE-002와 동일 정책 · 🟢 확정 |
-| OD-SAFE-004 | 자동 재시도 정책 · idempotent step만 자동 재시도 · 🟢 확정 |
+| OD-SAFE-001 | aws-paper automatic BUY/SELL E2E · initially blocked → allowed after validation · 🟢 확정 |
+| OD-SAFE-002 | aws-live automatic BUY · candidate+manual approval first, phased after validation · 🟢 확정 |
+| OD-SAFE-003 | aws-live automatic SELL · same policy as OD-SAFE-002 · 🟢 확정 |
+| OD-SAFE-004 | automatic retry policy · automatic retry only for idempotent steps · 🟢 확정 |
 
-### 핵심 서비스 배치
+### Key service placement
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| OD-MS-001 | port-marketconnector 컴퓨트 · EC2+EIP · 🟢 확정 |
-| OD-MS-002 | port-view 컴퓨트 · ECS Fargate Service (1순위), Elastic Beanstalk (2순위 비교 본문 유지) · 🟢 확정 |
-| OD-MS-003 | port-interest-crawler 컴퓨트 · ECS Fargate Task NAT-free public (1순위), ECS on EC2 (Selenium 안정성 미달 시 승격) · 🟢 확정 |
-| OD-MS-004 | port-interest-preprocessor 컴퓨트 · ECS Fargate Task (1순위), Lambda는 짧은 step만 보조 · 🟢 확정 |
-| OD-MS-005 | port_strategy_common 배포 · 별도 컴퓨트 없음. git submodule packaging (1순위), wheel+CodeArtifact (성숙기 2순위) · 🟢 확정 |
-| OD-MS-006 | port_strategy_decision 컴퓨트 · ECS Fargate Task + EventBridge Scheduler (1순위, 04에서 Step Functions 통합), Lambda 비권고 · 🟢 확정 |
-| OD-MS-007 | port_strategy_execution 컴퓨트 · ECS Fargate Task + Step Functions + EventBridge Scheduler (1순위), Lambda 비권고 · 🟢 확정 |
-| OD-MS-008 | port_strategy_research 컴퓨트 · AWS Batch (1순위, Step Functions 보조), ECS Fargate Task (2순위), Lambda 비권고 · 🟢 확정 |
+| OD-MS-001 | port-marketconnector compute · EC2+EIP · 🟢 확정 |
+| OD-MS-002 | port-view compute · ECS Fargate Service (first priority), Elastic Beanstalk (second-priority comparison retained in body) · 🟢 확정 |
+| OD-MS-003 | port-interest-crawler compute · ECS Fargate Task NAT-free public (first priority), ECS on EC2 (promoted if Selenium stability is insufficient) · 🟢 확정 |
+| OD-MS-004 | port-interest-preprocessor compute · ECS Fargate Task (first priority), Lambda assists only for short steps · 🟢 확정 |
+| OD-MS-005 | port_strategy_common deployment · no separate compute. git submodule packaging (first priority), wheel+CodeArtifact (second priority at maturity) · 🟢 확정 |
+| OD-MS-006 | port_strategy_decision compute · ECS Fargate Task + EventBridge Scheduler (first priority, Step Functions integration in 04), Lambda not recommended · 🟢 확정 |
+| OD-MS-007 | port_strategy_execution compute · ECS Fargate Task + Step Functions + EventBridge Scheduler (first priority), Lambda not recommended · 🟢 확정 |
+| OD-MS-008 | port_strategy_research compute · AWS Batch (first priority, Step Functions assist), ECS Fargate Task (second priority), Lambda not recommended · 🟢 확정 |
 | OD-MS-009 | Daily Batch orchestration · Step Functions + EventBridge Scheduler + ECS RunTask · 🟢 확정 |
 
 ## Decision Inventory
 
-각 Decision ID는 한 번만 표시한다. 결정의 검증 과정과 날짜별 변경 내역은 관련 spec `operation-notes.md`에서 관리한다.
+Each Decision ID is shown only once. The validation process and per-date change history of a decision are managed in the related spec `operation-notes.md`.
 
 ## Environment
 ### OD-ENV-001
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | AWS dev 환경 구축 여부 |
-| 선택값 | 미구축 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 큰 절감(별도 RDS/ECS/NAT/ALB 0) |
-| 운영 주의 | 통합 검증은 aws-paper에서 수행 |
-| 관련 spec | 02, 03, 04, 05, 08, 09 모두 dev 항목 제거 |
+| Status | 🟢 확정 |
+| Decision | Whether to build an AWS dev environment |
+| Selected value | not built |
+| Next review | None |
+| Cost impact | Large savings (0 separate RDS/ECS/NAT/ALB) |
+| Operational note | Integrated validation performed in aws-paper |
+| Related spec | 02, 03, 04, 05, 08, 09 all remove the dev item |
 
 ### OD-ENV-002
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | local-dev 운영 위치 |
-| 선택값 | 기존 로컬 PostgreSQL 환경 유지 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 로컬과 aws-paper 사이 데이터 차이 관리 필요 |
-| 관련 spec | 02 cutover, 10 cutover-runbook |
+| Status | 🟢 확정 |
+| Decision | local-dev operation location |
+| Selected value | existing local PostgreSQL environment retained |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Need to manage data differences between local and aws-paper |
+| Related spec | 02 cutover, 10 cutover-runbook |
 
 ### OD-ENV-003
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | AWS 1차 구축 환경 |
-| 선택값 | aws-paper |
-| 다음 검토 | 없음 |
-| 비용 영향 | 중 |
-| 운영 주의 | 자동 주문은 paper 안에서 검증 |
-| 관련 spec | 03, 04, 08 우선 적용 |
+| Status | 🟢 확정 |
+| Decision | AWS first-build environment |
+| Selected value | aws-paper |
+| Next review | None |
+| Cost impact | Medium |
+| Operational note | Automatic orders are validated within paper |
+| Related spec | 03, 04, 08 applied first |
 
 ### OD-ENV-004
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | aws-live 구축 시점 |
-| 선택값 | paper 검증 후 후속 구축 |
-| 다음 검토 | 없음 |
-| 비용 영향 | live 비용 보류 |
-| 운영 주의 | live 자동매매 단계적 도입 |
-| 관련 spec | 10 cutover-and-validation-runbook |
+| Status | 🟢 확정 |
+| Decision | aws-live build timing |
+| Selected value | follow-up build after paper validation |
+| Next review | None |
+| Cost impact | live cost on hold |
+| Operational note | phased introduction of live auto-trading |
+| Related spec | 10 cutover-and-validation-runbook |
 
 ### OD-ENV-005
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | VPC 분리 정책 |
-| 선택값 | 단일 VPC 유지 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 절감 |
-| 운영 주의 | 환경 사이 SG / Subnet 태그로 격리 |
-| 관련 spec | 02 |
+| Status | 🟢 확정 |
+| Decision | VPC separation policy |
+| Selected value | single VPC retained |
+| Next review | None |
+| Cost impact | savings |
+| Operational note | isolate between environments via SG / Subnet tags |
+| Related spec | 02 |
 
 ### OD-ENV-006
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | Paper 환경 DB source of truth |
-| 선택값 | AWS Paper RDS 단일 source of truth |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (RDS 비용은 OD-RDS-001 별도) |
-| 운영 주의 | local DB 와 AWS Paper RDS 간 주문 / 체결 / 포지션 병합 / 동기화는 운영자 실수의 가장 큰 risk(R-DATA-007 정합). local 은 `LOCAL_DEV` fixture / 실험 / 백업 참고용으로만 사용. |
-| 관련 spec | 02, 03, 04, 05, 08, 09, 10 |
+| Status | 🟡 잠정 |
+| Decision | Paper environment DB source of truth |
+| Selected value | AWS Paper RDS single source of truth |
+| Next review | follow-up review |
+| Cost impact | 0 (RDS cost is separate in OD-RDS-001) |
+| Operational note | Merging / synchronizing orders / fills / positions between the local DB and AWS Paper RDS is the largest operator-mistake risk (R-DATA-007 alignment). local is used only for `LOCAL_DEV` fixture / experiment / backup reference. |
+| Related spec | 02, 03, 04, 05, 08, 09, 10 |
 
 ### OD-ENV-007
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | Local PC → AWS Paper RDS 접속 방식 |
-| 선택값 | SSM Port Forwarding 만 사용 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (SSM Port Forwarding 자체 비용 없음) |
-| 운영 주의 | RDS Public 허용 시 R-SEC-001 위반. DB host 가 `localhost` 라도 실제 대상은 AWS Paper RDS 일 수 있어 host 만으로 환경 식별 금지. |
-| 관련 spec | 02, 03, 04, 05 |
+| Status | 🟡 잠정 |
+| Decision | Local PC → AWS Paper RDS connection method |
+| Selected value | use SSM Port Forwarding only |
+| Next review | follow-up review |
+| Cost impact | 0 (SSM Port Forwarding itself has no cost) |
+| Operational note | Allowing RDS Public violates R-SEC-001. Even if the DB host is `localhost`, the actual target may be AWS Paper RDS, so do not identify the environment by host alone. |
+| Related spec | 02, 03, 04, 05 |
 
 ### OD-ENV-008
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | Local DB 와 AWS Paper RDS 간 동기화 정책 |
-| 선택값 | 미사용 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | 동기화 도입 시 데이터 정합성 / 중복 주문 / fill 중복 / position 상태 충돌 risk(R-DATA-007). |
-| 관련 spec | 02, 03, 04, 10 |
+| Status | 🟡 잠정 |
+| Decision | Synchronization policy between the Local DB and AWS Paper RDS |
+| Selected value | not used |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | Introducing synchronization risks data consistency / duplicate orders / duplicate fills / position state conflicts (R-DATA-007). |
+| Related spec | 02, 03, 04, 10 |
 
 ## Network
 ### OD-NET-001
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | NAT Gateway 사용 (aws-paper) |
-| 선택값 | 미사용 |
-| 다음 검토 | 없음 |
-| 비용 영향 | ~$43+ /월 절감 |
-| 운영 주의 | 인터넷 outbound 워크로드를 명시 분리해야 함 |
-| 관련 spec | 02, 03, 08 |
+| Status | 🟢 확정 |
+| Decision | NAT Gateway use (aws-paper) |
+| Selected value | not used |
+| Next review | None |
+| Cost impact | ~$43+ /month savings |
+| Operational note | Internet outbound workloads must be explicitly separated |
+| Related spec | 02, 03, 08 |
 
 ### OD-NET-002
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | NAT Gateway 사용 (aws-live) |
-| 선택값 | 미사용(기본안) |
-| 다음 검토 | 없음 |
-| 비용 영향 | ~$86+ /월 절감 |
-| 운영 주의 | live AZ 장애 시 outbound는 public 워크로드에 의존 |
-| 관련 spec | 02, 03, 08 |
+| Status | 🟢 확정 |
+| Decision | NAT Gateway use (aws-live) |
+| Selected value | not used (default plan) |
+| Next review | None |
+| Cost impact | ~$86+ /month savings |
+| Operational note | On live AZ failure, outbound depends on the public workload |
+| Related spec | 02, 03, 08 |
 
 ### OD-NET-003
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | marketconnector outbound IP |
-| 선택값 | EC2+EIP 유지 |
-| 다음 검토 | 없음 |
-| 비용 영향 | EC2 단가만 |
-| 운영 주의 | broker IP 등록을 EIP에 묶음. EC2 교체 시 EIP detach/attach Runbook 필요 |
-| 관련 spec | 03 marketconnector-ec2 |
+| Status | 🟢 확정 |
+| Decision | marketconnector outbound IP |
+| Selected value | EC2+EIP retained |
+| Next review | None |
+| Cost impact | EC2 unit price only |
+| Operational note | broker IP registration is bound to the EIP. An EIP detach/attach Runbook is needed when replacing the EC2 |
+| Related spec | 03 marketconnector-ec2 |
 
 ### OD-NET-004
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | crawler/preprocessor outbound 방식 |
-| 선택값 | public subnet + assignPublicIp (1순위) |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | Task SG 실수 시 외부 노출 위험. Egress 검증 필요 |
-| 관련 spec | 08 |
+| Status | 🟡 잠정 |
+| Decision | crawler/preprocessor outbound method |
+| Selected value | public subnet + assignPublicIp (first priority) |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | External exposure risk on Task SG mistake. Egress validation needed |
+| Related spec | 08 |
 
 ### OD-NET-005
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | VPC Endpoint 활성 항목 |
-| 선택값 | 기본 유지 세트 = S3 Gateway + ECR api/dkr Interface + Secrets Manager Interface + CloudWatch Logs Interface |
-| 선택값 보충 | SSM Endpoint는 필수 세트가 아니라 NAT-free 여부·public outbound 구조·운영 접근 경로에 따라 선택 |
-| 선택값 보충 | 현재 aws-paper는 SSM Endpoint 제거 상태 |
-| 다음 검토 | 없음 |
-| 비용 영향 | Interface Endpoint 개수와 AZ 수에 비례(AZ 축소 시 감소) |
-| 운영 주의 | 기본 세트 누락 시 NAT 없이 해당 AWS API 접근 불가 |
-| 운영 주의 보충 | SSM Endpoint 유무는 SSM Session Manager 사용과 별개 개념 |
-| 관련 spec | 02, 06, 07 |
+| Status | 🟢 확정 |
+| Decision | VPC Endpoint active items |
+| Selected value | default retained set = S3 Gateway + ECR api/dkr Interface + Secrets Manager Interface + CloudWatch Logs Interface |
+| Selected value supplement | SSM Endpoint is not part of the required set but is selected depending on NAT-free status·public outbound structure·operator access path |
+| Selected value supplement | currently aws-paper has the SSM Endpoint removed |
+| Next review | None |
+| Cost impact | proportional to the number of Interface Endpoints and AZs (decreases when AZs are reduced) |
+| Operational note | If the default set is missing, the corresponding AWS API cannot be accessed without NAT |
+| Operational note supplement | The presence of an SSM Endpoint is a separate concept from SSM Session Manager use |
+| Related spec | 02, 06, 07 |
 
 ### OD-NET-006
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | STS / KMS Endpoint 활성 |
-| 선택값 | 우선 미사용. 필요 시 활성 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | AZ당 ~$8/월 추가 |
-| 운영 주의 | 미사용 시 KMS 호출이 NAT가 없으면 실패할 수 있음 |
-| 관련 spec | 02, 06 |
+| Status | 🟡 잠정 |
+| Decision | STS / KMS Endpoint activation |
+| Selected value | not used for now. Activate if needed |
+| Next review | follow-up review |
+| Cost impact | ~$8/month additional per AZ |
+| Operational note | If not used, KMS calls may fail without NAT |
+| Related spec | 02, 06 |
 
 ### OD-NET-007
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | ALB 사용 (aws-paper) |
-| 선택값 | 초기 미사용 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | ~$16.5/월 절감 |
-| 운영 주의 | port-view 운영자 접근은 SSM 포트포워딩 또는 internal IP |
-| 관련 spec | 05 port-view-ecs |
+| Status | 🟡 잠정 |
+| Decision | ALB use (aws-paper) |
+| Selected value | initially not used |
+| Next review | follow-up review |
+| Cost impact | ~$16.5/month savings |
+| Operational note | port-view operator access is via SSM port forwarding or internal IP |
+| Related spec | 05 port-view-ecs |
 
 ### OD-NET-008
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | ALB 사용 (aws-live) |
-| 선택값 | 초기 비용 절감안 보류 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | ~$16.5/월 절감 |
-| 운영 주의 | live 운영자 접근 정책에 따라 재검토 |
-| 관련 spec | 05 |
+| Status | 🟡 잠정 |
+| Decision | ALB use (aws-live) |
+| Selected value | initial cost-savings plan on hold |
+| Next review | follow-up review |
+| Cost impact | ~$16.5/month savings |
+| Operational note | re-review per the live operator access policy |
+| Related spec | 05 |
 
 ### OD-NET-009
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | 운영자 접근 방식 |
-| 선택값 | SSM Session Manager만 사용 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | EC2 SSH 22 inbound 0.0.0.0/0 절대 금지 |
-| 관련 spec | 02, 03 |
+| Status | 🟢 확정 |
+| Decision | Operator access method |
+| Selected value | use SSM Session Manager only |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | EC2 SSH 22 inbound 0.0.0.0/0 absolutely prohibited |
+| Related spec | 02, 03 |
 
 ### OD-NET-010
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | Local-to-AWS Paper RDS SSM Port Forwarding 표준 경유지 |
-| 선택값 | `portfolio-paper-marketconnector-ec2` 단일 · local port `15433` → tunnel → AWS Paper RDS |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (SSM Port Forwarding) |
-| 운영 주의 | tunnel 종료 시 DB 접속 단절 (R-AUTO-012) |
-| 관련 spec | 02, 03, 04, 05, 06 |
+| Status | 🟡 잠정 |
+| Decision | Local-to-AWS Paper RDS SSM Port Forwarding standard waypoint |
+| Selected value | `portfolio-paper-marketconnector-ec2` single · local port `15433` → tunnel → AWS Paper RDS |
+| Next review | follow-up review |
+| Cost impact | 0 (SSM Port Forwarding) |
+| Operational note | DB connection is cut when the tunnel closes (R-AUTO-012) |
+| Related spec | 02, 03, 04, 05, 06 |
 
 ### OD-NET-011
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | Local-to-AWS Paper RDS pgAdmin4 사용 원칙 |
-| 선택값 | `localhost:15433` (SSM tunnel) 만 등록. RDS endpoint 직접 등록 금지 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | tunnel 미오픈 시 접속이 외부로 향하지 않음 (R-SEC-001) |
-| 관련 spec | 02, 03, 04, 05, 10 |
+| Status | 🟡 잠정 |
+| Decision | Local-to-AWS Paper RDS pgAdmin4 usage principle |
+| Selected value | register only `localhost:15433` (SSM tunnel). Direct RDS endpoint registration prohibited |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | When the tunnel is not open, the connection does not go outward (R-SEC-001) |
+| Related spec | 02, 03, 04, 05, 10 |
 
 ## RDS
 ### OD-RDS-001
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | aws-paper RDS 인스턴스 |
-| 선택값 | db.t4g.small single-AZ |
-| 다음 검토 | 없음 |
-| 비용 영향 | ~$26 + storage |
-| 운영 주의 | dev 부재로 paper에 검증 부하 집중 |
-| 관련 spec | 02, 04, 05 |
+| Status | 🟢 확정 |
+| Decision | aws-paper RDS instance |
+| Selected value | db.t4g.small single-AZ |
+| Next review | None |
+| Cost impact | ~$26 + storage |
+| Operational note | With dev absent, validation load concentrates on paper |
+| Related spec | 02, 04, 05 |
 
 ### OD-RDS-002
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | aws-live RDS 비용 절감안 |
-| 선택값 | single-AZ 시작 가능 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | multi-AZ 대비 약 50% 절감 |
-| 운영 주의 | AZ 장애 시 다운타임. PITR로만 복구 |
-| 관련 spec | 02, 10 |
+| Status | 🟡 잠정 |
+| Decision | aws-live RDS cost-savings plan |
+| Selected value | can start single-AZ |
+| Next review | follow-up review |
+| Cost impact | about 50% savings vs multi-AZ |
+| Operational note | Downtime on AZ failure. Recovery only via PITR |
+| Related spec | 02, 10 |
 
 ### OD-RDS-003
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | aws-live RDS 안정성 우선안 |
-| 선택값 | multi-AZ |
-| 다음 검토 | 없음 |
-| 비용 영향 | 비용 절감안 대비 약 2배 |
-| 운영 주의 | AZ failover 자동, 다운타임 최소 |
-| 관련 spec | 02, 10 |
+| Status | 🟢 확정 |
+| Decision | aws-live RDS stability-first plan |
+| Selected value | multi-AZ |
+| Next review | None |
+| Cost impact | about 2x the cost-savings plan |
+| Operational note | AZ failover automatic, minimal downtime |
+| Related spec | 02, 10 |
 
 ### OD-RDS-004
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | PostgreSQL major version |
-| 선택값 | 16 이상 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | minor auto upgrade 정책 paper/live 활성 |
-| 관련 spec | 02 |
+| Status | 🟢 확정 |
+| Decision | PostgreSQL major version |
+| Selected value | 16 or higher |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | minor auto upgrade policy active for paper/live |
+| Related spec | 02 |
 
 ### OD-RDS-005
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | encryption at rest |
-| 선택값 | aws-paper KMS default, aws-live CMK 권고 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | KMS key 관리 비용 작음 |
-| 운영 주의 | CMK 사용 시 IAM 권한 매트릭스 추가 |
-| 관련 spec | 02, 06 |
+| Status | 🟡 잠정 |
+| Decision | encryption at rest |
+| Selected value | aws-paper KMS default, aws-live CMK recommended |
+| Next review | follow-up review |
+| Cost impact | KMS key management cost small |
+| Operational note | Using CMK adds an IAM permission matrix |
+| Related spec | 02, 06 |
 
 ### OD-RDS-006
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | backup retention (aws-paper) |
-| 선택값 | 7일 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 작음 |
-| 운영 주의 | 7일 이상 데이터 손실 시 외부 백업 필요 |
-| 관련 spec | 02 |
+| Status | 🟢 확정 |
+| Decision | backup retention (aws-paper) |
+| Selected value | 7 days |
+| Next review | None |
+| Cost impact | small |
+| Operational note | External backup needed for data loss beyond 7 days |
+| Related spec | 02 |
 
 ### OD-RDS-007
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | backup retention (aws-live) |
-| 선택값 | 14일 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 중 |
-| 운영 주의 | 비용 절감 시 7일까지 단축 가능 |
-| 관련 spec | 02, 10 |
+| Status | 🟢 확정 |
+| Decision | backup retention (aws-live) |
+| Selected value | 14 days |
+| Next review | None |
+| Cost impact | Medium |
+| Operational note | Can shorten to 7 days for cost savings |
+| Related spec | 02, 10 |
 
 ### OD-RDS-008
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | PITR |
-| 선택값 | aws-paper on, aws-live on |
-| 다음 검토 | 없음 |
-| 비용 영향 | 작음 |
-| 운영 주의 | 다른 시점 복구 가능 |
-| 관련 spec | 02 |
+| Status | 🟢 확정 |
+| Decision | PITR |
+| Selected value | aws-paper on, aws-live on |
+| Next review | None |
+| Cost impact | small |
+| Operational note | Recovery to a different point in time possible |
+| Related spec | 02 |
 
 ### OD-RDS-009
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | manual snapshot 정책 |
-| 선택값 | cutover 직전 + 분기 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 매우 작음 |
-| 운영 주의 | snapshot 명명 규칙(`before-cutover-{date}`) |
-| 관련 spec | 02, 10 |
+| Status | 🟢 확정 |
+| Decision | manual snapshot policy |
+| Selected value | just before cutover + quarterly |
+| Next review | None |
+| Cost impact | very small |
+| Operational note | snapshot naming convention (`before-cutover-{date}`) |
+| Related spec | 02, 10 |
 
 ## Database
 ### OD-DB-001
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | DB 이름 |
-| 선택값 | portfolio (모든 환경 동일) |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 환경변수 호환성 유지 |
-| 관련 spec | 02, 06 |
+| Status | 🟢 확정 |
+| Decision | DB name |
+| Selected value | portfolio (same in all environments) |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Maintain environment-variable compatibility |
+| Related spec | 02, 06 |
 
 ### OD-DB-002
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | schema 구성 |
-| 선택값 | schema-per-domain 10개 유지 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 기존 search_path 유지 |
-| 관련 spec | 02 |
+| Status | 🟢 확정 |
+| Decision | schema composition |
+| Selected value | schema-per-domain 10 retained |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Maintain the existing search_path |
+| Related spec | 02 |
 
 ### OD-DB-003
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | 환경변수 키 호환 |
-| 선택값 | INTEREST_DB_* / PORT_* / PORTFOLIO_DB_NAME 모두 유지 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 코드 무수정 정책 강제 |
-| 관련 spec | 02, 06 |
+| Status | 🟢 확정 |
+| Decision | environment-variable key compatibility |
+| Selected value | INTEREST_DB_* / PORT_* / PORTFOLIO_DB_NAME all retained |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Enforce the no-code-modification policy |
+| Related spec | 02, 06 |
 
 ### OD-DB-004
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | DB role 분리 |
-| 선택값 | 7개 role(marketconnector_app, crawler_app, preprocessor_app, decision_app, execution_app, research_app, view_app) |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 권한 매트릭스 운영 부담 |
-| 관련 spec | 02, 06 |
+| Status | 🟢 확정 |
+| Decision | DB role separation |
+| Selected value | 7 roles (marketconnector_app, crawler_app, preprocessor_app, decision_app, execution_app, research_app, view_app) |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Permission-matrix operational burden |
+| Related spec | 02, 06 |
 
 ### OD-DB-005
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | view_app 권한 |
-| 선택값 | 모든 schema READ + ops WRITE 기본. execution write는 05에서 재검토 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | port-view에서 execution write가 필요하면 05에서 변경 |
-| 관련 spec | 02, 05 |
+| Status | 🟡 잠정 |
+| Decision | view_app permissions |
+| Selected value | all schema READ + ops WRITE by default. execution write re-reviewed in 05 |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | If execution write is needed in port-view, change in 05 |
+| Related spec | 02, 05 |
 
 ### OD-DB-006
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | search_path 정책 |
-| 선택값 | MS별 README 그대로 유지 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | role별 ALTER ROLE SET search_path 적용 |
-| 관련 spec | 02 |
+| Status | 🟢 확정 |
+| Decision | search_path policy |
+| Selected value | keep per-MS README as-is |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Apply per-role ALTER ROLE SET search_path |
+| Related spec | 02 |
 
 ### OD-DB-007
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | legacy schema의 app role 권한 |
-| 선택값 | 모든 app role에 USAGE / SELECT 미부여(2026-06-09 1차 적용 결과 반영) |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 02 design.md 매트릭스(legacy R 일부 부여) 대비 보안 강화. legacy 데이터 접근 필요한 MS 식별 시 별도 결정으로 grant |
-| 관련 spec | 02, 05, 06 |
+| Status | 🟢 확정 |
+| Decision | app role permissions on the legacy schema |
+| Selected value | USAGE / SELECT not granted to any app role (reflects the 2026-06-09 first-application result) |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Security hardening vs the 02 design.md matrix (legacy R partially granted). Grant via a separate decision when an MS needing legacy data access is identified |
+| Related spec | 02, 05, 06 |
 
 ### OD-DB-008
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | marketconnector_app의 execution 권한 |
-| 선택값 | R-only 축소(2026-06-09 1차 적용 반영) |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | execution write는 execution_app 단독으로 한정. 02 design.md 매트릭스(R/W) 대비 권한 분리 강화 |
-| 관련 spec | 02, 03, 04 |
+| Status | 🟢 확정 |
+| Decision | marketconnector_app's execution permissions |
+| Selected value | reduced to R-only (reflects the 2026-06-09 first application) |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | execution write is limited to execution_app alone. Permission-separation hardening vs the 02 design.md matrix (R/W) |
+| Related spec | 02, 03, 04 |
 
 ### OD-DB-009
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | view_app의 execution 권한 |
-| 선택값 | R-only 유지(write 필요성은 05 spec에서 재검토) |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | OD-DB-005를 본 결정으로 분리. View에서 execution write가 꼭 필요해지면 05에서 변경 |
-| 관련 spec | 02, 05 |
+| Status | 🟡 잠정 |
+| Decision | view_app's execution permissions |
+| Selected value | keep R-only (write necessity re-reviewed in the 05 spec) |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | Split OD-DB-005 into this decision. If execution write becomes essential in View, change in 05 |
+| Related spec | 02, 05 |
 
 ### OD-DB-010
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | 1차 적용 시 기존 객체 owner 일괄 이관 (REASSIGN OWNED) |
-| 선택값 | 미실행(기존 table / sequence / index owner는 `portfolio_admin` 유지) |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | schema owner는 `portfolio_owner`로 이관 완료. default privileges는 새 객체에만 자동 적용. 기존 객체 일괄 이관 여부는 후속 결정으로 분리 관리 |
-| 관련 spec | 02, 06 |
+| Status | 🟢 확정 |
+| Decision | bulk owner reassignment of existing objects at first application (REASSIGN OWNED) |
+| Selected value | not executed (existing table / sequence / index owner kept as `portfolio_admin`) |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | schema owner reassignment to `portfolio_owner` complete. default privileges apply automatically only to new objects. Whether to bulk-reassign existing objects is separated and managed as a follow-up decision |
+| Related spec | 02, 06 |
 
 ### OD-DB-011
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | `execution_app` 의 `decision` schema UPDATE 권한 (Step 9 SELL execution link) |
-| 선택값 | `decision.strategy_daily_position_decision` 제한적 UPDATE 만 부여 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | UPDATE 권한이 `decision.strategy_daily_position_decision` 한 테이블에 한정. |
-| 관련 spec | 02, 04 |
+| Status | 🟢 확정 |
+| Decision | `execution_app`'s `decision` schema UPDATE permission (Step 9 SELL execution link) |
+| Selected value | grant only limited UPDATE on `decision.strategy_daily_position_decision` |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | The UPDATE permission is limited to the single table `decision.strategy_daily_position_decision`. |
+| Related spec | 02, 04 |
 
 ### OD-DB-012
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | `ops_recorder_app` 신규 role (Step Functions 실행 이력 OPS mirror 전용 · 2026-07-03) |
-| 선택값 | 전용 최소 권한 role 신설 · `ops` schema USAGE + `ops.strategy_daily_batch_run` · `ops.strategy_daily_batch_step_log` SELECT · INSERT · UPDATE + 관련 sequence USAGE · SELECT |
-| 선택값 보충 | DELETE 미부여 · `view_app` 재사용 안 함 · `execution_app` 권한 확대 안 함 · `chk_strategy_daily_batch_run_type` 에 `AWS_STEPFUNCTIONS` 값 추가(기존 `MANUAL` · `SCHEDULED` · `RETRY` |
-| 선택값 보충 | `MANUAL_PARTIAL` 유지) |
-| 다음 검토 | 없음 |
+| Status | 🟢 확정 |
+| Decision | `ops_recorder_app` new role (Step Functions execution-history OPS mirror only · 2026-07-03) |
+| Selected value | Establish a dedicated least-privilege role · `ops` schema USAGE + `ops.strategy_daily_batch_run` · `ops.strategy_daily_batch_step_log` SELECT · INSERT · UPDATE + related sequence USAGE · SELECT |
+| Selected value supplement | DELETE not granted · `view_app` not reused · `execution_app` permissions not expanded · add `AWS_STEPFUNCTIONS` value to `chk_strategy_daily_batch_run_type` (existing `MANUAL` · `SCHEDULED` · `RETRY` |
+| Selected value supplement | `MANUAL_PARTIAL` retained) |
+| Next review | None |
 
 ## Compute / Service
 ### OD-MS-001
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | port-marketconnector 컴퓨트 |
-| 선택값 | EC2+EIP |
-| 다음 검토 | 없음 |
-| 비용 영향 | EC2 단가 + EIP attach 무료 |
-| 운영 주의 | EC2 SG 실수 시 외부 노출. SSM + SG 통제 필수 |
-| 관련 spec | 03 |
+| Status | 🟢 확정 |
+| Decision | port-marketconnector compute |
+| Selected value | EC2+EIP |
+| Next review | None |
+| Cost impact | EC2 unit price + EIP attach free |
+| Operational note | External exposure on EC2 SG mistake. SSM + SG control essential |
+| Related spec | 03 |
 
 ### OD-MS-002
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | port-view 컴퓨트 |
-| 선택값 | ECS Fargate Service (1순위), Elastic Beanstalk (2순위 비교 본문 유지) |
-| 다음 검토 | 없음 |
-| 비용 영향 | Fargate per-task |
-| 운영 주의 | ALB 도입 여부는 OD-NET-007 / 008 |
-| P2 범위 | View 운영 보안·표시 고도화(ALB · HTTPS · Route53 · 인증 · Auto Scaling · Blue/Green · UI 고도화 · 외부 공개) 미수행 · 범위 제외 |
-| P2 현재 상태 | ECS Fargate 1차 실증 상태 유지 · 외부 미공개 |
-| P2 재검토 | 외부 공개 또는 다중 사용자 운영 필요 시 |
-| 관련 spec | 05 |
+| Status | 🟢 확정 |
+| Decision | port-view compute |
+| Selected value | ECS Fargate Service (first priority), Elastic Beanstalk (second-priority comparison retained in body) |
+| Next review | None |
+| Cost impact | Fargate per-task |
+| Operational note | Whether to introduce ALB is OD-NET-007 / 008 |
+| P2 scope | View operational security·display enhancement (ALB · HTTPS · Route53 · authentication · Auto Scaling · Blue/Green · UI enhancement · external exposure) not performed · out of scope |
+| P2 current status | ECS Fargate first empirical demonstration state maintained · not externally exposed |
+| P2 re-review | When external exposure or multi-user operation is needed |
+| Related spec | 05 |
 
 ### OD-MS-003
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | port-interest-crawler 컴퓨트 |
-| 선택값 | ECS Fargate Task NAT-free public (1순위), ECS on EC2 (Selenium 안정성 미달 시 승격) |
-| 관점 | 목표 컴퓨트 선택 관점(KRX headless 전환 가능 시 ECS 통합 재검토) |
-| 관점 보충 | 현재 실제 운영은 Hybrid(OD-MS-011) |
-| 다음 검토 | 없음 |
-| 비용 영향 | Fargate per-task. NAT 없음 |
-| 운영 주의 | Selenium / KRX 로그인 stateful. SG 통제 필수 |
-| 관련 spec | 08 |
+| Status | 🟢 확정 |
+| Decision | port-interest-crawler compute |
+| Selected value | ECS Fargate Task NAT-free public (first priority), ECS on EC2 (promoted if Selenium stability is insufficient) |
+| Perspective | Target-compute selection perspective (re-review ECS integration if KRX headless conversion becomes possible) |
+| Perspective supplement | Current actual operation is Hybrid (OD-MS-011) |
+| Next review | None |
+| Cost impact | Fargate per-task. No NAT |
+| Operational note | Selenium / KRX login stateful. SG control essential |
+| Related spec | 08 |
 
 ### OD-MS-004
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | port-interest-preprocessor 컴퓨트 |
-| 선택값 | ECS Fargate Task (1순위), Lambda는 짧은 step만 보조 |
-| 다음 검토 | 없음 |
-| 비용 영향 | Fargate per-task |
-| 운영 주의 | NAT-free에서 holiday API outbound는 public subnet 필요 |
-| 관련 spec | 08 |
+| Status | 🟢 확정 |
+| Decision | port-interest-preprocessor compute |
+| Selected value | ECS Fargate Task (first priority), Lambda assists only for short steps |
+| Next review | None |
+| Cost impact | Fargate per-task |
+| Operational note | In NAT-free, holiday API outbound needs a public subnet |
+| Related spec | 08 |
 
 ### OD-MS-005
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | port_strategy_common 배포 |
-| 선택값 | 별도 컴퓨트 없음. git submodule packaging (1순위), wheel+CodeArtifact (성숙기 2순위) |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 각 MS 이미지 빌드 시점 버전 동기화 부담 |
-| 관련 spec | 07 |
+| Status | 🟢 확정 |
+| Decision | port_strategy_common deployment |
+| Selected value | no separate compute. git submodule packaging (first priority), wheel+CodeArtifact (second priority at maturity) |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Version synchronization burden at each MS image build time |
+| Related spec | 07 |
 
 ### OD-MS-006
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | port_strategy_decision 컴퓨트 |
-| 선택값 | ECS Fargate Task + EventBridge Scheduler (1순위, 04에서 Step Functions 통합), Lambda 비권고 |
-| 다음 검토 | 없음 |
-| 비용 영향 | Fargate per-task |
-| 운영 주의 | 다중 schema read·write + 공통 라이브러리. Lambda timeout / connection 누수 위험 |
-| 관련 spec | 04 |
+| Status | 🟢 확정 |
+| Decision | port_strategy_decision compute |
+| Selected value | ECS Fargate Task + EventBridge Scheduler (first priority, Step Functions integration in 04), Lambda not recommended |
+| Next review | None |
+| Cost impact | Fargate per-task |
+| Operational note | Multi-schema read·write + common library. Lambda timeout / connection leak risk |
+| Related spec | 04 |
 
 ### OD-MS-007
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | port_strategy_execution 컴퓨트 |
-| 선택값 | ECS Fargate Task + Step Functions + EventBridge Scheduler (1순위), Lambda 비권고 |
-| 다음 검토 | 없음 |
-| 비용 영향 | Fargate per-task |
-| 운영 주의 | live BUY/SELL 자동 재시도 금지 정책을 state machine 레벨에서 강제 |
-| 관련 spec | 04, 10 |
+| Status | 🟢 확정 |
+| Decision | port_strategy_execution compute |
+| Selected value | ECS Fargate Task + Step Functions + EventBridge Scheduler (first priority), Lambda not recommended |
+| Next review | None |
+| Cost impact | Fargate per-task |
+| Operational note | Enforce the live BUY/SELL no-automatic-retry policy at the state machine level |
+| Related spec | 04, 10 |
 
 ### OD-MS-008
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | port_strategy_research 컴퓨트 |
-| 선택값 | AWS Batch (1순위, Step Functions 보조), ECS Fargate Task (2순위), Lambda 비권고 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 사용량 기반 |
-| 운영 주의 | 장시간 backtest / RDS connection 누수 점검. report S3 보관 |
-| 관련 spec | 09 |
+| Status | 🟢 확정 |
+| Decision | port_strategy_research compute |
+| Selected value | AWS Batch (first priority, Step Functions assist), ECS Fargate Task (second priority), Lambda not recommended |
+| Next review | None |
+| Cost impact | usage-based |
+| Operational note | Check long-running backtest / RDS connection leak. report S3 retention |
+| Related spec | 09 |
 
 ### OD-MS-009
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | Daily Batch orchestration |
-| 선택값 | Step Functions + EventBridge Scheduler + ECS RunTask |
-| 다음 검토 | 없음 |
-| 비용 영향 | Step Functions transitions ≪ ECS Task 비용 |
-| 운영 주의 | 기존 port-view subprocess는 AWS에서 그대로 쓰지 않음 |
-| 관련 spec | 04, 05 |
+| Status | 🟢 확정 |
+| Decision | Daily Batch orchestration |
+| Selected value | Step Functions + EventBridge Scheduler + ECS RunTask |
+| Next review | None |
+| Cost impact | Step Functions transitions ≪ ECS Task cost |
+| Operational note | The existing port-view subprocess is not used as-is on AWS |
+| Related spec | 04, 05 |
 
 ### OD-MS-010
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | infra alarm 채널 |
-| 선택값 | 도메인 알림은 SlackNotificationService 유지, 인프라 알람은 SNS → Lambda → Slack webhook fan-out |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 무료 한도 안 |
-| 운영 주의 | webhook URL은 Secrets Manager 또는 SSM SecureString. 06에서 최종 결정 |
-| 관련 spec | 05, 10 |
+| Status | 🟡 잠정 |
+| Decision | infra alarm channel |
+| Selected value | Keep domain notifications on SlackNotificationService; infra alarms via SNS → Lambda → Slack webhook fan-out |
+| Next review | follow-up review |
+| Cost impact | within free tier |
+| Operational note | webhook URL in Secrets Manager or SSM SecureString. Final decision in 06 |
+| Related spec | 05, 10 |
 
 ### OD-MS-011
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | port-interest-crawler runtime 분리 (Hybrid execution model) |
-| 선택값 | Hybrid(KRX GUI=Windows EC2 interactive worker · non-GUI=ECS Fargate Task). preprocessor=ECS Fargate Task |
-| 관점 | 현재 실제 Hybrid 운영 모델 관점 |
-| 관점 보충 | 목표 구조(KRX headless 전환 시 ECS 통합)는 OD-MS-003 |
-| 관점 보충 | 서비스 배치 결론 유지 · 세부 운영 방식은 후속 검증 가능 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | EC2 idle + Fargate per-task |
-| 운영 주의 | EC2 worker stop 절차 · 자동화 미도달 |
-| 관련 spec | 08, 04, 05, 09, 10 |
+| Status | 🟡 잠정 |
+| Decision | port-interest-crawler runtime separation (Hybrid execution model) |
+| Selected value | Hybrid (KRX GUI=Windows EC2 interactive worker · non-GUI=ECS Fargate Task). preprocessor=ECS Fargate Task |
+| Perspective | Current actual Hybrid operational model perspective |
+| Perspective supplement | The target structure (ECS integration on KRX headless conversion) is OD-MS-003 |
+| Perspective supplement | Service-placement conclusion retained · detailed operational method can be validated later |
+| Next review | follow-up review |
+| Cost impact | EC2 idle + Fargate per-task |
+| Operational note | EC2 worker stop procedure · automation not reached |
+| Related spec | 08, 04, 05, 09, 10 |
 
 ### OD-MS-012
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | KRX GUI 의존 crawler 1차 운영 모드 |
-| 선택값 | wrapper 기반 수동 실행(`run_krx_worker_daily.ps1`) |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (wrapper 자체) |
-| 운영 주의 | wrapper 성공이 DB 적재 성공을 보장 안 함 (R-AUTO-007) |
-| 관련 spec | 08 |
+| Status | 🟡 잠정 |
+| Decision | KRX GUI-dependent crawler first operational mode |
+| Selected value | wrapper-based manual execution (`run_krx_worker_daily.ps1`) |
+| Next review | follow-up review |
+| Cost impact | 0 (wrapper itself) |
+| Operational note | wrapper success does not guarantee DB loading success (R-AUTO-007) |
+| Related spec | 08 |
 
 ### OD-MS-013
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | port_strategy_decision Task Definition 분리 정책 |
-| 선택값 | buy-signal · position-signal 별도 Task Definition 2개 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | Fargate per-task |
-| 운영 주의 | 호출 순서를 orchestration 레벨에서 강제 |
-| 관련 spec | 04, 05 |
+| Status | 🟡 잠정 |
+| Decision | port_strategy_decision Task Definition separation policy |
+| Selected value | 2 separate Task Definitions for buy-signal · position-signal |
+| Next review | follow-up review |
+| Cost impact | Fargate per-task |
+| Operational note | Enforce the call order at the orchestration level |
+| Related spec | 04, 05 |
 
 ### OD-MS-014
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | port_strategy_common 1차 배포 방식 |
-| 선택값 | 1차 ECS smoke image 에서는 vendoring |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (vendoring) |
-| 운영 주의 | 소스 동시 갱신 시 버전 불일치 위험 |
-| 관련 spec | 04, 05, 07, 09 |
+| Status | 🟡 잠정 |
+| Decision | port_strategy_common first deployment method |
+| Selected value | vendoring in the first ECS smoke image |
+| Next review | follow-up review |
+| Cost impact | 0 (vendoring) |
+| Operational note | Version mismatch risk when the source is updated concurrently |
+| Related spec | 04, 05, 07, 09 |
 
 ### OD-MS-015
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | KRX GUI 의존 crawler 1차 자동화 방식 |
-| 선택값 | SSM RunCommand → schtasks → Scheduled Task → Autologon session → wrapper |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (SSM/Task) |
-| 운영 주의 | Autologon session 부재 시 KRX 로그인 실패 (R-AUTO-008) |
-| 관련 spec | 08 |
+| Status | 🟡 잠정 |
+| Decision | KRX GUI-dependent crawler first automation method |
+| Selected value | SSM RunCommand → schtasks → Scheduled Task → Autologon session → wrapper |
+| Next review | follow-up review |
+| Cost impact | 0 (SSM/Task) |
+| Operational note | KRX login fails in the absence of an Autologon session (R-AUTO-008) |
+| Related spec | 08 |
 
 ### OD-MS-016
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | Strategy Execution / MarketConnector 주문 실행 책임 분리 |
-| 선택값 | 책임 분리. Execution=READY→REQUESTED · Connector=REQUESTED→SUBMITTED/FAILED |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | View Daily Batch Step 12가 Connector executor 호출 |
-| 관련 spec | 03, 04, 05 |
+| Status | 🟡 잠정 |
+| Decision | Strategy Execution / MarketConnector order-execution responsibility separation |
+| Selected value | responsibility separation. Execution=READY→REQUESTED · Connector=REQUESTED→SUBMITTED/FAILED |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | View Daily Batch Step 12 calls the Connector executor |
+| Related spec | 03, 04, 05 |
 
 ### OD-MS-017
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | port_strategy_execution Task Definition 운영 방식 |
-| 선택값 | 단일 Task Definition + command override |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | Task Def 수 감소, Fargate 비용 동일 |
-| 운영 주의 | command override 매핑 오류 위험 (R-AUTO-014) |
-| 관련 spec | 04, 05, 10 |
+| Status | 🟡 잠정 |
+| Decision | port_strategy_execution Task Definition operational method |
+| Selected value | single Task Definition + command override |
+| Next review | follow-up review |
+| Cost impact | Fewer Task Defs, Fargate cost same |
+| Operational note | command override mapping error risk (R-AUTO-014) |
+| Related spec | 04, 05, 10 |
 
 ### OD-MS-018
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | port_strategy_research Batch image dependency boundary |
-| 선택값 | Research 내부 adapter 로 이관. Batch image=research+common, decision 미포함 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 낮음 (image size 영향) |
-| 운영 주의 | adapter 중복으로 common 계약 변경 시 갱신 누락 (R-DATA-008) |
-| 관련 spec | 09, 07, 10 |
+| Status | 🟡 잠정 |
+| Decision | port_strategy_research Batch image dependency boundary |
+| Selected value | Migrate to Research-internal adapters. Batch image=research+common, decision not included |
+| Next review | follow-up review |
+| Cost impact | low (image size impact) |
+| Operational note | Update omission when the common contract changes, due to adapter duplication (R-DATA-008) |
+| Related spec | 09, 07, 10 |
 
 ### OD-MS-019
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | port_strategy_research AWS Batch 포팅 대상 entrypoint + report artifact 보존 |
-| 선택값 | 포팅 대상 = `BACKTEST_RESEARCH` + `BACKTEST_REPORT` 2종 한정 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | Fargate 사용량 기반 |
-| 운영 주의 | View Daily Batch → SubmitJob 매핑 전 운영자 수동 (R-AUTO-015) |
-| 관련 spec | 09, 04, 05, 06, 07, 10 |
+| Status | 🟡 잠정 |
+| Decision | port_strategy_research AWS Batch porting-target entrypoints + report artifact preservation |
+| Selected value | porting targets = `BACKTEST_RESEARCH` + `BACKTEST_REPORT` 2 types only |
+| Next review | follow-up review |
+| Cost impact | Fargate usage-based |
+| Operational note | Operator manual before the View Daily Batch → SubmitJob mapping (R-AUTO-015) |
+| Related spec | 09, 04, 05, 06, 07, 10 |
 
 ### OD-MS-020
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | port-interest-crawler 상태 표현 / 완료 정의 |
-| 선택값 | Interest Crawler = **hybrid 1차 구현 부분 완료** |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (표현 정정) |
-| 운영 주의 | 잔존 표현 정기 grep + raw 최신일 SQL 점검 (R-DATA-009/010) |
-| 관련 spec | 08, 04, 05, 09 |
+| Status | 🟡 잠정 |
+| Decision | port-interest-crawler status expression / completion definition |
+| Selected value | Interest Crawler = **hybrid first implementation partial complete** |
+| Next review | follow-up review |
+| Cost impact | 0 (expression correction) |
+| Operational note | Periodic grep of residual expressions + raw latest-date SQL check (R-DATA-009/010) |
+| Related spec | 08, 04, 05, 09 |
 
 ### OD-MS-021
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | Backend AWS E2E dry-run 17단계 순서 + 안전 기준 |
-| 선택값 | 로컬 View Daily Batch 17단계 순서 그대로. 안전 기준 8종 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (paper 한정) |
-| 운영 주의 | 안전 기준 위반은 R-AUTO-001 |
-| 관련 spec | 08, 04, 05, 09, 10 |
+| Status | 🟡 잠정 |
+| Decision | Backend AWS E2E dry-run 17-step order + safety criteria |
+| Selected value | Keep the local View Daily Batch 17-step order as-is. 8 safety criteria |
+| Next review | follow-up review |
+| Cost impact | 0 (paper limited) |
+| Operational note | A safety-criteria violation is R-AUTO-001 |
+| Related spec | 08, 04, 05, 09, 10 |
 
 ### OD-MS-022
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | KRX GUI crawler 자동 로그인 기반 운영 방식 |
-| 선택값 | Windows Autologon + Administrator session + Scheduled Task + SSM trigger |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (Autologon/Task) |
-| 운영 주의 | Autologon 은 paper Windows worker 한정 보안 예외 (R-SEC-009 등) |
-| 관련 spec | 08, 05, 10 |
+| Status | 🟡 잠정 |
+| Decision | KRX GUI crawler auto-login-based operational method |
+| Selected value | Windows Autologon + Administrator session + Scheduled Task + SSM trigger |
+| Next review | follow-up review |
+| Cost impact | 0 (Autologon/Task) |
+| Operational note | Autologon is a paper Windows worker-limited security exception (R-SEC-009 etc.) |
+| Related spec | 08, 05, 10 |
 
 ### OD-MS-023
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | Daily AWS wrapper 운영 정책 (운영자 로컬 PowerShell 도구) |
-| 선택값 | 로컬 Windows PowerShell wrapper 분리 파일 구조(main + config + functions + step 17개) |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (로컬 도구) |
-| 운영 주의 | `-AllowPaperOrderExecute` 오사용 시 실주문 (R-AUTO-019) |
-| 관련 spec | 03, 04, 05, 08, 09, 10 |
+| Status | 🟡 잠정 |
+| Decision | Daily AWS wrapper operational policy (operator local PowerShell tool) |
+| Selected value | local Windows PowerShell wrapper split-file structure (main + config + functions + 17 steps) |
+| Next review | follow-up review |
+| Cost impact | 0 (local tool) |
+| Operational note | Real order on misuse of `-AllowPaperOrderExecute` (R-AUTO-019) |
+| Related spec | 03, 04, 05, 08, 09, 10 |
 
 ### OD-MS-024
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | 추가매수 허용 정책 + position_state 병합 방식 |
-| 선택값 | 추가매수 허용 + merge. `merge_open_position_state()` 로 가중평균 병합 + idempotency |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 (정상 흐름) |
-| 운영 주의 | idempotency 미적용 시 execution_order_id 중복 (R-DATA-012) |
-| 관련 spec | 04, 05, 10 |
+| Status | 🟡 잠정 |
+| Decision | additional-buy allowance policy + position_state merge method |
+| Selected value | additional buy allowed + merge. weighted-average merge via `merge_open_position_state()` + idempotency |
+| Next review | follow-up review |
+| Cost impact | 0 (normal flow) |
+| Operational note | execution_order_id duplication if idempotency is not applied (R-DATA-012) |
+| Related spec | 04, 05, 10 |
 
 ### OD-MS-025
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | MarketConnector `connector_order_check.py` 운영 모드 (Step 13 체결조회) |
-| 선택값 | active 주문 단건 순차 조회 기본 + broad 옵션 격리 + 내부 분기 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | broad 호출 감소로 summary fallback 노출 표면 감소 (R-AUTO-018) |
-| 관련 spec | 03, 04, 05, 10 |
+| Status | 🟡 잠정 |
+| Decision | MarketConnector `connector_order_check.py` operational mode (Step 13 fill query) |
+| Selected value | active-order single sequential query default + broad option isolation + internal branching |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | Reduced broad calls reduce the summary fallback exposure surface (R-AUTO-018) |
+| Related spec | 03, 04, 05, 10 |
 
 ### OD-MS-026
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | Step 2 INTEREST_CRAWLER 운영 성공 기준 (wrapper 성공판정 강화) |
-| 선택값 | Task trigger + Running→Ready wait + Last Result 0 + worker log + KRX raw DB validation 모두 충족 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | Scheduled Task trigger 성공만 SUCCESS 처리하던 한계 축소 (R-AUTO-020) |
-| 관련 spec | 08, 04, 05, 10 |
+| Status | 🟡 잠정 |
+| Decision | Step 2 INTEREST_CRAWLER operational success criterion (wrapper success-judgment reinforcement) |
+| Selected value | Task trigger + Running→Ready wait + Last Result 0 + worker log + KRX raw DB validation all satisfied |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | Reduced the limitation of handling SUCCESS on Scheduled Task trigger success alone (R-AUTO-020) |
+| Related spec | 08, 04, 05, 10 |
 
 ### OD-MS-027
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | MarketConnector env bootstrap 재생성 운영 정책 (`/tmp/inject-env.sh` 휘발 대응) |
-| 선택값 | wrapper 공통 함수 재생성. Step 1/12/13/17 진입 직전 호출. |
-| 다음 검토 | 03, 04, 06, 10 |
-| 비용 영향 | 0 — wrapper 공통 함수 재생성 자체는 비용 없음. Secrets Manager `GetSecretValue` 호출은 기존 흐름과 동일. |
-| 운영 주의 | MarketConnector EC2 stop / start 후 `/tmp` 휘발로 Step 1 / 12 / 13 / 17 실패 위험(R-AUTO-021 신규 / Mitigated). |
+| Status | 🟡 잠정 |
+| Decision | MarketConnector env bootstrap regeneration operational policy (handling `/tmp/inject-env.sh` volatility) |
+| Selected value | wrapper common-function regeneration. Called just before entering Step 1/12/13/17. |
+| Next review | 03, 04, 06, 10 |
+| Cost impact | 0 — wrapper common-function regeneration itself has no cost. The Secrets Manager `GetSecretValue` call is the same as the existing flow. |
+| Operational note | Risk of Step 1 / 12 / 13 / 17 failure due to `/tmp` volatility after MarketConnector EC2 stop / start (R-AUTO-021 new / Mitigated). |
 
 ### OD-MS-028
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | Step 12 retry-normalizer 내장 정책 (장종료 REJECTED · `40580000` 후 다음날 자동 재제출 경로 대응) |
-| 선택값 | Step 12 시작부 내장 · 복구 조건 6종 충족 시. |
-| 다음 검토 | 03, 04, 10 |
-| 비용 영향 | 0 — retry-normalizer 자체는 비용 모델 변경 없음. |
-| 운영 주의 | 복구 조건이 광역으로 확장되면 의도하지 않은 broker 중복 주문 위험(R-AUTO-001 / R-BROKER-004 정합). `broker_order_no IS NULL` + `connector_fill` 없음 조건 유지로 mitigation. |
+| Status | 🟡 잠정 |
+| Decision | Step 12 retry-normalizer built-in policy (handling the next-day automatic re-submission path after market-close REJECTED · `40580000`) |
+| Selected value | built into the Step 12 head · when the 6 recovery conditions are satisfied. |
+| Next review | 03, 04, 10 |
+| Cost impact | 0 — the retry-normalizer itself has no cost-model change. |
+| Operational note | If recovery conditions expand broadly, there is an unintended broker duplicate-order risk (R-AUTO-001 / R-BROKER-004 alignment). Mitigated by maintaining the `broker_order_no IS NULL` + no `connector_fill` condition. |
 
 ### OD-MS-029
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | Daily AWS Paper Step Functions approval workflow false / true path 운영 절차 |
-| 선택값 | false path 사전 검증 후 true path 승인 실행. |
-| 다음 검토 | 04, 10 |
-| 비용 영향 | Step Functions transitions 비용 + 동일 ECS RunTask · AWS Batch · SSM RunCommand 사용량 — 비용 모델 변경 미미. |
-| 운영 주의 | true path 진입 시 의도하지 않은 `allowPaperOrderExecute=true` 입력은 broker 실 주문 제출로 이어질 수 있음(R-AUTO-019 / R-AUTO-023 정합). |
+| Status | 🟢 확정 |
+| Decision | Daily AWS Paper Step Functions approval workflow false / true path operational procedure |
+| Selected value | true path approval execution after false path pre-validation. |
+| Next review | 04, 10 |
+| Cost impact | Step Functions transitions cost + same ECS RunTask · AWS Batch · SSM RunCommand usage — cost-model change negligible. |
+| Operational note | On entering the true path, an unintended `allowPaperOrderExecute=true` input can lead to actual broker order submission (R-AUTO-019 / R-AUTO-023 alignment). |
 
 ### OD-MS-030
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | AWS 공통 Slack notifier Lambda 도입 정책 (운영 이벤트 알림 보조 계층) |
-| 선택값 | Lambda `portfolio-event-notifier` 기반 AWS 공통 notifier. |
-| 다음 검토 | 04, 05, 10 |
-| 비용 영향 | 매우 낮음 — Lambda 1M requests + 400,000 GB-sec 무료 한도 안. Slack webhook 호출 자체 비용 없음. |
-| 운영 주의 | webhook URL 환경변수 장기 보관 위험(R-AUTO-024 신규 / Accepted — 운영 안정화 후 Secrets Manager 또는 SSM SecureString 이전) + Slack 발송 실패 위험(R-AUTO-023 신규). |
+| Status | 🟡 잠정 |
+| Decision | AWS common Slack notifier Lambda introduction policy (operational-event notification assist layer) |
+| Selected value | AWS common notifier based on Lambda `portfolio-event-notifier`. |
+| Next review | 04, 05, 10 |
+| Cost impact | very low — within the Lambda 1M requests + 400,000 GB-sec free tier. Slack webhook calls themselves have no cost. |
+| Operational note | Risk of long-term storage of the webhook URL environment variable (R-AUTO-024 new / Accepted — move to Secrets Manager or SSM SecureString after operational stabilization) + Slack send failure risk (R-AUTO-023 new). |
 
 ### OD-MS-031
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | Step Functions / EventBridge 1차 Slack 연동 범위 3종 한정 정책 |
-| 선택값 | 3종(APPROVAL_REQUIRED + DAILY_EXECUTION_SUCCESS/FAILED) 한정. |
-| 다음 검토 | 04, 05, 10 |
-| 비용 영향 | Step Functions transitions 비용 변화 미미 / Lambda 호출 비용 무료 한도 안 / 매 운영 회차 Slack 발송 3건 이내. |
-| 운영 주의 | 본 결정의 핵심은 메시지 누락이 아니라 Step Functions Catch 경로에서 실패 알림이 끊기지 않는 것(R-AUTO-023 정합). |
+| Status | 🟢 확정 |
+| Decision | Step Functions / EventBridge first Slack integration scope limited to 3 kinds policy |
+| Selected value | limited to 3 kinds (APPROVAL_REQUIRED + DAILY_EXECUTION_SUCCESS/FAILED). |
+| Next review | 04, 05, 10 |
+| Cost impact | Step Functions transitions cost change negligible / Lambda call cost within free tier / at most 3 Slack sends per operational cycle. |
+| Operational note | The core of this decision is not message omission but that the failure notification is not cut off on the Step Functions Catch path (R-AUTO-023 alignment). |
 
 ### OD-MS-032
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | EventBridge Scheduler + Dispatcher Lambda 기반 Daily 자동화 구조 |
-| 선택값 | 2개 Scheduler + Dispatcher Lambda + 단계적 활성화. |
-| 다음 검토 | 04, 05, 10 |
-| 비용 영향 | EventBridge Scheduler 14M / Lambda 1M requests 무료 한도 안 / Step Functions Standard transitions 비용은 OD-MS-009 정합. |
-| 운영 주의 | Scheduler / Dispatcher Lambda / Step Functions 연결 실패 위험(R-AUTO-025 신규) — IAM simulate + Lambda dryRun + Scheduler get-schedule 상태 확인으로 mitigation. |
+| Status | 🟢 확정 |
+| Decision | EventBridge Scheduler + Dispatcher Lambda-based Daily automation structure |
+| Selected value | 2 Schedulers + Dispatcher Lambda + phased activation. |
+| Next review | 04, 05, 10 |
+| Cost impact | within the EventBridge Scheduler 14M / Lambda 1M requests free tier / Step Functions Standard transitions cost is OD-MS-009 alignment. |
+| Operational note | Risk of Scheduler / Dispatcher Lambda / Step Functions connection failure (R-AUTO-025 new) — mitigated by IAM simulate + Lambda dryRun + Scheduler get-schedule status confirmation. |
 
 ### OD-MS-033
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | Step 12 retry-normalizer 재시도 확장 + KIS rate-limit backoff + 09:01 ENABLE 보류 |
-| 선택값 | `40580000` + `EGW00201` 재시도 · sleep/backoff · 09:01 auto ENABLE 보류. |
-| 다음 검토 | 03, 04, 05, 10 |
-| 비용 영향 | Step 12 entrypoint 실행 시간 영향 미미 / 운영 회차 누적 비용 모델 변경 없음. |
-| 운영 주의 | 09:01 schedule 자동 ENABLE 보류 정책 위반 시 즉시 `disable-schedule` 호출 + 운영자 직접 SQL 점검(R-AUTO-025 / R-AUTO-026 정합). |
+| Status | 🟢 확정 |
+| Decision | Step 12 retry-normalizer retry expansion + KIS rate-limit backoff + 09:01 ENABLE on hold |
+| Selected value | `40580000` + `EGW00201` retry · sleep/backoff · 09:01 auto ENABLE on hold. |
+| Next review | 03, 04, 05, 10 |
+| Cost impact | Step 12 entrypoint execution-time impact negligible / no operational-cycle cumulative cost-model change. |
+| Operational note | On violation of the 09:01 schedule auto-ENABLE-on-hold policy, immediately call `disable-schedule` + operator direct SQL check (R-AUTO-025 / R-AUTO-026 alignment). |
 
 ### OD-MS-034
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | EC2 lifecycle 자동 실행 구성 (07:50 start / Step 1~11 성공 시 Crawler stop / 15:50 stop) |
-| 선택값 | EventBridge Scheduler + Lambda 기반 EC2 start/stop. |
-| 다음 검토 | 03, 04, 05, 08, 10 |
-| 비용 영향 | EventBridge Scheduler 14M / Lambda 1M requests 무료 한도 안 + EC2 lifecycle 비용 절감 효과(영업 시간 외 EC2 stop). |
-| 운영 주의 | Scheduler / EC2 lifecycle Lambda / Step Functions 연결 실패 위험(R-AUTO-028 신규). |
+| Status | 🟢 확정 |
+| Decision | EC2 lifecycle automatic execution configuration (07:50 start / Crawler stop on Step 1~11 success / 15:50 stop) |
+| Selected value | EventBridge Scheduler + Lambda-based EC2 start/stop. |
+| Next review | 03, 04, 05, 08, 10 |
+| Cost impact | within the EventBridge Scheduler 14M / Lambda 1M requests free tier + EC2 lifecycle cost-savings effect (EC2 stop outside business hours). |
+| Operational note | Risk of Scheduler / EC2 lifecycle Lambda / Step Functions connection failure (R-AUTO-028 new). |
 
 ### OD-MS-035
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | 장중 포지션 확인 3단계 구조 (Snapshot Refresh + Intraday Evaluate + Stop Sell Submit & Refresh) |
-| 선택값 | 3단계 분리 + 신규 파일 + Submit 초기 수동·승인 후. |
-| 다음 검토 | 03, 04, 05, 10 |
-| 비용 영향 | EventBridge Scheduler + Lambda dispatcher 각 무료 한도 안 / Step Functions transitions Standard 매우 낮음 / aws-paper 한정 범위 안에서 누적 비용 증가 매우 낮음. |
-| 운영 주의 | Stale snapshot(R-DATA-014) / Duplicate order(R-AUTO-029) / sellable_qty(R-DATA-015) / current_price(R-DATA-016) 신규 리스크 4종 모두 Mitigated. |
+| Status | 🟢 확정 |
+| Decision | Intraday position check 3-stage structure (Snapshot Refresh + Intraday Evaluate + Stop Sell Submit & Refresh) |
+| Selected value | 3-stage separation + new files + Submit initially manual·after approval. |
+| Next review | 03, 04, 05, 10 |
+| Cost impact | EventBridge Scheduler + Lambda dispatcher each within free tier / Step Functions transitions Standard very low / cumulative cost increase very low within the aws-paper-limited scope. |
+| Operational note | Stale snapshot (R-DATA-014) / Duplicate order (R-AUTO-029) / sellable_qty (R-DATA-015) / current_price (R-DATA-016) — all 4 new risks Mitigated. |
 
 ### OD-MS-036
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | Intraday Stop Sell Submit Workflow (장중 손절 주문 제출 전용 State Machine + 수동 승인 운영) |
-| 선택값 | 별도 state machine `portfolio-paper-intraday-stop-sell-approval` + 수동 승인. |
-| 다음 검토 | 03, 04, 05, 10 |
-| 비용 영향 | Step Functions Standard transitions 비용 매우 낮음 / SSM RunCommand + ECS RunTask.sync 사용량 기준 / 누적 비용 증가 매우 낮음. |
-| 운영 주의 | approval gate 오설정 위험(R-AUTO-031 신규) / Daily SELL vs Intraday Stop SELL 흐름 혼선 위험(R-AUTO-032 신규) / 보유 부재 상태 실주문 테스트 위험(R-BROKER-005 신규) 모두 Mitigated. |
+| Status | 🟢 확정 |
+| Decision | Intraday Stop Sell Submit Workflow (intraday stop-loss order submission-dedicated State Machine + manual approval operation) |
+| Selected value | separate state machine `portfolio-paper-intraday-stop-sell-approval` + manual approval. |
+| Next review | 03, 04, 05, 10 |
+| Cost impact | Step Functions Standard transitions cost very low / SSM RunCommand + ECS RunTask.sync usage-based / cumulative cost increase very low. |
+| Operational note | approval gate misconfiguration risk (R-AUTO-031 new) / Daily SELL vs Intraday Stop SELL flow confusion risk (R-AUTO-032 new) / real-order test risk in the no-holdings state (R-BROKER-005 new) — all Mitigated. |
 
 ### OD-MS-037
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | View Local AWS Paper read-only 1차 scope 확정 + ECS / Fargate 진입 전 batch 2차 검증 선행 정책 |
-| 선택값 | read-only 1차 scope 확정 + ECS 진입 전 batch 2차 검증 선행. |
-| 다음 검토 | 04, 05, 10 |
-| 비용 영향 | SSM Port Forwarding 무료 / RDS Free Tier(`db.t4g.micro`) 안 / 누적 비용 증가 0건. |
-| 운영 주의 | View Local 실행성 호출 위험(R-AUTO-033 신규) / SSM tunnel 종료 시 DB 접속 단절(R-AUTO-012 정합). |
+| Status | 🟢 확정 |
+| Decision | View Local AWS Paper read-only first scope finalization + policy of doing batch second validation before entering ECS / Fargate |
+| Selected value | read-only first scope finalized + batch second validation done before ECS entry. |
+| Next review | 04, 05, 10 |
+| Cost impact | SSM Port Forwarding free / within RDS Free Tier (`db.t4g.micro`) / 0 cumulative cost increase. |
+| Operational note | View Local execution-type call risk (R-AUTO-033 new) / DB connection cut when the SSM tunnel closes (R-AUTO-012 alignment). |
 
 ### OD-MS-038
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | Daily Brief Slack mini workflow 운영 방식 (Daily 주문 실행 경로와 분리) |
-| 선택값 | 별도 mini Step Functions + Builder Lambda + Notifier Lambda + Scheduler 2개. |
-| 다음 검토 | 04, 05, 10 |
-| 비용 영향 | mini Step Functions transitions + Lambda 호출 + Scheduler 2개 invocations 모두 매우 작음(평일 2회 = 월 약 44 invocation). |
-| 운영 주의 | Daily Brief 알림 누락 / 중복 위험(R-AUTO-035 신규) / Slack webhook URL Lambda 환경변수 노출 위험(R-AUTO-024 정합) / DB password Lambda 환경변수 주입 위험은 Secrets Manager `valueFrom` 방식으로 완화. |
+| Status | 🟢 확정 |
+| Decision | Daily Brief Slack mini workflow operational method (separated from the Daily order-execution path) |
+| Selected value | separate mini Step Functions + Builder Lambda + Notifier Lambda + 2 Schedulers. |
+| Next review | 04, 05, 10 |
+| Cost impact | mini Step Functions transitions + Lambda calls + 2 Scheduler invocations all very small (2 times per weekday = about 44 invocations/month). |
+| Operational note | Daily Brief notification omission / duplication risk (R-AUTO-035 new) / Slack webhook URL Lambda environment-variable exposure risk (R-AUTO-024 alignment) / DB password Lambda environment-variable injection risk is mitigated via the Secrets Manager `valueFrom` method. |
 
 ### OD-MS-039
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | Step Functions 실행 이력 OPS mirror 운영 방식 (Recorder Lambda + 전용 최소 권한 role · 2026-07-03) |
-| 선택값 | Recorder Lambda `portfolio-daily-batch-ops-recorder`(Python 3.12 · ap-northeast-2 · VPC Lambda · Secrets Manager `ops_recorder_app` secret 사용 · action `RECORD_START` |
-| 선택값 보충 | `RECORD_STEP` · `RECORD_SUCCESS` |
-| 선택값 보충 | `RECORD_FAILURE`) 를 Step Functions 실행 role 에 `lambda:InvokeFunction` 한정 부여 후 State Machine 이 `ops.strategy_daily_batch_run` + `ops.strategy_daily_batch_step_log` 에 run-level + 대표 workflow step 을 mirror 한다 |
-| 선택값 보충 | 대상 State Machine 은 `portfolio-paper-daily-step1-17-approval` + `portfolio-paper-daily-step12-17-approval` 2종 |
-| 선택값 보충 | 1차 범위는 전체 세부 step mirror 가 아니라 run-level + 대표 workflow step 중심 · View 는 reader · controller 역할 유지 |
-| 다음 검토 | 04, 05, 10 |
+| Status | 🟢 확정 |
+| Decision | Step Functions execution-history OPS mirror operational method (Recorder Lambda + dedicated least-privilege role · 2026-07-03) |
+| Selected value | Grant the Recorder Lambda `portfolio-daily-batch-ops-recorder` (Python 3.12 · ap-northeast-2 · VPC Lambda · uses Secrets Manager `ops_recorder_app` secret · action `RECORD_START` |
+| Selected value supplement | `RECORD_STEP` · `RECORD_SUCCESS` |
+| Selected value supplement | `RECORD_FAILURE`) to the Step Functions execution role with `lambda:InvokeFunction` limited, then the State Machine mirrors run-level + representative workflow steps to `ops.strategy_daily_batch_run` + `ops.strategy_daily_batch_step_log` |
+| Selected value supplement | Target State Machines are `portfolio-paper-daily-step1-17-approval` + `portfolio-paper-daily-step12-17-approval` (2 kinds) |
+| Selected value supplement | The first scope is centered on run-level + representative workflow steps, not full detailed-step mirroring · View retains the reader · controller role |
+| Next review | 04, 05, 10 |
 
 ### OD-MS-040
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | ECS batch container Asia/Seoul timezone 정책 (Daily market-date 계산 포함 컨테이너 · 2026-07-08) |
-| 선택값 | Daily market-date 계산을 포함하는 ECS batch container 는 UTC 기본값에 의존하지 않고 `TZ=Asia · Seoul` 을 명시한다 · 단기 조치는 TaskDefinition env 에 `TZ=Asia |
-| 선택값 보충 | Seoul` 추가(`portfolio-paper-interest-crawler:8` |
-| 선택값 보충 | `portfolio-paper-interest-preprocessor:2`) + State Machine `portfolio-paper-daily-step1-17-approval` 의 Step2A_RunInterestCrawlerNongui |
-| 선택값 보충 | Step3_RunPreprocessor task revision 갱신 · 근본 개선은 코드에서 `datetime.now()` 직접 사용을 timezone-aware helper 로 대체하여 컨테이너 default TZ 의존을 제거하는 것(후속) |
-| 다음 검토 | 04, 08 |
+| Status | 🟢 확정 |
+| Decision | ECS batch container Asia/Seoul timezone policy (container including Daily market-date calculation · 2026-07-08) |
+| Selected value | An ECS batch container that includes Daily market-date calculation specifies `TZ=Asia · Seoul` instead of relying on the UTC default · the short-term action adds `TZ=Asia |
+| Selected value supplement | Seoul` to the TaskDefinition env (`portfolio-paper-interest-crawler:8` |
+| Selected value supplement | `portfolio-paper-interest-preprocessor:2`) + Step2A_RunInterestCrawlerNongui of State Machine `portfolio-paper-daily-step1-17-approval` |
+| Selected value supplement | Step3_RunPreprocessor task revision update · the root improvement is replacing direct `datetime.now()` use in code with a timezone-aware helper to remove the container default TZ dependency (follow-up) |
+| Next review | 04, 08 |
 
 ## Security / IAM
 ### OD-SEC-001
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🔴 미정 |
-| 결정 | Secrets 보관 위치 |
-| 선택값 | 06에서 최종 결정. 본 spec은 placeholder |
-| 다음 검토 | 운영자 결정 필요 |
-| 비용 영향 | secret 수에 비례 |
-| 운영 주의 | rotation 정책 미정 |
-| 관련 spec | 06 |
+| Status | 🔴 미정 |
+| Decision | Secrets storage location |
+| Selected value | Final decision in 06. This spec is a placeholder |
+| Next review | Operator decision needed |
+| Cost impact | proportional to the number of secrets |
+| Operational note | rotation policy undecided |
+| Related spec | 06 |
 
 ### OD-SEC-002
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | RDS master password 보관 |
-| 선택값 | Secrets Manager(권고) |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | $0.40/secret/월 |
-| 운영 주의 | 06 결정에 따라 변경 가능 |
-| 관련 spec | 06 |
+| Status | 🟡 잠정 |
+| Decision | RDS master password storage |
+| Selected value | Secrets Manager (recommended) |
+| Next review | follow-up review |
+| Cost impact | $0.40/secret/month |
+| Operational note | Can change per the 06 decision |
+| Related spec | 06 |
 
 ### OD-SEC-003
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | KIS access_token 보관 |
-| 선택값 | EC2 로컬+S3 backup 1순위 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 매우 작음 |
-| 운영 주의 | EC2 교체 시 토큰 인계 Runbook 필수 |
-| 관련 spec | 03 |
+| Status | 🟡 잠정 |
+| Decision | KIS access_token storage |
+| Selected value | EC2 local+S3 backup first priority |
+| Next review | follow-up review |
+| Cost impact | very small |
+| Operational note | Token handover Runbook essential when replacing the EC2 |
+| Related spec | 03 |
 
 ### OD-SEC-004
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | EC2 SSH 22 inbound |
-| 선택값 | 미오픈. SSM Session Manager만 사용 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | OD-NET-009와 동일 |
-| 관련 spec | 02, 03 |
+| Status | 🟢 확정 |
+| Decision | EC2 SSH 22 inbound |
+| Selected value | not opened. Use SSM Session Manager only |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Same as OD-NET-009 |
+| Related spec | 02, 03 |
 
 ### OD-SEC-005
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | EC2 / 8개 MS Access Key 미사용 원칙 |
-| 선택값 | EC2 안 access key 저장 금지. IMDSv2 + Instance Role 또는 ECS Task Role 만 사용 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | 위반 시 IAM Console 즉시 폐기 + IMDSv2 + Role only 모드 복귀. |
-| 관련 spec | 03, 04, 05, 06, 08, 09 |
+| Status | 🟡 잠정 |
+| Decision | EC2 / 8 MS Access Key non-use principle |
+| Selected value | Prohibit storing access keys in EC2. Use only IMDSv2 + Instance Role or ECS Task Role |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | On violation, immediately revoke in the IAM Console + return to IMDSv2 + Role only mode. |
+| Related spec | 03, 04, 05, 06, 08, 09 |
 
 ### OD-SEC-006
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | EC2 / ECS IAM Role 기반 secret / parameter read 원칙 |
-| 선택값 | 최소 권한. Resource wildcard 금지. Action wildcard 금지 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | 정책 detach + 이전 정책 복구 / 정책 정적 검사로 wildcard 0건 점검 |
-| 관련 spec | 03, 04, 05, 06, 08, 09 |
+| Status | 🟡 잠정 |
+| Decision | EC2 / ECS IAM Role-based secret / parameter read principle |
+| Selected value | Least privilege. Resource wildcard prohibited. Action wildcard prohibited |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | Policy detach + previous-policy restore / check 0 wildcards via policy static analysis |
+| Related spec | 03, 04, 05, 06, 08, 09 |
 
 ### OD-SEC-007
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | EC2 운영자 접근 = SSM Session Manager 중심 |
-| 선택값 | `AmazonSSMManagedInstanceCore` attach + SSM Session Manager 진입 중심 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 0 |
-| 운영 주의 | SSM Session Manager 접근에는 AWS API outbound 경로가 필요 |
-| 운영 주의 보충 | 그 경로는 Public outbound 또는 SSM Interface Endpoint 중 하나일 수 있음 |
-| 운영 주의 보충 | 현재 aws-paper는 SSM Endpoint 제거 상태 |
-| 관련 spec | 03, 04, 05, 08, 09 |
+| Status | 🟡 잠정 |
+| Decision | EC2 operator access = SSM Session Manager-centric |
+| Selected value | `AmazonSSMManagedInstanceCore` attach + SSM Session Manager entry-centric |
+| Next review | follow-up review |
+| Cost impact | 0 |
+| Operational note | SSM Session Manager access needs an AWS API outbound path |
+| Operational note supplement | That path can be either Public outbound or an SSM Interface Endpoint |
+| Operational note supplement | currently aws-paper has the SSM Endpoint removed |
+| Related spec | 03, 04, 05, 08, 09 |
 
 ### OD-SEC-008
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | KRX 로그인 자격 보관 |
-| 선택값 | Secrets Manager (`/portfolio/{env}/krx/crawler-login`, JSON `username` / `password`). EC2 worker IAM Role inline poli... |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | $0.40/secret/월 + KMS 호출 미미 |
-| 운영 주의 | secret read 권한 누락 시 worker 기동 실패. 권한 변경 시 운영자 노트에 4줄 요약 기록 |
-| 관련 spec | 06, 08 |
+| Status | 🟡 잠정 |
+| Decision | KRX login credential storage |
+| Selected value | Secrets Manager (`/portfolio/{env}/krx/crawler-login`, JSON `username` / `password`). EC2 worker IAM Role inline poli... |
+| Next review | follow-up review |
+| Cost impact | $0.40/secret/month + KMS calls negligible |
+| Operational note | worker startup fails if the secret read permission is missing. Record a 4-line summary in the operator note on permission changes |
+| Related spec | 06, 08 |
 
 ## Observability
 ### OD-OBS-001
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | CloudWatch Logs 사용 |
-| 선택값 | CloudWatch Logs 사용 |
-| 다음 검토 | 없음 |
-| 비용 영향 | retention 비례 |
-| 운영 주의 | 비용 폭주 방지 위해 retention 짧게 시작 |
-| 관련 spec | 04, 05, 08 |
+| Status | 🟢 확정 |
+| Decision | CloudWatch Logs use |
+| Selected value | Use CloudWatch Logs |
+| Next review | None |
+| Cost impact | proportional to retention |
+| Operational note | Start retention short to prevent cost runaway |
+| Related spec | 04, 05, 08 |
 
 ### OD-OBS-002
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | CloudWatch Logs retention (aws-paper) |
-| 선택값 | 7일 시작 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 작음 |
-| 운영 주의 | 장애 분석 회고에 부족할 수 있음 |
-| 관련 spec | 02, 05 |
+| Status | 🟡 잠정 |
+| Decision | CloudWatch Logs retention (aws-paper) |
+| Selected value | start at 7 days |
+| Next review | follow-up review |
+| Cost impact | small |
+| Operational note | May be insufficient for failure-analysis retrospectives |
+| Related spec | 02, 05 |
 
 ### OD-OBS-003
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | CloudWatch Logs retention (aws-live) |
-| 선택값 | 14일 시작, 운영 안정 후 30일로 상향 가능 |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | 중 |
-| 운영 주의 | live 감사용 90일 검토 가능 |
-| 관련 spec | 05, 10 |
+| Status | 🟡 잠정 |
+| Decision | CloudWatch Logs retention (aws-live) |
+| Selected value | start at 14 days, can raise to 30 days after operational stabilization |
+| Next review | follow-up review |
+| Cost impact | Medium |
+| Operational note | 90 days can be considered for live auditing |
+| Related spec | 05, 10 |
 
 ### OD-OBS-004
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🔴 미정 |
-| 결정 | Slack webhook 보관 |
-| 선택값 | 06에서 최종 결정 |
-| 다음 검토 | 운영자 결정 필요 |
-| 비용 영향 | 작음 |
-| 운영 주의 | webhook URL 노출 시 외부 발신 위험 |
-| 관련 spec | 06 |
+| Status | 🔴 미정 |
+| Decision | Slack webhook storage |
+| Selected value | Final decision in 06 |
+| Next review | Operator decision needed |
+| Cost impact | small |
+| Operational note | External-send risk if the webhook URL is exposed |
+| Related spec | 06 |
 
 ## Cutover
 ### OD-CUT-001
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | cutover 방식 |
-| 선택값 | pg_dump+pg_restore 1순위 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 짧은 다운타임 허용 |
-| 관련 spec | 02, 10 |
+| Status | 🟢 확정 |
+| Decision | cutover method |
+| Selected value | pg_dump+pg_restore first priority |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Short downtime allowed |
+| Related spec | 02, 10 |
 
 ### OD-CUT-002
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🔵 보류 |
-| 결정 | AWS DMS 도입 |
-| 선택값 | 보류 |
-| 다음 검토 | 별도 phase에서 재검토 |
-| 비용 영향 | DMS 인스턴스 비용 |
-| 운영 주의 | 무중단이 꼭 필요해질 때 재검토 |
-| 관련 spec | 10 |
+| Status | 🔵 보류 |
+| Decision | AWS DMS introduction |
+| Selected value | on hold |
+| Next review | re-review in a separate phase |
+| Cost impact | DMS instance cost |
+| Operational note | Re-review when zero-downtime becomes essential |
+| Related spec | 10 |
 
 ### OD-CUT-003
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | aws-live cutover 시점 |
-| 선택값 | paper 검증 후 |
-| 다음 검토 | 없음 |
-| 비용 영향 | live 비용 지연 |
-| 운영 주의 | paper 검증 N영업일 운영자 결정 |
-| 관련 spec | 10 |
+| Status | 🟢 확정 |
+| Decision | aws-live cutover timing |
+| Selected value | after paper validation |
+| Next review | None |
+| Cost impact | live cost delayed |
+| Operational note | operator decides the N business days of paper validation |
+| Related spec | 10 |
 
 ### OD-CUT-004
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟡 잠정 |
-| 결정 | local-dev 유지 기간 |
-| 선택값 | 병행 운영(rollback 보험용) |
-| 다음 검토 | 후속 검토 |
-| 비용 영향 | local 호스트 비용만 |
-| 운영 주의 | 데이터 분기 관리 부담 |
-| 관련 spec | 10 |
+| Status | 🟡 잠정 |
+| Decision | local-dev retention period |
+| Selected value | parallel operation (as rollback insurance) |
+| Next review | follow-up review |
+| Cost impact | local host cost only |
+| Operational note | data-divergence management burden |
+| Related spec | 10 |
 
 ## Safety
 ### OD-SAFE-001
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | aws-paper 자동 BUY/SELL E2E |
-| 선택값 | 초기 차단 → 검증 후 허용 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 모의투자라도 fill/position sync 오류는 재현해야 함 |
-| Paper Daily 안정화 | 2026-07-22 정상 자동 회차 end-to-end 성공 · 1차 안정화 완료 |
-| 확대 해석 금지 | aws-live 준비·장기 무장애·전체 AWS Migration 완료 아님 |
-| broker 재시도 정책 | 자동 재시도 금지 유지(OD-SAFE-004) · 기존 실패 execution 이력 보존 |
-| 관련 spec | 04, 10 |
+| Status | 🟢 확정 |
+| Decision | aws-paper automatic BUY/SELL E2E |
+| Selected value | initially blocked → allowed after validation |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | Even in paper trading, fill/position sync errors must be reproduced |
+| Paper Daily stabilization | 2026-07-22 normal automatic cycle end-to-end success · first stabilization complete |
+| No overstatement | Not aws-live readiness·long-term zero-failure·full AWS Migration completion |
+| broker retry policy | Keep automatic retry prohibited (OD-SAFE-004) · preserve existing failed execution history |
+| Related spec | 04, 10 |
 
 ### OD-SAFE-002
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | aws-live 자동 BUY |
-| 선택값 | 후보+수동 승인 우선, 검증 후 단계적 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 1회 잘못된 자동 재시도가 큰 손실로 이어질 수 있음 |
-| 관련 spec | 04, 05, 10 |
+| Status | 🟢 확정 |
+| Decision | aws-live automatic BUY |
+| Selected value | candidate+manual approval first, phased after validation |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | A single wrong automatic retry can lead to a large loss |
+| Related spec | 04, 05, 10 |
 
 ### OD-SAFE-003
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | aws-live 자동 SELL |
-| 선택값 | OD-SAFE-002와 동일 정책 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | 동상 |
-| 관련 spec | 04, 05, 10 |
+| Status | 🟢 확정 |
+| Decision | aws-live automatic SELL |
+| Selected value | same policy as OD-SAFE-002 |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | same as above |
+| Related spec | 04, 05, 10 |
 
 ### OD-SAFE-004
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 상태 | 🟢 확정 |
-| 결정 | 자동 재시도 정책 |
-| 선택값 | idempotent step만 자동 재시도 |
-| 다음 검토 | 없음 |
-| 비용 영향 | 0 |
-| 운영 주의 | BUY/SELL/fill sync/position 변경/intraday stop SELL 생성은 재시도 금지 |
-| 관련 spec | 04, 08, 10 |
+| Status | 🟢 확정 |
+| Decision | automatic retry policy |
+| Selected value | automatic retry only for idempotent steps |
+| Next review | None |
+| Cost impact | 0 |
+| Operational note | BUY/SELL/fill sync/position change/intraday stop SELL creation are retry-prohibited |
+| Related spec | 04, 08, 10 |
 
 ## Review Queue
 
 ### 미정
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| OD-SEC-001 | Secrets 보관 위치 · 현재 선택값: 06에서 최종 결정. 본 spec은 placeholder · 다음: 운영자 결정 필요 |
-| OD-OBS-004 | Slack webhook 보관 · 현재 선택값: 06에서 최종 결정 · 다음: 운영자 결정 필요 |
+| OD-SEC-001 | Secrets storage location · current selected value: final decision in 06. This spec is a placeholder · next: operator decision needed |
+| OD-OBS-004 | Slack webhook storage · current selected value: final decision in 06 · next: operator decision needed |
 
 ### 보류
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| OD-CUT-002 | AWS DMS 도입 · 보류 · 별도 phase에서 재검토 |
+| OD-CUT-002 | AWS DMS introduction · on hold · re-review in a separate phase |
 
-### 잠정 결정
+### 잠정 decisions
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 대상 | 42건 |
-| 관리 방식 | 관련 spec 검증 후 확정·변경·보류 중 하나로 갱신 |
-| 본 문서 | 최종 선택값과 상태만 유지 |
-| 실행 근거 | 해당 spec `operation-notes.md`에 기록 |
-| 날짜별 이력 | `WORKLOG.md`와 `CHANGELOG.md`에서 관리 |
+| Target | 42 |
+| Management method | Updated to one of 확정·change·보류 after related-spec validation |
+| This document | Keeps only the final selected value and status |
+| Execution evidence | Recorded in the relevant spec `operation-notes.md` |
+| Per-date history | Managed in `WORKLOG.md` and `CHANGELOG.md` |
 
 ## Evidence Management
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 본 문서 | Decision ID · 상태 · 결정 · 선택값 · 다음 검토 · 관련 spec |
-| 상세 실행 근거 | 각 spec `operation-notes.md` |
-| 날짜별 작업 | `WORKLOG.md` |
-| 문서 변경 | `CHANGELOG.md` |
-| 관련 리스크 | `risk-register.md` |
-| 서비스 비교 | `ms-aws-service-decision-matrix.md` |
-| Decision Details | 별도 장문 섹션을 사용하지 않음 |
-| Decision Change Log Details | 별도 장문 섹션을 사용하지 않음 |
-| executionName · ARN · SHA256 | 본 문서에 기록하지 않음 |
+| This document | Decision ID · status · decision · selected value · next review · related spec |
+| Detailed execution evidence | each spec `operation-notes.md` |
+| Per-date work | `WORKLOG.md` |
+| Document changes | `CHANGELOG.md` |
+| Related risks | `risk-register.md` |
+| Service comparison | `ms-aws-service-decision-matrix.md` |
+| Decision Details | Does not use a separate long-form section |
+| Decision Change Log Details | Does not use a separate long-form section |
+| executionName · ARN · SHA256 | Not recorded in this document |
 
 ## Decision Update Rules
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 새 Decision | 해당 prefix의 마지막 번호 다음 ID 부여 |
-| ID 재사용 | 금지 |
-| 확정 변경 | 운영자 승인 후 선택값과 상태 갱신 |
-| 잠정 승격 | 관련 spec 검증 완료 후 확정 가능 |
-| 미정 | 운영자 선택 전까지 임의 값 확정 금지 |
-| 보류 | 재검토 조건이 충족될 때만 상태 변경 |
-| 상세 이력 | operation-notes와 WORKLOG에 기록 |
-| 중복 금지 | 동일 Decision ID는 Inventory에 한 번만 표시 |
-| 표 형식 | 독립 표는 `항목 / 값` 2열 |
-| 긴 셀 | 여러 행으로 분리 |
-| 민감정보 | `[REDACTED]` 계열 placeholder만 사용 |
+| New Decision | Assign the ID after the last number of that prefix |
+| ID reuse | Prohibited |
+| 확정 change | Update the selected value and status after operator approval |
+| 잠정 promotion | Can be finalized after related-spec validation completes |
+| 미정 | Do not finalize an arbitrary value before operator selection |
+| 보류 | Change status only when the re-review condition is met |
+| Detailed history | Recorded in operation-notes and WORKLOG |
+| No duplication | The same Decision ID is shown only once in the Inventory |
+| Table format | standalone tables use 2 columns `Item / Value` |
+| Long cells | Split into multiple rows |
+| Sensitive information | Use only `[REDACTED]`-family placeholders |
 
 ## Security Notes
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 실제 AWS 실행 | 없음 |
-| 애플리케이션 코드 수정 | 없음 |
-| AWS 리소스 변경 | 없음 |
-| broker · KIS · DB 실행 | 없음 |
-| 민감정보 원문 | 기록 금지 |
-| 허용 표기 | `[REDACTED]` 계열 placeholder |
-| 문서 역할 | AWS Migration 공통 Operator Decisions |
+| Actual AWS execution | None |
+| Application code modification | None |
+| AWS resource change | None |
+| broker · KIS · DB execution | None |
+| Sensitive information originals | Recording prohibited |
+| Allowed notation | `[REDACTED]`-family placeholder |
+| Document role | AWS Migration common Operator Decisions |

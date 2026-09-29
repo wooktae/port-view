@@ -1,130 +1,130 @@
 # Validation Checklist — 06-secrets-and-iam
 
-본 문서는 [`./runbook.md`](./runbook.md) 의 [확인] / 완료 기준을 4종 라벨 기반 체크리스트로 정리한 최소판이다.
-본 spec(06) 1차 적용 환경은 `aws-paper`, region 은 `ap-northeast-2`, 1차 적용 대상은 MarketConnector EC2.
+This document is the minimal edition that organizes the [확인] / completion criteria of [`./runbook.md`](./runbook.md) into a 4-label-based checklist.
+This spec's (06) first application environment is `aws-paper`, the region is `ap-northeast-2`, and the first application target is the MarketConnector EC2.
 
-라벨 규칙(본 문서 외 라벨 사용 금지):
+Label rules (do not use labels other than those in this document):
 
-- `[O]` 통과 / 충족 확인됨.
-- `[X]` 미충족 또는 실패. 운영자 / Kiro 후속 조치 필요.
-- `[Kiro 후속 작업 필요]` 본 spec 안에서 Kiro 가 추가로 만들거나 채울 산출물이 있어 보류된 항목.
-- `[운영자 확인 필요]` 운영자만 AWS Console / EC2 shell 에서 직접 확인 가능한 항목. Kiro 자동 검증 대상 아님.
+- `[O]` pass / confirmed met.
+- `[X]` not met or failure. Operator / Kiro follow-up action needed.
+- `[Kiro 후속 작업 필요]` an item on hold because there is a deliverable that Kiro must additionally create or fill within this spec.
+- `[운영자 확인 필요]` an item that only the operator can confirm directly on the AWS Console / EC2 shell. Not a Kiro automatic-validation target.
 
-보안 / 안전 원칙
+Security / safety principles
 
-- 아래 항목은 `[REDACTED]` 또는 placeholder 만 사용. 본 문서에 평문 기록 금지.
-  - secret value / KIS app key / KIS app secret / 계좌번호
+- The items below use only `[REDACTED]` or a placeholder. Do not record them in plaintext in this document.
+  - secret value / KIS app key / KIS app secret / account number
   - RDS endpoint hostname / RDS password / account-id
-  - 실제 secret ARN / IAM access key id / Slack webhook URL
-- `secretsmanager:GetSecretValue` 실호출은 운영자만. Kiro 자동 검증은 `secretsmanager:DescribeSecret` metadata 만.
-- 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 미수정.
-- 실제 AWS 리소스 미생성 / 미수정 / 미삭제. 본 체크리스트는 점검 / 결과 기록만 한다.
+  - actual secret ARN / IAM access key id / Slack webhook URL
+- Only the operator issues an actual `secretsmanager:GetSecretValue` call. Kiro automatic validation is limited to `secretsmanager:DescribeSecret` metadata.
+- The 8 MS code / README / AGENTS.md / CHANGELOG / docs / worklog unmodified.
+- Actual AWS resources not created / not modified / not deleted. This checklist only inspects / records results.
 
-## 1. 문서 생성 상태
+## 1. Document creation status
 
-- [O] [`./requirements.md`](./requirements.md) 생성
-- [O] [`./README.md`](./README.md) 생성
-- [O] [`./design.md`](./design.md) 생성
-- [O] [`./tasks.md`](./tasks.md) 생성
-- [O] [`./runbook.md`](./runbook.md) 생성
-- [Kiro 후속 작업 필요] [`./operation-notes.md`](./operation-notes.md) 생성 예정
+- [O] [`./requirements.md`](./requirements.md) created
+- [O] [`./README.md`](./README.md) created
+- [O] [`./design.md`](./design.md) created
+- [O] [`./tasks.md`](./tasks.md) created
+- [O] [`./runbook.md`](./runbook.md) created
+- [Kiro 후속 작업 필요] [`./operation-notes.md`](./operation-notes.md) creation planned
 
 ## 2. Secrets Manager
 
-- [운영자 확인 필요] `/portfolio/paper/marketconnector/kis-app-key` 생성 확인 (Description / Tag 포함)
-- [운영자 확인 필요] `/portfolio/paper/marketconnector/kis-app-secret` 생성 확인
-- [운영자 확인 필요] `/portfolio/paper/marketconnector/paper-account` 생성 확인 (JSON multi-key: `PAPER_ACNT`, `ACNT_PRDT_CD`)
-- [운영자 확인 필요] `/portfolio/paper/rds/marketconnector-app` 생성 확인 (JSON multi-key: `host`, `port`, `dbname`, `username`, `password`)
-- [운영자 확인 필요] 기존 `/portfolio/paper/rds/master` 유지 확인 (이름 / KMS / 마지막 수정 시각이 02 spec 시점과 일치)
-- [운영자 확인 필요] 위 secret 5건 외 다른 `/portfolio/paper/marketconnector/*` 또는 `/portfolio/paper/rds/*` secret 추가 등록 0건
-- [운영자 확인 필요] secret value 본문이 본 문서 / runbook.md / operation-notes.md / 콘솔 캡처 / 운영자 노트에 평문으로 기록되지 않음 확인
+- [운영자 확인 필요] confirm `/portfolio/paper/marketconnector/kis-app-key` creation (including Description / Tag)
+- [운영자 확인 필요] confirm `/portfolio/paper/marketconnector/kis-app-secret` creation
+- [운영자 확인 필요] confirm `/portfolio/paper/marketconnector/paper-account` creation (JSON multi-key: `PAPER_ACNT`, `ACNT_PRDT_CD`)
+- [운영자 확인 필요] confirm `/portfolio/paper/rds/marketconnector-app` creation (JSON multi-key: `host`, `port`, `dbname`, `username`, `password`)
+- [운영자 확인 필요] confirm the existing `/portfolio/paper/rds/master` is retained (name / KMS / last modified time match the 02 spec point in time)
+- [운영자 확인 필요] 0 additional registrations of other `/portfolio/paper/marketconnector/*` or `/portfolio/paper/rds/*` secrets beyond the 5 secrets above
+- [운영자 확인 필요] confirm the secret value body is not recorded in plaintext in this document / runbook.md / operation-notes.md / console captures / operator notes
 
 ## 3. SSM Parameter Store
 
-- [운영자 확인 필요] `/portfolio/paper/marketconnector/kis-base-url` 생성 확인
-- [운영자 확인 필요] `/portfolio/paper/marketconnector/connector-host` 생성 확인
-- [운영자 확인 필요] `/portfolio/paper/marketconnector/connector-port` 생성 확인
-- [운영자 확인 필요] `/portfolio/paper/marketconnector/connector-debug` 생성 확인
-- [운영자 확인 필요] `/portfolio/paper/marketconnector/environment` 생성 확인 (Value=`paper`)
-- [운영자 확인 필요] `/portfolio/paper/marketconnector/broker-name` 생성 확인
-- [운영자 확인 필요] 위 6건 외 다른 `/portfolio/paper/marketconnector/*` parameter 추가 등록 0건
-- [운영자 확인 필요] parameter 이름 자체에 실제 endpoint hostname / 계좌번호 / secret value / password / token 미포함 확인
+- [운영자 확인 필요] confirm `/portfolio/paper/marketconnector/kis-base-url` creation
+- [운영자 확인 필요] confirm `/portfolio/paper/marketconnector/connector-host` creation
+- [운영자 확인 필요] confirm `/portfolio/paper/marketconnector/connector-port` creation
+- [운영자 확인 필요] confirm `/portfolio/paper/marketconnector/connector-debug` creation
+- [운영자 확인 필요] confirm `/portfolio/paper/marketconnector/environment` creation (Value=`paper`)
+- [운영자 확인 필요] confirm `/portfolio/paper/marketconnector/broker-name` creation
+- [운영자 확인 필요] 0 additional registrations of other `/portfolio/paper/marketconnector/*` parameters beyond the 6 above
+- [운영자 확인 필요] confirm the parameter names themselves do not contain an actual endpoint hostname / account number / secret value / password / token
 
 ## 4. IAM Role / Policy
 
-- [운영자 확인 필요] IAM Role `portfolio-paper-marketconnector-ec2-role` 존재 / Trust Policy `Service: ec2.amazonaws.com` + `sts:AssumeRole` 확인
-- [운영자 확인 필요] Instance Profile `portfolio-paper-marketconnector-ec2-profile` 존재 / Role attach 확인
-- [운영자 확인 필요] EC2 instance 에 위 Instance Profile attach 확인 (`describe-iam-instance-profile-associations` 결과의 ARN 일치)
-- [운영자 확인 필요] Permission Policy 에 `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret` 만 허용. 다른 secretsmanager Action 0건
-- [운영자 확인 필요] Permission Policy 에 `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` 만 허용. 다른 ssm Action 0건
-- [운영자 확인 필요] Permission Policy Resource 에 `"*"` 0건
-- [운영자 확인 필요] Permission Policy Resource 에 `Action: "*"` / `secretsmanager:*` / `ssm:*` 0건
-- [운영자 확인 필요] Permission Policy Resource 에 다른 service prefix 0건 (아래 5종)
+- [운영자 확인 필요] confirm IAM Role `portfolio-paper-marketconnector-ec2-role` exists / Trust Policy `Service: ec2.amazonaws.com` + `sts:AssumeRole`
+- [운영자 확인 필요] confirm Instance Profile `portfolio-paper-marketconnector-ec2-profile` exists / Role attach
+- [운영자 확인 필요] confirm the above Instance Profile is attached to the EC2 instance (the ARN in the `describe-iam-instance-profile-associations` result matches)
+- [운영자 확인 필요] Permission Policy allows only `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret`. 0 other secretsmanager Actions
+- [운영자 확인 필요] Permission Policy allows only `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath`. 0 other ssm Actions
+- [운영자 확인 필요] 0 `"*"` in the Permission Policy Resource
+- [운영자 확인 필요] 0 `Action: "*"` / `secretsmanager:*` / `ssm:*` in the Permission Policy
+- [운영자 확인 필요] 0 other service prefixes in the Permission Policy Resource (the 5 below)
   - `/portfolio/paper/view/*`
   - `/portfolio/paper/crawler/*`
   - `/portfolio/paper/preprocessor/*`
   - `/portfolio/paper/strategy/*`
   - `/portfolio/paper/research/*`
-- [운영자 확인 필요] Permission Policy Resource 에 다른 환경 prefix(`/portfolio/live/...`) 0건
-- [운영자 확인 필요] Permission Policy Resource 의 secret ARN 4건 / parameter ARN prefix 1건이 design §4.2 매트릭스와 일치
-- [운영자 확인 필요] CMK 사용 결정이 없는 경우 Policy 안 `kms:Decrypt` statement 0건. CMK 사용 결정 시에만 해당 KMS Key ARN 만 한정
+- [운영자 확인 필요] 0 other environment prefix (`/portfolio/live/...`) in the Permission Policy Resource
+- [운영자 확인 필요] the 4 secret ARNs / 1 parameter ARN prefix in the Permission Policy Resource match the design §4.2 matrix
+- [운영자 확인 필요] 0 `kms:Decrypt` statements in the Policy when there is no CMK-use decision. Limit to that KMS Key ARN only when CMK use is decided
 
-## 5. EC2 Access Key 미사용
+## 5. EC2 Access Key non-use
 
-- [운영자 확인 필요] `~/.aws/credentials` 미존재 (`test -f ~/.aws/credentials` → not found)
-- [운영자 확인 필요] `~/.aws/config` 안 `aws_access_key_id` / `aws_secret_access_key` 라인 0건
-- [운영자 확인 필요] 현재 shell 의 `AWS_ACCESS_KEY_ID` 환경변수 미설정
-- [운영자 확인 필요] 현재 shell 의 `AWS_SECRET_ACCESS_KEY` 환경변수 미설정
-- [운영자 확인 필요] 현재 shell 의 `AWS_SESSION_TOKEN` 환경변수 미설정 (Instance Role 자격증명은 metadata service 가 자동 처리하므로 export 불필요)
-- [운영자 확인 필요] `~/.bashrc`, `~/.profile`, `~/.bash_profile` 안 access key 관련 export 라인 0건
-- [운영자 확인 필요] systemd unit 의 `Environment=` / `EnvironmentFile=` 안 access key 0건
-- [운영자 확인 필요] application `.env` / config 파일 안 access key 0건
-- [운영자 확인 필요] `aws sts get-caller-identity` 결과 `Arn` 이 `arn:aws:sts::<account-id>:assumed-role/portfolio-paper-marketconnector-ec2-role/<instance-id>` 형태
-- [운영자 확인 필요] `aws configure list` 결과 `access_key` Source 컬럼이 `iam-role` 또는 `Ec2InstanceMetadata`
+- [운영자 확인 필요] `~/.aws/credentials` does not exist (`test -f ~/.aws/credentials` → not found)
+- [운영자 확인 필요] 0 `aws_access_key_id` / `aws_secret_access_key` lines inside `~/.aws/config`
+- [운영자 확인 필요] the `AWS_ACCESS_KEY_ID` environment variable is unset in the current shell
+- [운영자 확인 필요] the `AWS_SECRET_ACCESS_KEY` environment variable is unset in the current shell
+- [운영자 확인 필요] the `AWS_SESSION_TOKEN` environment variable is unset in the current shell (the Instance Role credentials are handled automatically by the metadata service, so export is unnecessary)
+- [운영자 확인 필요] 0 access-key-related export lines inside `~/.bashrc`, `~/.profile`, `~/.bash_profile`
+- [운영자 확인 필요] 0 access keys inside the systemd unit's `Environment=` / `EnvironmentFile=`
+- [운영자 확인 필요] 0 access keys inside the application `.env` / config files
+- [운영자 확인 필요] the `aws sts get-caller-identity` result `Arn` is of the form `arn:aws:sts::<account-id>:assumed-role/portfolio-paper-marketconnector-ec2-role/<instance-id>`
+- [운영자 확인 필요] the `access_key` Source column of the `aws configure list` result is `iam-role` or `Ec2InstanceMetadata`
 
-## 6. EC2 조회 검증
+## 6. EC2 query validation
 
-- [운영자 확인 필요] EC2 에서 `aws secretsmanager describe-secret --secret-id /portfolio/paper/marketconnector/kis-app-key` 성공
-- [운영자 확인 필요] EC2 에서 `aws secretsmanager describe-secret` 가 본 spec 4건 secret 모두 metadata 정상 반환
-- [운영자 확인 필요] EC2 에서 `aws ssm get-parameters-by-path --path /portfolio/paper/marketconnector` 가 6건 parameter 모두 반환
-- [운영자 확인 필요] EC2 에서 다른 service prefix(`/portfolio/paper/view/*`, `/portfolio/paper/crawler/*`) 조회 시 AccessDenied 또는 NotFound (권한 격리 정상)
-- [운영자 확인 필요] EC2 에서 `secretsmanager:GetSecretValue` 자동 검증 호출 0건 (운영자 정상 운영 흐름에서만 호출)
-- [운영자 확인 필요] EC2 에서 다른 환경 prefix(`/portfolio/live/...`) 조회 시 AccessDenied (권한 격리 정상)
+- [운영자 확인 필요] `aws secretsmanager describe-secret --secret-id /portfolio/paper/marketconnector/kis-app-key` succeeds on the EC2
+- [운영자 확인 필요] `aws secretsmanager describe-secret` returns metadata normally for all 4 of this spec's secrets on the EC2
+- [운영자 확인 필요] `aws ssm get-parameters-by-path --path /portfolio/paper/marketconnector` returns all 6 parameters on the EC2
+- [운영자 확인 필요] querying another service prefix (`/portfolio/paper/view/*`, `/portfolio/paper/crawler/*`) on the EC2 gives AccessDenied or NotFound (privilege isolation normal)
+- [운영자 확인 필요] 0 `secretsmanager:GetSecretValue` automatic-validation calls on the EC2 (called only in the operator's normal operation flow)
+- [운영자 확인 필요] querying another environment prefix (`/portfolio/live/...`) on the EC2 gives AccessDenied (privilege isolation normal)
 
-## 7. Connector smoke test (조회성만)
+## 7. Connector smoke test (read-only only)
 
-- [운영자 확인 필요] 임시 export 스크립트 실행 후 아래 DB 환경변수가 현재 shell 에 주입됨 (값 표시 / 로그 기록 금지)
+- [운영자 확인 필요] after running the temporary export script, the DB environment variables below are injected into the current shell (do not display values / record in logs)
   - `INTEREST_DB_HOST` / `INTEREST_DB_PORT` / `INTEREST_DB_NAME` / `INTEREST_DB_USER` / `INTEREST_DB_PASSWORD`
-- [운영자 확인 필요] 임시 export 스크립트 실행 후 아래 KIS / 설정 환경변수 주입됨
+- [운영자 확인 필요] after running the temporary export script, the KIS / configuration environment variables below are injected
   - `APP_KEY` / `APP_SECRET` / `BASE_URL` / `PAPER_ACNT` / `ACNT_PRDT_CD` / `PORT_ENVIRONMENT` / `PORT_BROKER_NAME`
-- [운영자 확인 필요] 임시 export 스크립트 / 환경변수 값이 파일 / 로그 / 콘솔 캡처에 평문 저장되지 않음
-- [운영자 확인 필요] RDS `marketconnector_app` 접속 성공 (DDL/DML 미실행, 조회만)
-- [운영자 확인 필요] KIS token 발급 또는 기존 `access_token.txt` 재사용 정상 동작
-- [운영자 확인 필요] `connector_balance.py` 잔고 조회 성공
-- [운영자 확인 필요] `connector_order_check.py` 주문 / 체결 조회 성공
-- [운영자 확인 필요] Flask 조회성 endpoint smoke test 통과 (잔고 / 보유 / 주문 내역 등)
-- [운영자 확인 필요] 본 검증 동안 신규 주문 / 매수 / 매도 / 취소 / 정정 API 호출 0건
-  - 미실행 대상: `connector_buy.py`, `connector_sell.py`, `connector_cancel.py`, `connector_modify.py`
+- [운영자 확인 필요] the temporary export script / environment-variable values are not stored in plaintext in files / logs / console captures
+- [운영자 확인 필요] RDS `marketconnector_app` connection success (no DDL/DML, query only)
+- [운영자 확인 필요] KIS token issuance or reuse of the existing `access_token.txt` works normally
+- [운영자 확인 필요] `connector_balance.py` balance query success
+- [운영자 확인 필요] `connector_order_check.py` order / fill query success
+- [운영자 확인 필요] Flask read-only endpoint smoke test passes (balance / holdings / order history, etc.)
+- [운영자 확인 필요] 0 new-order / buy / sell / cancel / modify API calls during this validation
+  - not-executed targets: `connector_buy.py`, `connector_sell.py`, `connector_cancel.py`, `connector_modify.py`
 
-## 8. 완료 기준
+## 8. Completion criteria
 
-- [운영자 확인 필요] EC2 안에 IAM access key 파일 / 환경변수 / dotfile / systemd EnvironmentFile / `.env` 0건
-- [운영자 확인 필요] Instance Role 자격증명만으로 본 spec 4건 secret + 6건 parameter read 가능
-- [운영자 확인 필요] IAM Permission Policy 에 Resource wildcard / Action wildcard / 다른 service prefix / 다른 환경 prefix 0건
-- [운영자 확인 필요] RDS `marketconnector_app` 조회 + KIS 조회성 smoke test 통과
-- [O] 본 문서 / `requirements.md` / `README.md` / `design.md` / `tasks.md` / `runbook.md` 어디에도 아래 항목 평문 기록 0건
-  - secret value / KIS app key / KIS app secret / 계좌번호
+- [운영자 확인 필요] 0 IAM access key files / environment variables / dotfiles / systemd EnvironmentFile / `.env` inside the EC2
+- [운영자 확인 필요] the 4 secrets + 6 parameters of this spec are readable with Instance Role credentials alone
+- [운영자 확인 필요] 0 Resource wildcard / Action wildcard / other service prefix / other environment prefix in the IAM Permission Policy
+- [운영자 확인 필요] RDS `marketconnector_app` query + KIS read-only smoke test pass
+- [O] 0 plaintext records of the items below anywhere in this document / `requirements.md` / `README.md` / `design.md` / `tasks.md` / `runbook.md`
+  - secret value / KIS app key / KIS app secret / account number
   - RDS endpoint hostname / RDS password / account-id
-  - 실제 secret ARN / IAM access key id / Slack webhook URL
+  - actual secret ARN / IAM access key id / Slack webhook URL
 
-## 9. 후속 인계
+## 9. Follow-up handover
 
-- [Kiro 후속 작업 필요] [`./operation-notes.md`](./operation-notes.md) 에 본 체크리스트 결과(일자별 누적) 기록 템플릿 작성. secret 값 미기록, 성공 / 실패만 기록.
-- [Kiro 후속 작업 필요] [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 갱신 (운영자 승인 시)
-  - OD-SEC-001 / OD-OBS-004 갱신
-  - 신규 OD-SEC-005 / OD-SEC-006 후보 반영
-- [Kiro 후속 작업 필요] [`../_common/risk-register.md`](../_common/risk-register.md) 등록 (운영자 승인 시)
-  - R-SEC 후보 4건: 권한 과다 / EC2 secret 평문 노출 / EC2 access key 파일 / naming 불일치
-  - 다음 가용 ID 로 등록
-- [Kiro 후속 작업 필요] [`../_common/followups-overview.md`](../_common/followups-overview.md) 의 06 섹션 갱신 (1차 적용 환경 / 1차 범위 / 범위 밖 / 03 인계).
-- [운영자 확인 필요] 본 spec 결정과 본 체크리스트 통과 결과를 03-marketconnector-ec2 spec 진입 입력으로 인계 (Instance Role 정책 / Access Key 미사용 원칙 / Task Role 골격).
+- [Kiro 후속 작업 필요] Author a template in [`./operation-notes.md`](./operation-notes.md) to record this checklist's results (dated cumulative). Do not record secret values, record only success / failure.
+- [Kiro 후속 작업 필요] Update [`../_common/operator-decisions.md`](../_common/operator-decisions.md) (upon operator approval)
+  - update OD-SEC-001 / OD-OBS-004
+  - reflect new OD-SEC-005 / OD-SEC-006 candidates
+- [Kiro 후속 작업 필요] Register in [`../_common/risk-register.md`](../_common/risk-register.md) (upon operator approval)
+  - 4 R-SEC candidates: excessive privilege / EC2 secret plaintext exposure / EC2 access key file / naming mismatch
+  - register under the next available IDs
+- [Kiro 후속 작업 필요] Update the 06 section of [`../_common/followups-overview.md`](../_common/followups-overview.md) (first application environment / first scope / out of scope / 03 handover).
+- [운영자 확인 필요] Hand over this spec's decisions and this checklist's pass results as entry input to the 03-marketconnector-ec2 spec (Instance Role policy / Access Key non-use principle / Task Role skeleton).

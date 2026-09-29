@@ -2,49 +2,49 @@
 
 ## Overview
 
-본 design은 PORT-STRATEGY-AI 8개 MS를 AWS로 이전하기 위한 **foundation 구조**를 정의한다. 실제 IaC 코드, AWS 리소스 생성, 8개 MS의 코드 변경은 본 spec 범위가 아니다. 본 문서는 후속 spec(예: `02-aws-network-and-rds`, `03-marketconnector-ec2`)에서 구체적인 IaC와 배포가 작성될 수 있도록 권고 구조와 결정 근거를 정리한다.
+This design defines the **foundation structure** for migrating the 8 PORT-STRATEGY-AI MS to AWS. Actual IaC code, AWS resource creation, and code changes to the 8 MS are out of scope for this spec. This document organizes the recommended structure and decision rationale so that concrete IaC and deployment can be authored in follow-up specs (e.g., `02-aws-network-and-rds`, `03-marketconnector-ec2`).
 
-본 design의 핵심 결정은 다음과 같다.
+The key decisions of this design are as follows.
 
-- 8개 MS를 워크로드 특성별로 EC2 / ECS Fargate / AWS Batch / Step Functions + EventBridge Scheduler / Lambda / Beanstalk 중 적합한 후보로 매핑한다. 모두 동일 컴퓨트로 통일하지 않는다.
-- 단일 PostgreSQL `portfolio` DB와 schema-per-domain 구조는 그대로 유지하면서 RDS for PostgreSQL로 옮긴다. 기존 `INTEREST_DB_*` 환경변수 키와 `search_path` 정책을 변경하지 않는다.
-- 모든 secret은 Secrets Manager / SSM Parameter Store로 외부화한다. broker 토큰 파일과 broker IP 등록 같은 운영 제약을 EC2 + EIP 권고에 반영한다.
-- 관측은 CloudWatch Logs / Metric / Alarm을 표준으로 하되, 기존 `port-view`의 `SlackNotificationService`를 유지하면서 인프라 알람은 별도 SNS → Lambda → Slack 경로로 보강한다.
-- 단계적 cutover 로드맵을 6 stage로 정의해 한 번에 모든 MS를 옮기지 않는다.
+- The 8 MS are mapped, by workload characteristics, to the appropriate candidate among EC2 / ECS Fargate / AWS Batch / Step Functions + EventBridge Scheduler / Lambda / Beanstalk. They are not unified onto the same compute.
+- The single PostgreSQL `portfolio` DB and schema-per-domain structure are preserved as-is while moving to RDS for PostgreSQL. The existing `INTEREST_DB_*` environment variable keys and `search_path` policy are not changed.
+- All secrets are externalized to Secrets Manager / SSM Parameter Store. Operational constraints such as the broker token file and broker IP registration are reflected in the EC2 + EIP recommendation.
+- Observability standardizes on CloudWatch Logs / Metric / Alarm, while preserving the existing `port-view` `SlackNotificationService`; infrastructure alarms are reinforced via a separate SNS → Lambda → Slack path.
+- A phased cutover roadmap is defined in 6 stages so that not all MS are moved at once.
 
 ## Architecture
 
-### 현재 (로컬) 구조 요약
+### Current (Local) Architecture Summary
 
-- 8개 MS가 같은 호스트의 PostgreSQL `portfolio` DB를 공유한다.
-- `port-view`가 운영 콘솔이며 Daily Batch는 다른 MS Python 절대경로(예: `C:\Workspaces\...`)를 subprocess로 호출한다.
-- `port-marketconnector` Flask가 KIS broker에 직접 outbound HTTPS로 호출하고 `access_token.txt` 단일 파일로 토큰을 보관한다.
-- `port-interest-crawler`가 Selenium/Chrome 기반으로 KRX/Naver를 수집하고, yfinance로 해외 데이터를 수집한다.
-- 각 Python MS는 `INTEREST_DB_*` 환경변수로 동일 DB에 연결하며 MS별 `search_path` 우선순위가 다르다.
-- Slack 알림은 `port-view`의 `SlackNotificationService`가 webhook URL로 전송한다.
+- The 8 MS share the PostgreSQL `portfolio` DB on the same host.
+- `port-view` is the operations console, and Daily Batch calls the Python absolute paths of other MS (e.g., `C:\Workspaces\...`) via subprocess.
+- The `port-marketconnector` Flask calls the KIS broker directly over outbound HTTPS and keeps the token in the single file `access_token.txt`.
+- `port-interest-crawler` collects KRX/Naver via Selenium/Chrome and collects overseas data via yfinance.
+- Each Python MS connects to the same DB via the `INTEREST_DB_*` environment variables, and the per-MS `search_path` priority differs.
+- Slack notifications are sent by the `port-view` `SlackNotificationService` to a webhook URL.
 
-### AWS 목표 구조 (논리)
+### Target AWS Architecture (Logical)
 
-- **Region**: 단일 region에 단일 VPC. live와 non-prod는 같은 VPC 안에서 환경 tag와 subnet 그룹으로 구분.
-- **Networking**: public subnet(ALB, NAT Gateway, marketconnector EC2 옵션), private subnet(ECS Fargate Task, AWS Batch, Lambda VPC, RDS).
-- **Data**: 단일 RDS for PostgreSQL `portfolio`. 환경 분리는 인스턴스 또는 DB 분리(권고는 environment별 RDS 인스턴스).
+- **Region**: A single VPC in a single region. Live and non-prod are distinguished within the same VPC by environment tags and subnet groups.
+- **Networking**: public subnet (ALB, NAT Gateway, marketconnector EC2 option), private subnet (ECS Fargate Task, AWS Batch, Lambda VPC, RDS).
+- **Data**: A single RDS for PostgreSQL `portfolio`. Environment separation is by instance or DB separation (the recommendation is a per-environment RDS instance).
 - **Compute**:
-  - `port-marketconnector`: EC2 + EIP (또는 NAT Gateway EIP) — broker IP 정책과 단일 토큰 세션 보호.
-  - `port-view`: ECS Fargate 1순위, Beanstalk 2순위. Daily Batch orchestration은 EventBridge + Step Functions로 분리 권고.
-  - `port-interest-crawler`: Selenium/Chrome 의존 부분은 ECS Fargate Task(EventBridge Scheduler 트리거), yfinance/Naver REST 호출 부분만 분리해 Lambda 후보.
-  - `port-interest-preprocessor`: ECS Fargate Task. 짧은 단일 step만 Lambda 후보로 검토.
-  - `port_strategy_common`: 별도 컴퓨트 없음. 다른 MS 컨테이너 이미지에 packaging.
+  - `port-marketconnector`: EC2 + EIP (or NAT Gateway EIP) — to protect the broker IP policy and the single-token session.
+  - `port-view`: ECS Fargate as first choice, Beanstalk as second. Daily Batch orchestration is recommended to be separated into EventBridge + Step Functions.
+  - `port-interest-crawler`: the Selenium/Chrome-dependent part as an ECS Fargate Task (triggered by EventBridge Scheduler); only the yfinance/Naver REST call part is separated as a Lambda candidate.
+  - `port-interest-preprocessor`: ECS Fargate Task. Only short single steps are reviewed as Lambda candidates.
+  - `port_strategy_common`: no separate compute. Packaged into the other MS container images.
   - `port_strategy_decision`: ECS Fargate Task + EventBridge Scheduler.
-  - `port_strategy_execution`: ECS Fargate Task + EventBridge Scheduler. intraday monitor는 paper/live 환경에서 짧은 주기 ECS Service 또는 Step Functions Map state 후보.
-  - `port_strategy_research`: AWS Batch 1순위(긴 backtest), ECS Fargate 2순위.
-- **Secrets**: Secrets Manager(고민감, rotation 후보), SSM Parameter Store(저민감 환경 의존 값).
+  - `port_strategy_execution`: ECS Fargate Task + EventBridge Scheduler. The intraday monitor is a short-interval ECS Service or Step Functions Map state candidate in the paper/live environments.
+  - `port_strategy_research`: AWS Batch as first choice (long backtests), ECS Fargate as second.
+- **Secrets**: Secrets Manager (highly sensitive, rotation candidates), SSM Parameter Store (low-sensitivity environment-dependent values).
 - **Image registry**: ECR per MS.
-- **CI/CD**: GitHub Actions → ECR → ECS / EC2 배포 1순위, CodePipeline + CodeBuild + CodeDeploy 2순위.
-- **Observability**: CloudWatch Logs / Metrics / Alarms / EventBridge. 인프라 알람은 SNS → Lambda → Slack webhook. 도메인 알림(Daily Batch, 잔고 등)은 기존 `SlackNotificationService` 유지.
+- **CI/CD**: GitHub Actions → ECR → ECS / EC2 deployment as first choice, CodePipeline + CodeBuild + CodeDeploy as second.
+- **Observability**: CloudWatch Logs / Metrics / Alarms / EventBridge. Infrastructure alarms via SNS → Lambda → Slack webhook. Domain notifications (Daily Batch, balance, etc.) preserve the existing `SlackNotificationService`.
 
-### 컴포넌트 간 흐름
+### Component Flow
 
-논리 흐름(텍스트 다이어그램):
+Logical flow (text diagram):
 
 ```
 [EventBridge Scheduler]
@@ -54,367 +54,367 @@
     │     ├─> ECS Task: strategy-decision-daily-buy
     │     ├─> ECS Task: strategy-decision-daily-position
     │     ├─> ECS Task: strategy-execution-daily-buy/sell
-    │     └─> Lambda: post-batch-summary -> port-view (또는 SlackNotificationService)
+    │     └─> Lambda: post-batch-summary -> port-view (or SlackNotificationService)
     └─> Step Functions: intraday-monitor
           └─> ECS Task: strategy-execution-intraday (loop with wait)
 
 [port-view ECS Service]
-    ├─> RDS PostgreSQL (read/write 운영 콘솔 조회 + Daily Batch 메타)
-    ├─> port-marketconnector EC2 (HTTP, Service Discovery 또는 ALB internal)
+    ├─> RDS PostgreSQL (read/write operations console queries + Daily Batch metadata)
+    ├─> port-marketconnector EC2 (HTTP, Service Discovery or ALB internal)
     └─> SlackNotificationService -> Slack webhook (Secrets Manager)
 
 [port-marketconnector EC2 (EIP)]
-    ├─> KIS broker (outbound HTTPS, EIP 등록 필요)
-    └─> RDS PostgreSQL (connector schema 우선 search_path)
+    ├─> KIS broker (outbound HTTPS, EIP registration required)
+    └─> RDS PostgreSQL (connector schema priority search_path)
 
 [Secrets Manager / SSM Parameter Store]
-    └─> IAM Role 통해 EC2 / ECS Task / Lambda에 주입
+    └─> injected into EC2 / ECS Task / Lambda via IAM Role
 ```
 
-## MS별 컴퓨트 후보 비교 및 권고
+## Per-MS Compute Candidate Comparison and Recommendation
 
-비교 항목: 워크로드 패턴, 외부 의존성, 컴퓨트 후보, 권고, 사유.
+Comparison items: workload pattern, external dependencies, compute candidates, recommendation, rationale.
 
 ### `port-marketconnector`
 
-- 워크로드 패턴: Flask API + 시간 민감한 broker 주문/시세. 단일 access token 파일 공유 필요. broker 측에서 outbound IP 등록 필요 가능성 높음.
-- 외부 의존성: KIS API (HTTPS), RDS, Slack 없음.
-- 후보 비교
-  - EC2 + EIP: 고정 outbound IP, 단일 토큰 파일 보존 용이, broker rate limit 단일성 확보. 운영 부담 약간 있음.
-  - ECS Fargate + NAT Gateway EIP: 컨테이너 표준화 가능. 단일 토큰 파일은 EFS 또는 Secrets Manager로 외부화 필요. NAT Gateway EIP 한도 관리 필요.
-  - App Runner: 외부 outbound EIP 고정 어려움. 비권고.
-- **권고**: EC2 + EIP 1순위, ECS Fargate + NAT Gateway EIP 2순위.
-- 근거(EC2 권고 사유): broker IP 등록 정책, `access_token.txt` 단일 세션 제약, 주문 시점 latency 안정성.
+- Workload pattern: Flask API + time-sensitive broker orders/quotes. Requires sharing a single access token file. High likelihood the broker requires outbound IP registration.
+- External dependencies: KIS API (HTTPS), RDS, no Slack.
+- Candidate comparison
+  - EC2 + EIP: fixed outbound IP, easy to preserve the single token file, ensures broker rate-limit singularity. Slightly higher operational burden.
+  - ECS Fargate + NAT Gateway EIP: container standardization possible. The single token file must be externalized to EFS or Secrets Manager. NAT Gateway EIP limit management needed.
+  - App Runner: hard to fix a dedicated outbound EIP. Not recommended.
+- **Recommendation**: EC2 + EIP as first choice, ECS Fargate + NAT Gateway EIP as second.
+- Rationale (reason for EC2 recommendation): broker IP registration policy, the `access_token.txt` single-session constraint, and latency stability at order time.
 
 ### `port-view`
 
-- 워크로드 패턴: Spring Boot 4.1 / Thymeleaf 운영 콘솔. JVM 장기 실행. Daily Batch orchestration 포함.
-- 외부 의존성: RDS, marketconnector HTTP, Slack webhook, Daily Batch가 호출하는 외부 MS 실행 경로(현재는 Python 로컬 경로).
-- 후보 비교
-  - ECS Fargate: 컨테이너 표준화, 무중단 배포 용이.
-  - Elastic Beanstalk Tomcat: Spring Boot 친화. 다만 컨테이너 표준화에서 멀어짐.
-  - App Runner: 단일 컨테이너 단순 배포. JVM 큰 메모리 freedom 제한 가능.
-- **권고**: ECS Fargate 1순위, Beanstalk 2순위.
-- Daily Batch 영향: 외부 MS Python 경로 직접 호출 구조는 AWS에서 깨진다. 본 foundation에서는 호출 방식을 Step Functions + EventBridge + ECS RunTask로 옮기는 권고만 명시한다. 실제 Daily Batch 코드 수정은 후속 spec.
+- Workload pattern: Spring Boot 4.1 / Thymeleaf operations console. Long-running JVM. Includes Daily Batch orchestration.
+- External dependencies: RDS, marketconnector HTTP, Slack webhook, and the external MS execution paths that Daily Batch calls (currently local Python paths).
+- Candidate comparison
+  - ECS Fargate: container standardization, easy zero-downtime deployment.
+  - Elastic Beanstalk Tomcat: Spring Boot friendly. However, it moves away from container standardization.
+  - App Runner: simple single-container deployment. May limit the JVM's large-memory freedom.
+- **Recommendation**: ECS Fargate as first choice, Beanstalk as second.
+- Daily Batch impact: the structure of directly calling external MS Python paths breaks on AWS. In this foundation, only the recommendation to move the call method to Step Functions + EventBridge + ECS RunTask is stated. The actual Daily Batch code change is a follow-up spec.
 
 ### `port-interest-crawler`
 
-- 워크로드 패턴: 일일 수집 + history backfill. Selenium/Chrome 의존(KRX, 일부 Naver). yfinance/Naver REST 호출.
-- 외부 의존성: KRX(웹/Selenium), Naver, yfinance.
-- 후보 비교
-  - Lambda: Selenium/Chrome 패키징 가능하지만 동시 실행, cold start, /tmp 한도 등 한계. KRX 로그인 흐름은 비권고.
-  - ECS Fargate Task + EventBridge Scheduler: Selenium/Chrome 컨테이너 안정. 권고.
-  - EC2: 가능하지만 24/7일 필요 없음. 비용 비권고.
-- **권고**: ECS Fargate Task 1순위. yfinance/Naver REST 호출만 분리해 Lambda 사용 가능.
-- 근거: Selenium/Chrome 의존성, KRX 로그인의 stateful 특성.
+- Workload pattern: daily collection + history backfill. Selenium/Chrome dependency (KRX, some Naver). yfinance/Naver REST calls.
+- External dependencies: KRX (web/Selenium), Naver, yfinance.
+- Candidate comparison
+  - Lambda: Selenium/Chrome packaging is possible but has limits such as concurrency, cold start, and /tmp caps. The KRX login flow is not recommended.
+  - ECS Fargate Task + EventBridge Scheduler: stable Selenium/Chrome container. Recommended.
+  - EC2: possible, but 24/7 is not needed. Not recommended on cost grounds.
+- **Recommendation**: ECS Fargate Task as first choice. Only the yfinance/Naver REST calls can be separated to use Lambda.
+- Rationale: the Selenium/Chrome dependency and the stateful nature of KRX login.
 
 ### `port-interest-preprocessor`
 
-- 워크로드 패턴: raw → pre feature 가공. DB upsert 비중 큼. 외부 holiday API 호출.
-- 외부 의존성: RDS, holiday API.
-- 후보 비교
-  - Lambda: 짧은 step에 적합. 일부 long-running step에서 timeout 위험.
-  - ECS Fargate Task: long upsert 안정. 권고.
-- **권고**: ECS Fargate Task 1순위. holiday API 같은 짧은 step만 Lambda 분리 검토.
+- Workload pattern: raw → pre feature processing. Large proportion of DB upsert. External holiday API calls.
+- External dependencies: RDS, holiday API.
+- Candidate comparison
+  - Lambda: suitable for short steps. Timeout risk on some long-running steps.
+  - ECS Fargate Task: stable for long upsert. Recommended.
+- **Recommendation**: ECS Fargate Task as first choice. Consider separating only short steps such as the holiday API to Lambda.
 
 ### `port_strategy_common`
 
-- 워크로드 패턴: 순수 라이브러리. DB / HTTP / IO 없음.
-- 후보 비교: 별도 컴퓨트 배포 대상 아님.
-- **권고**: 다른 MS의 컨테이너 이미지에 packaging.
-  - 1순위: git submodule + `pip install ./port_strategy_common`을 Dockerfile 빌드 단계에서 수행.
-  - 2순위: wheel/sdist로 빌드 후 CodeArtifact 또는 S3 사설 index에 게시.
-- 근거: 순수 함수 코어이므로 별도 컴퓨트 비용을 만들지 않는다.
+- Workload pattern: pure library. No DB / HTTP / IO.
+- Candidate comparison: not a separate compute deployment target.
+- **Recommendation**: package it into the other MS container images.
+  - First choice: git submodule + running `pip install ./port_strategy_common` in the Dockerfile build stage.
+  - Second choice: build a wheel/sdist and publish to CodeArtifact or a private S3 index.
+- Rationale: since it is a pure-function core, it should not incur separate compute cost.
 
 ### `port_strategy_decision`
 
-- 워크로드 패턴: 일일 batch. daily BUY signal과 daily position decision. RDS 연결.
-- 후보 비교
-  - ECS Fargate Task + EventBridge Scheduler: 권고.
-  - AWS Batch: 동시 다수 job 필요 없으면 과한 옵션.
-  - Step Functions: 다른 MS와 함께 daily pipeline 묶을 때 유용.
-- **권고**: ECS Fargate Task 1순위. Step Functions에 step으로 포함.
+- Workload pattern: daily batch. daily BUY signal and daily position decision. RDS connection.
+- Candidate comparison
+  - ECS Fargate Task + EventBridge Scheduler: recommended.
+  - AWS Batch: an over-provisioned option unless many concurrent jobs are needed.
+  - Step Functions: useful when bundling a daily pipeline with the other MS.
+- **Recommendation**: ECS Fargate Task as first choice. Included as a step in Step Functions.
 
 ### `port_strategy_execution`
 
-- 워크로드 패턴: 일일 + 장중. BUY/SELL execution order 생성, connector 호출, fill sync, position sync, intraday monitor.
-- 후보 비교
-  - ECS Fargate Task + EventBridge Scheduler: 일일 step에 권고.
-  - intraday monitor: ECS Service(상시) 또는 Step Functions Map + Wait 기반 폴링 모델.
-- **권고**: 일일은 ECS Fargate Task 1순위. intraday는 Step Functions + ECS RunTask 폴링 모델 1순위, ECS Service 2순위.
-- 안전 제약: live BUY/SELL은 자동 재시도 금지. 재시도 정책은 Runbook에서 정의.
+- Workload pattern: daily + intraday. BUY/SELL execution order creation, connector calls, fill sync, position sync, intraday monitor.
+- Candidate comparison
+  - ECS Fargate Task + EventBridge Scheduler: recommended for daily steps.
+  - intraday monitor: an ECS Service (always-on) or a Step Functions Map + Wait-based polling model.
+- **Recommendation**: daily as ECS Fargate Task first choice. intraday as Step Functions + ECS RunTask polling model first choice, ECS Service second.
+- Safety constraint: live BUY/SELL must not be automatically retried. The retry policy is defined in the Runbook.
 
 ### `port_strategy_research`
 
-- 워크로드 패턴: backtest run, analysis, 텍스트 리포트 생성. 장시간 실행 가능.
-- 후보 비교
-  - AWS Batch: 장시간 / 가변 자원 적합. 권고.
-  - ECS Fargate Task: 짧은 backtest에 충분.
-  - Step Functions: backtest → analysis → report 흐름 묶기 좋음.
-- **권고**: AWS Batch 1순위, ECS Fargate Task 2순위. 리포트 파일은 S3 버킷에 저장 권고.
+- Workload pattern: backtest run, analysis, text report generation. May run for a long time.
+- Candidate comparison
+  - AWS Batch: suitable for long-running / variable resources. Recommended.
+  - ECS Fargate Task: sufficient for short backtests.
+  - Step Functions: good for bundling the backtest → analysis → report flow.
+- **Recommendation**: AWS Batch as first choice, ECS Fargate Task as second. Report files are recommended to be stored in an S3 bucket.
 
-## RDS for PostgreSQL 전환 설계
+## RDS for PostgreSQL Migration Design
 
-### 인스턴스 구성
+### Instance Configuration
 
-- 단일 region 단일 VPC.
-- 환경별 RDS 인스턴스를 별도로 두는 방식 권고: `portfolio-dev`, `portfolio-paper`, `portfolio-live`.
-- live: PostgreSQL 16 이상, multi-AZ, 자동 백업 7~14일, encryption at rest, performance insights on.
-- paper: single-AZ 허용, 자동 백업 7일.
-- dev: single-AZ 허용, 자동 백업 1~3일.
+- Single VPC in a single region.
+- Recommendation to place a separate RDS instance per environment: `portfolio-dev`, `portfolio-paper`, `portfolio-live`.
+- live: PostgreSQL 16 or higher, multi-AZ, automated backup 7~14 days, encryption at rest, performance insights on.
+- paper: single-AZ allowed, automated backup 7 days.
+- dev: single-AZ allowed, automated backup 1~3 days.
 
-### Schema 정책
+### Schema Policy
 
-- 10개 schema 유지: `reference, interest, preprocessor, research, decision, execution, connector, ops, legacy, public`.
-- 각 MS의 `search_path` 우선순위는 README에 정의된 그대로 유지. 본 spec에서 변경하지 않는다.
+- Preserve the 10 schemas: `reference, interest, preprocessor, research, decision, execution, connector, ops, legacy, public`.
+- Each MS's `search_path` priority is preserved exactly as defined in its README. It is not changed in this spec.
 
-### DB Role / 권한
+### DB Role / Permissions
 
-- MS별 role 권고(예시 이름):
-  - `marketconnector_app`: `connector`, `execution`, `legacy`, `reference`, `public` 읽기/쓰기 + RDS read-only on others.
-  - `crawler_app`: `interest`, `reference` 읽기/쓰기.
-  - `preprocessor_app`: `preprocessor` 읽기/쓰기, `interest`, `reference` 읽기.
-  - `decision_app`: `decision` 읽기/쓰기, `research`, `preprocessor`, `connector`, `execution`, `reference` 읽기.
-  - `execution_app`: `execution` 읽기/쓰기, `connector`, `decision`, `research`, `reference` 읽기.
-  - `research_app`: `research` 읽기/쓰기, `preprocessor`, `interest`, `reference` 읽기.
-  - `view_app`: 모든 schema 읽기 + `ops` 읽기/쓰기.
-- 환경변수 키: 기존 `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD` 유지. 값만 MS별 role로 분기.
+- Per-MS role recommendation (example names):
+  - `marketconnector_app`: read/write on `connector`, `execution`, `legacy`, `reference`, `public` + RDS read-only on others.
+  - `crawler_app`: read/write on `interest`, `reference`.
+  - `preprocessor_app`: read/write on `preprocessor`, read on `interest`, `reference`.
+  - `decision_app`: read/write on `decision`, read on `research`, `preprocessor`, `connector`, `execution`, `reference`.
+  - `execution_app`: read/write on `execution`, read on `connector`, `decision`, `research`, `reference`.
+  - `research_app`: read/write on `research`, read on `preprocessor`, `interest`, `reference`.
+  - `view_app`: read on all schemas + read/write on `ops`.
+- Environment variable keys: preserve the existing `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD`. Only the values branch per MS role.
 
-### 데이터 이전
+### Data Migration
 
-- 1순위: `pg_dump` + `pg_restore`(schema-only → data) cutover 방식.
-  - 사유: 단일 instance, 단일 DB. AWS DMS 도입 비용 대비 단순성 우선.
-- 2순위: AWS DMS(zero-downtime 필요해질 때).
-- cutover 단계 개요
-  1. 운영자가 모든 MS 실행 정지(특히 broker 주문, fill sync, intraday monitor).
-  2. 로컬 PostgreSQL `portfolio` DB에 대한 `pg_dump`(schema + data) 수행.
-  3. RDS portfolio-target에 `pg_restore` 수행.
-  4. `search_path` / role 권한 검증 SQL 실행(읽기만).
-  5. AWS 측 MS를 paper 환경에서 가동.
-  6. 검증 통과 후 live cutover.
+- First choice: `pg_dump` + `pg_restore` (schema-only → data) cutover method.
+  - Rationale: single instance, single DB. Simplicity is prioritized over the cost of introducing AWS DMS.
+- Second choice: AWS DMS (when zero-downtime becomes necessary).
+- Cutover-stage outline
+  1. The operator stops all MS execution (especially broker orders, fill sync, intraday monitor).
+  2. Perform `pg_dump` (schema + data) against the local PostgreSQL `portfolio` DB.
+  3. Perform `pg_restore` to the RDS portfolio-target.
+  4. Run `search_path` / role permission verification SQL (read-only).
+  5. Bring up the AWS-side MS in the paper environment.
+  6. After validation passes, live cutover.
 
-### 백업 / 복원
+### Backup / Restore
 
-- automated backup retention: live 14일, paper 7일, dev 1~3일.
-- manual snapshot: 매 cutover 직전, 매 분기.
-- point-in-time recovery: live 활성, paper 활성.
+- automated backup retention: live 14 days, paper 7 days, dev 1~3 days.
+- manual snapshot: just before every cutover, and every quarter.
+- point-in-time recovery: active for live, active for paper.
 
-## Secrets / 환경변수 설계
+## Secrets / Environment Variable Design
 
-### 항목별 매핑
+### Item-by-Item Mapping
 
-- Secrets Manager (고민감, rotation 후보)
+- Secrets Manager (highly sensitive, rotation candidates)
   - KIS app key, app secret, base URL
-  - 계좌번호, 계좌 상품 코드
-  - access_token.txt 내용(또는 EFS path 우선 후보 — 아래 별도 항목 참조)
+  - account number, account product code
+  - contents of access_token.txt (or EFS path as a preferred candidate — see the separate item below)
   - RDS password (`INTEREST_DB_PASSWORD`)
   - Slack webhook URL
   - Naver API client secret
-- SSM Parameter Store (저민감)
+- SSM Parameter Store (low sensitivity)
   - `INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `PORTFOLIO_DB_NAME`, `INTEREST_DB_USER`
-  - `PORT_ACCOUNT_NO` (운영자 정책에 따라 SecureString 권고)
+  - `PORT_ACCOUNT_NO` (SecureString recommended, per operator policy)
   - `PORT_BROKER_NAME`, `PORT_ENVIRONMENT`, `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION`
   - `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT`
-  - Naver API client id (저민감 시 일반 Parameter Store 가능)
-  - Chrome / ChromeDriver 경로(컨테이너 빌드 시 고정, 불필요할 수 있음)
+  - Naver API client id (standard Parameter Store possible if low sensitivity)
+  - Chrome / ChromeDriver paths (fixed at container build time; may be unnecessary)
 
-### `access_token.txt` 보관 위치
+### `access_token.txt` Storage Location
 
-- 후보 비교
-  - EFS: 단일 broker 세션 전제에서 EC2/ECS 모두 mount 가능. 동시 쓰기 충돌 위험은 운영적으로 단일 instance 보장으로 회피.
-  - S3: 단순 보관. 다만 빈번한 read/write에서 latency / consistency 고려 필요.
-  - Secrets Manager: 토큰 자체 저장 가능. 다만 갱신 시 Secrets API 호출 비용 / latency / rate limit 고려.
-- **권고**: 마켓커넥터를 EC2 단일 instance로 운영하는 한 EC2 로컬 디스크 + 정기 backup to S3 1순위, EFS 2순위.
-- 근거: 단일 broker 세션 단일 instance 전제이면 EFS / Secrets Manager 비용/지연을 굳이 들일 필요가 없다. 다만 EC2 교체 시 토큰 백업/복원 절차가 Runbook에 필요하다.
+- Candidate comparison
+  - EFS: mountable by both EC2/ECS under the single broker session premise. Concurrent-write conflict risk is avoided operationally by guaranteeing a single instance.
+  - S3: simple storage. However, latency / consistency must be considered for frequent read/write.
+  - Secrets Manager: can store the token itself. However, on refresh, the Secrets API call cost / latency / rate limit must be considered.
+- **Recommendation**: as long as the market connector runs as a single EC2 instance, EC2 local disk + periodic backup to S3 as first choice, EFS as second.
+- Rationale: under the single-broker-session, single-instance premise, there is no need to incur the cost/latency of EFS / Secrets Manager. However, the token backup/restore procedure on EC2 replacement is required in the Runbook.
 
-### 환경변수 호환성
+### Environment Variable Compatibility
 
-- 기존 키 이름(`INTEREST_DB_*`, `PORT_*`)은 그대로 유지한다.
-- AWS 측에서는 ECS Task Definition 또는 EC2 user data에서 Secrets Manager / Parameter Store 값을 같은 키 이름으로 주입한다.
-- 어떤 secret도 Dockerfile, build artifact, log, 본 문서에 실값으로 기록하지 않는다. 모두 `[REDACTED]`로 표기한다.
+- The existing key names (`INTEREST_DB_*`, `PORT_*`) are preserved as-is.
+- On the AWS side, the ECS Task Definition or EC2 user data injects the Secrets Manager / Parameter Store values under the same key names.
+- No secret is recorded with an actual value in the Dockerfile, build artifact, log, or this document. All are marked as `[REDACTED]`.
 
-## 네트워크 설계
+## Network Design
 
 ### VPC / Subnet
 
-- 단일 VPC, 다중 AZ.
-- Public subnet: ALB, NAT Gateway, marketconnector EC2(EIP 사용 시).
-- Private subnet (app): ECS Fargate Task, AWS Batch compute env, Lambda(VPC 연결).
-- Private subnet (data): RDS subnet group 전용.
-- VPC endpoint 권고: S3, ECR, Secrets Manager, SSM, CloudWatch Logs.
+- Single VPC, multiple AZs.
+- Public subnet: ALB, NAT Gateway, marketconnector EC2 (when using EIP).
+- Private subnet (app): ECS Fargate Task, AWS Batch compute env, Lambda (VPC-attached).
+- Private subnet (data): dedicated to the RDS subnet group.
+- VPC endpoint recommendation: S3, ECR, Secrets Manager, SSM, CloudWatch Logs.
 
-### Outbound IP 정책
+### Outbound IP Policy
 
-- 1순위: marketconnector EC2에 EIP 직접 부여하고 broker에 등록.
-- 2순위: NAT Gateway EIP를 broker에 등록(다만 NAT Gateway EIP를 다수 워크로드가 공유하면 다른 outbound도 함께 노출되는 점 주의).
-- 본 spec은 marketconnector를 EC2 + 자체 EIP로 권고한다.
+- First choice: assign an EIP directly to the marketconnector EC2 and register it with the broker.
+- Second choice: register the NAT Gateway EIP with the broker (but note that if many workloads share the NAT Gateway EIP, other outbound traffic is also exposed together).
+- This spec recommends marketconnector as EC2 + its own EIP.
 
-### 내부 호출
+### Internal Calls
 
-- `port-view` → `port-marketconnector` 호출은 동일 VPC 내부 호출.
-- 1순위: ECS Service Discovery(Cloud Map) 또는 Internal ALB.
-- 2순위: 고정 private IP + Security Group 화이트리스트.
-- 운영자 접속: SSH 직접 노출 금지. SSM Session Manager 사용.
+- The `port-view` → `port-marketconnector` call is an internal call within the same VPC.
+- First choice: ECS Service Discovery (Cloud Map) or Internal ALB.
+- Second choice: fixed private IP + Security Group whitelist.
+- Operator access: no direct SSH exposure. Use SSM Session Manager.
 
-### 외부 outbound 경로
+### External Outbound Paths
 
-- KRX, Naver, yfinance, Slack, holiday API, KIS broker는 모두 outbound HTTPS만 필요. 어떤 MS도 외부 inbound 노출이 필요하지 않다.
-- ALB inbound는 운영자(인증)와 Slack/외부 webhook callback이 없으면 사실상 운영자 콘솔 접근만 필요. `port-view`만 internal ALB 또는 운영자 전용 public ALB(인증) 뒤에 둔다.
+- KRX, Naver, yfinance, Slack, the holiday API, and the KIS broker all require only outbound HTTPS. No MS requires external inbound exposure.
+- ALB inbound, absent operator (authenticated) access and Slack/external webhook callbacks, effectively needs only operations console access. Only `port-view` is placed behind an internal ALB or an operator-only public ALB (authenticated).
 
-## 컨테이너 이미지와 CI/CD
+## Container Images and CI/CD
 
-### ECR 명명 규칙
+### ECR Naming Convention
 
-- `port-view`, `port-interest-crawler`, `port-interest-preprocessor`, `port-strategy-decision`, `port-strategy-execution`, `port-strategy-research`, `port-marketconnector`(컨테이너 옵션 보관용).
-- 태그: `:{git-sha}` + `:{env}` 이동 가능 alias(예: `:dev`, `:paper`, `:live`).
+- `port-view`, `port-interest-crawler`, `port-interest-preprocessor`, `port-strategy-decision`, `port-strategy-execution`, `port-strategy-research`, `port-marketconnector` (kept for the container option).
+- Tags: `:{git-sha}` + movable `:{env}` alias (e.g., `:dev`, `:paper`, `:live`).
 
 ### `port_strategy_common` packaging
 
-- 1순위: git submodule + Dockerfile 빌드 단계에서 `pip install ./port_strategy_common`(또는 `pip install -e .`).
-- 2순위: wheel/sdist 빌드 후 CodeArtifact 또는 S3 사설 index에 publish, 다른 MS Dockerfile에서 `pip install port-strategy-common==X.Y.Z`.
-- 본 spec에서 1순위 권고. CodeArtifact 도입은 후속 spec.
+- First choice: git submodule + `pip install ./port_strategy_common` (or `pip install -e .`) in the Dockerfile build stage.
+- Second choice: build a wheel/sdist and publish to CodeArtifact or a private S3 index, then `pip install port-strategy-common==X.Y.Z` in the other MS Dockerfiles.
+- This spec recommends the first choice. Introducing CodeArtifact is a follow-up spec.
 
-### CI/CD 도구
+### CI/CD Tooling
 
-- 1순위: GitHub Actions → ECR push → ECS RunTask / Service 배포 또는 EC2 CodeDeploy hook.
-- 2순위: CodePipeline + CodeBuild + CodeDeploy.
-- 본 spec 권고는 1순위. 사유: 8개 MS 저장소가 외부에 분산되어 있고 GitHub workflow가 단순. 다만 CodeBuild는 VPC 내부 빌드(예: RDS migration job)가 필요할 때 보강 도구로 유지.
+- First choice: GitHub Actions → ECR push → ECS RunTask / Service deployment or EC2 CodeDeploy hook.
+- Second choice: CodePipeline + CodeBuild + CodeDeploy.
+- This spec recommends the first choice. Rationale: the 8 MS repositories are distributed externally and GitHub workflows are simple. However, CodeBuild is kept as a reinforcing tool for when in-VPC builds are needed (e.g., an RDS migration job).
 
-### 빌드 시 secret 처리
+### Build-time Secret Handling
 
-- build-time secret 주입 금지. 이미지에 secret을 굽지 않는다.
-- runtime에 IAM Role + Secrets Manager / Parameter Store 주입.
+- Build-time secret injection is prohibited. Secrets are not baked into the image.
+- At runtime, inject via IAM Role + Secrets Manager / Parameter Store.
 
-### 환경별 promotion
+### Per-Environment Promotion
 
-- `dev` 자동 배포, `paper` manual approval, `live` manual approval + paper 검증 N영업일 통과 조건.
-- N 값은 운영자가 결정. 본 spec은 placeholder만 유지.
+- `dev` auto deploy, `paper` manual approval, `live` manual approval + condition of passing N business days of paper validation.
+- The value of N is decided by the operator. This spec keeps only a placeholder.
 
-### EC2 권고 MS의 배포
+### Deployment of EC2-Recommended MS
 
-- `port-marketconnector`가 EC2 1순위인 경우, 컨테이너 외 배포 옵션
-  - 1순위: AMI baseline + systemd unit + CodeDeploy(또는 GitHub Actions + S3 + AWS CLI).
-  - 2순위: 같은 EC2에 docker engine 설치 후 컨테이너 단일 실행(EIP는 EC2에 유지).
-- 본 spec은 1순위 권고. broker 토큰 단일성과 운영 단순성 우선.
+- When `port-marketconnector` is EC2 first choice, non-container deployment options
+  - First choice: AMI baseline + systemd unit + CodeDeploy (or GitHub Actions + S3 + AWS CLI).
+  - Second choice: install a docker engine on the same EC2 and run a single container (the EIP stays on the EC2).
+- This spec recommends the first choice. Broker token singularity and operational simplicity are prioritized.
 
-## Observability / 알림 / Runbook
+## Observability / Alerting / Runbook
 
-### 로그
+### Logs
 
-- log group 명명 규칙: `/portfolio/{env}/{ms}`(예: `/portfolio/live/marketconnector`).
-- log retention: live 90일, paper 30일, dev 7~14일.
-- 컨테이너는 awslogs driver, EC2는 CloudWatch agent.
+- log group naming convention: `/portfolio/{env}/{ms}` (e.g., `/portfolio/live/marketconnector`).
+- log retention: live 90 days, paper 30 days, dev 7~14 days.
+- Containers use the awslogs driver; EC2 uses the CloudWatch agent.
 
-### 메트릭 / Alarm
+### Metrics / Alarm
 
-- 표준 메트릭
-  - CPU / Memory(인프라 측)
-  - RDS connection count, deadlocks, replica lag(없는 경우 제외)
-  - ECS Task failure count, exit code 분포
-  - EventBridge / Step Functions 실패 count
-- 도메인 메트릭(custom)
-  - broker API error rate(marketconnector)
-  - Daily Batch step 성공/실패 count
+- Standard metrics
+  - CPU / Memory (infrastructure side)
+  - RDS connection count, deadlocks, replica lag (excluded if absent)
+  - ECS Task failure count, exit code distribution
+  - EventBridge / Step Functions failure count
+- Domain metrics (custom)
+  - broker API error rate (marketconnector)
+  - Daily Batch step success/failure count
   - intraday monitor heartbeat
-  - fill sync lag(체결 발생 → sync 반영 지연)
-- alarm threshold 권고 — 운영자 데이터로 fine-tune 필요. 본 spec은 placeholder 권고만.
+  - fill sync lag (delay from fill occurrence → sync reflection)
+- alarm threshold recommendation — needs fine-tuning with operator data. This spec provides only placeholder recommendations.
 
-### Slack 알림
+### Slack Alerts
 
-- 도메인 알림: 기존 `port-view`의 `SlackNotificationService` 유지. webhook URL은 Secrets Manager에서 주입.
-- 인프라 알람: CloudWatch Alarm → SNS → Lambda → Slack webhook.
-  - 후보 비교: AWS Chatbot 사용 가능. 다만 Chatbot은 IAM/Slack workspace 등록 필요. 단순 webhook이 운영 부담 적음.
-- **권고**: 인프라 알람은 SNS → Lambda → Slack 1순위, AWS Chatbot 2순위.
+- Domain notifications: preserve the existing `port-view` `SlackNotificationService`. The webhook URL is injected from Secrets Manager.
+- Infrastructure alarms: CloudWatch Alarm → SNS → Lambda → Slack webhook.
+  - Candidate comparison: AWS Chatbot is usable. However, Chatbot requires IAM/Slack workspace registration. A simple webhook has lower operational burden.
+- **Recommendation**: infrastructure alarms via SNS → Lambda → Slack as first choice, AWS Chatbot as second.
 
-### Daily Batch 통합
+### Daily Batch Integration
 
-- `strategy_daily_batch_run`, `strategy_daily_batch_step_log` 테이블은 schema 그대로 유지.
-- AWS 측 트리거는 EventBridge Scheduler → Step Functions → ECS RunTask.
-- 단계 실패 시 Step Functions 실패 → CloudWatch Alarm → SNS → Slack.
-- `port-view`의 Daily Batch 화면은 그대로 유지하되 "수동 실행", "실패 step 재실행" 액션은 후속 spec에서 ECS RunTask API 호출로 대체.
+- The `strategy_daily_batch_run` and `strategy_daily_batch_step_log` tables keep their schema as-is.
+- The AWS-side trigger is EventBridge Scheduler → Step Functions → ECS RunTask.
+- On step failure, Step Functions failure → CloudWatch Alarm → SNS → Slack.
+- The `port-view` Daily Batch screen is preserved, but the "manual run" and "re-run failed step" actions are replaced with ECS RunTask API calls in a follow-up spec.
 
-### Runbook 항목 (foundation 단계 골격)
+### Runbook Items (Foundation-Stage Skeleton)
 
-- broker 토큰 만료 / 재발급
-  - 증상: KIS API 인증 실패.
-  - 절차: 운영자 수동 갱신 → Secrets Manager 갱신 → marketconnector restart → broker test call.
-  - 자동 재시도: 금지(운영자 수동만).
-- KIS 주문 실패
-  - 증상: `connector_order_request` 상태에 실패 기록. broker error code 다양.
-  - 절차: error code 분류 → 일시적 오류만 운영자 승인 후 재제출 → 영구 오류는 사용자 통보.
-  - 자동 재시도: 일부 일시적 오류만 허용. live 환경에서는 자동 재시도 기본 금지.
+- broker token expiry / reissue
+  - Symptom: KIS API authentication failure.
+  - Procedure: operator manual refresh → Secrets Manager update → marketconnector restart → broker test call.
+  - Automatic retry: prohibited (operator manual only).
+- KIS order failure
+  - Symptom: failure recorded in the `connector_order_request` status. Broker error codes vary.
+  - Procedure: classify error code → resubmit only transient errors after operator approval → notify the user for permanent errors.
+  - Automatic retry: allowed only for some transient errors. In the live environment, automatic retry is prohibited by default.
 - RDS failover
-  - 증상: 모든 MS connection 실패.
-  - 절차: RDS multi-AZ 자동 failover 후 endpoint 동일 → 각 MS connection pool 재시작 → 정합성 검사.
-- Daily Batch 실패 재실행
-  - 증상: Step Functions execution 실패 / step 일부 실패.
-  - 절차: 실패 step 식별 → 입력 idempotent 여부 확인 → idempotent step만 재실행 → 운영자 승인 후 후속 step 재개.
-- intraday monitor 중단
-  - 증상: heartbeat 메트릭 끊김.
-  - 절차: Step Functions / ECS Task 상태 확인 → 재기동 → 누락 구간 재처리는 운영자 승인 필요(주문 영향).
+  - Symptom: connection failure across all MS.
+  - Procedure: RDS multi-AZ automatic failover, then endpoint unchanged → restart each MS connection pool → consistency check.
+- Daily Batch failure re-execution
+  - Symptom: Step Functions execution failure / partial step failure.
+  - Procedure: identify the failed step → check whether the input is idempotent → re-run only idempotent steps → resume subsequent steps after operator approval.
+- intraday monitor interruption
+  - Symptom: heartbeat metric stops.
+  - Procedure: check Step Functions / ECS Task state → restart → reprocessing the missed interval requires operator approval (order impact).
 
-### 자동 재시도 정책
+### Automatic Retry Policy
 
-- 자동 재시도 허용: 시세 조회, 전처리 idempotent step, 휴일 API, yfinance / Naver REST 일시 오류.
-- 자동 재시도 금지: BUY / SELL 주문, fill sync 결과 반영, position state 변경, intraday stop SELL 생성.
+- Automatic retry allowed: quote lookup, idempotent preprocessing steps, holiday API, transient yfinance / Naver REST errors.
+- Automatic retry prohibited: BUY / SELL orders, reflecting fill sync results, position state changes, intraday stop SELL creation.
 
-## 환경 분리 / 비용 / 단계적 cutover
+## Environment Separation / Cost / Phased Cutover
 
-### 환경 분리
+### Environment Separation
 
-- dev: broker live 연결 금지. paper or sandbox 모드만 허용. RDS 별도 인스턴스.
-- paper: broker paper / 검증 모드만 허용. 실제 주문 금지. RDS 별도 인스턴스.
-- live: broker live 연결 허용. multi-AZ RDS, 모든 알람 활성.
+- dev: broker live connection prohibited. Only paper or sandbox mode allowed. Separate RDS instance.
+- paper: only broker paper / validation mode allowed. Actual orders prohibited. Separate RDS instance.
+- live: broker live connection allowed. multi-AZ RDS, all alarms active.
 
-### 비용 항목
+### Cost Items
 
-- EC2 (marketconnector + 옵션 운영용 bastion): low ~ medium.
-- ECS Fargate Task: per-execution. daily batch 짧은 실행이면 low.
-- RDS: low(dev/paper) ~ medium(live multi-AZ).
-- NAT Gateway: 시간당 + 데이터 전송 비용. medium 가능. cost optimization 후보.
-- CloudWatch Logs / Metrics / Alarms: low ~ medium(retention에 따라).
-- Secrets Manager: secret 수 × 월 단가, low.
-- 본 spec은 실제 가격 대신 low / medium / high 추정만 제시. 정확 추정은 후속 spec.
-- 환경별(dev / paper / live) 월 비용 시뮬레이션과 NAT Gateway 사용 여부 비교, 두 가지 마이그레이션 권고안(최소 비용 paper 검증형 / 운영 안정성 우선형)은 루트 공통 문서 [cost-simulation.md](../_common/cost-simulation.md) 참고.
+- EC2 (marketconnector + optional operational bastion): low ~ medium.
+- ECS Fargate Task: per-execution. low if daily batch is a short run.
+- RDS: low (dev/paper) ~ medium (live multi-AZ).
+- NAT Gateway: hourly + data transfer cost. Could be medium. A cost optimization candidate.
+- CloudWatch Logs / Metrics / Alarms: low ~ medium (depending on retention).
+- Secrets Manager: secret count × monthly unit price, low.
+- This spec presents only low / medium / high estimates rather than actual prices. Precise estimation is a follow-up spec.
+- For the per-environment (dev / paper / live) monthly cost simulation, the comparison of whether to use NAT Gateway, and the two migration recommendation options (minimum-cost paper-validation type / operational-stability-first type), see the root common document [cost-simulation.md](../_common/cost-simulation.md).
 
-### 단계적 cutover 로드맵
+### Phased Cutover Roadmap
 
-- Stage 1: 네트워크 / RDS / Secrets / ECR foundation
-  - 진입 조건: 본 spec 승인.
-  - 이탈 조건: VPC 또는 RDS 설계 결함 발견.
-- Stage 2: `port_strategy_common` packaging + 1개 MS 파일럿
-  - 권고 파일럿: `port-interest-preprocessor` 또는 `port_strategy_research`(broker 영향 없음).
-  - 진입 조건: Stage 1 완료, ECR / IAM Role 준비.
-  - 이탈 조건: packaging 충돌, RDS 권한 문제.
+- Stage 1: Network / RDS / Secrets / ECR foundation
+  - Entry condition: this spec approved.
+  - Exit condition: a VPC or RDS design flaw is found.
+- Stage 2: `port_strategy_common` packaging + one MS pilot
+  - Recommended pilot: `port-interest-preprocessor` or `port_strategy_research` (no broker impact).
+  - Entry condition: Stage 1 complete, ECR / IAM Role ready.
+  - Exit condition: packaging conflict, RDS permission issue.
 - Stage 3: `port-marketconnector` EC2 + EIP
-  - 진입 조건: Stage 2 완료, broker IP 등록 절차 합의, access_token Runbook 합의.
-  - 이탈 조건: broker 측 IP 정책 불일치, 토큰 단일성 깨짐.
-- Stage 4: `port_strategy_decision` + `port_strategy_execution` (paper 환경 우선)
-  - 진입 조건: Stage 3 검증 N영업일 통과(paper).
-  - 이탈 조건: paper 환경에서 fill sync 또는 position sync 정합성 불일치.
-- Stage 5: `port-view` 운영 콘솔 + Daily Batch 통합(EventBridge + Step Functions)
-  - 진입 조건: Stage 4 paper 검증 통과.
-  - 이탈 조건: Daily Batch step 매핑 누락.
-- Stage 6: live cutover 및 legacy 로컬 운영 종료
-  - 진입 조건: paper 환경 N영업일 무결성 + Runbook 리허설 완료.
-  - 이탈 조건: live 첫 영업일 broker / 주문 / 정합성 이슈.
+  - Entry condition: Stage 2 complete, broker IP registration procedure agreed, access_token Runbook agreed.
+  - Exit condition: broker-side IP policy mismatch, token singularity broken.
+- Stage 4: `port_strategy_decision` + `port_strategy_execution` (paper environment first)
+  - Entry condition: Stage 3 passes N business days of validation (paper).
+  - Exit condition: fill sync or position sync consistency mismatch in the paper environment.
+- Stage 5: `port-view` operations console + Daily Batch integration (EventBridge + Step Functions)
+  - Entry condition: Stage 4 paper validation passes.
+  - Exit condition: Daily Batch step mapping omission.
+- Stage 6: live cutover and shutdown of legacy local operation
+  - Entry condition: N business days of paper-environment integrity + Runbook rehearsal complete.
+  - Exit condition: broker / order / consistency issues on the first live business day.
 
-## 본 spec의 안전 제약
+## Safety Constraints of This Spec
 
-- 산출물은 `requirements.md`, `design.md`, `tasks.md` 3개 파일만.
-- 8개 MS의 기존 README, AGENTS.md, CHANGELOG, docs, worklog는 수정하지 않는다.
-- 8개 MS의 Python / Java 소스 코드는 수정하지 않는다.
-- 실제 AWS 리소스는 만들지 않는다. IaC도 본 spec에서는 작성하지 않는다.
-- 실제 secret 값을 본 문서에 적지 않는다(모두 `[REDACTED]`).
-- 8개 MS의 어떤 entrypoint도 실행하지 않는다.
+- The artifacts are only the 3 files `requirements.md`, `design.md`, and `tasks.md`.
+- The existing README, AGENTS.md, CHANGELOG, docs, and worklog of the 8 MS are not modified.
+- The Python / Java source code of the 8 MS is not modified.
+- No actual AWS resources are created. No IaC is authored in this spec either.
+- No actual secret values are written in this document (all `[REDACTED]`).
+- No entrypoint of the 8 MS is executed.
 
-## 후속 spec 후보
+## Follow-up Spec Candidates
 
-본 spec은 foundation 단계이므로 다음 spec 후보를 식별만 해 둔다.
+Because this spec is the foundation stage, the following follow-up spec candidates are only identified.
 
-- `02-aws-network-and-rds`: VPC, subnet, SG, RDS 인스턴스 IaC.
-- `03-marketconnector-ec2`: marketconnector EC2 + EIP + access_token 운영 절차 + broker 등록 IaC.
-- `04-strategy-batch-stepfunctions`: Daily Batch와 intraday monitor의 Step Functions / EventBridge / ECS RunTask 설계 + 코드 변경.
-- `05-port-view-ecs-and-runbook`: port-view ECS 배포, Runbook v1 확정, Slack 알림 통합.
-- `06-secrets-and-iam`: IAM Role 세분화 + Secrets rotation 정책.
-- `07-cicd-pipelines`: GitHub Actions 표준 워크플로 + ECR + 배포 자동화.
+- `02-aws-network-and-rds`: VPC, subnet, SG, RDS instance IaC.
+- `03-marketconnector-ec2`: marketconnector EC2 + EIP + access_token operational procedure + broker registration IaC.
+- `04-strategy-batch-stepfunctions`: Step Functions / EventBridge / ECS RunTask design + code changes for Daily Batch and the intraday monitor.
+- `05-port-view-ecs-and-runbook`: port-view ECS deployment, Runbook v1 finalization, Slack alert integration.
+- `06-secrets-and-iam`: IAM Role granularity + Secrets rotation policy.
+- `07-cicd-pipelines`: GitHub Actions standard workflow + ECR + deployment automation.

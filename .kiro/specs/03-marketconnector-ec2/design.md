@@ -2,311 +2,311 @@
 
 ## Introduction
 
-본 spec 의 핵심은 한 줄로 요약한다.
+The core of this spec is summarized in one line.
 
-> **이미 생성된 MarketConnector EC2 가 02 / 06 spec 의 1차 적용 결과를 입력으로 받아, KIS Connector(Flask) / `marketconnector_app` 기반 RDS 접속 / Secrets Manager·SSM Parameter Store env 주입 / Instance Role 기반 Access Key 미사용 운영 형태로 정식 전환되도록 절차 / 검증 / 운영 노트 작성 기준을 확정하고, 2026-06-10 검증 결과 8건을 산출물에 누적 기록한다.**
+> **The already-created MarketConnector EC2 takes the first-application results of the 02 / 06 specs as input, and this spec fixes the criteria for authoring the procedure / validation / operation notes so that it is formally transitioned into an operating form based on the KIS Connector (Flask) / `marketconnector_app`-based RDS connection / Secrets Manager and SSM Parameter Store env injection / Instance Role-based no-Access-Key operation; it also accumulates the 8 validation results from 2026-06-10 into the deliverables.**
 
-관련 spec: [`../02-aws-network-and-rds`](../02-aws-network-and-rds) / [`../06-secrets-and-iam`](../06-secrets-and-iam)
+Related specs: [`../02-aws-network-and-rds`](../02-aws-network-and-rds) / [`../06-secrets-and-iam`](../06-secrets-and-iam)
 
-- 1차 적용 환경: `aws-paper` / region `ap-northeast-2` / 1차 적용 대상: MarketConnector EC2 1대.
-- 본 spec 의 입력:
+- First-application environment: `aws-paper` / region `ap-northeast-2` / first-application target: 1 MarketConnector EC2.
+- Inputs of this spec:
   - [`./requirements.md`](./requirements.md) R1 ~ R14
-  - [`../02-aws-network-and-rds/`](../02-aws-network-and-rds/) 1차 적용 결과(VPC / Subnet / SG / VPC Endpoint 5종 / RDS PostgreSQL / DB role 7종)
-  - [`../06-secrets-and-iam/`](../06-secrets-and-iam/) 1차 적용 결과(Secrets Manager 4건 / SSM Parameter Store 6건 / Instance Role + Profile + read-only Policy / Access Key 미사용 원칙)
-- 본 spec 의 산출물: 본 phase 에서는 [`./design.md`](./design.md) 한 개.
-  - [`./tasks.md`](./tasks.md) / [`./runbook.md`](./runbook.md) / [`./validation-checklist.md`](./validation-checklist.md) / [`./operation-notes.md`](./operation-notes.md) 는 후속 phase. R14.7 근거.
-- 본 spec 의 범위 밖(반드시 명시). R14 근거.
-  - EC2 신규 생성
-  - 신규 주문 / 매수 / 매도 / 취소 / 정정 호출
-  - live rotation 자동화
-  - GitHub Actions OIDC / CI/CD Role(07 spec)
-  - 8개 MS 전체 full IAM 매트릭스(04 / 05 / 08 / 09 분담)
-  - aws-live IAM(10 spec)
-  - 8개 MS 의 README / AGENTS.md / CHANGELOG / docs / worklog 와 소스 코드 / 패키징 파일 수정
+  - [`../02-aws-network-and-rds/`](../02-aws-network-and-rds/) first-application results (VPC / Subnet / SG / 5 VPC Endpoints / RDS PostgreSQL / 7 DB roles)
+  - [`../06-secrets-and-iam/`](../06-secrets-and-iam/) first-application results (4 Secrets Manager entries / 6 SSM Parameter Store entries / Instance Role + Profile + read-only Policy / no-Access-Key principle)
+- Deliverable of this spec: in this phase, only [`./design.md`](./design.md).
+  - [`./tasks.md`](./tasks.md) / [`./runbook.md`](./runbook.md) / [`./validation-checklist.md`](./validation-checklist.md) / [`./operation-notes.md`](./operation-notes.md) are follow-up phases. Basis: R14.7.
+- Out of scope for this spec (must be stated explicitly). Basis: R14.
+  - EC2 new creation
+  - New order / buy / sell / cancel / modify calls
+  - live rotation automation
+  - GitHub Actions OIDC / CI/CD Role (07 spec)
+  - Full IAM matrix across all 8 MS (split across 04 / 05 / 08 / 09)
+  - aws-live IAM (10 spec)
+  - Modifying the README / AGENTS.md / CHANGELOG / docs / worklog and source code / packaging files of the 8 MS
 
-본 문서에는 아래 실제 값을 절대 적지 않는다. 모두 `[REDACTED]` 또는 placeholder(`<account-id>`, `<region>`, `<instance-id>`, `<eip>`, `<rds-endpoint>`, `<venv-path>`, `<venv-name>`, `<ebs-size>`, `<instance-type>`) 만 사용한다. R14.4 근거.
+This document never records the actual values below. Everywhere it uses only `[REDACTED]` or placeholders (`<account-id>`, `<region>`, `<instance-id>`, `<eip>`, `<rds-endpoint>`, `<venv-path>`, `<venv-name>`, `<ebs-size>`, `<instance-type>`). Basis: R14.4.
 
-- 실제 secret value / RDS password / 토큰 / Slack webhook URL
-- KIS app key / KIS app secret / 계좌번호
+- Actual secret value / RDS password / token / Slack webhook URL
+- KIS app key / KIS app secret / account number
 - RDS endpoint hostname / account-id
-- 실제 secret ARN / IAM access key id
+- Actual secret ARN / IAM access key id
 - instance-id / EIP / EBS volume id
 
-## 1. 범위 / 범위 밖 (R1)
+## 1. Scope / Out of Scope (R1)
 
-### 1.1 범위 안 (R1.2 근거)
+### 1.1 In Scope (basis: R1.2)
 
-| 항목 | 설명 |
+| Item | Description |
 |------|------|
-| EC2 OS | Amazon Linux 2023 (사전 완료) |
-| Python 실행환경 | Python 3.9.25 + venv 1개 |
-| 1차 의존 라이브러리 | `requests`, `flask`, `psycopg2-binary`, `psycopg`, `pandas` (5종) |
+| EC2 OS | Amazon Linux 2023 (already complete) |
+| Python runtime | Python 3.9.25 + 1 venv |
+| First-application dependency libraries | `requests`, `flask`, `psycopg2-binary`, `psycopg`, `pandas` (5 items) |
 | PostgreSQL client | client major 18 / full 18.4 |
 | pg_restore | major 18 / full 18.4 |
-| KIS Connector(Flask) | `connector_app.py` 기반 정상 운영 형태 진입 가능성 검증 |
-| RDS 접속 | `marketconnector_app` 사용자 기준 private RDS 접속 |
-| Secrets / SSM env 주입 | 06 §1 / §2 / §3 결과를 입력으로 환경변수 매핑 (06 인계) |
-| Access Key 미사용 | IMDSv2 + Instance Role 자격증명만 사용 (06 인계) |
-| 6/10 검증 결과 8건 | 산출물 누적 기록 |
-| 운영자 절차 / 검증 / 노트 작성 기준 | runbook / validation-checklist / operation-notes 후속 phase |
+| KIS Connector (Flask) | Validate the feasibility of entering a normal operating form based on `connector_app.py` |
+| RDS connection | Private RDS connection based on the `marketconnector_app` user |
+| Secrets / SSM env injection | Map environment variables using the 06 §1 / §2 / §3 results as input (handed over by 06) |
+| No Access Key | Use only IMDSv2 + Instance Role credentials (handed over by 06) |
+| 8 validation results from 6/10 | Accumulated record in the deliverables |
+| Operator procedure / validation / note authoring criteria | runbook / validation-checklist / operation-notes are follow-up phases |
 
-### 1.2 범위 밖 (R1.3 근거)
+### 1.2 Out of Scope (basis: R1.3)
 
-| 항목 | 분담 spec / 사유 |
+| Item | Split spec / reason |
 |------|------------------|
-| EC2 신규 생성 | 02 spec 시점에 RDS restore runner 로 이미 생성 완료 (사전 완료) |
-| 신규 주문 / 매수 / 매도 / 취소 / 정정 호출 | 본 spec 모든 phase 에서 0건. 조회성 smoke test 만 |
-| live rotation 자동화 | 06 spec 범위 밖과 동일 |
+| EC2 new creation | Already created as the RDS restore runner at the 02 spec point (already complete) |
+| New order / buy / sell / cancel / modify calls | 0 in every phase of this spec. Only read-only smoke tests |
+| live rotation automation | Same as out of scope for the 06 spec |
 | GitHub Actions OIDC / CI/CD Role | 07 spec |
-| 8개 MS 전체 full IAM 매트릭스 | 04 / 05 / 08 / 09 / 10 spec 분담 |
-| aws-live IAM 매트릭스 | 10 spec 통합 |
-| 8개 MS 코드 / docs 수정 | R14.1 안전 제약 |
+| Full IAM matrix across all 8 MS | Split across 04 / 05 / 08 / 09 / 10 specs |
+| aws-live IAM matrix | Consolidated in the 10 spec |
+| Modifying 8 MS code / docs | R14.1 safety constraint |
 
-### 1.3 후속 spec 인계 항목 (R1.4 근거)
+### 1.3 Hand-off Items to Follow-up Specs (basis: R1.4)
 
-| 후속 spec | 인계 항목 | 형태 |
+| Follow-up spec | Hand-off item | Form |
 |-----------|-----------|------|
-| 04 strategy-batch-stepfunctions | EC2 운영 패턴 → ECS Task Role 패턴 매핑 (§13) | Task Role 골격 + `/portfolio/paper/strategy/*` service prefix |
-| 05 port-view-ecs-and-runbook | 동상 | Task Role 골격 + `/portfolio/paper/view/*` service prefix |
-| 08 interest-crawler-and-preprocessor-ecs | 동상 | Task Role 골격 + `/portfolio/paper/crawler/*`, `/portfolio/paper/preprocessor/*` |
-| 09 strategy-research-batch | 동상 | Task Role 골격 + `/portfolio/paper/research/*` |
-| 10 cutover-and-validation-runbook | aws-live `/portfolio/live/...` prefix 통합 | env prefix 분리 + Role 권한 매트릭스 락 |
+| 04 strategy-batch-stepfunctions | EC2 operating pattern → ECS Task Role pattern mapping (§13) | Task Role skeleton + `/portfolio/paper/strategy/*` service prefix |
+| 05 port-view-ecs-and-runbook | Same as above | Task Role skeleton + `/portfolio/paper/view/*` service prefix |
+| 08 interest-crawler-and-preprocessor-ecs | Same as above | Task Role skeleton + `/portfolio/paper/crawler/*`, `/portfolio/paper/preprocessor/*` |
+| 09 strategy-research-batch | Same as above | Task Role skeleton + `/portfolio/paper/research/*` |
+| 10 cutover-and-validation-runbook | Consolidation of the aws-live `/portfolio/live/...` prefix | env prefix separation + Role permission matrix lock |
 
-### 1.4 phase 분리 정책 (R1.5 근거)
+### 1.4 Phase Separation Policy (basis: R1.5)
 
-본 phase(design) 시점에는 [`./design.md`](./design.md) 한 개만 작성한다. tasks / runbook / validation-checklist / operation-notes 는 후속 phase 의 책임이며 본 phase 에서 생성하지 않는다.
+At this phase (design), only [`./design.md`](./design.md) is authored. tasks / runbook / validation-checklist / operation-notes are the responsibility of follow-up phases and are not created in this phase.
 
-## 2. EC2 사전 완료 (R2)
+## 2. EC2 Already Complete (R2)
 
-### 2.1 사전 완료 항목 (R2.1 / R2.3 근거)
+### 2.1 Already-Complete Items (basis: R2.1 / R2.3)
 
-| 항목 | 가정값 | 본 design 표기 |
+| Item | Assumed value | Notation in this design |
 |------|--------|---------------|
-| EC2 OS | Amazon Linux 2023 | 명시 |
-| Subnet 배치 | public subnet | 02 spec 결정(`public-a`) 입력 |
+| EC2 OS | Amazon Linux 2023 | Stated |
+| Subnet placement | public subnet | 02 spec decision (`public-a`) as input |
 | EIP | attach + running | placeholder `<eip>` |
-| 기본 SG | `sg-marketconnector-ec2` ↔ `sg-rds-postgres` 5432 inbound (02 spec 매트릭스) | 명시 |
-| IAM Role | `portfolio-paper-marketconnector-ec2-role` (06 spec §4.1) | 이름 명시 |
-| IAM Instance Profile | `portfolio-paper-marketconnector-ec2-profile` (06 spec §4.1) attach 완료 | 이름 명시 |
+| Default SG | `sg-marketconnector-ec2` ↔ `sg-rds-postgres` 5432 inbound (02 spec matrix) | Stated |
+| IAM Role | `portfolio-paper-marketconnector-ec2-role` (06 spec §4.1) | Name stated |
+| IAM Instance Profile | `portfolio-paper-marketconnector-ec2-profile` (06 spec §4.1) attach complete | Name stated |
 
-### 2.2 식별자 placeholder 정책 (R2.2 근거)
+### 2.2 Identifier Placeholder Policy (basis: R2.2)
 
-본 design 은 EC2 인스턴스 타입, EBS 볼륨 크기, instance-id, EIP 값, 실제 account-id 를 적지 않는다. 모든 자리에 placeholder(`<instance-type>`, `<ebs-size>`, `<instance-id>`, `<eip>`, `<account-id>`) 또는 `[REDACTED]` 만 사용한다.
+This design does not record the EC2 instance type, EBS volume size, instance-id, EIP value, or actual account-id. Every place uses only a placeholder (`<instance-type>`, `<ebs-size>`, `<instance-id>`, `<eip>`, `<account-id>`) or `[REDACTED]`.
 
-### 2.3 미변경 항목 (R2.4 근거)
+### 2.3 Unchanged Items (basis: R2.4)
 
-| 항목 | 정책 |
+| Item | Policy |
 |------|------|
-| EC2 신규 생성 | **금지** |
-| 인스턴스 타입 변경 | **금지** |
-| EBS 재생성 / 볼륨 교체 | **금지** |
-| public subnet 변경 | **금지** |
-| EIP detach 또는 교체 | **금지** |
+| EC2 new creation | **Prohibited** |
+| Instance type change | **Prohibited** |
+| EBS re-creation / volume replacement | **Prohibited** |
+| public subnet change | **Prohibited** |
+| EIP detach or replacement | **Prohibited** |
 
-### 2.4 mismatch 시 처리 흐름 (R2.5 근거)
+### 2.4 Handling Flow on Mismatch (basis: R2.5)
 
-운영자 점검 시점에 사전 완료 항목 한 가지가 본 design 가정과 다르게 발견되는 경우, 본 spec 임의 변경 금지. 처리 흐름은 다음과 같다.
+If, at the operator inspection point, one of the already-complete items is found to differ from the assumptions of this design, arbitrary change of this spec is prohibited. The handling flow is as follows.
 
-작업 일시 중지(suspend) → [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MC 또는 OD-NET 카테고리에 변경 제안만 기록 → 운영자 승인 / 거절 → 본 design 갱신 후 작업 재개.
+Suspend the work → record only a change proposal under the OD-MC or OD-NET category of [`../_common/operator-decisions.md`](../_common/operator-decisions.md) → operator approval / rejection → update this design and then resume the work.
 
-## 3. 운영자 인수 사실 (R3)
+## 3. Operator Hand-over Facts (R3)
 
-### 3.1 일자별 인수 사실 (R3.1 / R3.3 근거)
+### 3.1 Hand-over Facts by Date (basis: R3.1 / R3.3)
 
-| 일자 | 사용 형태 | 입력 | 결과 |
+| Date | Usage form | Input | Result |
 |------|-----------|------|------|
-| 2026-06-09 | RDS restore runner | local PostgreSQL `pg_dump` → S3 임시 bucket → EC2 → private RDS `pg_restore` 18.4 | schema 10개 생성 / role 7개 생성 / 핵심 테이블 row count match / `pg_restore` exit code 0 |
-| 2026-06-10 | MarketConnector 운영 전환 | 06 spec 1차 적용 결과(Secrets 4건 + SSM 6건 + Instance Role + read-only Policy) | 8건 검증 모두 성공(§10) |
+| 2026-06-09 | RDS restore runner | local PostgreSQL `pg_dump` → S3 temporary bucket → EC2 → private RDS `pg_restore` 18.4 | 10 schemas created / 7 roles created / core table row count match / `pg_restore` exit code 0 |
+| 2026-06-10 | MarketConnector operating transition | 06 spec first-application results (4 Secrets + 6 SSM + Instance Role + read-only Policy) | All 8 validations succeeded (§10) |
 
-### 3.2 RDS private endpoint 정책 (R3.2 근거)
+### 3.2 RDS private endpoint Policy (basis: R3.2)
 
-본 RDS 는 `Publicly accessible = No` 로 운영되며, 같은 VPC 안의 EC2 에서만 접속 가능하다(R-NET-004 mitigation 입력). 본 EC2 가 같은 VPC 의 public subnet 에 배치되어 있고 SG 매트릭스(`sg-marketconnector-ec2` → `sg-rds-postgres` 5432) 가 적용된 상태에서만 접속이 성립한다.
+This RDS is operated with `Publicly accessible = No` and is reachable only from EC2 within the same VPC (input for R-NET-004 mitigation). A connection is established only when this EC2 is placed in a public subnet of the same VPC and the SG matrix (`sg-marketconnector-ec2` → `sg-rds-postgres` 5432) is applied.
 
-### 3.3 표기 정책 (R3.4 / R3.5 근거)
+### 3.3 Notation Policy (basis: R3.4 / R3.5)
 
-본 design 의 일자별 인수 사실 본문에는 실제 dump 파일 경로 / S3 bucket 이름 / RDS endpoint hostname / 실제 EIP / 실제 instance-id / 실제 account-id / 비밀번호 / 토큰 을 평문으로 적지 않는다. 모두 placeholder 또는 `[REDACTED]` 만 사용한다. operation-notes.md(후속 phase) 가 일자별 누적 기록 시점에도 동일 정책을 따른다.
+The body of the hand-over-facts-by-date in this design does not record the actual dump file path / S3 bucket name / RDS endpoint hostname / actual EIP / actual instance-id / actual account-id / password / token in plaintext. Everywhere it uses only a placeholder or `[REDACTED]`. operation-notes.md (follow-up phase) follows the same policy when it records the accumulated per-date entries.
 
-## 4. Python / venv / 의존 (R4)
+## 4. Python / venv / Dependencies (R4)
 
-### 4.1 Python 실행환경 (R4.1 / R4.2 근거)
+### 4.1 Python Runtime (basis: R4.1 / R4.2)
 
-| 항목 | 본 spec 결정 |
+| Item | Decision of this spec |
 |------|--------------|
-| Python 버전 | `3.9.25` |
-| venv 개수 | 1개 |
-| venv 경로 | placeholder `<venv-path>` |
-| venv 이름 | placeholder `<venv-name>` |
+| Python version | `3.9.25` |
+| Number of venvs | 1 |
+| venv path | placeholder `<venv-path>` |
+| venv name | placeholder `<venv-name>` |
 
-### 4.2 1차 의존 라이브러리 (R4.3 근거)
+### 4.2 First-Application Dependency Libraries (basis: R4.3)
 
-| 패키지 | 용도 | 본 spec 시점 결과 |
+| Package | Purpose | Result at this spec point |
 |--------|------|------------------|
-| `requests` | KIS HTTP client | 설치 성공 |
-| `flask` | Connector API | 설치 성공 |
-| `psycopg2-binary` | RDS 접속(주 사용) | 설치 성공 |
-| `psycopg` | RDS 접속(보조) | 설치 성공 |
-| `pandas` | 시세 / 잔고 처리 | 설치 성공 |
+| `requests` | KIS HTTP client | Install success |
+| `flask` | Connector API | Install success |
+| `psycopg2-binary` | RDS connection (primary use) | Install success |
+| `psycopg` | RDS connection (secondary) | Install success |
+| `pandas` | Quote / balance processing | Install success |
 
-### 4.3 추가 의존 / MS 코드 미수정 (R4.4 / R4.5 근거)
+### 4.3 Additional Dependencies / No MS Code Modification (basis: R4.4 / R4.5)
 
-위 5종 외 추가 라이브러리(예: 운영자 결정으로 추가될 보조 패키지) 는 본 spec 의 후속 phase 또는 별도 spec 의 책임이며 본 design 에서 1차 락 하지 않는다. 본 spec 작업은 8개 MS 의 소스 코드 / `requirements.txt` / `setup.py` / `pyproject.toml` 을 수정하지 않는다(R14.1 정합).
+Any library beyond the 5 above (e.g., an auxiliary package to be added by operator decision) is the responsibility of a follow-up phase of this spec or a separate spec and is not first-locked in this design. The work of this spec does not modify the source code / `requirements.txt` / `setup.py` / `pyproject.toml` of the 8 MS (consistent with R14.1).
 
-### 4.4 설치 결과 기록 정책 (R4.6 근거)
+### 4.4 Install Result Recording Policy (basis: R4.6)
 
-설치 결과는 성공 / 실패 두 값만 산출물에 기록한다. 실제 사용된 PyPI mirror, pip cache 경로, 운영자 사용자 home 절대경로는 본 design / 후속 phase 산출물 어디에도 기록하지 않는다.
+Only the two values success / failure are recorded in the deliverables for the install result. The actual PyPI mirror used, the pip cache path, and the operator user home absolute path are recorded nowhere in this design or in follow-up phase deliverables.
 
 ## 5. PostgreSQL client / pg_restore 18.4 (R5)
 
-### 5.1 권고값 (R5.1 / R5.2 근거)
+### 5.1 Recommended Values (basis: R5.1 / R5.2)
 
-| 도구 | 권고값 | 호환 메모 |
+| Tool | Recommended value | Compatibility note |
 |------|--------|-----------|
-| `pg_dump` | client major 18 / full 18.4 이상 유지 | 02 spec 부록 A 정합 |
-| `pg_restore` | client major 18 / full 18.4 이상 유지 | 02 spec 부록 A 정합 |
-| `psql` | client major 18 / full 18.4 이상 유지 | 02 spec 부록 A 정합 |
+| `pg_dump` | Maintain at least client major 18 / full 18.4 | Consistent with 02 spec appendix A |
+| `pg_restore` | Maintain at least client major 18 / full 18.4 | Consistent with 02 spec appendix A |
+| `psql` | Maintain at least client major 18 / full 18.4 | Consistent with 02 spec appendix A |
 
-aws-paper RDS engine 은 PostgreSQL 18.4 로 운영 중이다. 본 spec 시점 client major 18 (full 18.4) 은 RDS engine major 18 (full 18.4) 과 동일 major 정합 상태로 호환된다(R-DATA-003 mitigation 인용). 향후 RDS engine major 가 변경되는 경우의 호환 매트릭스는 본 spec 범위 밖이며, 02 spec 부록 A 와 R-DATA-003 mitigation 재확인 후 후속 spec 결정으로 처리한다.
+The aws-paper RDS engine is operating on PostgreSQL 18.4. At this spec point, client major 18 (full 18.4) is compatible with RDS engine major 18 (full 18.4) in the same-major consistency state (citing the R-DATA-003 mitigation). The compatibility matrix for a future change of the RDS engine major is out of scope for this spec and is handled as a follow-up spec decision after re-confirming 02 spec appendix A and the R-DATA-003 mitigation.
 
-### 5.2 다운그레이드 금지 정책 (R5.3 / R5.4 근거)
+### 5.2 No-Downgrade Policy (basis: R5.3 / R5.4)
 
-본 spec 시점에 client 를 18.4 미만으로 다운그레이드하지 않는다.
+At this spec point, do not downgrade the client below 18.4.
 
-dump source major version 또는 RDS engine major version 변경이 발생한 경우, 본 spec 임의 결정 금지. 아래 참조 후 후속 spec(02 또는 10) 의 결정으로 처리한다.
+If a change of the dump source major version or the RDS engine major version occurs, arbitrary decision within this spec is prohibited. Handle it as a decision of a follow-up spec (02 or 10) after consulting the references below.
 
-- [`../02-aws-network-and-rds/runbook.md`](../02-aws-network-and-rds/runbook.md) 부록 A
+- [`../02-aws-network-and-rds/runbook.md`](../02-aws-network-and-rds/runbook.md) appendix A
 - [`../_common/risk-register.md`](../_common/risk-register.md) R-DATA-003 mitigation
 
-### 5.3 후속 phase 책임 (R5.5 근거)
+### 5.3 Follow-up Phase Responsibility (basis: R5.5)
 
-[`./runbook.md`](./runbook.md)(후속 phase) 가 `pg_dump --version`, `pg_restore --version`, `psql --version` 출력으로 client major version 18 임을 확인하는 단계를 포함한다.
+[`./runbook.md`](./runbook.md) (follow-up phase) includes a step that confirms client major version 18 from the output of `pg_dump --version`, `pg_restore --version`, `psql --version`.
 
-## 6. RDS `marketconnector_app` 접속 (R6)
+## 6. RDS `marketconnector_app` Connection (R6)
 
-### 6.1 SG / 접근 정책 (R6.1 근거)
+### 6.1 SG / Access Policy (basis: R6.1)
 
-| 항목 | 정책 |
+| Item | Policy |
 |------|------|
-| RDS endpoint | private endpoint 만 |
-| RDS SG inbound | `sg-marketconnector-ec2` → `sg-rds-postgres` 5432 만 허용 |
+| RDS endpoint | private endpoint only |
+| RDS SG inbound | Allow only `sg-marketconnector-ec2` → `sg-rds-postgres` 5432 |
 | Public access | `No` |
-| 외부 CIDR inbound | 절대 금지(R-SEC-001 mitigation 정합) |
+| External CIDR inbound | Strictly prohibited (consistent with R-SEC-001 mitigation) |
 
-### 6.2 DB role / 사용 정책 (R6.2 근거)
+### 6.2 DB role / Usage Policy (basis: R6.2)
 
-| Role | 사용 시점 | 정책 |
+| Role | When used | Policy |
 |------|-----------|------|
-| `marketconnector_app` | application runtime | 본 spec 의 일상 application 접속에 사용 |
-| `portfolio_admin` | DDL / 관리 작업 시점만 | 일상 application 접속 금지. OD-DB-007 / OD-DB-008 정합 |
+| `marketconnector_app` | application runtime | Used for the day-to-day application connection of this spec |
+| `portfolio_admin` | Only at DDL / administration time | No day-to-day application connection. Consistent with OD-DB-007 / OD-DB-008 |
 
-### 6.3 secret 매핑 (R6.3 / R6.4 근거)
+### 6.3 secret Mapping (basis: R6.3 / R6.4)
 
-| Secret 경로 (06 spec §2.4) | JSON key | 환경변수 키 (8개 MS 호환) |
+| Secret path (06 spec §2.4) | JSON key | Environment variable key (8 MS compatible) |
 |----------------------------|----------|--------------------------|
 | `/portfolio/paper/rds/marketconnector-app` | `host` | `INTEREST_DB_HOST` |
-| 동상 | `port` | `INTEREST_DB_PORT` |
-| 동상 | `dbname` | `INTEREST_DB_NAME` |
-| 동상 | `username` | `INTEREST_DB_USER` |
-| 동상 | `password` | `INTEREST_DB_PASSWORD` |
+| Same as above | `port` | `INTEREST_DB_PORT` |
+| Same as above | `dbname` | `INTEREST_DB_NAME` |
+| Same as above | `username` | `INTEREST_DB_USER` |
+| Same as above | `password` | `INTEREST_DB_PASSWORD` |
 
-본 design / 후속 phase 산출물 어디에도 실제 RDS endpoint hostname 을 평문으로 적지 않는다. placeholder `<rds-endpoint>` 또는 `[REDACTED]` 만 사용한다.
+Nowhere in this design or the follow-up phase deliverables is the actual RDS endpoint hostname recorded in plaintext. Only the placeholder `<rds-endpoint>` or `[REDACTED]` is used.
 
-### 6.4 외부 접속 처리 (R6.5 근거)
+### 6.4 External Connection Handling (basis: R6.5)
 
-VPC 밖(운영자 로컬 PC) 에서 RDS 접속이 필요한 경우, 본 EC2 + SSM Session Manager 또는 EC2 Instance Connect 경유로만 진입한다. RDS SG 에 외부 IP 를 직접 허용하지 않는다(R-SEC-001 / R-NET-004 mitigation 정합).
+If an RDS connection is needed from outside the VPC (the operator's local PC), enter only via this EC2 + SSM Session Manager or EC2 Instance Connect. Do not allow an external IP directly on the RDS SG (consistent with R-SEC-001 / R-NET-004 mitigation).
 
-### 6.5 DDL/DML 정책 (R6.6 근거)
+### 6.5 DDL/DML Policy (basis: R6.6)
 
-본 spec 의 모든 phase 에서 application 이 일으키는 조회성 SELECT 외에 INSERT / UPDATE / DELETE / CREATE / ALTER / DROP 호출 0건. 본 spec 시점의 RDS 측 변경은 운영자 직접 작업 외 모두 금지(R14 정합).
+In every phase of this spec, 0 INSERT / UPDATE / DELETE / CREATE / ALTER / DROP calls beyond the read-only SELECT that the application performs. At this spec point, all RDS-side changes other than operator direct work are prohibited (consistent with R14).
 
-## 7. KIS Connector / Flask 운영 형태 (R7)
+## 7. KIS Connector / Flask Operating Form (R7)
 
-### 7.1 운영 모드 비교 (R7.2 / R7.3 근거)
+### 7.1 Operating Mode Comparison (basis: R7.2 / R7.3)
 
-| 모드 | 형태 | 본 spec 시점 책임 |
+| Mode | Form | Responsibility at this spec point |
 |------|------|------------------|
-| 임시 검증 단계 | shell session 또는 임시 export 스크립트 + 운영자 수동 entrypoint 실행 + Flask debug flag(필요 시 일시 ON) | **본 spec 책임** |
-| 정상 운영 모드 | systemd unit 또는 startup script 자동 기동 + Flask debug OFF + 로그 위치 결정 + 재기동 정책 | **본 spec 의 후속 task 또는 별도 phase 책임** |
+| Temporary validation stage | shell session or a temporary export script + operator manual entrypoint execution + Flask debug flag (temporarily ON if needed) | **Responsibility of this spec** |
+| Normal operating mode | systemd unit or startup script auto-start + Flask debug OFF + log location decision + restart policy | **Responsibility of a follow-up task of this spec or a separate phase** |
 
-### 7.2 정상 운영 모드 전환 항목 (R7.3 근거)
+### 7.2 Normal Operating Mode Transition Items (basis: R7.3)
 
-| 항목 | 책임 시점 |
+| Item | Responsibility timing |
 |------|-----------|
-| systemd unit 작성 | 후속 phase |
-| startup script 작성 | 후속 phase |
-| Flask debug 모드 OFF 강제 | 후속 phase |
-| process 재기동 정책 | 후속 phase |
-| 로그 파일 위치 결정 | 후속 phase |
+| Author systemd unit | Follow-up phase |
+| Author startup script | Follow-up phase |
+| Force Flask debug mode OFF | Follow-up phase |
+| Process restart policy | Follow-up phase |
+| Log file location decision | Follow-up phase |
 
-### 7.3 entrypoint 분류 (R7.1 / R7.4 근거)
+### 7.3 entrypoint Classification (basis: R7.1 / R7.4)
 
-| 분류 | 파일 | 본 spec 시점 정책 |
+| Classification | File | Policy at this spec point |
 |------|------|------------------|
-| 조회성 — 2026-06-10 검증 완료 | `connector_balance.py`, `connector_order_check.py`, `connector_app.py` 의 Flask 내부 smoke test (조회성 endpoint) | §10 의 (d) / (e) / (f) 결과 [O] 로 기록 |
-| 조회성 — 운영 가능 후보 (본 spec 시점 정식 검증 미완) | `connector_quote_realtime.py`, `connector_quote_closed.py`, `connector_view_service.py` | 정상 운영 형태에서 기동 가능해야 하며, 운영 진입 시점(후속 phase 또는 별도 phase) 에 검증 필요 |
-| 신규 주문 | `connector_buy.py`, `connector_sell.py`, `connector_cancel.py`, `connector_modify.py` | 본 spec 의 어떤 phase 에서도 호출 0건 |
+| Read-only — validated 2026-06-10 | `connector_balance.py`, `connector_order_check.py`, the Flask internal smoke test of `connector_app.py` (read-only endpoints) | Recorded as `[O]` in §10 results (d) / (e) / (f) |
+| Read-only — operable candidate (formal validation incomplete at this spec point) | `connector_quote_realtime.py`, `connector_quote_closed.py`, `connector_view_service.py` | Must be startable in the normal operating form; validation is needed at the operating-entry point (a follow-up phase or a separate phase) |
+| New order | `connector_buy.py`, `connector_sell.py`, `connector_cancel.py`, `connector_modify.py` | 0 calls in any phase of this spec |
 
-### 7.4 후속 phase 책임 (R7.5 / R7.6 근거)
+### 7.4 Follow-up Phase Responsibility (basis: R7.5 / R7.6)
 
-[`./runbook.md`](./runbook.md)(후속 phase) 는 임시 검증 단계의 Flask 기동 명령(예: `python connector_app.py`) 과 조회성 endpoint 호출 패턴을 placeholder 기반으로 포함한다. 신규 주문 endpoint 호출 예제는 절대 포함하지 않는다. systemd unit 기반 정상 운영 모드 전환은 본 spec 의 후속 task 또는 별도 phase 진입 시점에만 적용한다.
+[`./runbook.md`](./runbook.md) (follow-up phase) includes the Flask startup command of the temporary validation stage (e.g., `python connector_app.py`) and the read-only endpoint call patterns on a placeholder basis. It never includes new-order endpoint call examples. The transition to systemd unit-based normal operating mode is applied only at the entry point of a follow-up task of this spec or a separate phase.
 
-운영 가능 후보 entrypoint(`connector_quote_realtime.py`, `connector_quote_closed.py`, `connector_view_service.py`) 는 본 spec 후속 task 또는 별도 phase 진입 시점에 조회성 smoke test 로 검증 후 §10 결과 표에 별도 행으로 추가한다.
+The operable-candidate entrypoints (`connector_quote_realtime.py`, `connector_quote_closed.py`, `connector_view_service.py`) are validated with read-only smoke tests at the entry point of a follow-up task of this spec or a separate phase, and then added as separate rows to the §10 result table.
 
-## 8. Secrets Manager / SSM Parameter Store env 주입 (R8)
+## 8. Secrets Manager / SSM Parameter Store env Injection (R8)
 
-### 8.1 06 spec 인용 정책 (R8.1 근거)
+### 8.1 06 spec Citation Policy (basis: R8.1)
 
-본 spec 은 06 spec §1(분류 기준) / §2(naming 매트릭스) / §3(환경변수 호환성) 표를 변형 없이 입력으로 받는다. 본 design 은 매핑 표를 다시 1차 락 하지 않고, 06 spec 의 결정값을 그대로 인용한다.
+This spec takes the 06 spec §1 (classification criteria) / §2 (naming matrix) / §3 (environment variable compatibility) tables as input without modification. This design does not first-lock the mapping table again; it cites the 06 spec decision values as-is.
 
-### 8.2 환경변수 매핑 (R8.2 근거)
+### 8.2 Environment Variable Mapping (basis: R8.2)
 
-| 보관소 | 이름 (예) | 환경변수 키 (8개 MS 호환) | 비고 |
+| Store | Name (example) | Environment variable key (8 MS compatible) | Note |
 |--------|-----------|--------------------------|------|
-| Secrets Manager | `/portfolio/paper/marketconnector/kis-app-key` | `APP_KEY` | 단일값 |
-| Secrets Manager | `/portfolio/paper/marketconnector/kis-app-secret` | `APP_SECRET` | 단일값 |
+| Secrets Manager | `/portfolio/paper/marketconnector/kis-app-key` | `APP_KEY` | Single value |
+| Secrets Manager | `/portfolio/paper/marketconnector/kis-app-secret` | `APP_SECRET` | Single value |
 | Secrets Manager | `/portfolio/paper/marketconnector/paper-account` | `PAPER_ACNT`, `ACNT_PRDT_CD` | JSON multi-key |
 | Secrets Manager | `/portfolio/paper/rds/marketconnector-app` | `INTEREST_DB_HOST` / `INTEREST_DB_PORT` / `INTEREST_DB_NAME` / `INTEREST_DB_USER` / `INTEREST_DB_PASSWORD` | JSON multi-key |
-| SSM Parameter | `/portfolio/paper/marketconnector/kis-base-url` | `BASE_URL` | 일반 설정값 |
-| SSM Parameter | `/portfolio/paper/marketconnector/environment` | `PORT_ENVIRONMENT` | 환경 식별자 |
-| SSM Parameter | `/portfolio/paper/marketconnector/broker-name` | `PORT_BROKER_NAME` | broker 이름 |
-| SSM Parameter | `/portfolio/paper/marketconnector/connector-host` | `CONNECTOR_HOST` | Flask host. 코드 기본값 `127.0.0.1` (port-marketconnector `connector_app.py` 기준) |
-| SSM Parameter | `/portfolio/paper/marketconnector/connector-port` | `CONNECTOR_PORT` | Flask port. 코드 기본값 `5000` |
-| SSM Parameter | `/portfolio/paper/marketconnector/connector-debug` | `CONNECTOR_DEBUG` | Flask debug flag. 코드 기본값 `False`. 정상 운영 모드에서는 반드시 `false` 강제 |
+| SSM Parameter | `/portfolio/paper/marketconnector/kis-base-url` | `BASE_URL` | General config value |
+| SSM Parameter | `/portfolio/paper/marketconnector/environment` | `PORT_ENVIRONMENT` | Environment identifier |
+| SSM Parameter | `/portfolio/paper/marketconnector/broker-name` | `PORT_BROKER_NAME` | broker name |
+| SSM Parameter | `/portfolio/paper/marketconnector/connector-host` | `CONNECTOR_HOST` | Flask host. Code default `127.0.0.1` (per port-marketconnector `connector_app.py`) |
+| SSM Parameter | `/portfolio/paper/marketconnector/connector-port` | `CONNECTOR_PORT` | Flask port. Code default `5000` |
+| SSM Parameter | `/portfolio/paper/marketconnector/connector-debug` | `CONNECTOR_DEBUG` | Flask debug flag. Code default `False`. Must be forced to `false` in normal operating mode |
 
-#### 8.2.1 KIS_* alias 동시 export 정책 (2026-06-17 보강)
+#### 8.2.1 KIS_* alias Simultaneous Export Policy (2026-06-17 addition)
 
-본 design 의 환경변수 키(`APP_KEY` / `APP_SECRET` / `PAPER_ACNT` / `ACNT_PRDT_CD` / `BASE_URL`) 는 8개 MS 호환을 위해 그대로 유지한다.
+The environment variable keys of this design (`APP_KEY` / `APP_SECRET` / `PAPER_ACNT` / `ACNT_PRDT_CD` / `BASE_URL`) are kept as-is for 8 MS compatibility.
 
-단, 실제 `port-marketconnector` 코드 실행 시점에는 본 design 시점의 호환 key 외에 `KIS_*` prefix alias 가 함께 필요하다는 사실이 2026-06-17 운영자 검증으로 1차 실증되었다.
+However, it was first demonstrated by operator validation on 2026-06-17 that, at actual `port-marketconnector` code execution time, a `KIS_*` prefix alias is also needed in addition to the compatibility keys of this design.
 
-자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-17 섹션 참조.
+For details, see the 2026-06-17 section of [`./operation-notes.md`](./operation-notes.md).
 
-| 호환 key (8개 MS 정합) | 실제 코드 실행에 필요한 alias | 출처 |
+| Compatibility key (8 MS consistent) | Alias needed for actual code execution | Source |
 |-----------------------|------------------------------|------|
-| `APP_KEY` | `KIS_APP_KEY` | Secrets Manager `/portfolio/paper/marketconnector/kis-app-key` JSON 내부 key `APP_KEY` 의 값 |
-| `APP_SECRET` | `KIS_APP_SECRET` | Secrets Manager `/portfolio/paper/marketconnector/kis-app-secret` JSON 내부 key `APP_SECRET` 의 값 |
-| `PAPER_ACNT` | `KIS_PAPER_ACNT` | Secrets Manager `/portfolio/paper/marketconnector/paper-account` JSON 내부 key `PAPER_ACNT` 의 값 |
-| `ACNT_PRDT_CD` | `KIS_ACNT_PRDT_CD` | Secrets Manager `/portfolio/paper/marketconnector/paper-account` JSON 내부 key `ACNT_PRDT_CD` 의 값 |
-| `BASE_URL` | `KIS_BASE_URL` | SSM Parameter `/portfolio/paper/marketconnector/kis-base-url` 의 값 |
+| `APP_KEY` | `KIS_APP_KEY` | The value of the internal key `APP_KEY` inside the Secrets Manager `/portfolio/paper/marketconnector/kis-app-key` JSON |
+| `APP_SECRET` | `KIS_APP_SECRET` | The value of the internal key `APP_SECRET` inside the Secrets Manager `/portfolio/paper/marketconnector/kis-app-secret` JSON |
+| `PAPER_ACNT` | `KIS_PAPER_ACNT` | The value of the internal key `PAPER_ACNT` inside the Secrets Manager `/portfolio/paper/marketconnector/paper-account` JSON |
+| `ACNT_PRDT_CD` | `KIS_ACNT_PRDT_CD` | The value of the internal key `ACNT_PRDT_CD` inside the Secrets Manager `/portfolio/paper/marketconnector/paper-account` JSON |
+| `BASE_URL` | `KIS_BASE_URL` | The value of the SSM Parameter `/portfolio/paper/marketconnector/kis-base-url` |
 
-임시 검증 단계에서는 호환 key 와 alias 를 **동시 export** 한다(예: 같은 secret 내부 value 를 `APP_KEY` 와 `KIS_APP_KEY` 두 환경변수로 동시 export).
+In the temporary validation stage, the compatibility key and the alias are **exported simultaneously** (e.g., the same internal secret value is exported simultaneously into the two environment variables `APP_KEY` and `KIS_APP_KEY`).
 
-동시 export 정책은 정상 운영 모드(systemd / startup script) 전환 시점까지 유지한다. 그 이후의 정합(호환 key / alias 중 어느 한 쪽으로 단일화할지, 또는 양쪽 동시 export 를 운영 표준으로 유지할지) 은 본 spec 후속 task 또는 별도 phase 책임으로 분리한다(§8.5 그대로 후속 인계).
+The simultaneous-export policy is maintained until the transition to normal operating mode (systemd / startup script). The subsequent alignment (whether to unify on one of the compatibility key / alias, or to keep both exported simultaneously as the operating standard) is separated as the responsibility of a follow-up task of this spec or a separate phase (handed over as-is per §8.5).
 
-#### 8.2.2 JSON SecretString 내부 key 추출 정책 (2026-06-17 보강)
+#### 8.2.2 JSON SecretString Internal Key Extraction Policy (2026-06-17 addition)
 
-아래 secret 은 plain string SecretString 이 아니라 **JSON SecretString** 이다.
+The secrets below are not a plain-string SecretString but a **JSON SecretString**.
 
-- `/portfolio/paper/marketconnector/kis-app-key` — 내부 key `APP_KEY`
-- `/portfolio/paper/marketconnector/kis-app-secret` — 내부 key `APP_SECRET`
-- `/portfolio/paper/marketconnector/paper-account` — 내부 key `PAPER_ACNT` / `ACNT_PRDT_CD`
+- `/portfolio/paper/marketconnector/kis-app-key` — internal key `APP_KEY`
+- `/portfolio/paper/marketconnector/kis-app-secret` — internal key `APP_SECRET`
+- `/portfolio/paper/marketconnector/paper-account` — internal keys `PAPER_ACNT` / `ACNT_PRDT_CD`
 
-따라서 임시 export 스크립트(§8.3) 는 다음 절차를 따른다.
+Therefore the temporary export script (§8.3) follows this procedure.
 
-1. Secrets Manager `GetSecretValue` 결과의 `SecretString` 을 JSON 으로 parse.
-2. 내부 key 의 value 만 환경변수로 export. JSON dict 전체를 환경변수 값으로 export 하지 않는다.
-3. 동일 value 를 호환 key / `KIS_*` alias 양쪽에 동시 export.
+1. Parse the `SecretString` of the Secrets Manager `GetSecretValue` result as JSON.
+2. Export only the value of the internal key as an environment variable. Do not export the entire JSON dict as an environment variable value.
+3. Export the same value simultaneously to both the compatibility key and the `KIS_*` alias.
 
-`/portfolio/paper/rds/marketconnector-app` 도 JSON multi-key SecretString 이며 아래 매핑을 그대로 export 하는 정책은 그대로 유지한다(02 / 06 spec 정합 / 변경 0건).
+`/portfolio/paper/rds/marketconnector-app` is also a JSON multi-key SecretString, and the policy of exporting the mapping below as-is is maintained (consistent with 02 / 06 spec / 0 changes).
 
 - `host` → `INTEREST_DB_HOST`
 - `port` → `INTEREST_DB_PORT`
@@ -314,242 +314,242 @@ VPC 밖(운영자 로컬 PC) 에서 RDS 접속이 필요한 경우, 본 EC2 + SS
 - `username` → `INTEREST_DB_USER`
 - `password` → `INTEREST_DB_PASSWORD`
 
-#### 8.2.3 1차 실패 → 보정 사례 (2026-06-17 보강)
+#### 8.2.3 First-Failure → Correction Case (2026-06-17 addition)
 
-2026-06-17 `CONNECTOR_BALANCE` 1차 실행에서 KIS balance API 호출이 도달했음에도 `response_status=500` / `response_code=1` / `is_success=false` 가 반환된 사례는 KIS credential 자체 폐기가 아니라 JSON SecretString 전체를 env 값으로 그대로 export 한 mapping 오류로 1차 진단되었다.
+On 2026-06-17, the case in the first `CONNECTOR_BALANCE` run where the KIS balance API call was reached yet `response_status=500` / `response_code=1` / `is_success=false` was returned was first diagnosed not as a discard of the KIS credential itself but as a mapping error that exported the entire JSON SecretString as-is into the env value.
 
-JSON 내부 `APP_KEY` / `APP_SECRET` 의 value 만 추출해 호환 key + `KIS_*` alias 양쪽에 동시 export 한 v5 패턴에서 KIS balance API 가 `response_status=200` / `response_code=0` / `is_success=true` 로 정상 응답하고 `connector_balance_snapshot` 신규 row 가 저장되었다.
+In the v5 pattern that extracted only the value of the internal `APP_KEY` / `APP_SECRET` and exported it simultaneously to both the compatibility key + `KIS_*` alias, the KIS balance API responded normally with `response_status=200` / `response_code=0` / `is_success=true`, and a new `connector_balance_snapshot` row was stored.
 
-본 사례는 secret value / KIS app key / KIS app secret 평문 기록 0건으로 누적된다. secret value 는 절대 기록하지 않고 다음 수준까지만 산출물에 기록 가능하다.
+This case is accumulated with 0 plaintext records of the secret value / KIS app key / KIS app secret. The secret value is never recorded; only the following levels may be recorded in the deliverables.
 
 - secret name path
-- shape(JSON SecretString)
-- 내부 key 이름
+- shape (JSON SecretString)
+- internal key name
 - value length
 
-자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-17 섹션 참조.
+For details, see the 2026-06-17 section of [`./operation-notes.md`](./operation-notes.md).
 
-### 8.3 임시 → 정상 전환 (R8.3 / R8.4 근거)
+### 8.3 Temporary → Normal Transition (basis: R8.3 / R8.4)
 
-| 단계 | 형태 | 보안 정책 | 책임 시점 |
+| Stage | Form | Security policy | Responsibility timing |
 |------|------|-----------|-----------|
-| 임시 검증 단계 | `/tmp/inject-env.sh` source + 메모리 export | 스크립트 본문에 secret 평문 미저장 / 권한 700 권고 / JSON SecretString 은 내부 key value 만 추출(§8.2.2) / 호환 key + `KIS_*` alias 동시 export(§8.2.1) | 본 spec |
-| 정상 운영 모드 | systemd `EnvironmentFile=` 또는 startup script 메모리 export | `EnvironmentFile=` 본문에 secret 평문 미저장. 권한 600 권고. v5 mapping 패턴(§8.2.1 / §8.2.2) 반영 후 운영자 결정으로 호환 key / alias 단일화 또는 양쪽 유지 결정 | 본 spec 후속 task 또는 별도 phase |
+| Temporary validation stage | `/tmp/inject-env.sh` source + memory export | No plaintext secret stored in the script body / permission 700 recommended / for a JSON SecretString extract only the internal key value (§8.2.2) / simultaneously export the compatibility key + `KIS_*` alias (§8.2.1) | This spec |
+| Normal operating mode | systemd `EnvironmentFile=` or startup script memory export | No plaintext secret stored in the `EnvironmentFile=` body. Permission 600 recommended. After reflecting the v5 mapping pattern (§8.2.1 / §8.2.2), decide by operator decision whether to unify on the compatibility key / alias or keep both | A follow-up task of this spec or a separate phase |
 
-### 8.4 호환 정책 (R8.5 근거)
+### 8.4 Compatibility Policy (basis: R8.5)
 
-| 항목 | 정책 |
+| Item | Policy |
 |------|------|
-| 8개 MS 코드 / `port-marketconnector` `config.py` | 미수정 (OD-DB-003 정합) |
-| 환경변수 키 이름 | 미변경. secret 값만 외부화 |
+| 8 MS code / `port-marketconnector` `config.py` | Not modified (consistent with OD-DB-003) |
+| Environment variable key names | Not changed. Only the secret values are externalized |
 
-### 8.5 후속 phase 책임 (R8.6 근거)
+### 8.5 Follow-up Phase Responsibility (basis: R8.6)
 
-[`./runbook.md`](./runbook.md)(후속 phase) 는 임시 export 스크립트 작성, secret / parameter read, env 주입, Connector 재기동 후 KIS / RDS 조회성 smoke test 통과 단계를 [실행] / [확인] / [준비] / [복구] 라벨로 분리한다.
+[`./runbook.md`](./runbook.md) (follow-up phase) separates the temporary export script authoring, secret / parameter read, env injection, and the KIS / RDS read-only smoke test pass step after Connector restart into the [실행] / [확인] / [준비] / [복구] labels.
 
-### 8.6 민감정보 표기 정책 (R8.7 근거)
+### 8.6 Sensitive Information Notation Policy (basis: R8.7)
 
-본 spec 산출물 어디에도 실제 secret value, KIS app key / app secret, 계좌번호, RDS password, RDS endpoint hostname 을 평문으로 적지 않는다. 모두 `[REDACTED]` 또는 placeholder 만 사용한다.
+Nowhere in this spec's deliverables is the actual secret value, KIS app key / app secret, account number, RDS password, or RDS endpoint hostname recorded in plaintext. Everywhere uses only `[REDACTED]` or a placeholder.
 
-## 9. Instance Role 기반 Access Key 미사용 (R9)
+## 9. Instance Role-Based No Access Key (R9)
 
-### 9.1 06 spec 입력 (R9.1 근거)
+### 9.1 06 spec Input (basis: R9.1)
 
-본 spec 은 06 spec §4(Instance Role 설계) / §5(Access Key 미사용 원칙) 의 결정을 그대로 입력으로 받는다. 본 design 은 06 spec 결정을 다시 락 하지 않고, 03 책임 보조 권한과 자격증명 정상 상태 점검 위치만 명시한다.
+This spec takes the decisions of the 06 spec §4 (Instance Role design) / §5 (no-Access-Key principle) as input as-is. This design does not re-lock the 06 spec decisions; it states only the 03-responsibility auxiliary permissions and the location for checking the credential-normal state.
 
-### 9.2 03 책임 보조 권한 매트릭스 (R9.3 / R9.4 근거)
+### 9.2 03-Responsibility Auxiliary Permission Matrix (basis: R9.3 / R9.4)
 
-| Statement | Effect | Action | Resource | 비고 |
+| Statement | Effect | Action | Resource | Note |
 |-----------|--------|--------|----------|------|
-| `SsmManagedInstanceCore` | (managed) | AWS managed `AmazonSSMManagedInstanceCore` attach | (managed) | SSM Session Manager 접속용 |
-| `CloudWatchLogsWrite (권고: log group 사전 생성)` | Allow | `logs:CreateLogStream`, `logs:PutLogEvents`, `logs:DescribeLogStreams` | `arn:aws:logs:<region>:<account-id>:log-group:/portfolio/paper/marketconnector*` | 본 spec 기본 권고. 운영자가 log group 사전 생성. See Details §9.1 Notes |
-| `CloudWatchLogsWrite (옵션: CreateLogGroup 포함)` | Allow | `logs:CreateLogStream`, `logs:PutLogEvents`, `logs:DescribeLogStreams`, `logs:CreateLogGroup` | `arn:aws:logs:<region>:<account-id>:log-group:/portfolio/paper/marketconnector*` | 권고 옵션 채택 불가 시 한정 적용. See Details §9.1 Notes |
+| `SsmManagedInstanceCore` | (managed) | AWS managed `AmazonSSMManagedInstanceCore` attach | (managed) | For SSM Session Manager access |
+| `CloudWatchLogsWrite (recommended: pre-create log group)` | Allow | `logs:CreateLogStream`, `logs:PutLogEvents`, `logs:DescribeLogStreams` | `arn:aws:logs:<region>:<account-id>:log-group:/portfolio/paper/marketconnector*` | Default recommendation of this spec. The operator pre-creates the log group. See Details §9.1 Notes |
+| `CloudWatchLogsWrite (option: include CreateLogGroup)` | Allow | `logs:CreateLogStream`, `logs:PutLogEvents`, `logs:DescribeLogStreams`, `logs:CreateLogGroup` | `arn:aws:logs:<region>:<account-id>:log-group:/portfolio/paper/marketconnector*` | Applied in a limited way only when the recommended option cannot be adopted. See Details §9.1 Notes |
 
 Details §9.1 Notes:
 
-- `CloudWatchLogsWrite (권고: log group 사전 생성)`: 본 spec 의 기본 권고 옵션. 운영자가 log group 을 사전 생성한다. application / Connector 가 임의 log group 을 만들 수 없다. 다른 service log-group prefix 포함 금지.
-- `CloudWatchLogsWrite (옵션: CreateLogGroup 포함)`: 권고 옵션을 채택할 수 없는 경우(예: 운영자 직접 사전 생성이 어려운 일시적 시점) 에만 한정 적용. 적용 후에는 본 spec 의 후속 task 에서 사전 생성 옵션으로 회수한다.
+- `CloudWatchLogsWrite (recommended: pre-create log group)`: the default recommended option of this spec. The operator pre-creates the log group. The application / Connector cannot create an arbitrary log group. Do not include other service log-group prefixes.
+- `CloudWatchLogsWrite (option: include CreateLogGroup)`: applied in a limited way only when the recommended option cannot be adopted (e.g., a temporary point where operator direct pre-creation is difficult). After application, reclaim it to the pre-create option in a follow-up task of this spec.
 
-log group 이름 후보(권고): `/portfolio/paper/marketconnector/app`, `/portfolio/paper/marketconnector/flask`, `/portfolio/paper/marketconnector/system`. 실제 log group 생성 / Resource ARN 채움은 운영자 직접 작업이며 본 spec 범위 밖.
+Log group name candidates (recommended): `/portfolio/paper/marketconnector/app`, `/portfolio/paper/marketconnector/flask`, `/portfolio/paper/marketconnector/system`. Actual log group creation / filling the Resource ARN is operator direct work and is out of scope for this spec.
 
-### 9.3 06 / 03 권한 분담 (R9.4 근거)
+### 9.3 06 / 03 Permission Split (basis: R9.4)
 
-| spec | 책임 권한 |
+| spec | Responsibility permission |
 |------|-----------|
-| 06 | Secrets Manager / SSM Parameter Store / (조건부) KMS Decrypt — read 권한 |
-| 03 (본 spec) | SSM Session Manager 접속 / CloudWatch Logs write — EC2 운영 보조 권한 |
+| 06 | Secrets Manager / SSM Parameter Store / (conditional) KMS Decrypt — read permission |
+| 03 (this spec) | SSM Session Manager access / CloudWatch Logs write — EC2 operating auxiliary permission |
 
-### 9.4 자격증명 정상 상태 (R9.2 근거)
+### 9.4 Credential Normal State (basis: R9.2)
 
-| 점검 항목 | 정상 상태 |
+| Check item | Normal state |
 |-----------|-----------|
 | `aws sts get-caller-identity` `Arn` | `arn:aws:sts::<account-id>:assumed-role/portfolio-paper-marketconnector-ec2-role/<instance-id>` |
-| `aws configure list` `access_key` Source | `iam-role` 또는 `Ec2InstanceMetadata` |
+| `aws configure list` `access_key` Source | `iam-role` or `Ec2InstanceMetadata` |
 
-### 9.5 금지 정책 (R9.1 근거)
+### 9.5 Prohibition Policy (basis: R9.1)
 
-| 패턴 | 정책 |
+| Pattern | Policy |
 |------|------|
-| `~/.aws/credentials` long-lived access key 파일 | **금지** |
-| `~/.aws/config` access key 항목 | **금지** |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` 환경변수 export | **금지** |
-| dotfile(`~/.bashrc`, `~/.profile`, `~/.bash_profile`) access key export | **금지** |
-| systemd unit `Environment=AWS_ACCESS_KEY_ID=...` | **금지** |
-| systemd unit `EnvironmentFile=` access key 저장 | **금지** |
-| application config / `.env` access key 저장 | **금지** |
+| `~/.aws/credentials` long-lived access key file | **Prohibited** |
+| `~/.aws/config` access key entry | **Prohibited** |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` environment variable export | **Prohibited** |
+| dotfile (`~/.bashrc`, `~/.profile`, `~/.bash_profile`) access key export | **Prohibited** |
+| systemd unit `Environment=AWS_ACCESS_KEY_ID=...` | **Prohibited** |
+| systemd unit `EnvironmentFile=` storing an access key | **Prohibited** |
+| application config / `.env` storing an access key | **Prohibited** |
 
-### 9.6 비상 시나리오 처리 (R9.6 근거)
+### 9.6 Emergency Scenario Handling (basis: R9.6)
 
-본 spec 운영 도중 EC2 안에 access key 가 발견되는 경우, 발견 1시간 이내에 다음을 수행한다.
+If an access key is found inside the EC2 during this spec's operation, perform the following within 1 hour of discovery.
 
-발견 → IAM Console 에서 access key 즉시 폐기(`Make inactive` → `Delete`) → EC2 안 `~/.aws/credentials` 백업 이동(타임스탬프 suffix) → IMDSv2 + Instance Role 자격증명만 사용하는 모드로 복귀 → 06 / 03 의 자격증명 정상 상태(§9.4) 재검증 → operation-notes.md(후속 phase) 에 사실 누적 기록.
+Discovery → immediately discard the access key in the IAM Console (`Make inactive` → `Delete`) → move the EC2's `~/.aws/credentials` to a backup (timestamp suffix) → revert to the mode that uses only IMDSv2 + Instance Role credentials → re-validate the credential-normal state of 06 / 03 (§9.4) → accumulate the facts into operation-notes.md (follow-up phase).
 
-## 10. 2026-06-10 검증 결과 8건 (R10)
+## 10. 8 Validation Results from 2026-06-10 (R10)
 
-### 10.1 8건 결과 (R10.1 / R10.2 근거)
+### 10.1 8 Results (basis: R10.1 / R10.2)
 
-| 번호 | 항목 | 결과 | 라벨 후보 |
+| No. | Item | Result | Label candidate |
 |------|------|------|-----------|
-| (a) | Python 3.9.25 / venv 구성 | 성공 | `[O]` |
-| (b) | `requests` / `flask` / `psycopg2-binary` / `psycopg` / `pandas` 설치 | 성공 | `[O]` |
-| (c) | `marketconnector_app` 기준 RDS 접속 | 성공 | `[O]` |
-| (d) | `connector_balance.py` 실행 | 성공 | `[O]` |
-| (e) | `connector_order_check.py` 실행 | 성공 | `[O]` |
-| (f) | Flask 내부 smoke test (조회성 endpoint) | 성공 | `[O]` |
-| (g) | Secrets Manager / SSM Parameter Store 기반 env 주입 | 성공 | `[O]` |
-| (h) | EC2 Instance Role 기반 Access Key 없이 실행 | 성공 | `[O]` |
+| (a) | Python 3.9.25 / venv configuration | Success | `[O]` |
+| (b) | `requests` / `flask` / `psycopg2-binary` / `psycopg` / `pandas` install | Success | `[O]` |
+| (c) | RDS connection based on `marketconnector_app` | Success | `[O]` |
+| (d) | `connector_balance.py` execution | Success | `[O]` |
+| (e) | `connector_order_check.py` execution | Success | `[O]` |
+| (f) | Flask internal smoke test (read-only endpoint) | Success | `[O]` |
+| (g) | Secrets Manager / SSM Parameter Store-based env injection | Success | `[O]` |
+| (h) | Execution without an Access Key based on the EC2 Instance Role | Success | `[O]` |
 
-### 10.2 기록 정책 (R10.3 / R10.4 / R10.6 근거)
+### 10.2 Recording Policy (basis: R10.3 / R10.4 / R10.6)
 
-operation-notes.md(후속 phase) 가 8건을 일자별 누적(`## 2026-06-10 ...`) 으로 기록한다.
+operation-notes.md (follow-up phase) records the 8 items as a per-date accumulation (`## 2026-06-10 ...`).
 
-- 결과(성공 / 실패) + 점검 일자 + 운영자 직접 확인 사실만 기록.
-- 검증 명령의 stdout / stderr 본문, secret value, 토큰 값, 실제 endpoint hostname 은 절대 본문에 인용하지 않는다.
-- validation-checklist.md(후속 phase) 는 02 / 06 spec 동일 4종 라벨(`[O]` / `[X]` / `[Kiro 후속 작업 필요]` / `[운영자 확인 필요]`) 로 점검 항목화한다.
+- Record only the result (success / failure) + the check date + the fact that the operator confirmed it directly.
+- Never quote the stdout / stderr body of the validation commands, the secret value, the token value, or the actual endpoint hostname in the body.
+- validation-checklist.md (follow-up phase) turns the items into checks with the same 4-label set as the 02 / 06 specs (`[O]` / `[X]` / `[Kiro 후속 작업 필요]` / `[운영자 확인 필요]`).
 
-### 10.3 실패 발생 시 처리 (R10.5 근거)
+### 10.3 Handling on Failure (basis: R10.5)
 
-8건 중 한 건이 향후 점검 시점에 실패로 바뀌는 경우, 본 spec 임의 결정 금지. 라벨을 `[X]` 또는 `[Kiro 후속 작업 필요]` 로 갱신 → 원인을 [`../_common/risk-register.md`](../_common/risk-register.md) R-* 후보로 기록 → 운영자 승인 절차 진행.
+If one of the 8 items turns to failure at a future check point, arbitrary decision within this spec is prohibited. Update the label to `[X]` or `[Kiro 후속 작업 필요]` → record the cause as an R-* candidate in [`../_common/risk-register.md`](../_common/risk-register.md) → proceed through the operator approval process.
 
-## 11. 산출물 형식 / 라벨 (R11)
+## 11. Deliverable Format / Labels (R11)
 
-### 11.1 [`./runbook.md`](./runbook.md) 8단계 (R11.2 / R11.3 근거)
+### 11.1 [`./runbook.md`](./runbook.md) 8 Steps (basis: R11.2 / R11.3)
 
-| 단계 | 라벨 후보 | 책임 |
+| Step | Label candidate | Responsibility |
 |------|-----------|------|
-| (a) 사전 확인(EC2 / SG / Profile attach / Python / venv / client 18) | [확인] | 운영자 직접 |
-| (b) 의존 라이브러리 설치 결과 확인 | [확인] | 운영자 직접 |
-| (c) 임시 export 스크립트 작성 / source 후 환경변수 주입 | [실행] | 운영자 직접 |
-| (d) `marketconnector_app` 기반 RDS 접속 확인 | [확인] | 운영자 직접 |
-| (e) `connector_balance.py` / `connector_order_check.py` 실행 | [확인] | 운영자 직접 |
-| (f) Flask 내부 smoke test (조회성만) | [확인] | 운영자 직접 |
-| (g) Instance Role 자격증명 / Access Key 미존재 점검 | [확인] | 운영자 직접 |
-| (h) 8건 결과 운영자 노트 누적 | [준비] | 운영자 직접 |
+| (a) Pre-check (EC2 / SG / Profile attach / Python / venv / client 18) | [확인] | Operator direct |
+| (b) Confirm dependency library install result | [확인] | Operator direct |
+| (c) Author temporary export script / inject environment variables after source | [실행] | Operator direct |
+| (d) Confirm RDS connection based on `marketconnector_app` | [확인] | Operator direct |
+| (e) Execute `connector_balance.py` / `connector_order_check.py` | [확인] | Operator direct |
+| (f) Flask internal smoke test (read-only only) | [확인] | Operator direct |
+| (g) Check Instance Role credentials / absence of Access Key | [확인] | Operator direct |
+| (h) Accumulate the 8 results into operator notes | [준비] | Operator direct |
 
-### 11.2 [`./validation-checklist.md`](./validation-checklist.md) 7개 점검 영역 (R11.5 근거)
+### 11.2 [`./validation-checklist.md`](./validation-checklist.md) 7 Check Areas (basis: R11.5)
 
-| 영역 | 점검 항목 (예) | 라벨 후보 |
+| Area | Check item (example) | Label candidate |
 |------|---------------|-----------|
-| (a) Python / venv / 의존 라이브러리 인벤토리 | Python 3.9.25 / venv 1개 / 5종 설치 | `[O]` 후보 |
-| (b) PostgreSQL client / pg_restore version | client major 18 / full 18.4 | `[O]` 후보 |
-| (c) `marketconnector_app` RDS 접속 결과 | private endpoint 접속 통과 | `[O]` 후보 |
-| (d) Connector / Flask 조회성 smoke test 결과 | 잔고 / 주문 조회 / Flask `/api/v1/view/...` 통과 | `[O]` 후보 |
-| (e) Secrets Manager / SSM env 주입 결과 | 환경변수 매핑(§8.2) 통과 | `[O]` 후보 |
-| (f) Instance Role 자격증명 / Access Key 미존재 결과 | assumed-role / Source `iam-role` / `~/.aws/credentials` 미존재 | `[O]` 후보 |
-| (g) 신규 주문 / 매수 / 매도 / 취소 / 정정 호출 0건 | 본 spec 모든 phase 호출 0건 | `[O]` 후보 |
+| (a) Python / venv / dependency library inventory | Python 3.9.25 / 1 venv / 5 installs | `[O]` candidate |
+| (b) PostgreSQL client / pg_restore version | client major 18 / full 18.4 | `[O]` candidate |
+| (c) `marketconnector_app` RDS connection result | private endpoint connection pass | `[O]` candidate |
+| (d) Connector / Flask read-only smoke test result | balance / order query / Flask `/api/v1/view/...` pass | `[O]` candidate |
+| (e) Secrets Manager / SSM env injection result | environment variable mapping (§8.2) pass | `[O]` candidate |
+| (f) Instance Role credentials / absence of Access Key result | assumed-role / Source `iam-role` / `~/.aws/credentials` absent | `[O]` candidate |
+| (g) 0 new order / buy / sell / cancel / modify calls | 0 calls in every phase of this spec | `[O]` candidate |
 
-### 11.3 4종 라벨 규칙 (R11.4 근거)
+### 11.3 4-Label Rule (basis: R11.4)
 
-`[O]` / `[X]` / `[Kiro 후속 작업 필요]` / `[운영자 확인 필요]` 만 사용한다. 그 외 라벨 사용 금지. 02 / 06 spec 동일 규칙.
+Use only `[O]` / `[X]` / `[Kiro 후속 작업 필요]` / `[운영자 확인 필요]`. Use of any other label is prohibited. Same rule as the 02 / 06 specs.
 
-### 11.4 [`./operation-notes.md`](./operation-notes.md) 형식 (R11.6 / R11.7 근거)
+### 11.4 [`./operation-notes.md`](./operation-notes.md) Format (basis: R11.6 / R11.7)
 
-| 항목 | 정책 |
+| Item | Policy |
 |------|------|
-| 누적 기록 형식 | `## YYYY-MM-DD <요약>` (02 / 06 spec 동일) |
-| secret / 식별자 기록 | 0건. `[REDACTED]` 또는 placeholder 만 |
-| IAM 변경 기록 템플릿 | 변경 일자 / 변경자 / 변경 사유 / 변경 전 후 항목 요약 4줄. JSON 본문 전체 인용 금지 |
-| 운영자 / Kiro 작업 분담 | 본문 상단에 명시: 실제 AWS 리소스 생성 / 변경 / 삭제는 운영자 직접, Kiro 는 문서 / 절차 / 검증 항목 정리만 |
+| Accumulated record format | `## YYYY-MM-DD <summary>` (same as 02 / 06 specs) |
+| secret / identifier recording | 0. Only `[REDACTED]` or placeholder |
+| IAM change record template | 4 lines: change date / changer / change reason / before-and-after item summary. Quoting the full JSON body is prohibited |
+| Operator / Kiro work split | Stated at the top of the body: actual AWS resource creation / change / deletion is operator direct; Kiro only organizes documents / procedures / validation items |
 
-## 12. _common 갱신 후보 (실제 갱신은 tasks 단계, R12)
+## 12. _common Update Candidates (actual update is at the tasks stage, R12)
 
-### 12.1 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 갱신 후보 (R12.1 근거)
+### 12.1 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) Update Candidates (basis: R12.1)
 
-| ID | 항목 | 본 spec 후보값 | Status |
+| ID | Item | Candidate value of this spec | Status |
 |----|------|---------------|--------|
-| OD-SEC-005 | EC2 / 8개 MS Access Key 미사용 원칙 | EC2 안 access key 파일 / 환경변수 / dotfile 저장 금지. IMDSv2 + Instance Role 만 | TENTATIVE 🟡 → CONFIRMED 🟢 (운영자 승인 시) |
-| OD-SEC-006 | EC2 / ECS IAM Role 기반 secret / parameter read 원칙 | 최소 권한. Resource wildcard 금지. Action wildcard 금지. service prefix 분리 | TENTATIVE 🟡 → CONFIRMED 🟢 (운영자 승인 시) |
-| 신규 OD-SEC-* 또는 OD-NET-009 보조 | `AmazonSSMManagedInstanceCore` 사용 정책 | EC2 SSH 22 inbound 미허용 + SSM Session Manager + managed policy attach 만 | TENTATIVE 🟡 |
+| OD-SEC-005 | EC2 / 8 MS no-Access-Key principle | Prohibit storing access key files / environment variables / dotfiles inside the EC2. Only IMDSv2 + Instance Role | TENTATIVE 🟡 → CONFIRMED 🟢 (upon operator approval) |
+| OD-SEC-006 | EC2 / ECS IAM Role-based secret / parameter read principle | Least privilege. No Resource wildcard. No Action wildcard. service prefix separation | TENTATIVE 🟡 → CONFIRMED 🟢 (upon operator approval) |
+| New OD-SEC-* or OD-NET-009 auxiliary | `AmazonSSMManagedInstanceCore` usage policy | No EC2 SSH 22 inbound + SSM Session Manager + managed policy attach only | TENTATIVE 🟡 |
 
-### 12.2 [`../_common/risk-register.md`](../_common/risk-register.md) 갱신 후보 (R12.2 / R12.4 근거)
+### 12.2 [`../_common/risk-register.md`](../_common/risk-register.md) Update Candidates (basis: R12.2 / R12.4)
 
-| ID (잠정) | Risk | Mitigation | Detection | Rollback |
+| ID (tentative) | Risk | Mitigation | Detection | Rollback |
 |-----------|------|------------|-----------|----------|
-| R-DATA-XXX | pg_restore client / RDS engine major version mismatch 재발(R-DATA-003 보강) | client major 18 / full 18.4 유지 정책 명시. 다운그레이드 금지 | `pg_restore --version` / `pg_dump --version` 출력 점검 | 02 runbook 부록 A 재실행 후 client 재설치 |
-| R-CAP-XXX | EC2 disk(EBS) 부족으로 venv / 로그 / token 파일 저장 실패 | 운영자 정기 점검 / log rotation / Connector 로그 위치 결정(후속 phase) | `df -h` / EBS CloudWatch metric / Connector startup error | log rotation 적용 / EBS volume 증설(운영자 결정) |
-| R-BROKER-XXX | KIS API rate limit 초과로 조회성 호출 실패 | 본 spec 시점 호출 빈도 최소화 + token 재사용 정책 + Connector 재기동 횟수 제한 | KIS API 응답 코드 점검 / Connector 로그 패턴 | 호출 일시 중지 + 운영자 결정으로 재개 |
-| R-SEC-XXX | Flask debug 모드 노출(임시 검증 단계 부주의) | 정상 운영 모드 전환 시 `CONNECTOR_DEBUG=false` 강제. 임시 검증 시 외부 노출 SG 미허용 | EC2 SG inbound 점검 / Flask startup 로그의 debug flag | debug flag OFF 후 재기동 + 외부 노출 여부 audit |
-| R-AUTO-XXX | systemd 미설정으로 Connector / Flask 비의도 종료(EC2 reboot 후 재기동 누락) | 정상 운영 모드 전환(systemd unit / startup script) 책임을 본 spec 후속 task 또는 별도 phase 로 명시 | EC2 reboot 후 Connector 재기동 점검 / 헬스체크 | systemd unit 적용 후 재기동 |
+| R-DATA-XXX | Recurrence of pg_restore client / RDS engine major version mismatch (reinforces R-DATA-003) | State the policy of maintaining client major 18 / full 18.4. No downgrade | Check `pg_restore --version` / `pg_dump --version` output | Re-run 02 runbook appendix A then reinstall the client |
+| R-CAP-XXX | Failure to store venv / logs / token files due to EC2 disk (EBS) shortage | Operator periodic check / log rotation / Connector log location decision (follow-up phase) | `df -h` / EBS CloudWatch metric / Connector startup error | Apply log rotation / expand the EBS volume (operator decision) |
+| R-BROKER-XXX | Read-only call failure due to exceeding the KIS API rate limit | Minimize call frequency at this spec point + token reuse policy + limit on Connector restart count | Check KIS API response codes / Connector log pattern | Suspend calls temporarily + resume by operator decision |
+| R-SEC-XXX | Flask debug mode exposure (carelessness in the temporary validation stage) | Force `CONNECTOR_DEBUG=false` on transition to normal operating mode. No externally exposed SG during temporary validation | Check EC2 SG inbound / the debug flag in the Flask startup log | Restart after turning the debug flag OFF + audit whether it was externally exposed |
+| R-AUTO-XXX | Unintended termination of Connector / Flask due to no systemd configuration (restart missed after EC2 reboot) | State that the responsibility for transition to normal operating mode (systemd unit / startup script) is a follow-up task of this spec or a separate phase | Check Connector restart after EC2 reboot / health check | Restart after applying the systemd unit |
 
-### 12.3 [`../_common/followups-overview.md`](../_common/followups-overview.md) 갱신 후보 (R12.3 근거)
+### 12.3 [`../_common/followups-overview.md`](../_common/followups-overview.md) Update Candidates (basis: R12.3)
 
-| 섹션 | 갱신 내용 |
+| Section | Update content |
 |------|-----------|
-| 03-marketconnector-ec2 1차 적용 환경 | `aws-paper`, `ap-northeast-2` |
-| 1차 범위 | MarketConnector EC2 정식 운영 전환 + 8건 검증 누적 기록 |
-| 1차 범위 밖 | EC2 신규 생성 / 신규 주문 / live rotation / OIDC / full IAM 매트릭스 |
-| 04 / 05 / 08 / 09 / 10 spec 인계 | EC2 운영 패턴 → ECS Task Role 패턴 매핑 (§13) |
+| 03-marketconnector-ec2 first-application environment | `aws-paper`, `ap-northeast-2` |
+| First scope | MarketConnector EC2 formal operating transition + accumulated record of 8 validations |
+| First out of scope | EC2 new creation / new order / live rotation / OIDC / full IAM matrix |
+| Hand-off to 04 / 05 / 08 / 09 / 10 specs | EC2 operating pattern → ECS Task Role pattern mapping (§13) |
 
-### 12.4 ID 부여 규칙 (R12.6 근거)
+### 12.4 ID Assignment Rule (basis: R12.6)
 
-신규 결정 ID / 신규 risk ID 는 02 / 06 spec 의 ID 부여 규칙(한 번 부여한 ID 는 재사용 / 재번호하지 않는다, 다음 가용 번호 부여) 을 그대로 따른다.
+New decision IDs / new risk IDs follow the ID assignment rule of the 02 / 06 specs as-is (an ID once assigned is not reused / re-numbered; assign the next available number).
 
-## 13. EC2 → ECS 운영 패턴 매핑 (R13)
+## 13. EC2 → ECS Operating Pattern Mapping (R13)
 
-### 13.1 매핑 표 (R13.1 / R13.4 근거)
+### 13.1 Mapping Table (basis: R13.1 / R13.4)
 
-| 영역 | EC2 (03 본 spec) | ECS Fargate (04 / 05 / 08 / 09) |
+| Area | EC2 (03 this spec) | ECS Fargate (04 / 05 / 08 / 09) |
 |------|------------------|--------------------------------|
-| 자격증명 | Instance Role + IMDSv2 | Task Role |
-| secret / parameter read | 06 정책 + 환경변수 주입 | ECS Task Definition `secrets` 필드 + Task Role |
-| 로그 | CloudWatch Logs Agent 또는 `PutLogEvents` | awslogs driver |
-| 접속 / 디버깅 | SSM Session Manager | ECS Exec |
-| 자동 기동 | systemd unit 또는 startup script | Task Definition + ECS Service |
-| 재기동 / 복구 | systemd `Restart=` | ECS Service `desiredCount` + Step Functions |
+| Credentials | Instance Role + IMDSv2 | Task Role |
+| secret / parameter read | 06 policy + environment variable injection | ECS Task Definition `secrets` field + Task Role |
+| Logs | CloudWatch Logs Agent or `PutLogEvents` | awslogs driver |
+| Access / debugging | SSM Session Manager | ECS Exec |
+| Auto-start | systemd unit or startup script | Task Definition + ECS Service |
+| Restart / recovery | systemd `Restart=` | ECS Service `desiredCount` + Step Functions |
 
-### 13.2 책임 분담 (R13.2 근거)
+### 13.2 Responsibility Split (basis: R13.2)
 
-03 (본 spec) = EC2 운영 패턴 1차 락. 04 / 05 / 08 / 09 = service prefix(`/portfolio/paper/strategy/*`, `/portfolio/paper/view/*`, `/portfolio/paper/crawler/*`, `/portfolio/paper/preprocessor/*`, `/portfolio/paper/research/*`) 채움.
+03 (this spec) = first lock of the EC2 operating pattern. 04 / 05 / 08 / 09 = fill in the service prefix (`/portfolio/paper/strategy/*`, `/portfolio/paper/view/*`, `/portfolio/paper/crawler/*`, `/portfolio/paper/preprocessor/*`, `/portfolio/paper/research/*`).
 
-### 13.3 후속 spec 변경 금지 결정 (R13.3 근거)
+### 13.3 No-Change Decisions for Follow-up Specs (basis: R13.3)
 
-후속 spec 은 다음을 변경하지 않는다.
+Follow-up specs do not change the following.
 
-Resource wildcard(`Resource: "*"`) 금지 / Action wildcard(`secretsmanager:*` / `ssm:*` / `Action: "*"`) 금지 / env prefix `paper` / `live` 만 사용 / 다른 service prefix Resource 부여 금지 / Access Key 미사용 원칙(IMDSv2 + Role only).
+No Resource wildcard (`Resource: "*"`) / no Action wildcard (`secretsmanager:*` / `ssm:*` / `Action: "*"`) / use only env prefix `paper` / `live` / no assigning a Resource for another service prefix / no-Access-Key principle (IMDSv2 + Role only).
 
-## 14. 안전 제약 (R14)
+## 14. Safety Constraints (R14)
 
-### 14.1 영역별 정책
+### 14.1 Policy by Area
 
-| 영역 | 정책 |
+| Area | Policy |
 |------|------|
-| 8개 MS 코드 / docs / 패키징 | 8개 MS 미수정. See Details §14 Notes |
-| 실제 AWS 리소스 | EC2 / EBS / EIP / SG / IAM Role / Policy / Instance Profile / Secrets Manager secret / SSM Parameter / RDS / parameter group / CloudWatch Logs Group / KMS Key 미작업. 모든 실제 생성 / 수정 / 삭제는 운영자 직접 |
-| 외부 호출 | broker / KIS API / Selenium / KRX / Naver / yfinance 호출 0건 |
-| 신규 주문 | 매수 / 매도 / 취소 / 정정 / Daily Batch / intraday monitor 호출 0건 |
-| RDS DDL/DML | 0건. 조회성 SELECT 만 허용 |
-| 조회성 smoke test | 운영자 직접 작업으로만 수행 |
-| secret / 식별자 표기 | `[REDACTED]` 또는 placeholder 만 사용. See Details §14.3 |
-| GetSecretValue 호출 | 운영자만 수행. Kiro 자동 검증은 `secretsmanager:DescribeSecret` metadata 만 |
-| 위반 감지 시 | 즉시 작업 중단 → 운영자 보고 → 롤백 절차 진행 |
+| 8 MS code / docs / packaging | 8 MS not modified. See Details §14 Notes |
+| Actual AWS resources | No work on EC2 / EBS / EIP / SG / IAM Role / Policy / Instance Profile / Secrets Manager secret / SSM Parameter / RDS / parameter group / CloudWatch Logs Group / KMS Key. All actual creation / change / deletion is operator direct |
+| External calls | 0 calls to broker / KIS API / Selenium / KRX / Naver / yfinance |
+| New orders | 0 calls to buy / sell / cancel / modify / Daily Batch / intraday monitor |
+| RDS DDL/DML | 0. Only read-only SELECT is allowed |
+| Read-only smoke test | Performed only as operator direct work |
+| secret / identifier notation | Use only `[REDACTED]` or placeholder. See Details §14.3 |
+| GetSecretValue calls | Performed only by the operator. Kiro automated validation uses only `secretsmanager:DescribeSecret` metadata |
+| On violation detection | Immediately halt the work → report to the operator → proceed with the rollback procedure |
 
-### 14.2 phase 분리 (R14.7 근거)
+### 14.2 Phase Separation (basis: R14.7)
 
-본 phase(design) 시점에 [`./design.md`](./design.md) 외 다른 산출물(`tasks.md`, `runbook.md`, `validation-checklist.md`, `operation-notes.md`) 을 생성하지 않는다. 후속 phase 의 책임이다.
+At this phase (design), do not create any deliverable other than [`./design.md`](./design.md) (`tasks.md`, `runbook.md`, `validation-checklist.md`, `operation-notes.md`). Those are the responsibility of follow-up phases.
 
-### 14 Notes — 8개 MS 미수정 대상 상세
+### 14 Notes — 8 MS No-Modification Targets in Detail
 
-8개 MS 미수정 대상은 아래 저장소의 README / AGENTS.md / CHANGELOG / docs / worklog / 소스 코드 / `requirements.txt` / `setup.py` / `pyproject.toml` 을 포함한다.
+The 8 MS no-modification targets include the README / AGENTS.md / CHANGELOG / docs / worklog / source code / `requirements.txt` / `setup.py` / `pyproject.toml` of the repositories below.
 
 - `port-view`
 - `port-marketconnector`
@@ -560,27 +560,27 @@ Resource wildcard(`Resource: "*"`) 금지 / Action wildcard(`secretsmanager:*` /
 - `port_strategy_execution`
 - `port_strategy_research`
 
-### 14.3 secret / 식별자 표기 상세
+### 14.3 secret / identifier Notation Details
 
-secret / 식별자 표기 정책의 실제 대상은 다음과 같다. 모두 `[REDACTED]` 또는 placeholder 만 사용한다.
+The actual targets of the secret / identifier notation policy are as follows. Everywhere uses only `[REDACTED]` or a placeholder.
 
-- 실제 secret value / password / token / webhook URL
-- KIS app key / KIS app secret / 계좌번호
+- Actual secret value / password / token / webhook URL
+- KIS app key / KIS app secret / account number
 - access key id / secret access key
 - RDS endpoint hostname / account-id
-- 실제 secret ARN / 실제 KMS Key ARN
+- Actual secret ARN / actual KMS Key ARN
 - instance-id / EIP / EBS volume id
 
-## Testing Strategy (참고)
+## Testing Strategy (reference)
 
-본 spec 은 EC2 운영 패턴 / IAM 보조 권한 / 환경변수 주입 흐름 / 절차서 산출물이다. 코드 / 순수 함수 / 입력 변동에 따라 행위가 달라지는 알고리즘이 없다. 따라서 property-based testing(PBT) 은 적용되지 않는다. 본 design 은 Correctness Properties 섹션을 포함하지 않는다.
+This spec is a deliverable of EC2 operating patterns / IAM auxiliary permissions / environment variable injection flow / procedure documents. It has no code / pure functions / algorithm whose behavior changes with input variation. Therefore property-based testing (PBT) does not apply. This design does not include a Correctness Properties section.
 
-본 spec 의 검증은 다음 두 형태로만 수행된다.
+Validation of this spec is performed only in the following two forms.
 
-- 환경 정합성 정적 점검: Python / venv / 의존 라이브러리 / client major version / Instance Role assumed-role ARN / Access Key 미존재 / Secret · Parameter Describe metadata 일치 점검. [`./validation-checklist.md`](./validation-checklist.md)(후속 phase) 책임.
-- 조회성 smoke test 통과 여부 점검. [`./runbook.md`](./runbook.md) / [`./validation-checklist.md`](./validation-checklist.md)(후속 phase) 책임.
-  - `marketconnector_app` 기준 RDS 접속
-  - `connector_balance.py` / `connector_order_check.py` 실행
-  - Flask 조회성 endpoint(`/api/v1/view/...`) 호출
-  - `secretsmanager:GetSecretValue` 호출은 운영자만 수행
-  - Kiro 자동 검증은 `secretsmanager:DescribeSecret` metadata 만 사용
+- Static environment consistency check: check the consistency of Python / venv / dependency libraries / client major version / Instance Role assumed-role ARN / absence of Access Key / Secret · Parameter Describe metadata. Responsibility of [`./validation-checklist.md`](./validation-checklist.md) (follow-up phase).
+- Check whether read-only smoke tests pass. Responsibility of [`./runbook.md`](./runbook.md) / [`./validation-checklist.md`](./validation-checklist.md) (follow-up phase).
+  - RDS connection based on `marketconnector_app`
+  - Execute `connector_balance.py` / `connector_order_check.py`
+  - Call the Flask read-only endpoint (`/api/v1/view/...`)
+  - The `secretsmanager:GetSecretValue` call is performed only by the operator
+  - Kiro automated validation uses only `secretsmanager:DescribeSecret` metadata

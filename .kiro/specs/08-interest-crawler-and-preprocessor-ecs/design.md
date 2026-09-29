@@ -2,383 +2,383 @@
 
 ## Introduction
 
-본 spec 의 핵심을 한 줄로 요약한다. **`port-interest-crawler` / `port-interest-preprocessor` 두 Python MS 를 `aws-paper` 환경의 ECR / ECS 위에서 1차 실행 검증할 수 있도록 ECR repository / Dockerfile 점검 / 로컬 빌드 / ECR push / ECS Cluster·Role·Log Group / Preprocessor 단발 실행 / Crawler outbound 리스크 분리 절차 기준을 확정한다.**
+This summarizes the core of this spec in one line. **It fixes the criteria for the procedures to enable a first-round execution validation of the two Python MS `port-interest-crawler` / `port-interest-preprocessor` on the ECR / ECS of the `aws-paper` environment: ECR repository / Dockerfile inspection / local build / ECR push / ECS Cluster·Role·Log Group / single Preprocessor run / separation of Crawler outbound risk.**
 
-- 1차 적용 환경: `aws-paper`, region `ap-northeast-2`. `aws-live` 와 10 spec 통합 cutover 는 본 spec 범위 밖.
-- 입력: [`./requirements.md`](./requirements.md) R1 ~ R11, [`../02-aws-network-and-rds`](../02-aws-network-and-rds)(VPC / Subnet / SG / VPC Endpoint / RDS), [`../06-secrets-and-iam`](../06-secrets-and-iam)(Secrets / SSM / Role 정책), [`../03-marketconnector-ec2`](../03-marketconnector-ec2)(EC2 → ECS 운영 패턴 §13).
-- 본 08 초기 문서 phase 산출물은 requirements.md / design.md / tasks.md 3개로 한정한다. runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md 는 운영자 실행 이후 별도 작성한다(R11 정합).
+- First-round target environment: `aws-paper`, region `ap-northeast-2`. The integrated cutover of `aws-live` with the 10 spec is out of scope for this spec.
+- Inputs: [`./requirements.md`](./requirements.md) R1 ~ R11, [`../02-aws-network-and-rds`](../02-aws-network-and-rds) (VPC / Subnet / SG / VPC Endpoint / RDS), [`../06-secrets-and-iam`](../06-secrets-and-iam) (Secrets / SSM / Role policy), [`../03-marketconnector-ec2`](../03-marketconnector-ec2) (EC2 → ECS operational pattern §13).
+- The deliverables of this 08 initial-document phase are limited to the 3 files requirements.md / design.md / tasks.md. runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md are authored separately after operator execution (consistent with R11).
 
-본 문서는 실제 secret value, account-id, RDS endpoint hostname, image digest, 실제 ARN, instance-id, IAM access key id 를 평문 기록하지 않는다. 모두 `[REDACTED]` 또는 placeholder(`<account-id>`, `<region>`, `<ecr-repo-uri>`, `<image-tag>`, `<task-arn>`, `<rds-endpoint>`, `<cluster-name>`) 만 사용한다(R10.4 정합).
+This document does not record actual secret values, account-id, RDS endpoint hostname, image digest, actual ARNs, instance-id, or IAM access key id in plaintext. It uses only `[REDACTED]` or placeholders (`<account-id>`, `<region>`, `<ecr-repo-uri>`, `<image-tag>`, `<task-arn>`, `<rds-endpoint>`, `<cluster-name>`) (consistent with R10.4).
 
 ## Runtime Role Split at a Glance
 
-Hybrid execution model 의 runtime 경계는 GUI 요구 여부로 결정된다. 자세한 근거는 §12(hybrid 분류) / §13(SSM 자동화) / §15(rev7 non-GUI 운영 경로 + Autologon) / §17(Step 2 성공판정 강화) 참조.
+The runtime boundary of the hybrid execution model is determined by whether GUI is required. For detailed rationale, see §12 (hybrid classification) / §13 (SSM automation) / §15 (rev7 non-GUI operational path + Autologon) / §17 (Step 2 success-judgment strengthening).
 
-| Workload | Runtime | 진입점 / trigger | 성공 판정 |
+| Workload | Runtime | Entrypoint / trigger | Success judgment |
 |---|---|---|---|
-| Preprocessor MS | ECS Fargate Task (single-run) | `aws ecs run-task` 1회 | exit code 0 / CloudWatch Logs `PREPROCESSOR PIPELINE END` / feature `updated_at` 갱신 |
-| non-GUI crawler | ECS Fargate Task (`portfolio-paper-interest-crawler:7`, daily 운영용) | `aws ecs run-task` 1회 (wrapper Step 2 안에서) | exit code 0 / 8종 non-GUI step SUCCESS / raw table `max(trade_date)` 정합 |
-| KRX GUI crawler | Windows EC2 worker (Autologon → Administrator console → Scheduled Task) | SSM RunCommand → `schtasks /Run /TN Portfolio-KRX-Worker-Daily` | Running→Ready 복귀 + Last Result 0 + latest log tail + KRX raw DB validation exit code 0 |
-| ECS Task Definition rev6 (참조 이력) | ECS Fargate (smoke 전용) | 운영 진입점 아님 | 2026-06-13 §5 통과 시점 상태 유지 / 운영 대상 아님 |
+| Preprocessor MS | ECS Fargate Task (single-run) | `aws ecs run-task` once | exit code 0 / CloudWatch Logs `PREPROCESSOR PIPELINE END` / feature `updated_at` refreshed |
+| non-GUI crawler | ECS Fargate Task (`portfolio-paper-interest-crawler:7`, for daily operations) | `aws ecs run-task` once (inside wrapper Step 2) | exit code 0 / 8 non-GUI steps SUCCESS / raw table `max(trade_date)` consistent |
+| KRX GUI crawler | Windows EC2 worker (Autologon → Administrator console → Scheduled Task) | SSM RunCommand → `schtasks /Run /TN Portfolio-KRX-Worker-Daily` | Running→Ready return + Last Result 0 + latest log tail + KRX raw DB validation exit code 0 |
+| ECS Task Definition rev6 (reference history) | ECS Fargate (smoke only) | Not an operational entrypoint | State retained as of the 2026-06-13 §5 pass point / not an operational target |
 
-**진입점 원칙**
+**Entrypoint principles**
 
-- SSM direct Python / wrapper 실행은 SYSTEM Session 0 부적합. 채택 거부(§13.2 / §15.5).
-- SSM RunCommand 는 `schtasks /Run` trigger 역할만 담당.
-- Scheduled Task trigger 성공 ≠ Step 2 SUCCESS. 6개 성공 조건(§17.1) 모두 통과 필요.
-- Headless / 비대화형 KRX 수집은 로컬 검증상 운영 방식에서 제외(§15.6).
-- Autologon 은 paper 전용 Windows worker 한정 보안 예외(R-SEC-009 / §12 · §15.4).
+- SSM direct Python / wrapper execution is unsuitable for the SYSTEM Session 0. Adoption rejected (§13.2 / §15.5).
+- SSM RunCommand serves only the `schtasks /Run` trigger role.
+- Scheduled Task trigger success ≠ Step 2 SUCCESS. All 6 success conditions (§17.1) must pass.
+- Headless / non-interactive KRX collection is excluded from the operational method based on local validation (§15.6).
+- Autologon is a security exception limited to the paper-only Windows worker (R-SEC-009 / §12 · §15.4).
 
-## 1. 범위 / 범위 밖 (R1)
+## 1. Scope / Out of Scope (R1)
 
-### 1.1 범위 안 / 범위 밖
+### 1.1 In Scope / Out of Scope
 
-| 구분 | 항목 |
+| Category | Item |
 |------|------|
-| 범위 안 | ECR repository 2개 생성 기준 / Dockerfile 점검 / 로컬 이미지 빌드(preprocessor 우선) / ECR push / ECS Cluster·Task Role·Task Execution Role·Log Group 준비 / Preprocessor ECS Task 단발 실행 검증 / Crawler outbound·Selenium 리스크 별도 관리 |
-| 범위 밖 | ECS Service 상시 가동 / EventBridge Scheduler / Step Functions 자동 기동 / aws-live 적용(10 spec) / GitHub Actions OIDC·CI/CD Role(07 spec) / 8개 MS README·AGENTS.md·소스·`requirements.txt`·Dockerfile 수정 / Crawler Selenium·Chrome 운영 안정화 100% 보장 |
+| In scope | Criteria for creating 2 ECR repositories / Dockerfile inspection / local image build (preprocessor first) / ECR push / preparation of ECS Cluster·Task Role·Task Execution Role·Log Group / single-run validation of the Preprocessor ECS Task / separate management of Crawler outbound·Selenium risk |
+| Out of scope | Always-on ECS Service / EventBridge Scheduler / Step Functions automatic startup / aws-live application (10 spec) / GitHub Actions OIDC·CI/CD Role (07 spec) / modification of the 8 MS README·AGENTS.md·source·`requirements.txt`·Dockerfile / 100% guarantee of Crawler Selenium·Chrome operational stabilization |
 
-### 1.2 본 phase 산출물 한정 (R11 근거)
+### 1.2 Limitation of this phase's deliverables (R11 basis)
 
-본 08 초기 문서 phase 산출물은 requirements.md / design.md / tasks.md 3개로 한정한다. runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md 는 운영자 실행 이후 별도 작성한다. [`../_common/operator-decisions.md`](../_common/operator-decisions.md) / [`../_common/risk-register.md`](../_common/risk-register.md) / [`../_common/followups-overview.md`](../_common/followups-overview.md) 의 실제 갱신은 후속 phase 책임이며, 본 phase 에서는 후보 식별만 수행한다.
+The deliverables of this 08 initial-document phase are limited to the 3 files requirements.md / design.md / tasks.md. runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md are authored separately after operator execution. The actual update of [`../_common/operator-decisions.md`](../_common/operator-decisions.md) / [`../_common/risk-register.md`](../_common/risk-register.md) / [`../_common/followups-overview.md`](../_common/followups-overview.md) is the responsibility of a subsequent phase; this phase performs candidate identification only.
 
 ## 2. ECR Repository (R2)
 
-### 2.1 Repository 매트릭스
+### 2.1 Repository matrix
 
-| Repository 이름 | region | URI placeholder | 대상 MS | image scan on push |
+| Repository name | region | URI placeholder | Target MS | image scan on push |
 |----------------|--------|----------------|--------|--------------------|
-| `portfolio-interest-crawler` | `<region>` (`ap-northeast-2`) | `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-crawler:<image-tag>` | `port-interest-crawler` (Crawler MS) | enabled (권고) |
-| `portfolio-interest-preprocessor` | `<region>` (`ap-northeast-2`) | `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-preprocessor:<image-tag>` | `port-interest-preprocessor` (Preprocessor MS) | enabled (권고) |
+| `portfolio-interest-crawler` | `<region>` (`ap-northeast-2`) | `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-crawler:<image-tag>` | `port-interest-crawler` (Crawler MS) | enabled (recommended) |
+| `portfolio-interest-preprocessor` | `<region>` (`ap-northeast-2`) | `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-preprocessor:<image-tag>` | `port-interest-preprocessor` (Preprocessor MS) | enabled (recommended) |
 
-실제 account-id 는 본 design 어디에도 평문 기록하지 않는다(R10.4 정합). 실제 repository 생성은 운영자 직접 작업이며 본 spec 범위 밖.
+The actual account-id is not recorded in plaintext anywhere in this design (consistent with R10.4). The actual repository creation is a direct operator task and is out of scope for this spec.
 
-### 2.2 공통 base image 분리
+### 2.2 Common base image separation
 
-두 MS 가 공통 Python base image / Selenium base image 를 공유할 가능성이 있으나, 공통 base image repository 분리 여부는 본 spec 범위 밖이며 후속 검토로 분리한다(R2.4 근거).
+The two MS may share a common Python base image / Selenium base image, but whether to separate a common base image repository is out of scope for this spec and is deferred to a subsequent review (R2.4 basis).
 
-### 2.3 환경 미분리 정책 (R2.5 근거)
+### 2.3 Environment non-separation policy (R2.5 basis)
 
-ECR repository 는 paper / live 환경별로 분리하지 않는다. 동일 image artifact 를 환경별 중복 repository 에 push 하지 않으며, paper / live 구분은 다음 6개 항목에서 처리한다: (1) image tag, (2) ECS Task Definition, (3) Secrets Manager / SSM Parameter Store path, (4) IAM Task Role, (5) environment variables, (6) RDS / broker 설정.
+The ECR repository is not separated per paper / live environment. The same image artifact is not pushed to duplicate repositories per environment, and the paper / live distinction is handled in the following 6 items: (1) image tag, (2) ECS Task Definition, (3) Secrets Manager / SSM Parameter Store path, (4) IAM Task Role, (5) environment variables, (6) RDS / broker configuration.
 
-## 3. Dockerfile 점검 (R3)
+## 3. Dockerfile inspection (R3)
 
-본 spec 작업은 두 MS 의 Dockerfile / 소스 / `requirements.txt` 를 직접 수정하지 않는다. Dockerfile 부재 또는 entrypoint 결함이 발견되는 경우, 후속 spec 또는 운영자 단계 책임으로 분리한다(R3.4 정합).
+The work of this spec does not directly modify the Dockerfile / source / `requirements.txt` of the two MS. If a missing Dockerfile or an entrypoint defect is found, it is separated as the responsibility of a subsequent spec or operator stage (consistent with R3.4).
 
-### 3.1 점검 항목 — Preprocessor MS
+### 3.1 Inspection items — Preprocessor MS
 
-| 점검 항목 | 기대 값 / 점검 방식 |
+| Inspection item | Expected value / inspection method |
 |----------|--------------------|
-| Dockerfile 존재 | repo 루트에 `Dockerfile` 1개 |
-| base image | Python 3.x slim 계열 권고. 실제 tag 결정은 운영자 |
-| requirements 설치 | `pip install -r requirements.txt` 또는 등가 방식 |
-| entrypoint / CMD | preprocessor 실행 entrypoint 명시 (예: `python pre_daily.py`) |
-| RDS env 호환 | `INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD` 환경변수 주입 호환 |
-| Selenium / Chrome 의존 | **불필요** (외부 API / Selenium 미사용) |
+| Dockerfile existence | 1 `Dockerfile` at the repo root |
+| base image | Python 3.x slim family recommended. The actual tag decision is the operator's |
+| requirements install | `pip install -r requirements.txt` or an equivalent method |
+| entrypoint / CMD | Specify the preprocessor execution entrypoint (e.g., `python pre_daily.py`) |
+| RDS env compatibility | Compatible with injecting the `INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD` environment variables |
+| Selenium / Chrome dependency | **Not required** (no external API / Selenium used) |
 
-### 3.2 점검 항목 — Crawler MS
+### 3.2 Inspection items — Crawler MS
 
-| 점검 항목 | 기대 값 / 점검 방식 |
+| Inspection item | Expected value / inspection method |
 |----------|--------------------|
-| Dockerfile 존재 | repo 루트에 `Dockerfile` 1개 |
-| base image | Python 3.x slim 또는 selenium-capable 계열 |
-| requirements 설치 | `pip install -r requirements.txt` 또는 등가 방식 |
-| entrypoint / CMD | crawler 실행 entrypoint 명시 |
-| Chrome / chromedriver 설치 | Selenium 의존 시 Dockerfile 안 설치 단계 존재 여부 1차 확인 |
-| RDS env 호환 | 동일 5개 환경변수 키 주입 호환 (raw 적재용) |
+| Dockerfile existence | 1 `Dockerfile` at the repo root |
+| base image | Python 3.x slim or selenium-capable family |
+| requirements install | `pip install -r requirements.txt` or an equivalent method |
+| entrypoint / CMD | Specify the crawler execution entrypoint |
+| Chrome / chromedriver install | First-round confirmation of whether an install step exists inside the Dockerfile when Selenium is depended on |
+| RDS env compatibility | Compatible with injecting the same 5 environment variable keys (for raw loading) |
 
-## 4. 로컬 이미지 빌드 (R4)
+## 4. Local image build (R4)
 
-### 4.1 빌드 순서 / 정책
+### 4.1 Build order / policy
 
-| 순번 | 대상 | 정책 |
+| Order | Target | Policy |
 |------|------|------|
-| 1 | Preprocessor MS | 우선 빌드. 빌드 성공 시 ECR push 단계로 진행 |
-| 2 | Crawler MS | Preprocessor 빌드 성공 후 진행. **실패 시 Preprocessor 흐름 차단 금지**(R4.3 정합) |
+| 1 | Preprocessor MS | Build first. On build success, proceed to the ECR push stage |
+| 2 | Crawler MS | Proceed after the Preprocessor build succeeds. **Do not block the Preprocessor flow on failure** (consistent with R4.3) |
 
-빌드 결과는 성공 / 실패 / image id 존재 여부만 후속 산출물에 기록한다. 빌드 로그 stdout / stderr 본문은 평문 인용하지 않는다(R4.4 정합).
+Only build success / failure / whether an image id exists are recorded in subsequent deliverables. The build log stdout / stderr body is not quoted in plaintext (consistent with R4.4).
 
-### 4.2 빌드 실패 원인 후보
+### 4.2 Build failure cause candidates
 
-| # | 원인 후보 | 1차 점검 위치 |
+| # | Cause candidate | First-round inspection location |
 |---|----------|--------------|
-| 1 | `requirements.txt` 호환성 (패키지 충돌 / 빌드 휠 부재) | `pip install` 단계 로그 |
-| 2 | Python version mismatch (3.9 / 3.10 / 3.11 등) | base image tag |
-| 3 | import path / module 부재 | entrypoint 실행 단계 |
-| 4 | system package 부족 (`build-essential`, `libpq-dev` 등) | Dockerfile 의 `apt-get install` 단계 |
-| 5 | Crawler MS 의 Selenium / Chrome / chromedriver 설치 실패 | Crawler Dockerfile 한정. Preprocessor 무관 |
+| 1 | `requirements.txt` compatibility (package conflict / missing build wheel) | `pip install` stage log |
+| 2 | Python version mismatch (3.9 / 3.10 / 3.11, etc.) | base image tag |
+| 3 | import path / missing module | entrypoint execution stage |
+| 4 | Insufficient system packages (`build-essential`, `libpq-dev`, etc.) | `apt-get install` stage of the Dockerfile |
+| 5 | Selenium / Chrome / chromedriver install failure of the Crawler MS | Limited to the Crawler Dockerfile. Unrelated to Preprocessor |
 
 ## 5. ECR Push (R5)
 
-### 5.1 Tag / 순서 정책
+### 5.1 Tag / order policy
 
-| 항목 | 정책 |
+| Item | Policy |
 |------|------|
-| image tag 형식 | `paper-<yyyymmdd>` 또는 `paper-latest` 형태의 placeholder `<image-tag>`. 실제 tag 결정은 운영자 직접 단계 |
-| push 순서 | (1) Preprocessor → (2) Crawler |
-| digest 확인 | push 성공 시 `sha256:...` 확인. 실값은 본 design / 후속 산출물에 평문 기록 금지. placeholder `<image-digest>` 만 사용 |
+| image tag format | Placeholder `<image-tag>` in the form `paper-<yyyymmdd>` or `paper-latest`. The actual tag decision is a direct operator stage |
+| push order | (1) Preprocessor → (2) Crawler |
+| digest confirmation | On push success, confirm `sha256:...`. The actual value must not be recorded in plaintext in this design / subsequent deliverables. Use only the placeholder `<image-digest>` |
 
-### 5.2 image tag 전략 (R5.5 근거)
+### 5.2 image tag strategy (R5.5 basis)
 
-| 단계 | tag 형식 | 비고 |
+| Stage | tag format | Note |
 |------|---------|------|
-| aws-paper 1차 검증 | `paper-<yyyymmdd>` / `paper-latest` | 본 spec 시점 사용 |
-| aws-live 적용 | `live-<yyyymmdd>` / `live-latest` | 10 spec cutover 이후 |
-| CI/CD 성숙 단계 | `git-<sha>` 추가 가능 | 후속 spec(07 OIDC) 이후 |
+| aws-paper first-round validation | `paper-<yyyymmdd>` / `paper-latest` | Used at the time of this spec |
+| aws-live application | `live-<yyyymmdd>` / `live-latest` | After the 10 spec cutover |
+| CI/CD maturity stage | `git-<sha>` may be added | After a subsequent spec (07 OIDC) |
 
-push target URI 는 `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-crawler:<image-tag>`, `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-preprocessor:<image-tag>` placeholder 만 사용한다.
+The push target URI uses only the placeholders `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-crawler:<image-tag>`, `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-preprocessor:<image-tag>`.
 
-### 5.3 Push 실패 원인 후보
+### 5.3 Push failure cause candidates
 
-| # | 원인 후보 | 1차 점검 위치 |
+| # | Cause candidate | First-round inspection location |
 |---|----------|--------------|
-| 1 | ECR login token 만료 (`aws ecr get-login-password` 재발급 필요) | `docker login` 응답 |
-| 2 | Task Execution Role / 운영자 IAM 권한 누락 (`ecr:PutImage` 등) | IAM 정책 |
-| 3 | repository 미생성 | ECR Console / `aws ecr describe-repositories` |
-| 4 | Docker daemon 미기동 / 로컬 환경 결함 | `docker info` |
-| 5 | region 불일치 (`ap-northeast-2` 외) | login URI / push 대상 URI |
+| 1 | ECR login token expired (`aws ecr get-login-password` reissue needed) | `docker login` response |
+| 2 | Task Execution Role / operator IAM permission missing (`ecr:PutImage`, etc.) | IAM policy |
+| 3 | repository not created | ECR Console / `aws ecr describe-repositories` |
+| 4 | Docker daemon not started / local environment defect | `docker info` |
+| 5 | region mismatch (other than `ap-northeast-2`) | login URI / push target URI |
 
-## 6. ECS Cluster / Role / Log Group 준비 (R6)
+## 6. ECS Cluster / Role / Log Group preparation (R6)
 
-### 6.1 인프라 산출물 매트릭스
+### 6.1 Infrastructure deliverable matrix
 
-| 종류 | 개수 | 이름 placeholder | 정책 |
+| Kind | Count | Name placeholder | Policy |
 |------|------|-----------------|------|
-| ECS Cluster (Fargate) | 1 | `<cluster-name>` | aws-paper 단일. 본 spec 시점 신규 생성 기준 |
-| Task Execution Role | 1 | `portfolio-paper-ecs-task-execution-role` | ECR pull / CloudWatch Logs write / Secrets·SSM read 권한 |
-| Task Role — Crawler | 1 | `portfolio-paper-crawler-task-role` | `/portfolio/paper/crawler/*` Secrets·SSM read 한정 |
-| Task Role — Preprocessor | 1 | `portfolio-paper-preprocessor-task-role` | `/portfolio/paper/preprocessor/*` Secrets·SSM read 한정 |
-| CloudWatch Log Group | 2 | `/portfolio/paper/crawler`, `/portfolio/paper/preprocessor` | 운영자 사전 생성. application 임의 log group 생성 금지 |
+| ECS Cluster (Fargate) | 1 | `<cluster-name>` | aws-paper single. New-creation basis at the time of this spec |
+| Task Execution Role | 1 | `portfolio-paper-ecs-task-execution-role` | ECR pull / CloudWatch Logs write / Secrets·SSM read permissions |
+| Task Role — Crawler | 1 | `portfolio-paper-crawler-task-role` | Limited to `/portfolio/paper/crawler/*` Secrets·SSM read |
+| Task Role — Preprocessor | 1 | `portfolio-paper-preprocessor-task-role` | Limited to `/portfolio/paper/preprocessor/*` Secrets·SSM read |
+| CloudWatch Log Group | 2 | `/portfolio/paper/crawler`, `/portfolio/paper/preprocessor` | Pre-created by the operator. Arbitrary log group creation by the application is prohibited |
 
-실제 Role / Cluster / Log Group 생성은 운영자 직접 작업이며 본 spec 범위 밖(R10.1 정합).
+The actual Role / Cluster / Log Group creation is a direct operator task and is out of scope for this spec (consistent with R10.1).
 
-### 6.2 Task Execution Role — 권한 골격
+### 6.2 Task Execution Role — permission skeleton
 
-| Statement | Action 후보 | Resource 범위 |
+| Statement | Action candidate | Resource scope |
 |-----------|-------------|--------------|
-| ECR Pull | `ecr:GetAuthorizationToken`, `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer` | repository ARN 한정 (`<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-crawler:<image-tag>`, `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-preprocessor:<image-tag>`) |
-| CloudWatch Logs Write | `logs:CreateLogStream`, `logs:PutLogEvents`, `logs:DescribeLogStreams` | `/portfolio/paper/crawler*`, `/portfolio/paper/preprocessor*` log group ARN 한정 |
-| Secrets / SSM Read | `secretsmanager:GetSecretValue`, `ssm:GetParameters` | service prefix Resource ARN 한정 |
+| ECR Pull | `ecr:GetAuthorizationToken`, `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer` | Limited to the repository ARN (`<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-crawler:<image-tag>`, `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-preprocessor:<image-tag>`) |
+| CloudWatch Logs Write | `logs:CreateLogStream`, `logs:PutLogEvents`, `logs:DescribeLogStreams` | Limited to the `/portfolio/paper/crawler*`, `/portfolio/paper/preprocessor*` log group ARN |
+| Secrets / SSM Read | `secretsmanager:GetSecretValue`, `ssm:GetParameters` | Limited to the service prefix Resource ARN |
 
-### 6.3 wildcard 금지 정책 (03 §13 정합, R6.5 근거)
+### 6.3 wildcard prohibition policy (consistent with 03 §13, R6.5 basis)
 
-| 패턴 | 정책 |
+| Pattern | Policy |
 |------|------|
-| Resource `*` | **금지** |
-| Action wildcard (`secretsmanager:*`, `ssm:*`, `ecs:*`, `Action: "*"`) | **금지** |
-| service prefix 분리 | crawler / preprocessor 각각 독립 prefix 만 부여. 다른 service prefix 부여 금지 |
+| Resource `*` | **Prohibited** |
+| Action wildcard (`secretsmanager:*`, `ssm:*`, `ecs:*`, `Action: "*"`) | **Prohibited** |
+| service prefix separation | Grant only each independent prefix to crawler / preprocessor. Granting a different service prefix is prohibited |
 
-### 6.4 Task Execution Role / Task Role 책임 분리 (R6.6 근거)
+### 6.4 Task Execution Role / Task Role responsibility separation (R6.6 basis)
 
-Task Definition `secrets` 필드 주입용 Secrets Manager / SSM read 권한은 **Task Execution Role** 이 보유한다. application runtime 에서 AWS SDK 로 Secrets Manager / SSM Parameter Store 를 직접 조회하는 권한은 **Task Role** 이 보유한다. 본 1차 검증은 Task Definition `secrets` 필드 주입을 우선 사용한다.
+The Secrets Manager / SSM read permission for injecting the Task Definition `secrets` field is held by the **Task Execution Role**. The permission for the application runtime to query Secrets Manager / SSM Parameter Store directly via the AWS SDK is held by the **Task Role**. This first-round validation preferentially uses Task Definition `secrets` field injection.
 
-## 7. Preprocessor 단발 실행 검증 (R7)
+## 7. Preprocessor single-run validation (R7)
 
-### 7.1 Task 실행 형태
+### 7.1 Task execution form
 
-| 항목 | 결정값 |
+| Item | Decision value |
 |------|--------|
 | networkMode | `awsvpc` |
-| Subnet 배치 | public subnet (02 spec `public-a` 또는 `public-b`) |
+| Subnet placement | public subnet (02 spec `public-a` or `public-b`) |
 | `assignPublicIp` | `ENABLED` (NAT-free outbound) |
-| 실행 방식 | `aws ecs run-task` 1회 단발. ECS Service / EventBridge / Step Functions 미사용 |
-| 본 spec 범위 밖 | Service 상시 가동 / Scheduler 정기 기동 (R7.3 정합) |
+| Execution method | `aws ecs run-task` once, single-run. No ECS Service / EventBridge / Step Functions |
+| Out of scope for this spec | Always-on Service / periodic Scheduler startup (consistent with R7.3) |
 
-### 7.2 검증 항목
+### 7.2 Validation items
 
-| # | 점검 항목 | 기대 결과 |
+| # | Inspection item | Expected result |
 |---|----------|----------|
-| 1 | `preprocessor_app` 기준 RDS 접속 | 성공 (private endpoint, `sg-preprocessor-task` → `sg-rds-postgres` 5432 통과) |
-| 2 | CloudWatch Logs 출력 | `/portfolio/paper/preprocessor` log group 안 stream 생성 / 본문 출력 |
+| 1 | RDS connection based on `preprocessor_app` | Success (private endpoint, `sg-preprocessor-task` → `sg-rds-postgres` 5432 passing) |
+| 2 | CloudWatch Logs output | Stream created inside the `/portfolio/paper/preprocessor` log group / body output |
 | 3 | Task exit code | `0` |
-| 4 | image pull / Secret 주입 | Task Execution Role 로그 / 환경변수 주입 정상 |
+| 4 | image pull / Secret injection | Task Execution Role log / environment variable injection normal |
 
-### 7.3 RDS 환경변수 매핑 (06 / 03 §6 인용)
+### 7.3 RDS environment variable mapping (cited from 06 / 03 §6)
 
-| Secret 경로 | JSON key | 환경변수 키 |
+| Secret path | JSON key | environment variable key |
 |------------|----------|-------------|
 | `/portfolio/paper/rds/preprocessor-app` | `host` | `INTEREST_DB_HOST` |
-| 동상 | `port` | `INTEREST_DB_PORT` |
-| 동상 | `dbname` | `INTEREST_DB_NAME` |
-| 동상 | `username` | `INTEREST_DB_USER` |
-| 동상 | `password` | `INTEREST_DB_PASSWORD` |
+| same as above | `port` | `INTEREST_DB_PORT` |
+| same as above | `dbname` | `INTEREST_DB_NAME` |
+| same as above | `username` | `INTEREST_DB_USER` |
+| same as above | `password` | `INTEREST_DB_PASSWORD` |
 
-실제 RDS endpoint hostname / password 는 본 design 어디에도 평문 기록 금지. placeholder `<rds-endpoint>` / `[REDACTED]` 만 사용.
+The actual RDS endpoint hostname / password must not be recorded in plaintext anywhere in this design. Use only the placeholders `<rds-endpoint>` / `[REDACTED]`.
 
-### 7.4 실행 실패 원인 후보
+### 7.4 Execution failure cause candidates
 
-| # | 원인 후보 | 1차 점검 위치 |
+| # | Cause candidate | First-round inspection location |
 |---|----------|--------------|
-| 1 | 환경변수 주입 누락 (Task Definition `secrets` 필드 결손) | Task Definition JSON / CloudWatch Logs |
-| 2 | Secret read 권한 누락 (Task Role 또는 Task Execution Role) | IAM 정책 / Task event 메시지 |
-| 3 | RDS SG inbound 미허용 (`sg-preprocessor-task` 미등록) | RDS SG inbound rule |
-| 4 | VPC Endpoint 누락 또는 public subnet 배치 누락 | Subnet / Route Table / VPC Endpoint |
-| 5 | image entrypoint 결함 / requirements 미설치 | image build 단계로 회귀 |
+| 1 | Environment variable injection missing (Task Definition `secrets` field defect) | Task Definition JSON / CloudWatch Logs |
+| 2 | Secret read permission missing (Task Role or Task Execution Role) | IAM policy / Task event message |
+| 3 | RDS SG inbound not allowed (`sg-preprocessor-task` not registered) | RDS SG inbound rule |
+| 4 | VPC Endpoint missing or public subnet placement missing | Subnet / Route Table / VPC Endpoint |
+| 5 | image entrypoint defect / requirements not installed | Regress to the image build stage |
 
-## 8. Crawler 외부 outbound 리스크 별도 관리 (R8)
+## 8. Separate management of Crawler external outbound risk (R8)
 
-본 spec 시점 Crawler 는 1차 검토(Dockerfile / 빌드 가능 여부 / outbound 도달 여부) 까지만 수행한다. 운영 안정화 100% 보장은 본 spec 범위 밖이며, Selenium / Chrome 의존성 결함 발견 시 Preprocessor 검증 흐름을 차단하지 않는다(R8.3 / R8.4 정합).
+At the time of this spec, the Crawler performs only the first-round review (Dockerfile / whether it can build / whether outbound is reachable). A 100% guarantee of operational stabilization is out of scope for this spec, and when a Selenium / Chrome dependency defect is found, it does not block the Preprocessor validation flow (consistent with R8.3 / R8.4).
 
-### 8.1 외부 의존 / outbound 도메인 후보
+### 8.1 External dependency / outbound domain candidates
 
-| 의존 / 도메인 | 용도 | 1차 검토 |
+| Dependency / domain | Use | First-round review |
 |--------------|------|---------|
-| Selenium / Chrome / chromedriver | 동적 페이지 수집 | Dockerfile 안 설치 단계 존재 여부만 확인. 안정성 검증은 후속 |
-| `data.krx.co.kr`, `open.krx.co.kr` | KRX OTP / 시세 / 수급 / 공매도 | DNS / 443 outbound 도달 여부 1차 확인 |
-| `finance.naver.com` | Naver 시세 / 뉴스 / 리포트 | 동상 |
-| `query1.finance.yahoo.com` | yfinance API | 동상 |
+| Selenium / Chrome / chromedriver | Dynamic page collection | Confirm only whether an install step exists inside the Dockerfile. Stability validation is subsequent |
+| `data.krx.co.kr`, `open.krx.co.kr` | KRX OTP / quote / flow / short selling | First-round confirmation of DNS / 443 outbound reachability |
+| `finance.naver.com` | Naver quote / news / report | same as above |
+| `query1.finance.yahoo.com` | yfinance API | same as above |
 
-### 8.2 리스크 후보 (분리 관리)
+### 8.2 Risk candidates (separate management)
 
-| ID 후보 | 리스크 | 본 spec 처리 |
+| ID candidate | Risk | Handling in this spec |
 |---------|-------|-------------|
-| R-CRAWL-XXX | KRX 로그인 / OTP 만료 / rate limit | 1차 검토만. 운영 안정화는 후속 spec |
-| R-CRAWL-XXX | Selenium / Chrome 비정상 종료 / headless 호환성 | 동상 |
-| R-CRAWL-XXX | Naver / yfinance 응답 schema 변경 | 동상 |
-| R-CRAWL-XXX | NAT-free 환경 outbound 도달 실패 (public subnet IP 차단) | §9 NAT-free 정책 재확인 |
+| R-CRAWL-XXX | KRX login / OTP expiration / rate limit | First-round review only. Operational stabilization is a subsequent spec |
+| R-CRAWL-XXX | Selenium / Chrome abnormal termination / headless compatibility | same as above |
+| R-CRAWL-XXX | Naver / yfinance response schema change | same as above |
+| R-CRAWL-XXX | Outbound reachability failure in the NAT-free environment (public subnet IP blocked) | Re-confirm the §9 NAT-free policy |
 
-## 9. NAT-free 정책 (R9)
+## 9. NAT-free policy (R9)
 
-### 9.1 정책 매트릭스
+### 9.1 Policy matrix
 
-| 항목 | 정책 |
+| Item | Policy |
 |------|------|
-| NAT Gateway | **사용 금지** (비용 발생 차단) |
-| 본 spec ECS Fargate Task outbound | 100% public subnet + `assignPublicIp = ENABLED` |
-| 외부 API outbound (KRX / Naver / yfinance / holiday) | 동상 |
-| NAT Gateway 발견 시 처리 | 본 spec 임의 결정 금지. [`../_common/operator-decisions.md`](../_common/operator-decisions.md) **OD-NET-001** / **OD-NET-002** 재확인 후 운영자 결정으로만 처리 (R9.3 정합) |
+| NAT Gateway | **Prohibited** (block cost incurrence) |
+| This spec's ECS Fargate Task outbound | 100% public subnet + `assignPublicIp = ENABLED` |
+| External API outbound (KRX / Naver / yfinance / holiday) | same as above |
+| Handling when a NAT Gateway is found | Arbitrary decision by this spec is prohibited. Handle only by an operator decision after re-confirming [`../_common/operator-decisions.md`](../_common/operator-decisions.md) **OD-NET-001** / **OD-NET-002** (consistent with R9.3) |
 
-## 10. EC2 → ECS 운영 패턴 인계 (03 spec §13 입력)
+## 10. EC2 → ECS operational pattern handover (03 spec §13 input)
 
-### 10.1 매핑 표 (03 §13.1 인용 + crawler / preprocessor 채움)
+### 10.1 Mapping table (cited from 03 §13.1 + filled in for crawler / preprocessor)
 
-| 영역 | EC2 (03 spec) | ECS Fargate (본 spec, 08) |
+| Area | EC2 (03 spec) | ECS Fargate (this spec, 08) |
 |------|--------------|--------------------------|
-| 자격증명 | Instance Role + IMDSv2 | Task Role (crawler / preprocessor 분리) |
-| secret / parameter read | 환경변수 주입(`/tmp/inject-env.sh` 또는 systemd `EnvironmentFile=`) | Task Definition `secrets` 필드 + Task Role |
-| 로그 | CloudWatch Logs Agent 또는 `PutLogEvents` | awslogs driver → `/portfolio/paper/crawler`, `/portfolio/paper/preprocessor` |
-| 접속 / 디버깅 | SSM Session Manager | ECS Exec |
-| 자동 기동 | systemd unit 또는 startup script | **본 spec 범위 밖** (Service / EventBridge / Step Functions 후속 spec) |
+| Credentials | Instance Role + IMDSv2 | Task Role (crawler / preprocessor separated) |
+| secret / parameter read | Environment variable injection (`/tmp/inject-env.sh` or systemd `EnvironmentFile=`) | Task Definition `secrets` field + Task Role |
+| Logs | CloudWatch Logs Agent or `PutLogEvents` | awslogs driver → `/portfolio/paper/crawler`, `/portfolio/paper/preprocessor` |
+| Access / debugging | SSM Session Manager | ECS Exec |
+| Automatic startup | systemd unit or startup script | **Out of scope for this spec** (Service / EventBridge / Step Functions subsequent spec) |
 
-### 10.2 service prefix 분리 (03 §13.2 정합)
+### 10.2 service prefix separation (consistent with 03 §13.2)
 
 | MS | service prefix |
 |----|---------------|
 | Crawler | `/portfolio/paper/crawler/*` |
 | Preprocessor | `/portfolio/paper/preprocessor/*` |
 
-후속 spec 은 다른 service prefix Resource 부여 금지 / Resource wildcard 금지 / Action wildcard 금지 / env prefix `paper` / `live` 만 사용 / Access Key 미사용 원칙(IMDSv2 + Role only) 을 변경하지 않는다(03 §13.3 정합).
+A subsequent spec does not change the principles of prohibiting granting a different service prefix Resource / prohibiting Resource wildcard / prohibiting Action wildcard / using only the env prefix `paper` / `live` / not using an Access Key (IMDSv2 + Role only) (consistent with 03 §13.3).
 
-## 11. 안전 제약 (R10, R11)
+## 11. Safety constraints (R10, R11)
 
-### 11.1 영역별 정책 (R10)
+### 11.1 Policy by area (R10)
 
-| 영역 | 정책 |
+| Area | Policy |
 |------|------|
-| 실제 AWS 리소스 | ECR repository / ECS Cluster / Task Definition / Service / IAM Role / Policy / CloudWatch Log Group / Secrets / SSM Parameter / RDS 의 생성·변경·삭제는 **운영자 직접 작업으로만**. 본 spec 의 모든 phase 에서 직접 수행 금지 |
-| 8개 MS 코드 / docs / 패키징 | `port-view`, `port-marketconnector`, `port-interest-crawler`, `port-interest-preprocessor`, `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research` 의 README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / `requirements.txt` / `Dockerfile` / `setup.py` / `pyproject.toml` 미수정 |
-| 외부 호출 | KRX / Naver / yfinance / Selenium / Chrome / KIS API 호출 0건 |
-| 크롤링 / 주문 | 크롤링 0건. 매수 / 매도 / 취소 / 정정 0건 |
-| RDS DDL/DML | 0건. 조회성 SELECT 도 본 phase 시점 0건 |
-| secret / 식별자 표기 | 실제 secret value, password, KIS app key·app secret, 계좌번호, token, RDS endpoint hostname, account-id, 실제 ARN, image digest, IAM access key id, instance-id 평문 기록 금지. `[REDACTED]` 또는 placeholder 만 |
-| `GetSecretValue` 호출 | 운영자만 수행. Kiro 자동 검증은 `secretsmanager:DescribeSecret` metadata 만 사용 (06 §11 정합) |
+| Actual AWS resources | The creation·modification·deletion of ECR repository / ECS Cluster / Task Definition / Service / IAM Role / Policy / CloudWatch Log Group / Secrets / SSM Parameter / RDS is **only by direct operator work**. Direct execution is prohibited in all phases of this spec |
+| 8 MS code / docs / packaging | The README / AGENTS.md / CHANGELOG / docs / worklog / source / `requirements.txt` / `Dockerfile` / `setup.py` / `pyproject.toml` of `port-view`, `port-marketconnector`, `port-interest-crawler`, `port-interest-preprocessor`, `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research` are not modified |
+| External calls | 0 calls to KRX / Naver / yfinance / Selenium / Chrome / KIS API |
+| Crawling / orders | 0 crawls. 0 buy / sell / cancel / modify |
+| RDS DDL/DML | 0. Even query-only SELECT is 0 at the time of this phase |
+| secret / identifier notation | The actual secret value, password, KIS app key·app secret, account number, token, RDS endpoint hostname, account-id, actual ARN, image digest, IAM access key id, instance-id must not be recorded in plaintext. Only `[REDACTED]` or a placeholder |
+| `GetSecretValue` call | Performed by the operator only. Kiro automatic validation uses only `secretsmanager:DescribeSecret` metadata (consistent with 06 §11) |
 
-### 11.2 phase 분리 (R11)
+### 11.2 phase separation (R11)
 
-본 08 초기 문서 phase 산출물은 requirements.md / design.md / tasks.md 3개로 한정한다. runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md 는 운영자 실행 이후 별도 작성한다.
+The deliverables of this 08 initial-document phase are limited to the 3 files requirements.md / design.md / tasks.md. runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md are authored separately after operator execution.
 
-| 산출물 | 본 phase 처리 |
+| Deliverable | Handling in this phase |
 |--------|--------------|
-| `requirements.md` / `design.md` / `tasks.md` | 본 08 초기 문서 phase 산출물 3개로 한정 |
-| `runbook.md` / `validation-checklist.md` / `operation-notes.md` | 운영자 실행 이후 별도 작성 |
-| `CHANGELOG.md` / `WORKLOG.md` (`docs/worklog/YYYY-MM-DD.md`) | 운영자 실행 이후 별도 작성 |
-| `_common/*.md` 갱신 | 본 phase 실제 갱신 금지. 후보만 후속 phase 에서 식별 |
+| `requirements.md` / `design.md` / `tasks.md` | Limited to the 3 deliverables of this 08 initial-document phase |
+| `runbook.md` / `validation-checklist.md` / `operation-notes.md` | Authored separately after operator execution |
+| `CHANGELOG.md` / `WORKLOG.md` (`docs/worklog/YYYY-MM-DD.md`) | Authored separately after operator execution |
+| `_common/*.md` update | Actual update is prohibited in this phase. Only candidates are identified in a subsequent phase |
 
-본 호출 단위 정책: 본 호출은 design.md 1개만 갱신하며 requirements.md / tasks.md 는 별도 호출 책임으로 분리한다.
+This call-unit policy: this call updates only design.md, and requirements.md / tasks.md are separated into a separate call responsibility.
 
-## 12. 2026-06-12 운영자 검증 결과 / Hybrid execution model
+## 12. 2026-06-12 operator validation result / Hybrid execution model
 
-본 섹션은 2026-06-12 Windows EC2 worker 기반 KRX GUI 의존 수집 1차 검증 결과를 반영한 보강 섹션이다. 기존 ECS 중심 설계를 전면 재작성하지 않고, 검증 결과로 갱신된 분류 결정과 Secrets Manager 연동 방식만 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-12 섹션 참조.
+This section is a supplement reflecting the first-round validation result of the 2026-06-12 Windows EC2 worker-based KRX GUI-dependent collection. It does not fully rewrite the existing ECS-centric design; it additionally specifies only the classification decision and Secrets Manager integration method updated from the validation result. For detailed operator execution results, see the 2026-06-12 section of [`./operation-notes.md`](./operation-notes.md).
 
-### 12.1 Hybrid execution model 분류
+### 12.1 Hybrid execution model classification
 
-본 spec 의 crawler / preprocessor runtime 은 단일 ECS Fargate 구조가 아니라 다음과 같이 역할을 분리한다.
+The crawler / preprocessor runtime of this spec is not a single ECS Fargate structure; it separates roles as follows.
 
-| 워크로드 | runtime | 1차 운영 가능 상태 | 비고 |
+| Workload | runtime | First-round operational-ready state | Note |
 |---------|---------|-------------------|------|
-| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task (NAT-free public subnet + `assignPublicIp=ENABLED`) | 2026-06-10 도달 | §7 그대로 유지 |
-| non-GUI crawler (Naver / yfinance / KRX 비-GUI 경로 후보) | ECS Fargate Task 후보 유지 | 미도달 (이월) | runtime 검증 / Selenium 미사용 / outbound 도달 검증 후속 |
-| KRX GUI 의존 crawler (KRX program / KRX shortsell, Selenium / Chrome) | Windows EC2 worker | 2026-06-12 도달 (1차 운영 가능 / 완전 자동화는 후속) | wrapper 기반 수동 실행 |
+| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task (NAT-free public subnet + `assignPublicIp=ENABLED`) | Reached 2026-06-10 | §7 kept as is |
+| non-GUI crawler (Naver / yfinance / KRX non-GUI path candidate) | ECS Fargate Task candidate kept | Not reached (carried over) | runtime validation / no Selenium used / outbound reachability validation subsequent |
+| KRX GUI-dependent crawler (KRX program / KRX shortsell, Selenium / Chrome) | Windows EC2 worker | Reached 2026-06-12 (first-round operational-ready / full automation is subsequent) | wrapper-based manual execution |
 
-### 12.2 KRX GUI 의존 수집이 EC2 worker 로 분리된 이유
+### 12.2 Reason the KRX GUI-dependent collection was separated to the EC2 worker
 
-| 이유 | 설명 |
+| Reason | Explanation |
 |------|------|
-| Chrome GUI / Download 의존 | KRX OTP 후 CSV 다운로드가 Chrome 다운로드 폴더로 떨어지는 흐름. 다운로드 경로가 OS 사용자 / 세션 의존 |
-| 로그인 session 유지 | KRX 로그인 후 OTP / 세션 토큰이 브라우저 컨텍스트에 stateful 하게 결합 |
-| Debug attach / 운영자 점검 용이성 | RDP 진입으로 즉시 GUI 상태 / 다운로드 폴더 / Chrome devtools 점검 가능 |
-| KRX 사이트 특성 | 비정형 JavaScript / 동적 element / OTP 등으로 headless 안정성 미달 가능성 |
-| ECS Fargate Task 의 GUI / Display 미지원 | Fargate 는 GUI / X11 / Display 지원이 사실상 없음. KRX OTP / Chrome download 흐름과 호환 부담 |
+| Chrome GUI / Download dependency | After KRX OTP, the CSV download drops into the Chrome download folder. The download path is OS user / session dependent |
+| Login session maintenance | After KRX login, the OTP / session token is statefully coupled to the browser context |
+| Ease of debug attach / operator inspection | RDP entry allows immediate inspection of the GUI state / download folder / Chrome devtools |
+| KRX site characteristics | Possibility of insufficient headless stability due to non-standard JavaScript / dynamic elements / OTP, etc. |
+| ECS Fargate Task lacks GUI / Display support | Fargate effectively has no GUI / X11 / Display support. Compatibility burden with the KRX OTP / Chrome download flow |
 
-### 12.3 Secrets Manager 연동 방식 (2026-06-12 반영)
+### 12.3 Secrets Manager integration method (reflected 2026-06-12)
 
-| Secret path | 용도 | JSON key | 1차 사용 시점 | 비고 |
+| Secret path | Use | JSON key | First-round use time | Note |
 |-------------|------|---------|--------------|------|
-| `/portfolio/paper/rds/preprocessor-app` | preprocessor RDS 접속 | `host` / `port` / `dbname` / `username` / `password` | 2026-06-10 | §7.3 |
-| `/portfolio/paper/rds/crawler-app` | EC2 worker 의 RDS 접속(crawler_app role) | `host` / `port` / `dbname` / `username` / `password` | 2026-06-12 | EC2 IAM Role `portfolio-paper-crawler-worker-role` 에서 read |
-| `/portfolio/paper/krx/crawler-login` | KRX 로그인 자격 | `username` / `password` | 2026-06-12 | EC2 IAM Role inline policy 에 `secretsmanager:DescribeSecret` / `secretsmanager:GetSecretValue` 추가 (Resource 한정 / wildcard 0건) |
+| `/portfolio/paper/rds/preprocessor-app` | preprocessor RDS connection | `host` / `port` / `dbname` / `username` / `password` | 2026-06-10 | §7.3 |
+| `/portfolio/paper/rds/crawler-app` | RDS connection of the EC2 worker (crawler_app role) | `host` / `port` / `dbname` / `username` / `password` | 2026-06-12 | read from EC2 IAM Role `portfolio-paper-crawler-worker-role` |
+| `/portfolio/paper/krx/crawler-login` | KRX login credential | `username` / `password` | 2026-06-12 | Added `secretsmanager:DescribeSecret` / `secretsmanager:GetSecretValue` to the EC2 IAM Role inline policy (Resource-limited / 0 wildcards) |
 
-위 Secret 의 실제 value / RDS endpoint hostname / KRX 로그인 password / 실제 ARN / account-id 는 본 design 어디에도 평문 기록 금지(R10.4 / R-DOCS-001 정합). KRX 로그인 ID / password 는 "Secrets Manager 에서 주입" 으로만 표기한다.
+The actual value / RDS endpoint hostname / KRX login password / actual ARN / account-id of the above Secrets must not be recorded in plaintext anywhere in this design (consistent with R10.4 / R-DOCS-001). The KRX login ID / password is noted only as "injected from Secrets Manager".
 
-### 12.4 EC2 worker 운영 모드 분리
+### 12.4 EC2 worker operational mode separation
 
-| 모드 | 설명 | 본 spec 시점 |
+| Mode | Explanation | At the time of this spec |
 |------|------|-------------|
-| 수동 실행 (wrapper 기반) | 운영자가 RDP 접속 후 `run_krx_worker_daily.ps1` 1회 실행. venv activate / DB Secret / KRX Secret / 다운로드 경로 junction / KRX 로그인 / KRX program / KRX shortsell / 로그 저장을 1회 흐름으로 처리 | **1차 운영 가능 상태(2026-06-12 도달)** |
-| 자동 실행 (SSM RunCommand + EventBridge Scheduler + 옵션상 Step Functions hybrid orchestration) | EC2 worker 무인 실행. 본 spec 범위 밖 / 후속 분리 | 미도달 |
-| Idle 비용 절감 | 작업 종료 후 EC2 stop 절차 명시. 본 spec 범위 밖 / 후속 분리 | 미도달 |
+| Manual execution (wrapper-based) | After the operator connects via RDP, `run_krx_worker_daily.ps1` is run once. venv activate / DB Secret / KRX Secret / download path junction / KRX login / KRX program / KRX shortsell / log saving are handled as a single flow | **First-round operational-ready state (reached 2026-06-12)** |
+| Automatic execution (SSM RunCommand + EventBridge Scheduler + optional Step Functions hybrid orchestration) | Unattended execution of the EC2 worker. Out of scope for this spec / separated subsequently | Not reached |
+| Idle cost reduction | Specify the EC2 stop procedure after work ends. Out of scope for this spec / separated subsequently | Not reached |
 
-### 12.5 본 섹션 갱신 원칙
+### 12.5 Update principles of this section
 
-- 기존 §1 ~ §11 결정값(ECR repository / Dockerfile 점검 / 로컬 빌드 / ECR push / ECS Cluster·Role·Log Group / Preprocessor 단발 실행 / NAT-free 정책 / 안전 제약) 은 변경하지 않는다.
-- crawler 관련 §3.2 / §4 / §5 의 ECS 단일 전환 가정은 §12.1 hybrid execution model 분류로 보강한다(전면 재작성 아님).
-- non-GUI crawler 가 ECS Fargate Task 로 운영되는 시점에는 §7 의 preprocessor 단발 실행 검증 패턴을 그대로 재사용한다.
-- KRX GUI 의존 수집이 EC2 worker 로 운영되는 동안에도 NAT-free 정책(§9)은 EC2 worker 의 outbound 경로에 동일하게 적용된다(public subnet + EIP 또는 동등 방식 / 운영자 결정).
-- 후속 spec / 후속 phase 책임 분리 원칙은 §11 그대로 유지한다.
+- The existing §1 ~ §11 decision values (ECR repository / Dockerfile inspection / local build / ECR push / ECS Cluster·Role·Log Group / Preprocessor single run / NAT-free policy / safety constraints) are not changed.
+- The ECS single-conversion assumption of the crawler-related §3.2 / §4 / §5 is supplemented by the §12.1 hybrid execution model classification (not a full rewrite).
+- When the non-GUI crawler is operated as an ECS Fargate Task, the §7 preprocessor single-run validation pattern is reused as is.
+- Even while the KRX GUI-dependent collection is operated on the EC2 worker, the NAT-free policy (§9) applies equally to the EC2 worker's outbound path (public subnet + EIP or an equivalent method / operator decision).
+- The subsequent spec / subsequent phase responsibility separation principle is kept as in §11.
 
-## 13. 2026-06-13 운영자 검증 결과 / Hybrid execution model 1차 자동화 완성
+## 13. 2026-06-13 operator validation result / Hybrid execution model first-round automation completed
 
-본 섹션은 2026-06-13 SSM RunCommand 자동화 + ECS crawler revision 6 의 Selenium / Chrome / outbound smoke 1차 검증 결과를 반영한 보강 섹션이다. §12 hybrid execution model 분류는 그대로 유지하고, KRX GUI 경로의 자동화 1차 구조와 ECS crawler smoke 의 의미만 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-13 섹션 참조.
+This section is a supplement reflecting the first-round validation result of the 2026-06-13 SSM RunCommand automation + the Selenium / Chrome / outbound smoke of ECS crawler revision 6. The §12 hybrid execution model classification is kept as is, and only the first-round automation structure of the KRX GUI path and the meaning of the ECS crawler smoke are additionally specified. For detailed operator execution results, see the 2026-06-13 section of [`./operation-notes.md`](./operation-notes.md).
 
-### 13.1 KRX GUI 경로 1차 자동화 구조
+### 13.1 KRX GUI path first-round automation structure
 
-| 단계 | 구성 요소 | 결정값 |
+| Stage | Component | Decision value |
 |------|----------|--------|
-| 트리거 | EventBridge Scheduler | **후속 분리** (현재는 운영자 또는 SSM 수동 트리거) |
-| 진입점 | SSM RunCommand (`AWS-RunPowerShellScript`) | 1차 자동화 진입점으로 사용 |
-| 트리거 명령 | `schtasks /Run /TN Portfolio-KRX-Worker-Daily` | wrapper 직접 실행이 아니라 Scheduled Task 1회 실행 트리거만 수행 |
-| 실행 컨테이너 | Windows Scheduled Task `Portfolio-KRX-Worker-Daily` | Administrator interactive session 으로 실행. SYSTEM Session 0 사용 금지 |
-| 실행 스크립트 | `C:\portfolio\run_krx_worker_daily.ps1` | venv activate / RDS Secret 주입 / KRX Secret 주입 / 다운로드 경로 junction 점검 / `interest_krx_login_new.py` → `interest_program.py` → `interest_shortsell.py` 순차 실행 / 로그 저장 |
-| 로그 위치 | `C:\portfolio\logs\krx_worker_daily_yyyyMMdd_HHmmss.log` | 파일 본문 전체는 본 design / operation-notes 평문 인용 금지 |
+| Trigger | EventBridge Scheduler | **Separated subsequently** (currently an operator or SSM manual trigger) |
+| Entrypoint | SSM RunCommand (`AWS-RunPowerShellScript`) | Used as the first-round automation entrypoint |
+| Trigger command | `schtasks /Run /TN Portfolio-KRX-Worker-Daily` | Performs only the Scheduled Task one-time run trigger, not direct wrapper execution |
+| Execution container | Windows Scheduled Task `Portfolio-KRX-Worker-Daily` | Runs in the Administrator interactive session. SYSTEM Session 0 use is prohibited |
+| Execution script | `C:\portfolio\run_krx_worker_daily.ps1` | venv activate / RDS Secret injection / KRX Secret injection / download path junction check / sequential run of `interest_krx_login_new.py` → `interest_program.py` → `interest_shortsell.py` / log saving |
+| Log location | `C:\portfolio\logs\krx_worker_daily_yyyyMMdd_HHmmss.log` | The full file body must not be quoted in plaintext in this design / operation-notes |
 
-본 1차 자동화 구조는 paper 환경에서 1차 검증 완료 상태(2026-06-13 도달)이며, EventBridge Scheduler 정기 트리거 연계는 후속 분리한다.
+This first-round automation structure is in a first-round validation-complete state in the paper environment (reached 2026-06-13), and the EventBridge Scheduler periodic trigger linkage is separated subsequently.
 
-### 13.2 SYSTEM Session 0 직접 실행 부적합 판단
+### 13.2 Judgment that direct SYSTEM Session 0 execution is unsuitable
 
-| 항목 | 결과 |
+| Item | Result |
 |------|------|
-| SSM RunCommand 의 실행 컨텍스트 | SessionId 0 / `nt authority\system` |
-| RDP 사용자 세션 | SessionId 2(Administrator) |
-| Chrome 프로세스 | SessionId 0 직접 실행 시 GUI / Display / Chrome download 폴더 / OTP 세션 컨텍스트 분리로 KRX 로그인 단계 실패 가능 |
-| 결정 | SSM RunCommand 가 wrapper 를 SYSTEM Session 0 에서 직접 실행하는 방식은 **KRX GUI 로그인에 부적합**으로 판단. 직접 실행 방식은 채택하지 않음 |
-| 우회 방식 | SSM RunCommand 는 `schtasks /Run` 트리거만 담당하고, 실제 wrapper 실행은 Administrator interactive session 안의 Scheduled Task 가 담당 |
+| Execution context of SSM RunCommand | SessionId 0 / `nt authority\system` |
+| RDP user session | SessionId 2 (Administrator) |
+| Chrome process | When run directly in SessionId 0, the KRX login stage may fail due to separation of the GUI / Display / Chrome download folder / OTP session context |
+| Decision | The method where SSM RunCommand directly runs the wrapper in SYSTEM Session 0 is judged **unsuitable for KRX GUI login**. The direct-execution method is not adopted |
+| Workaround | SSM RunCommand handles only the `schtasks /Run` trigger, and the actual wrapper execution is handled by the Scheduled Task inside the Administrator interactive session |
 
-### 13.3 ECS crawler Task Definition revision 6 의 의미
+### 13.3 Meaning of ECS crawler Task Definition revision 6
 
-| 항목 | 결정값 |
+| Item | Decision value |
 |------|--------|
 | family | `portfolio-paper-interest-crawler` |
-| revision | 1 ~ 6 (최신 revision = 6) |
+| revision | 1 ~ 6 (latest revision = 6) |
 | image | `portfolio-interest-crawler:paper-20260611` |
 | cpu / memory | 1024 / 2048 |
 | network mode | `awsvpc` |
@@ -386,290 +386,290 @@ Task Definition `secrets` 필드 주입용 Secrets Manager / SSM read 권한은 
 | Task Execution Role | `portfolio-paper-ecs-task-execution-role` |
 | Log Group | `/portfolio/paper/crawler` |
 | Log stream prefix | `ecs-selenium-chrome-smoke` |
-| `command` 의 의미 | **실제 daily crawler entrypoint 가 아니라 Selenium / Chrome / outbound smoke 검증용** |
-| 운영용 Task Definition 분리 | **후속 분리** (실제 daily crawler 의 Task Definition / image / command 는 별도 revision 또는 별도 family 로 분리 — task 58) |
+| Meaning of `command` | **Not the actual daily crawler entrypoint, but for Selenium / Chrome / outbound smoke validation** |
+| Operational Task Definition separation | **Separated subsequently** (the actual daily crawler's Task Definition / image / command is separated into a separate revision or separate family — task 58) |
 
-revision 6 의 RunTask smoke 결과(2026-06-13)는 다음을 1차 검증한다.
+The RunTask smoke result of revision 6 (2026-06-13) first-round validates the following.
 
-- ECS / Fargate Selenium 4.40.0 / Chromium / chromedriver runtime 동작
-- public-a / public-b subnet + `sgroup-crawler-tasks` SG + `assignPublicIp = ENABLED` 기반 outbound 도달
-- `example.com` HTTPS 도달 / Naver Finance 페이지 로딩(TITLE `Npay 증권` 확인)
+- ECS / Fargate Selenium 4.40.0 / Chromium / chromedriver runtime operation
+- outbound reachability based on public-a / public-b subnet + `sgroup-crawler-tasks` SG + `assignPublicIp = ENABLED`
+- `example.com` HTTPS reachability / Naver Finance page loading (TITLE `Npay 증권` confirmed)
 - exitCode 0 / `SELENIUM CHROME SMOKE SUCCESS` / `DRIVER QUIT` / `SELENIUM CHROME SMOKE END`
 
-따라서 revision 6 은 ECS / Fargate / Chromium runtime 가용성에 대한 smoke 보증으로만 해석한다. 실제 daily crawler 의 운영 안정화는 본 spec 범위 밖이며, non-GUI crawler 인벤토리 확정과 운영용 Task Definition 분리(task 58)는 후속 spec / 후속 phase 책임이다.
+Therefore, revision 6 is interpreted only as a smoke guarantee of ECS / Fargate / Chromium runtime availability. The operational stabilization of the actual daily crawler is out of scope for this spec, and confirming the non-GUI crawler inventory and separating the operational Task Definition (task 58) are subsequent spec / subsequent phase responsibilities.
 
-### 13.4 Hybrid execution model 1차 완성 판단
+### 13.4 Hybrid execution model first-round completion judgment
 
-| 워크로드 | 실행 위치 | 1차 운영 가능 상태 |
+| Workload | Execution location | First-round operational-ready state |
 |---------|----------|-------------------|
-| Preprocessor MS | ECS Fargate Task | 2026-06-10 도달 |
-| KRX GUI 의존 crawler (KRX program / KRX shortsell) | Windows EC2 worker (Scheduled Task + wrapper) | 2026-06-12 도달 |
-| KRX GUI 경로 자동화 trigger | SSM RunCommand → `schtasks /Run` | 2026-06-13 도달 |
-| non-GUI crawler runtime 가용성 (Selenium / Chrome / outbound) | ECS Fargate Task (smoke 용 revision 6) | 2026-06-13 1차 통과 |
-| EventBridge Scheduler / Step Functions 정기 trigger | — | 미도달 (후속 분리) |
-| EC2 worker 무인 stop / 비용 절감 | — | 미도달 (후속 분리) |
+| Preprocessor MS | ECS Fargate Task | Reached 2026-06-10 |
+| KRX GUI-dependent crawler (KRX program / KRX shortsell) | Windows EC2 worker (Scheduled Task + wrapper) | Reached 2026-06-12 |
+| KRX GUI path automation trigger | SSM RunCommand → `schtasks /Run` | Reached 2026-06-13 |
+| non-GUI crawler runtime availability (Selenium / Chrome / outbound) | ECS Fargate Task (smoke revision 6) | First-round passed 2026-06-13 |
+| EventBridge Scheduler / Step Functions periodic trigger | — | Not reached (separated subsequently) |
+| EC2 worker unattended stop / cost reduction | — | Not reached (separated subsequently) |
 
-본 시점의 hybrid execution model 1차 완성 판단은 위 6개 차원의 1차 검증 통과 + 자동화 trigger 1단계 도달을 근거로 한다. EventBridge Scheduler 정기 trigger / Step Functions hybrid orchestration / non-GUI crawler 운영용 Task Definition 분리 / wrapper 내 DB 검증 자동 출력 / EC2 worker stop 절차는 모두 후속 spec / 후속 phase 책임이다.
+The first-round completion judgment of the hybrid execution model at this point is based on the first-round validation passing of the above 6 dimensions + reaching stage 1 of the automation trigger. The EventBridge Scheduler periodic trigger / Step Functions hybrid orchestration / separation of the non-GUI crawler's operational Task Definition / automatic DB validation output within the wrapper / EC2 worker stop procedure are all subsequent spec / subsequent phase responsibilities.
 
-### 13.5 본 섹션 갱신 원칙
+### 13.5 Update principles of this section
 
-- 기존 §1 ~ §12 결정값은 변경하지 않는다.
-- §13 은 §12.4 EC2 worker 운영 모드 분리 표의 `자동 실행 (SSM RunCommand + EventBridge Scheduler + 옵션상 Step Functions hybrid orchestration)` 행을 1차 자동화 진입점(SSM RunCommand → Scheduled Task trigger)까지 도달한 상태로 갱신하는 보강이다.
-- EventBridge Scheduler 정기 trigger 연계는 본 spec 범위 밖이며 후속 분리 원칙(§11 / §12.5) 그대로 유지한다.
-- non-GUI crawler 의 실제 운영용 Task Definition 분리는 본 §13 의 smoke 결과(revision 6)와는 다른 후속 작업으로 구분한다(task 58).
+- The existing §1 ~ §12 decision values are not changed.
+- §13 is a supplement that updates the `Automatic execution (SSM RunCommand + EventBridge Scheduler + optional Step Functions hybrid orchestration)` row of the §12.4 EC2 worker operational mode separation table to the state of having reached the first-round automation entrypoint (SSM RunCommand → Scheduled Task trigger).
+- The EventBridge Scheduler periodic trigger linkage is out of scope for this spec, and the subsequent separation principle (§11 / §12.5) is kept as is.
+- The actual operational Task Definition separation of the non-GUI crawler is distinguished as subsequent work different from this §13's smoke result (revision 6) (task 58).
 
-## Testing Strategy (참고)
+## Testing Strategy (reference)
 
-본 spec 은 ECR / ECS / IAM / 절차서 산출물이며, 코드 / 순수 함수 / 입력 변동에 따라 행위가 달라지는 알고리즘이 없다. 따라서 property-based testing(PBT) 은 적용되지 않으며, 본 design 은 Correctness Properties 섹션을 포함하지 않는다(03 spec Testing Strategy 동일 정책).
+This spec is an ECR / ECS / IAM / procedure-document deliverable, and there is no code / pure function / algorithm whose behavior changes with input variation. Therefore property-based testing (PBT) does not apply, and this design does not include a Correctness Properties section (same policy as the 03 spec Testing Strategy).
 
-본 spec 의 검증은 다음 두 형태로만 수행되며 모두 후속 phase 책임이다.
+The validation of this spec is performed only in the following two forms, both of which are subsequent phase responsibilities.
 
-- **정적 점검**: ECR repository 존재 / repository scan 설정 / image tag·digest 존재 / Task Definition `secrets` 매핑 / Task Role·Task Execution Role 권한 골격 / Log Group 존재 / NAT Gateway 부재 / wildcard 부재 / Access Key 부재. validation-checklist.md(후속 phase) 책임.
-- **단발 실행 검증**: Preprocessor ECS Task 1회 `aws ecs run-task` → RDS 접속 성공 / CloudWatch Logs 출력 / exit code 0. runbook.md(후속 phase) 책임. Crawler outbound 검증은 본 spec 범위 밖이며 별도 phase 또는 후속 spec 책임.
+- **Static inspection**: ECR repository existence / repository scan setting / image tag·digest existence / Task Definition `secrets` mapping / Task Role·Task Execution Role permission skeleton / Log Group existence / NAT Gateway absence / wildcard absence / Access Key absence. Responsibility of validation-checklist.md (subsequent phase).
+- **Single-run validation**: Preprocessor ECS Task once `aws ecs run-task` → RDS connection success / CloudWatch Logs output / exit code 0. Responsibility of runbook.md (subsequent phase). Crawler outbound validation is out of scope for this spec and is the responsibility of a separate phase or subsequent spec.
 
-## 14. 2026-06-15 운영자 검증 결과 / Interest Crawler 상태 재판정
+## 14. 2026-06-15 operator validation result / Interest Crawler status re-judgment
 
-본 섹션은 2026-06-15 운영자가 직접 수행한 Backend AWS E2E dry-run 1차 점검 결과를 반영한 보강 섹션이다. §12 Hybrid execution model 분류와 §13 1차 자동화 완성 판단 자체는 변경하지 않고, 본 spec 의 crawler runtime 상태 표현을 "전체 완료" 가 아닌 "hybrid 1차 / 부분 완료" 로 보정한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-15 섹션 / 본 일자 결정 락은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-020 / OD-MS-021 참조.
+This section is a supplement reflecting the first-round inspection result of the Backend AWS E2E dry-run performed directly by the operator on 2026-06-15. It does not change the §12 Hybrid execution model classification and the §13 first-round automation completion judgment themselves; it corrects the crawler runtime status expression of this spec from "fully complete" to "hybrid first-round / partially complete". For detailed operator execution results, see the 2026-06-15 section of [`./operation-notes.md`](./operation-notes.md) / for this date's decision lock, see OD-MS-020 / OD-MS-021 of [`../_common/operator-decisions.md`](../_common/operator-decisions.md).
 
-### 14.1 표현 보정 (OD-MS-020 정합)
+### 14.1 Expression correction (consistent with OD-MS-020)
 
-기존 표현은 KRX GUI worker 의 운영 가능 도달과 ECS / Fargate Selenium Chrome smoke 통과를 묶어 Interest Crawler 전체가 완성된 것으로 해석될 여지가 있어 보정한다.
+The existing expression could be interpreted as the whole Interest Crawler being complete by bundling the operational-ready reach of the KRX GUI worker and the ECS / Fargate Selenium Chrome smoke pass, so it is corrected.
 
-| 기존 표현 | 보정 표현 |
+| Existing expression | Corrected expression |
 |----------|----------|
-| Interest Crawler 완성: 완료 | Interest Crawler hybrid 1차 구현: 부분 완료 |
-| Interest Crawler 는 hybrid execution model 기준으로 1차 완성 | KRX GUI worker 는 운영 가능 상태로 1차 완성 / ECS · Fargate crawler 는 smoke 검증 완료 / non-GUI daily raw 수집 운영 경로와 raw 전체 최신성 검증은 후속 |
+| Interest Crawler complete: done | Interest Crawler hybrid first-round implementation: partially complete |
+| Interest Crawler is first-round complete based on the hybrid execution model | KRX GUI worker is first-round complete in an operational-ready state / ECS · Fargate crawler is smoke-validation complete / the non-GUI daily raw collection operational path and full raw freshness validation are subsequent |
 
-본 표현 보정은 다음 원칙을 따른다.
+This expression correction follows the following principles.
 
-- "완료" 표기는 실제 데이터 적재 / 최신성 검증까지 확인된 경우에만 사용한다.
-- KRX GUI worker 완료와 Interest Crawler 전체 완료를 혼동하지 않는다.
-- smoke 성공과 daily raw 최신성 성공을 분리한다.
+- The "complete" notation is used only when actual data loading / freshness validation is confirmed.
+- Do not confuse KRX GUI worker completion with full Interest Crawler completion.
+- Separate smoke success from daily raw freshness success.
 
-### 14.2 워크로드 별 본 일자 상태 (2026-06-15)
+### 14.2 Per-workload status on this date (2026-06-15)
 
-§12.1 hybrid execution model 분류 표를 본 일자 상태로 갱신한다(분류 자체는 변경 없음).
+The §12.1 hybrid execution model classification table is updated to this date's status (the classification itself unchanged).
 
-| 워크로드 | runtime | 본 일자 상태 | 비고 |
+| Workload | runtime | This date's status | Note |
 |---------|---------|-------------|------|
-| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task | 본 일자 단발 RunTask 성공(exitCode 0 / `updated_at` 갱신) — 데이터 최신성 제약 | §7 그대로 유지 |
-| KRX GUI 의존 crawler (KRX program / KRX shortsell, Selenium / Chrome) | Windows EC2 worker | 본 일자 wrapper 재실행 성공 — `[Collected Date] None` idempotent / `interest_program_raw` · `interest_shortsell_raw` 최신일 2026-06-12 | KRX 거래일 정상(2026-06-15 월요일 기준 직전 거래일까지 적재) |
-| non-GUI crawler (Naver / yfinance / KRX 비-GUI 경로 후보) | ECS Fargate Task 후보 유지 | **운영 실행 미도달** — Selenium Chrome smoke(2026-06-13 §13.3 revision 6)는 통과하였으나 실제 daily raw 수집 운영 경로 / Task Definition / command 분리 / outbound 도달 검증은 미완료 | task 58 / task 72 후속 분리 |
+| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task | Single RunTask success on this date (exitCode 0 / `updated_at` refreshed) — data freshness constraint | §7 kept as is |
+| KRX GUI-dependent crawler (KRX program / KRX shortsell, Selenium / Chrome) | Windows EC2 worker | wrapper re-run success on this date — `[Collected Date] None` idempotent / `interest_program_raw` · `interest_shortsell_raw` latest date 2026-06-12 | KRX trading day normal (loaded up to the prior trading day as of Monday 2026-06-15) |
+| non-GUI crawler (Naver / yfinance / KRX non-GUI path candidate) | ECS Fargate Task candidate kept | **Operational execution not reached** — the Selenium Chrome smoke (2026-06-13 §13.3 revision 6) passed, but the actual daily raw collection operational path / Task Definition / command separation / outbound reachability validation is incomplete | task 58 / task 72 subsequent separation |
 
-### 14.3 non-GUI crawler 인벤토리 분류 (운영 경로 분리 후속)
+### 14.3 non-GUI crawler inventory classification (operational path separation subsequent)
 
-본 일자 1차 분류는 다음과 같다. 실제 운영용 Task Definition / command 분리는 task 58 / task 72 후속.
+This date's first-round classification is as follows. The actual operational Task Definition / command separation is subsequent to task 58 / task 72.
 
-- ECS Fargate 후보(non-GUI 가능성 높음): `interest_news.py` / `interest_agency.py` / `interest_foreignindex.py` / `interest_commodity.py` / `interest_macroeconomic.py` / `interest_price.py` / `interest_investorflow.py` / `interest_marketbreadth.py`
-- ECS Fargate 제외(KRX GUI 의존 또는 별도 분리): `interest_krx_login_new.py` / `interest_program.py` / `interest_shortsell.py` / `interest_ticker_value.py`
+- ECS Fargate candidates (high likelihood of non-GUI): `interest_news.py` / `interest_agency.py` / `interest_foreignindex.py` / `interest_commodity.py` / `interest_macroeconomic.py` / `interest_price.py` / `interest_investorflow.py` / `interest_marketbreadth.py`
+- ECS Fargate excluded (KRX GUI-dependent or separately separated): `interest_krx_login_new.py` / `interest_program.py` / `interest_shortsell.py` / `interest_ticker_value.py`
 
-위 분류는 운영용 Task Definition 분리 시점에 1:1 매핑으로 다시 점검한다. `interest_crawler_daily.py` 자체는 KRX GUI 의존 파일과 non-GUI 파일을 동시에 호출하므로 ECS Fargate 단독 실행 대상에서 제외(2026-06-13 §13.3 정합).
+The above classification is re-inspected as a 1:1 mapping at the time of the operational Task Definition separation. `interest_crawler_daily.py` itself calls both KRX GUI-dependent files and non-GUI files simultaneously, so it is excluded from the ECS Fargate standalone-execution target (consistent with 2026-06-13 §13.3).
 
-### 14.4 raw 최신성 검증 부족과 downstream 영향
+### 14.4 Insufficient raw freshness validation and downstream impact
 
-본 일자 SQL 점검 결과(2026-06-15 시점):
+Result of this date's SQL inspection (as of 2026-06-15):
 
-- `interest_program_raw` / `interest_shortsell_raw` 최신일 = 2026-06-12 (KRX GUI worker 경로 정상)
-- non-GUI raw 7종(`interest_agency_raw` / `interest_news_raw` / `interest_commodity_raw` / `interest_foreignindex_raw` / `interest_investorflow_raw` / `interest_marketbreadth_raw` / `interest_price_raw`) — 직전 거래일까지 적재되지 않음
-- `interest_ticker_value_raw` 최신일 = 2026-03-09(본 dry-run 핵심 차단 요인에서는 제외 / 별도 후속 분리)
+- `interest_program_raw` / `interest_shortsell_raw` latest date = 2026-06-12 (KRX GUI worker path normal)
+- non-GUI raw 7 types (`interest_agency_raw` / `interest_news_raw` / `interest_commodity_raw` / `interest_foreignindex_raw` / `interest_investorflow_raw` / `interest_marketbreadth_raw` / `interest_price_raw`) — not loaded up to the prior trading day
+- `interest_ticker_value_raw` latest date = 2026-03-09 (excluded from this dry-run's core blocking factor / separated subsequently)
 
-이 상태에서 preprocessor ECS RunTask 가 성공하더라도 신규 feature date 생성이 제한된다(본 일자 §4 정합). Backend AWS E2E dry-run 흐름에서 `BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL` 로 넘어가기 전 raw 최신성 회복이 선결 조건이며, 후속 spec(04 / 09)에서 stale data 입력 위험으로 작용한다(R-DATA-009 / R-DATA-010 정합).
+In this state, even if the preprocessor ECS RunTask succeeds, new feature date generation is limited (consistent with this date's §4). In the Backend AWS E2E dry-run flow, raw freshness recovery is a precondition before moving on to `BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL`, and it acts as a stale data input risk in a subsequent spec (04 / 09) (consistent with R-DATA-009 / R-DATA-010).
 
-### 14.5 Backend AWS E2E dry-run 진입 정합
+### 14.5 Backend AWS E2E dry-run entry consistency
 
-§12 / §13 의 hybrid execution model 1차 완성 판단은 그대로 유지하되, View Daily Batch 17단계 순서를 기준으로 본 일자 backend AWS 실행 상태를 정리한 결과는 다음과 같다(자세한 표는 [`./operation-notes.md`](./operation-notes.md) 2026-06-15 §6).
+The §12 / §13 hybrid execution model first-round completion judgment is kept as is, but the result of organizing this date's backend AWS execution status based on the View Daily Batch 17-step order is as follows (for the detailed table, see 2026-06-15 §6 of [`./operation-notes.md`](./operation-notes.md)).
 
-| 분류 | 본 일자 상태 |
+| Category | This date's status |
 |------|-------------|
-| 완료 | 1번 `CONNECTOR_BALANCE` / 3번 `PREPROCESSOR`(데이터 최신성 제약) |
-| 부분 완료 / follow-up 승격 | 2번 `INTEREST_CRAWLER` |
-| 미진행 | 4 ~ 7번(`BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL`) |
-| 미진행 / dry-run skip 예정 | 8 ~ 17번(`DAILY_BUY_EXECUTION` / `DAILY_SELL_EXECUTION` / `DAILY_AUTO_SELL` / `DAILY_AUTO_BUY` / `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` / `CONNECTOR_ORDER_CHECK` / `SYNC_SELL_FILL` / `SYNC_BUY_FILL` / `SYNC_BUY_POSITION` / `BALANCE_REFRESH`) |
+| Complete | #1 `CONNECTOR_BALANCE` / #3 `PREPROCESSOR` (data freshness constraint) |
+| Partially complete / promoted to follow-up | #2 `INTEREST_CRAWLER` |
+| Not progressed | #4 ~ #7 (`BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL`) |
+| Not progressed / dry-run skip planned | #8 ~ #17 (`DAILY_BUY_EXECUTION` / `DAILY_SELL_EXECUTION` / `DAILY_AUTO_SELL` / `DAILY_AUTO_BUY` / `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` / `CONNECTOR_ORDER_CHECK` / `SYNC_SELL_FILL` / `SYNC_BUY_FILL` / `SYNC_BUY_POSITION` / `BALANCE_REFRESH`) |
 
-본 표는 OD-MS-021 결정 락의 입력으로 사용된다. 실제 BUY / SELL / `--execute` / fill·position sync 자동 재시도 / aws-live 작업은 모두 0건이다(§11.1 / OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011 정합).
+This table is used as input for the OD-MS-021 decision lock. The actual BUY / SELL / `--execute` / fill·position sync automatic retry / aws-live work are all 0 (consistent with §11.1 / OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011).
 
-### 14.6 본 섹션 갱신 원칙
+### 14.6 Update principles of this section
 
-- 기존 §1 ~ §13 결정값은 변경하지 않는다.
-- §14 는 §12 의 hybrid execution model 분류와 §13 의 1차 자동화 완성 판단 위에 표현 보정 / 본 일자 상태 갱신 / non-GUI 운영 미도달 명시 / raw 최신성 부족 영향 명시만 추가한다.
-- non-GUI crawler 의 실제 운영용 Task Definition 분리, raw 최신성 회복 작업, preprocessor 재실행, raw / feature 최신성 검증 SQL 자동화는 모두 후속 spec / 후속 phase 책임이다(task 72 / 73 / 74 / 77 / 78 / 58 정합).
+- The existing §1 ~ §13 decision values are not changed.
+- §14 adds only expression correction / this date's status update / explicit statement of non-GUI operational non-reach / explicit statement of the impact of insufficient raw freshness on top of the §12 hybrid execution model classification and the §13 first-round automation completion judgment.
+- The actual operational Task Definition separation of the non-GUI crawler, the raw freshness recovery work, the preprocessor re-run, and the raw / feature freshness validation SQL automation are all subsequent spec / subsequent phase responsibilities (consistent with task 72 / 73 / 74 / 77 / 78 / 58).
 
-## 15. 2026-06-16 운영자 검증 결과 / Hybrid execution model 갱신 (Crawler 데이터 미수집 해결 + KRX EC2 자동화 성공)
+## 15. 2026-06-16 operator validation result / Hybrid execution model update (Crawler data non-collection resolved + KRX EC2 automation success)
 
-본 섹션은 2026-06-16 운영자 직접 수행 결과를 반영한 보강 섹션이다. §1 ~ §14 결정값은 변경하지 않고 아래만 보강한다.
+This section is a supplement reflecting the results performed directly by the operator on 2026-06-16. The §1 ~ §14 decision values are not changed; only the following are supplemented.
 
-작업 범위:
+Work scope:
 
-- (a) Crawler 데이터 미수집 원인 해소(non-GUI 전용 orchestration / Task Definition 부재 식별)
-- (b) `interest_crawler_daily_nongui.py` 신규 + Docker rebuild + ECR push + ECS Task Definition revision 7 등록 + RunTask exitCode 0
-- (c) non-GUI raw 6종 + KRX raw 2종 + news / agency 2026-06-16 적재 회복
-- (d) Windows EC2 worker Autologon bootstrap + Administrator console session Active 확인 + SSM RunCommand → `schtasks /Run` → Scheduled Task 흐름 재검증
+- (a) Resolution of the Crawler data non-collection cause (identification of the absence of a non-GUI-only orchestration / Task Definition)
+- (b) New `interest_crawler_daily_nongui.py` + Docker rebuild + ECR push + ECS Task Definition revision 7 registration + RunTask exitCode 0
+- (c) Recovery of non-GUI raw 6 types + KRX raw 2 types + news / agency 2026-06-16 loading
+- (d) Windows EC2 worker Autologon bootstrap + confirmation of Administrator console session Active + SSM RunCommand → `schtasks /Run` → Scheduled Task flow re-validation
 
-보강 대상: hybrid execution model 의 운영 상태 표현 / non-GUI rev7 의미 / KRX GUI 자동 로그인 운영 방식 1차 실증 / SSM direct Python · wrapper 실행 부적합 / Headless · 비대화형 KRX 수집 운영 방식 제외 결정.
+Supplement targets: the operational status expression of the hybrid execution model / the meaning of non-GUI rev7 / the first-round demonstration of the KRX GUI automatic-login operational method / the unsuitability of SSM direct Python · wrapper execution / the decision to exclude the headless · non-interactive KRX collection operational method.
 
-참조: [`./operation-notes.md`](./operation-notes.md) 2026-06-16 §1 ~ §5 / 결정 락 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-022 + OD-MS-011 / OD-MS-015 / OD-MS-020.
+Reference: [`./operation-notes.md`](./operation-notes.md) 2026-06-16 §1 ~ §5 / decision lock [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-022 + OD-MS-011 / OD-MS-015 / OD-MS-020.
 
-### 15.1 표현 보정 (OD-MS-020 / OD-MS-022 정합)
+### 15.1 Expression correction (consistent with OD-MS-020 / OD-MS-022)
 
-§14.1 의 보정 표현은 본 일자 결과로 추가 보강한다. "완료" 표기는 실제 데이터 적재 / 최신성 검증까지 확인된 경우에만 사용한다는 원칙은 그대로 유지한다.
+The §14.1 corrected expression is further supplemented with this date's result. The principle that the "complete" notation is used only when actual data loading / freshness validation is confirmed is kept as is.
 
-| 기존 표현 | 보정 표현 |
+| Existing expression | Corrected expression |
 |----------|----------|
-| Interest Crawler hybrid 1차 구현: 부분 완료 | Interest Crawler hybrid 구조 완료(non-GUI rev7 운영 경로 생성 + RunTask 성공 + raw 최신성 회복) |
-| non-GUI daily raw 수집 운영 경로와 raw 전체 최신성 검증은 후속 | non-GUI ECS / Fargate rev7 운영 경로 생성 및 RunTask 성공(전체 step SUCCESS / raw 최신성 회복) |
-| KRX EC2 수집: 진행 예정 | KRX GUI crawler = Windows EC2 worker + Autologon + Administrator interactive session + Scheduled Task + SSM trigger 성공 |
-| KRX headless 장기 후보 | 로컬 검증상 운영 방식에서 제외(KRX 로그인 / nos_setup / 키보드보안 / iframe 제약) |
-| Preprocessor 실행 완료(데이터 최신성 제약) | Preprocessor = raw 입력 데이터 회복 후 ECS 재실행 가능 상태 도달(재실행은 후속) |
+| Interest Crawler hybrid first-round implementation: partially complete | Interest Crawler hybrid structure complete (non-GUI rev7 operational path created + RunTask success + raw freshness recovery) |
+| The non-GUI daily raw collection operational path and full raw freshness validation are subsequent | Creation of the non-GUI ECS / Fargate rev7 operational path and RunTask success (all steps SUCCESS / raw freshness recovery) |
+| KRX EC2 collection: planned | KRX GUI crawler = Windows EC2 worker + Autologon + Administrator interactive session + Scheduled Task + SSM trigger success |
+| KRX headless long-term candidate | Excluded from the operational method based on local validation (KRX login / nos_setup / keyboard security / iframe constraints) |
+| Preprocessor execution complete (data freshness constraint) | Preprocessor = reached the ECS re-run-ready state after raw input data recovery (re-run is subsequent) |
 
-### 15.2 워크로드 별 본 일자 상태 (2026-06-16)
+### 15.2 Per-workload status on this date (2026-06-16)
 
-§12.1 / §14.2 hybrid execution model 분류 표를 본 일자 상태로 갱신한다(분류 자체는 변경 없음).
+The §12.1 / §14.2 hybrid execution model classification table is updated to this date's status (the classification itself unchanged).
 
-| 워크로드 | runtime | 본 일자 상태 | 비고 |
+| Workload | runtime | This date's status | Note |
 |---------|---------|-------------|------|
-| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task | raw 입력 데이터 회복 후 재실행 가능 상태 도달 / 재실행은 후속(task 77) | §7 / §14.2 그대로 유지 |
-| non-GUI crawler | ECS Fargate Task Definition revision 7 | 운영 경로 생성 및 RunTask 성공(failures 0 / exitCode 0 / 약 9분 51초 / 전체 step SUCCESS) | §15.3 신규 |
-| KRX GUI crawler (KRX program / KRX shortsell) | Windows EC2 worker + Autologon + Administrator interactive session + Scheduled Task + SSM trigger | 본 일자 KRX login / program / shortsell 2026-06-15 적재 성공(`interest_program_raw` 547 → 548 / `interest_shortsell_raw` 190,554 → 190,903) | §15.4 신규 |
+| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task | Reached the re-run-ready state after raw input data recovery / re-run is subsequent (task 77) | §7 / §14.2 kept as is |
+| non-GUI crawler | ECS Fargate Task Definition revision 7 | Operational path created and RunTask success (failures 0 / exitCode 0 / about 9 min 51 sec / all steps SUCCESS) | §15.3 new |
+| KRX GUI crawler (KRX program / KRX shortsell) | Windows EC2 worker + Autologon + Administrator interactive session + Scheduled Task + SSM trigger | KRX login / program / shortsell 2026-06-15 loading success on this date (`interest_program_raw` 547 → 548 / `interest_shortsell_raw` 190,554 → 190,903) | §15.4 new |
 
-### 15.3 ECS Task Definition revision 6 / revision 7 의미 분리
+### 15.3 ECS Task Definition revision 6 / revision 7 meaning separation
 
-| 항목 | revision 6 (Selenium / Chrome smoke 전용) | revision 7 (non-GUI daily 운영용) |
+| Item | revision 6 (Selenium / Chrome smoke only) | revision 7 (for non-GUI daily operations) |
 |------|-----------------------------------------|---------------------------------|
 | family | `portfolio-paper-interest-crawler` | `portfolio-paper-interest-crawler` |
 | revision | 6 | 7 |
 | image tag | `paper-20260611` | `paper-20260616-nongui` |
 | `command` | Selenium Chrome smoke command | `["python", "interest_crawler_daily_nongui.py"]` |
 | log stream prefix | `ecs-selenium-chrome-smoke` | `ecs-crawler-nongui-daily` |
-| 의미 | ECS / Fargate / Chromium runtime 가용성에 대한 smoke 보증 | non-GUI 8종(`interest_news` / `interest_agency` / `interest_foreignindex` / `interest_commodity` / `interest_macroeconomic` / `interest_price` / `interest_investorflow` / `interest_marketbreadth`) daily raw 운영 entrypoint |
-| 운영 시점 사용 여부 | 사용 안 함(smoke 검증 종료) | 본 일자부터 daily 운영 entrypoint 로 사용 |
+| Meaning | smoke guarantee of ECS / Fargate / Chromium runtime availability | non-GUI 8 types (`interest_news` / `interest_agency` / `interest_foreignindex` / `interest_commodity` / `interest_macroeconomic` / `interest_price` / `interest_investorflow` / `interest_marketbreadth`) daily raw operational entrypoint |
+| Whether used at operational time | Not used (smoke validation ended) | Used as the daily operational entrypoint from this date |
 
-revision 6 의 RunTask smoke 결과(2026-06-13 §13.3) 는 그대로 유효하지만 daily 운영용 Task Definition 은 본 일자 revision 7 로 분리되었다. revision 7 은 KRX GUI 계열 3종(`interest_krx_login_new` / `interest_program` / `interest_shortsell`) 을 import 하지 않으며, ECS / Fargate 단독 실행 대상에서 제외되는 KRX GUI 단계는 §15.4 의 Windows EC2 worker 경로로 분리된다.
+The RunTask smoke result of revision 6 (2026-06-13 §13.3) remains valid as is, but the daily operational Task Definition was separated to revision 7 on this date. revision 7 does not import the 3 KRX GUI-family types (`interest_krx_login_new` / `interest_program` / `interest_shortsell`), and the KRX GUI stages excluded from the ECS / Fargate standalone-execution target are separated to the §15.4 Windows EC2 worker path.
 
-### 15.4 KRX GUI 자동 로그인 기반 운영 방식 (OD-MS-022 정합)
+### 15.4 KRX GUI automatic-login-based operational method (consistent with OD-MS-022)
 
-KRX GUI 의존 crawler 의 1차 자동화 흐름(2026-06-13 §13.1) 은 그대로 유지하되, 본 일자 Autologon bootstrap 1차 실증으로 다음 흐름이 운영 방식으로 확정된다.
+The first-round automation flow of the KRX GUI-dependent crawler (2026-06-13 §13.1) is kept as is, but with this date's Autologon bootstrap first-round demonstration, the following flow is confirmed as the operational method.
 
-| 단계 | 구성 요소 | 본 일자 상태 |
+| Stage | Component | This date's status |
 |------|----------|-------------|
-| 사전 조건 | Microsoft Sysinternals Autologon 으로 Administrator 자동 로그인 / EC2 재부팅 후 SSM Online + `query user` Administrator console session Active 확인 | 1차 실증 통과 |
-| 트리거 | SSM RunCommand (`AWS-RunPowerShellScript`) | 1차 실증 통과 |
-| 트리거 명령 | `schtasks /Run /TN "Portfolio-KRX-Worker-Daily"` | 1차 실증 통과 |
-| 실행 컨테이너 | Windows Scheduled Task `Portfolio-KRX-Worker-Daily` (Logon Mode `Interactive only` / Run As User `Administrator`) | 1차 실증 통과 |
-| 실행 스크립트 | `powershell.exe -ExecutionPolicy Bypass -File C:\portfolio\run_krx_worker_daily.ps1` | 1차 실증 통과 |
-| 자식 호출 | `python interest_krx_login_new.py` → `python interest_program.py` → `python interest_shortsell.py` | 1차 실증 통과 |
-| 결과 | Last Result `0` / wrapper `DONE :: KRX worker daily` / `interest_program_raw` 2026-06-15 / `interest_shortsell_raw` 2026-06-15 | 1차 실증 통과 |
+| Precondition | Administrator automatic login via Microsoft Sysinternals Autologon / after EC2 reboot, confirm SSM Online + `query user` Administrator console session Active | First-round demonstration passed |
+| Trigger | SSM RunCommand (`AWS-RunPowerShellScript`) | First-round demonstration passed |
+| Trigger command | `schtasks /Run /TN "Portfolio-KRX-Worker-Daily"` | First-round demonstration passed |
+| Execution container | Windows Scheduled Task `Portfolio-KRX-Worker-Daily` (Logon Mode `Interactive only` / Run As User `Administrator`) | First-round demonstration passed |
+| Execution script | `powershell.exe -ExecutionPolicy Bypass -File C:\portfolio\run_krx_worker_daily.ps1` | First-round demonstration passed |
+| Child calls | `python interest_krx_login_new.py` → `python interest_program.py` → `python interest_shortsell.py` | First-round demonstration passed |
+| Result | Last Result `0` / wrapper `DONE :: KRX worker daily` / `interest_program_raw` 2026-06-15 / `interest_shortsell_raw` 2026-06-15 | First-round demonstration passed |
 
-본 일자 결과로 KRX GUI crawler 의 운영 모드는 "wrapper 기반 수동 실행"(OD-MS-012)에서 "Autologon + Administrator interactive session + Scheduled Task + SSM trigger 자동화"(OD-MS-022)로 1차 자동화 진입 완료. EventBridge Scheduler 정기 trigger 연계는 §11 / §12.5 / §13.5 그대로 후속 분리한다.
+With this date's result, the operational mode of the KRX GUI crawler completed first-round automation entry from "wrapper-based manual execution" (OD-MS-012) to "Autologon + Administrator interactive session + Scheduled Task + SSM trigger automation" (OD-MS-022). The EventBridge Scheduler periodic trigger linkage is separated subsequently as in §11 / §12.5 / §13.5.
 
-### 15.5 SSM direct Python / wrapper 실행 부적합 명시
+### 15.5 Explicit statement of SSM direct Python / wrapper execution unsuitability
 
-§13.2 의 SYSTEM Session 0 직접 실행 부적합 판단을 본 일자 결과로 보강한다.
+The §13.2 judgment that direct SYSTEM Session 0 execution is unsuitable is supplemented with this date's result.
 
-- SSM RunCommand 가 wrapper(`run_krx_worker_daily.ps1`) 또는 Python(`interest_krx_login_new.py`) 을 직접 실행하는 방식은 **운영 방식에서 제외**한다.
-- 이유 — SSM RunCommand 자체가 SYSTEM 으로 실행되며 Session 0 / 비대화형 컨텍스트에서 KRX GUI / Chrome download / nos_setup / 키보드보안 / iframe 흐름을 처리할 수 없다.
-- 정상 동작 — SSM RunCommand 의 `whoami` 결과는 `nt authority\system` 으로 출력되는 것이 정상이며, 실제 KRX GUI 실행 컨텍스트는 별도 Administrator console interactive session 안의 Scheduled Task 가 담당한다.
+- The method where SSM RunCommand directly runs the wrapper (`run_krx_worker_daily.ps1`) or Python (`interest_krx_login_new.py`) is **excluded from the operational method**.
+- Reason — SSM RunCommand itself runs as SYSTEM and cannot handle the KRX GUI / Chrome download / nos_setup / keyboard security / iframe flow in the Session 0 / non-interactive context.
+- Normal behavior — the `whoami` result of SSM RunCommand being output as `nt authority\system` is normal, and the actual KRX GUI execution context is handled by the Scheduled Task inside a separate Administrator console interactive session.
 
-### 15.6 Headless / 비대화형 KRX 수집 운영 방식 제외 명시
+### 15.6 Explicit statement of excluding the headless / non-interactive KRX collection operational method
 
-KRX 사이트의 동작 특성(KRX 로그인 / nos_setup / 키보드보안 / iframe 제약 / OTP 등) 으로 인해 headless 또는 비대화형 KRX 수집은 본 일자까지의 로컬 검증상 운영 안정성 미달로 판단된다.
+Due to the behavioral characteristics of the KRX site (KRX login / nos_setup / keyboard security / iframe constraints / OTP, etc.), headless or non-interactive KRX collection is judged to fall short of operational stability based on local validation up to this date.
 
-- Headless KRX 수집: 로컬 검증상 운영 방식에서 제외
-- 비대화형 KRX 수집: 운영 방식에서 제외
-- 본 결정은 OD-MS-022 정합으로 본 spec 의 KRX GUI crawler 운영 모드 단일화에 사용된다. 장기적으로 KRX 사이트 변경 / 로컬 검증 결과 변경에 따라 재검토 가능 — 본 시점에서는 후속 분리하지 않고 운영 방식에서 제외 결정만 락한다.
+- Headless KRX collection: excluded from the operational method based on local validation
+- Non-interactive KRX collection: excluded from the operational method
+- This decision is used, consistent with OD-MS-022, to unify the KRX GUI crawler operational mode of this spec. It can be re-examined in the long term according to KRX site changes / changes in local validation results — at this point, it is not separated subsequently and only the exclusion-from-operational-method decision is locked.
 
-### 15.7 Backend AWS E2E dry-run 진입 정합
+### 15.7 Backend AWS E2E dry-run entry consistency
 
-§14.5 의 표를 본 일자 상태로 갱신한다(17단계 순서와 안전 기준은 OD-MS-021 그대로 유지).
+The §14.5 table is updated to this date's status (the 17-step order and safety criteria are kept as in OD-MS-021).
 
-| 분류 | 본 일자 상태 |
+| Category | This date's status |
 |------|-------------|
-| 완료 | 1번 `CONNECTOR_BALANCE` / 2번 `INTEREST_CRAWLER`(Crawler 데이터 미수집 해결 완료 / hybrid 구조 완료) |
-| Preprocessor 재실행 가능 상태 도달 / 재실행은 후속 | 3번 `PREPROCESSOR` |
-| 후속 재개 예정 | 4 ~ 7번(`BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL`) |
-| 미진행 / dry-run skip 예정 | 8 ~ 17번(`DAILY_BUY_EXECUTION` / `DAILY_SELL_EXECUTION` / `DAILY_AUTO_SELL` / `DAILY_AUTO_BUY` / `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` / `CONNECTOR_ORDER_CHECK` / `SYNC_SELL_FILL` / `SYNC_BUY_FILL` / `SYNC_BUY_POSITION` / `BALANCE_REFRESH`) |
+| Complete | #1 `CONNECTOR_BALANCE` / #2 `INTEREST_CRAWLER` (Crawler data non-collection resolution complete / hybrid structure complete) |
+| Reached the Preprocessor re-run-ready state / re-run is subsequent | #3 `PREPROCESSOR` |
+| Subsequent resumption planned | #4 ~ #7 (`BACKTEST_RESEARCH` / `BACKTEST_REPORT` / `DAILY_BUY_SIGNAL` / `DAILY_POSITION_SIGNAL`) |
+| Not progressed / dry-run skip planned | #8 ~ #17 (`DAILY_BUY_EXECUTION` / `DAILY_SELL_EXECUTION` / `DAILY_AUTO_SELL` / `DAILY_AUTO_BUY` / `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` / `CONNECTOR_ORDER_CHECK` / `SYNC_SELL_FILL` / `SYNC_BUY_FILL` / `SYNC_BUY_POSITION` / `BALANCE_REFRESH`) |
 
-실제 BUY / SELL / `--execute` / fill · position sync 자동 재시도 / aws-live 작업은 모두 0건이다(§11.1 / OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011 / OD-MS-021 정합).
+The actual BUY / SELL / `--execute` / fill · position sync automatic retry / aws-live work are all 0 (consistent with §11.1 / OD-SAFE-001 ~ OD-SAFE-004 / R-AUTO-009 ~ R-AUTO-011 / OD-MS-021).
 
-### 15.8 본 섹션 갱신 원칙
+### 15.8 Update principles of this section
 
-- 기존 §1 ~ §14 결정값은 변경하지 않는다.
-- §15 는 §12 / §13 / §14 위에 본 일자 1차 실증 결과(non-GUI rev7 운영 경로 생성 + RunTask 성공 + raw 최신성 회복 + KRX EC2 자동 로그인 기반 운영 방식 실증)를 반영한 표현 갱신과 결정 락(OD-MS-022)만 추가한다.
-- Preprocessor ECS 재실행 / Backend AWS E2E dry-run 재개(`BACKTEST_RESEARCH` → `BACKTEST_REPORT` → `DAILY_BUY_SIGNAL` → `DAILY_POSITION_SIGNAL` 순서) / `interest_foreignindex_raw` HANGSENG · NIKKEI225 · SHANGHAI NULL Data 후속 점검 / EventBridge Scheduler 정기 trigger / Step Functions hybrid orchestration / wrapper 내 DB 검증 출력 자동 추가 / EC2 worker stop 절차 / Chrome process 정리 옵션 / View 구현은 모두 후속 spec / 후속 phase 책임이다.
+- The existing §1 ~ §14 decision values are not changed.
+- §15 adds only the expression update reflecting this date's first-round demonstration result (non-GUI rev7 operational path creation + RunTask success + raw freshness recovery + demonstration of the KRX EC2 automatic-login-based operational method) and the decision lock (OD-MS-022) on top of §12 / §13 / §14.
+- The Preprocessor ECS re-run / Backend AWS E2E dry-run resumption (`BACKTEST_RESEARCH` → `BACKTEST_REPORT` → `DAILY_BUY_SIGNAL` → `DAILY_POSITION_SIGNAL` order) / follow-up inspection of `interest_foreignindex_raw` HANGSENG · NIKKEI225 · SHANGHAI NULL Data / EventBridge Scheduler periodic trigger / Step Functions hybrid orchestration / automatic addition of DB validation output within the wrapper / EC2 worker stop procedure / Chrome process cleanup option / View implementation are all subsequent spec / subsequent phase responsibilities.
 
-## 16. 2026-06-20 운영자 검증 결과 / Daily AWS Paper Wrapper 최종 점검 + EC2 lifecycle 후속 필요성
+## 16. 2026-06-20 operator validation result / Daily AWS Paper Wrapper final inspection + EC2 lifecycle follow-up necessity
 
-본 섹션은 2026-06-20 운영자 직접 수행한 (a) Daily AWS Paper Wrapper 구조 / 안전 기준 / EC2 기동 기준 최종 점검, (b) RunDate `2026-06-18` / Step 1 ~ Step 11 범위 wrapper 재실행 시도 안전 중단, (c) 6/19 KRX raw 최신성 복구 상태 점검 결과를 반영한 보강 섹션이다. §12 ~ §15 결정값은 변경하지 않고, EC2 lifecycle 후속 필요성과 Step 2 wrapper 성공판정 강화 진입 근거만 추가로 명시한다. 자세한 운영자 실행 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-20 §1 ~ §5 참조.
+This section is a supplement reflecting the results performed directly by the operator on 2026-06-20: (a) final inspection of the Daily AWS Paper Wrapper structure / safety criteria / EC2 startup criteria, (b) safe halt of the wrapper re-run attempt for the RunDate `2026-06-18` / Step 1 ~ Step 11 scope, (c) inspection of the 6/19 KRX raw freshness recovery status. It does not change the §12 ~ §15 decision values; it additionally specifies only the EC2 lifecycle follow-up necessity and the basis for entering Step 2 wrapper success-judgment strengthening. For detailed operator execution results, see [`./operation-notes.md`](./operation-notes.md) 2026-06-20 §1 ~ §5.
 
-### 16.1 EC2 기동 기준 (Step 별 의존성)
+### 16.1 EC2 startup criteria (per-Step dependency)
 
-본 spec 의 Step 2 INTEREST_CRAWLER 책임 범위와 인접 step 의 EC2 의존성을 명시한다.
+Specifies the Step 2 INTEREST_CRAWLER responsibility scope of this spec and the EC2 dependency of adjacent steps.
 
-| Step | 의존 EC2 | 본 일자 운영 메모 |
+| Step | Dependent EC2 | This date's operational memo |
 |------|----------|------------------|
-| Step 1 `CONNECTOR_BALANCE` | MarketConnector EC2 | EC2 stop · start 후 `/tmp/inject-env.sh` 유실 가능 / 본 일자 1차 실증(재생성 후 통과). 03 spec 책임 |
-| Step 2 `INTEREST_CRAWLER` | (a) non-GUI ECS Fargate Task / (b) Crawler Worker EC2(KRX GUI) | non-GUI 는 EC2 의존 없음 / KRX GUI 는 Crawler Worker EC2 가 `running` 상태 + Administrator interactive session 필요 |
-| Step 12 / 13 / 17 | MarketConnector EC2 | broker / KIS 호출 또는 BALANCE_REFRESH / 03 spec 책임 |
+| Step 1 `CONNECTOR_BALANCE` | MarketConnector EC2 | `/tmp/inject-env.sh` may be lost after EC2 stop · start / first-round demonstration on this date (passed after regeneration). 03 spec responsibility |
+| Step 2 `INTEREST_CRAWLER` | (a) non-GUI ECS Fargate Task / (b) Crawler Worker EC2 (KRX GUI) | non-GUI has no EC2 dependency / KRX GUI requires the Crawler Worker EC2 in `running` state + an Administrator interactive session |
+| Step 12 / 13 / 17 | MarketConnector EC2 | broker / KIS call or BALANCE_REFRESH / 03 spec responsibility |
 
-### 16.2 EC2 lifecycle 후속 필요성 (08 spec 입력)
+### 16.2 EC2 lifecycle follow-up necessity (08 spec input)
 
-- 두 EC2 가 stopped 상태이면 wrapper 실행 전 운영자가 직접 start 필요 / 종료 후 stop 필요(R-AUTO-016 / R-AUTO-017 mitigation 정합).
-- MarketConnector EC2 의 `/tmp/inject-env.sh` 유실 대응 / SSM Online wait / KRX worker EC2 stop 절차의 자동화는 본 spec 범위 밖 / 후속 분리(task 59 정합).
-- 본 일자 6/18 wrapper 중복 실행 시도 결과 — Step 12 미실행 / 신규 broker 주문 0건 / 신규 execution_plan 0건 / Crawler Worker chrome 잔여 프로세스는 EC2 stop 으로 정리 / R-AUTO-002 / R-AUTO-019 mitigation 정합.
+- If both EC2 are stopped, the operator must directly start them before the wrapper run / must stop them after completion (consistent with R-AUTO-016 / R-AUTO-017 mitigation).
+- The automation of the MarketConnector EC2 `/tmp/inject-env.sh` loss handling / SSM Online wait / KRX worker EC2 stop procedure is out of scope for this spec / separated subsequently (consistent with task 59).
+- Result of this date's 6/18 wrapper duplicate-run attempt — Step 12 not executed / 0 new broker orders / 0 new execution_plan / residual Crawler Worker chrome processes cleaned up by EC2 stop / consistent with R-AUTO-002 / R-AUTO-019 mitigation.
 
-### 16.3 본 섹션 갱신 원칙
+### 16.3 Update principles of this section
 
-- §12 ~ §15 결정값은 변경하지 않는다.
-- §16 은 EC2 기동 기준 / EC2 lifecycle 후속 필요성 / 6/18 중복 실행 시도 결과만 보강한다.
-- KRX GUI 경로의 자동 로그인(OD-MS-022) / non-GUI ECS Fargate 운영 경로(OD-MS-011) / 표현 보정(OD-MS-020) 정책은 본 일자에도 그대로 유지된다.
+- The §12 ~ §15 decision values are not changed.
+- §16 supplements only the EC2 startup criteria / EC2 lifecycle follow-up necessity / 6/18 duplicate-run attempt result.
+- The KRX GUI path automatic login (OD-MS-022) / non-GUI ECS Fargate operational path (OD-MS-011) / expression correction (OD-MS-020) policies are kept as is on this date as well.
 
-## 17. 2026-06-21 운영자 검증 결과 / Step 2 INTEREST_CRAWLER 성공판정 강화 (OD-MS-026 신규)
+## 17. 2026-06-21 operator validation result / Step 2 INTEREST_CRAWLER success-judgment strengthening (OD-MS-026 new)
 
-본 섹션은 2026-06-21 운영자 직접 수행 결과를 반영한 보강 섹션이다. §12 ~ §16 결정값은 변경하지 않고, Step 2 성공 조건과 worker stopped fail-closed 설계 변경 / KRX raw validation script 의 Step 2 guard 역할만 추가로 명시한다.
+This section is a supplement reflecting the results performed directly by the operator on 2026-06-21. It does not change the §12 ~ §16 decision values; it additionally specifies only the Step 2 success conditions and the worker stopped fail-closed design change / the Step 2 guard role of the KRX raw validation script.
 
-작업 범위:
+Work scope:
 
-- (a) `step-02-interest-crawler.ps1` 성공판정 강화
-- (b) non-GUI ECS crawler env 보강
-- (c) `interest_krx_raw_validate_daily.py` 신규 생성 + EC2 배포 + EC2 단독 검증
-- (d) `step-02-interest-crawler.ps1` DB validation 연동
-- (e) crawler worker stopped fail-closed 처리
-- (f) Step 2 단독 실행 검증
+- (a) `step-02-interest-crawler.ps1` success-judgment strengthening
+- (b) non-GUI ECS crawler env supplement
+- (c) New `interest_krx_raw_validate_daily.py` + EC2 deployment + EC2 standalone validation
+- (d) `step-02-interest-crawler.ps1` DB validation integration
+- (e) crawler worker stopped fail-closed handling
+- (f) Step 2 standalone execution validation
 
-참조: [`./operation-notes.md`](./operation-notes.md) 2026-06-21 §1 ~ §8 / 결정 락 OD-MS-026 신규 / R-AUTO-020 신규 mitigation 1차 실증 / R-AUTO-007 / R-AUTO-016 / R-AUTO-017 보강.
+Reference: [`./operation-notes.md`](./operation-notes.md) 2026-06-21 §1 ~ §8 / decision lock OD-MS-026 new / R-AUTO-020 new mitigation first-round demonstration / R-AUTO-007 / R-AUTO-016 / R-AUTO-017 supplement.
 
-### 17.1 Step 2 성공 조건 (강화)
+### 17.1 Step 2 success conditions (strengthened)
 
-Step 2 `INTEREST_CRAWLER` 의 SUCCESS 조건은 다음 6개를 모두 통과해야 한다(OD-MS-026 정합 / R-AUTO-020 mitigation 정합).
+The SUCCESS condition of Step 2 `INTEREST_CRAWLER` must pass all of the following 6 (consistent with OD-MS-026 / consistent with R-AUTO-020 mitigation).
 
-1. **non-GUI ECS crawler exitCode 0** — Task Definition `portfolio-paper-interest-crawler:7` RunTask 의 lastStatus `STOPPED` / container exitCode 0 / stoppedReason `Essential container in task exited` / CloudWatch log 저장 확인.
-2. **Crawler Worker EC2 running** — instance state `running` 이 아니면 Step 2 fail-closed(아래 §17.2 참조).
-3. **Windows Scheduled Task `Portfolio-KRX-Worker-Daily` Running → Ready 복귀** — `schtasks /Run` 으로 trigger / `Running` 상태 polling → `Ready` 복귀 wait / `sawRunning` 로그 출력 / timeout 시 Step 2 실패.
-4. **Last Result 0 또는 0x0** — Scheduled Task 종료 후 Last Result 확인 / Scheduled Task trigger 성공만으로 SUCCESS 처리하지 않는다(R-AUTO-020 mitigation 핵심).
-5. **latest worker log path / tail 출력** — `C:\portfolio\logs\krx_worker_daily_*.log` 최신 파일 path / last write time / size / tail 출력. `KRX login SUCCESS` / `KRX program SUCCESS` / `KRX shortsell SUCCESS` / `DONE :: KRX worker daily` 라벨 확인(본문 평문 인용 0건 / R-DOCS-001 정합).
-6. **KRX raw DB validation 통과** — `INTEREST_CRAWLER_KRX_DB_VALIDATE` SSM step → `interest_krx_raw_validate_daily.py --expected-date <ExpectedKrxRawDate>` 실행 → `interest_program_raw` / `interest_shortsell_raw` 의 expected trade_date 기준 row_count + `max(trade_date)` 검증 / non-zero exit 또는 row_count 0 시 Step 2 fail. step result 에 `KrxDbValidationCommandId` 포함.
+1. **non-GUI ECS crawler exitCode 0** — RunTask of Task Definition `portfolio-paper-interest-crawler:7` with lastStatus `STOPPED` / container exitCode 0 / stoppedReason `Essential container in task exited` / CloudWatch log saving confirmed.
+2. **Crawler Worker EC2 running** — if the instance state is not `running`, Step 2 is fail-closed (see §17.2 below).
+3. **Windows Scheduled Task `Portfolio-KRX-Worker-Daily` Running → Ready return** — trigger via `schtasks /Run` / poll for `Running` state → wait for `Ready` return / output `sawRunning` log / Step 2 fails on timeout.
+4. **Last Result 0 or 0x0** — confirm Last Result after the Scheduled Task ends / do not treat as SUCCESS by Scheduled Task trigger success alone (core of R-AUTO-020 mitigation).
+5. **latest worker log path / tail output** — latest file path / last write time / size / tail output of `C:\portfolio\logs\krx_worker_daily_*.log`. Confirm the `KRX login SUCCESS` / `KRX program SUCCESS` / `KRX shortsell SUCCESS` / `DONE :: KRX worker daily` labels (0 plaintext body quotes / consistent with R-DOCS-001).
+6. **KRX raw DB validation pass** — `INTEREST_CRAWLER_KRX_DB_VALIDATE` SSM step → run `interest_krx_raw_validate_daily.py --expected-date <ExpectedKrxRawDate>` → validate the row_count + `max(trade_date)` of `interest_program_raw` / `interest_shortsell_raw` based on the expected trade_date / Step 2 fails on non-zero exit or row_count 0. Include `KrxDbValidationCommandId` in the step result.
 
-### 17.2 worker stopped 처리 (skip → fail-closed)
+### 17.2 worker stopped handling (skip → fail-closed)
 
-| 시점 | 처리 방식 | 결과 |
+| Time | Handling method | Result |
 |------|-----------|------|
-| ~ 2026-06-20 (이전) | crawler worker EC2 가 `running` 이 아니면 wrapper 안에서 KRX GUI Scheduled Task trigger 자동 skip | skip 상태에서도 Step 2 SUCCESS 가능성 존재 / KRX raw 미적재가 Step 3 이후로 전파될 위험(R-AUTO-016 / R-AUTO-020 정합) |
-| 2026-06-21 (현재) | crawler worker EC2 가 `running` 이 아니면 즉시 Step 2 실패(fail-closed) / instanceId / state 출력 | KRX GUI worker · DB validation 미수행 상태에서 Step 2 SUCCESS 진입 차단 |
+| ~ 2026-06-20 (previous) | If the crawler worker EC2 is not `running`, the KRX GUI Scheduled Task trigger is automatically skipped inside the wrapper | Step 2 SUCCESS is possible even in the skip state / risk that KRX raw non-loading propagates to Step 3 onward (consistent with R-AUTO-016 / R-AUTO-020) |
+| 2026-06-21 (current) | If the crawler worker EC2 is not `running`, Step 2 fails immediately (fail-closed) / output instanceId / state | Block Step 2 SUCCESS entry when the KRX GUI worker · DB validation is not performed |
 
-본 변경은 R-AUTO-016 mitigation 갱신과 R-AUTO-020 신규 mitigation 의 핵심 설계 변경이며, 본 일자 단독 실행 검증에서는 worker state `running` 이 1차 실증되어 fail-closed 분기 자체는 진입하지 않았다(`§17.4 정합`).
+This change is the core design change of the R-AUTO-016 mitigation update and the R-AUTO-020 new mitigation, and in this date's standalone execution validation the worker state `running` was first-round demonstrated, so the fail-closed branch itself was not entered (`consistent with §17.4`).
 
-### 17.3 KRX raw validation script 의 Step 2 guard 역할
+### 17.3 Step 2 guard role of the KRX raw validation script
 
-- `interest_krx_raw_validate_daily.py` 는 Step 2 guard 로 사용되며, Step 2 가 SUCCESS 처리되기 전 단계의 마지막 체크 포인트다.
-- 검증 대상은 `interest_program_raw` / `interest_shortsell_raw` 두 raw table 이며, expected trade_date 기준 row_count + `max(trade_date)` 가 expected 이상인지 확인한다. 실패 시 exit code 30 반환.
-- DB session 정합 — user `crawler_app` / schema `interest` / search_path `interest, reference, legacy, public`(2026-06-21 EC2 단독 검증 결과 정합).
-- 본 script 가 Step 2 guard 위치에 배치됨으로써 wrapper 가 Scheduled Task trigger 성공만 보고 Step 2 SUCCESS 처리하던 한계(R-AUTO-007 / R-AUTO-020)가 1차 차단된다.
+- `interest_krx_raw_validate_daily.py` is used as the Step 2 guard and is the last checkpoint of the stage before Step 2 is treated as SUCCESS.
+- The validation targets are the two raw tables `interest_program_raw` / `interest_shortsell_raw`, and it confirms that the row_count based on the expected trade_date + `max(trade_date)` is at or above expected. It returns exit code 30 on failure.
+- DB session consistency — user `crawler_app` / schema `interest` / search_path `interest, reference, legacy, public` (consistent with the 2026-06-21 EC2 standalone validation result).
+- By placing this script at the Step 2 guard position, the limitation where the wrapper treated Step 2 as SUCCESS by seeing only the Scheduled Task trigger success (R-AUTO-007 / R-AUTO-020) is first-round blocked.
 
-### 17.4 Step 2 단독 실행 검증 결과 (2026-06-21)
+### 17.4 Step 2 standalone execution validation result (2026-06-21)
 
-| 항목 | 값 / 결과 |
+| Item | Value / result |
 |------|-----------|
 | RunId | `daily-aws-paper-20260621-204017` |
-| Environment / RunDate / 실행 범위 | `aws-paper` / `2026-06-20` / `-StartStep 2 -EndStep 2` |
+| Environment / RunDate / execution scope | `aws-paper` / `2026-06-20` / `-StartStep 2 -EndStep 2` |
 | ExpectedKrxRawDate | `2026-06-19` |
 | StepCode / Status / Runner | `INTEREST_CRAWLER` / `SUCCESS` / `ECS+SSM` |
 | non-GUI ECS taskDefinition / taskId / exitCode | `portfolio-paper-interest-crawler:7` / `78979b5cbb714d0eb94f5946e15a14ce` / `0` |
@@ -678,13 +678,13 @@ Step 2 `INTEREST_CRAWLER` 의 SUCCESS 조건은 다음 6개를 모두 통과해�
 | Scheduled Task | elapsedSeconds=`111` / sawRunning=True / FinalStatus=`Ready` / FinalLastResult=`0` |
 | latest worker log | `C:\portfolio\logs\krx_worker_daily_20260621_114154.log` |
 | KRX raw DB validation SSM commandId | `2279c6d7-2da6-4317-9c10-7cc77374b317` |
-| `interest_program_raw` 검증 | expected=`2026-06-19` / max_date=`2026-06-19` / expected_count=`1` / OK |
-| `interest_shortsell_raw` 검증 | expected=`2026-06-19` / max_date=`2026-06-19` / expected_count=`349` / OK |
+| `interest_program_raw` validation | expected=`2026-06-19` / max_date=`2026-06-19` / expected_count=`1` / OK |
+| `interest_shortsell_raw` validation | expected=`2026-06-19` / max_date=`2026-06-19` / expected_count=`349` / OK |
 | validation exit code | `0` (stderr empty) |
 
-### 17.5 본 섹션 갱신 원칙
+### 17.5 Update principles of this section
 
-- §12 ~ §16 결정값은 변경하지 않는다.
-- §17 은 (a) Step 2 성공 조건 강화, (b) worker stopped 처리 변경(skip → fail-closed), (c) KRX raw validation script 의 Step 2 guard 역할, (d) Step 2 단독 실행 검증 결과만 추가로 명시한다.
-- KRX GUI 경로의 자동 로그인(OD-MS-022) / non-GUI ECS Fargate 운영 경로(OD-MS-011) / 표현 보정(OD-MS-020) / wrapper 운영 정책(OD-MS-023) 결정은 그대로 유지된다.
-- Step 3 PREPROCESSOR 이후 단계 진행 / EC2 lifecycle 자동화 / Step Functions 혼합 orchestration / View 표시 연동 / worker log centralized collection 은 모두 후속 spec / 후속 phase 책임으로 유지한다.
+- The §12 ~ §16 decision values are not changed.
+- §17 additionally specifies only (a) the Step 2 success-condition strengthening, (b) the worker stopped handling change (skip → fail-closed), (c) the Step 2 guard role of the KRX raw validation script, and (d) the Step 2 standalone execution validation result.
+- The KRX GUI path automatic login (OD-MS-022) / non-GUI ECS Fargate operational path (OD-MS-011) / expression correction (OD-MS-020) / wrapper operational policy (OD-MS-023) decisions are kept as is.
+- Progression of stages after Step 3 PREPROCESSOR / EC2 lifecycle automation / Step Functions mixed orchestration / View display integration / worker log centralized collection are all kept as subsequent spec / subsequent phase responsibilities.

@@ -1,15 +1,15 @@
-## 2026-06-08 AWS Foundation 실행 기록
+## 2026-06-08 AWS Foundation Execution Record
 
-- Step 2 비용 / 환경 결정 확인 완료: aws-paper low 적용. secret 값 기록 없음.
-- CIDR: 10.0.0.0/16 (권고)
-- AZ 2개: ap-northeast-2a, ap-northeast-2c (권고)
-- Subnet 6개: public-a, public-b, app-a, app-b, data-a, data-b
+- Step 2 cost / environment decision confirmation complete: aws-paper low applied. No secret value recorded.
+- CIDR: 10.0.0.0/16 (recommended)
+- 2 AZs: ap-northeast-2a, ap-northeast-2c (recommended)
+- 6 Subnets: public-a, public-b, app-a, app-b, data-a, data-b
 - Internet Gateway: portfolio-igw
-- NAT Gateways 목록 비어 있음
-- NAT 역할의 EC2 인스턴스 없음
-- Route 테이블: rt-public, rt-app, rt-data
-- 보안 그룹 생성
- 1) sgroup-marketconnector-ec2 (sg로 시작 불가)
+- NAT Gateways list is empty
+- No EC2 instance serving the NAT role
+- Route tables: rt-public, rt-app, rt-data
+- Security group creation
+ 1) sgroup-marketconnector-ec2 (cannot start with sg)
  2) sgroup-port-view-ecs
  3) sgroup-strategy-tasks
  4) sgroup-crawler-tasks 
@@ -17,312 +17,312 @@
  6) sgroup-research-batch
  7) sgroup-rds-postgres
  8) sgroup-vpc-endpoints
- - Security Group 규칙 채우기: 완료
- - VPC Endpoint 생성: 완료
- - RDS Subnet Group 생성: 완료
- - RDS Parameter Group 생성: 완료
- - Secret 이름: /portfolio/paper/rds/master
- - Step 14-1 RDS 생성 진행: PostgreSQL 16.14-R1, portfolio-paper-rds, portfolio_admin, 자체 관리 암호 방식 선택. 실제 password 값 기록 없음.
+ - Security Group rule population: complete
+ - VPC Endpoint creation: complete
+ - RDS Subnet Group creation: complete
+ - RDS Parameter Group creation: complete
+ - Secret name: /portfolio/paper/rds/master
+ - Step 14-1 RDS creation in progress: PostgreSQL 16.14-R1, portfolio-paper-rds, portfolio_admin, self-managed password method selected. No actual password value recorded.
  - KMS Key ID: alias/aws/rds
- - RDS 생성: 완료
+ - RDS creation: complete
  - INTEREST_DB_HOST:
  - DB Endpoint: portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com
- - DB 프로그래밍 언어: PSQL (Windows)로 변경
- - Step 15 RDS 접속 보안 / Parameter / Option 확인 완료: Publicly accessible = No, pg-portfolio-paper 적용, backup retention 7일, deletion protection enabled 확인. secret 값 기록 없음.
+ - DB programming language: changed to PSQL (Windows)
+ - Step 15 RDS access security / Parameter / Option confirmation complete: Publicly accessible = No, pg-portfolio-paper applied, backup retention 7 days, deletion protection enabled confirmed. No secret value recorded.
 
 
-## 2026-06-08 Kiro ReadOnly 검증 IAM 설계 및 자동 검증 결과
+## 2026-06-08 Kiro ReadOnly Validation IAM Design and Automated Validation Result
 
-- Kiro ReadOnly 검증 IAM 설계 완료.
-  - 사용자 이름 `portfolio-kiro-readonly-validator` / 정책 이름 `PortfolioKiroReadOnlyValidatorPolicy`
-  - 상세 설계 참조: [`../../docs/kiro-readonly-validator-iam.md`](../../docs/kiro-readonly-validator-iam.md)
-  - 정책 포함: ec2 / rds / secretsmanager(metadata 한정) / iam / cloudwatch / logs / tag ReadOnly
-  - 명시 Deny: `secretsmanager:GetSecretValue`, KMS Decrypt
-- 자동 검증 실행: AWS CLI ReadOnly 호출만 사용. 리소스 생성/수정/삭제 없음. SecretsManager는 DescribeSecret만 호출하고 GetSecretValue는 호출하지 않음.
-- 자동 검증 가능 항목 — 모두 기대값 일치.
-  - VPC / 6개 Subnet / IGW attach
-  - NAT 미생성 / NAT 역할 EC2 미생성
-  - Route Table 3종(rt-public 0/0→IGW, rt-app/rt-data 외부 라우트 없음)
-  - SG 8개 인벤토리 / sg-rds-postgres inbound SG 참조만(0/0:5432 없음) / SSH 22 0/0 inbound 0건
-  - sg-vpc-endpoints inbound / 운영 SG outbound 표 일치 점검
-  - VPC Endpoint 6종 available + Private DNS + sgroup-vpc-endpoints
-  - RDS subnet group / parameter group / instance(class / storage / public access / backup retention / deletion protection / encryption / parameter group in-sync)
-- 자동 검증 완료 항목 수: 약 38건 (Network 13 + SG 16 + VPC Endpoint 8 + RDS 11에서 자동 가능한 부분 포함, 일부 sub-항목 합산 추정).
-- 수동 확인 필요 항목 수: 약 31건 (Pre-flight 운영자 인지 / 비용 프로파일 결정 인지 / RDS PITR Console 확인 / Cost Validation Billing Dashboard / DB SQL 미실행 / Cutover 합의 / Rollback 미수행 / Documentation 사람 점검 등).
-- 불일치 항목 수: 0건. 기존 `sgroup-marketconnector-ec2` outbound는 AWS CLI 출력 구조상 list 표기 차이로 [X] 후보였으나, 실제 규칙은 HTTPS 0.0.0.0/0 + sgroup-vpc-endpoints(443) + sgroup-rds-postgres(5432)를 모두 충족하므로 운영 불일치 없음.
-- secret value 조회 없음 (DescribeSecret metadata만 호출).
-- AWS 리소스 생성 / 수정 / 삭제 없음 (read-only API만 호출).
-- 본 검증 산출물 갱신 대상: `.kiro/docs/kiro-readonly-validator-iam.md`, `.kiro/specs/02-aws-network-and-rds/validation-checklist.md`, `.kiro/specs/02-aws-network-and-rds/operation-notes.md` 3개 파일. 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 없음.
-- 후속 작업 권고
-  - 운영자가 portadmin으로 `portfolio-kiro-readonly-validator` IAM User 생성 + 정책 attach + access key 발급 후 Kiro 환경의 별도 profile에 등록.
-  - access key는 본 문서 / repo / 평문 파일에 적지 않는다(`[REDACTED]`).
-  - 03 / 06 spec 진행 시점에 DB / schema / role SQL 실행 후 Section 6 수동 확인 항목을 [O]로 갱신.
-  - Cost Anomaly Detection alert 등록 후 Section 8 항목을 [O]로 갱신.
-
-
-## 2026-06-08 validation-checklist 상태 라벨 4종 재분류
-
-- validation-checklist.md 상태 라벨을 3종에서 4종으로 재분류함. 기존 `<span style="color:black">[확인 필요]</span>`를 모두 제거하고 `<span style="color:green">[Kiro 후속 작업 필요]</span>` 또는 `<span style="color:black">[운영자 확인 필요]</span>`로 분리함.
-- Rollback Validation은 현재 rollback 미수행이 정상 상태이므로 모두 `[O] Rollback 미수행 — 현재 대상 아님` 형태로 정리함. 향후 실제 rollback 시점에 AWS API 재검증으로 [O]/[X]를 갱신할 예정.
-- Cost / Documentation 항목 중 Kiro가 추가 ReadOnly 호출 / 파일 grep / 문서 비교로 확인 가능한 것은 `[Kiro 후속 작업 필요]`로 분류함. 본 세션에서 ALB 0건(elbv2 / classic elb), Cost Anomaly Detection alert 0건, repo grep(AKIA / Slack webhook / JWT / 평문 secret 0건)은 추가로 자동 검증해 [O] 또는 [운영자 확인 필요]로 즉시 확정함.
-- 실제 운영자 판단 / 비용 승인 / 외부 노출 / 사람 인지 / 미래 합의는 `[운영자 확인 필요]`로 분리함(operator-decisions / risk-register 인지, 비용 라인 결정, cutover 합의, public 문서 마스킹, Cost Anomaly Detection 등록 결정, DB SQL 합의 등).
-- 기존 [X] 항목 정정: `sgroup-marketconnector-ec2` outbound는 design.md 표(0.0.0.0/0 broker, sg-rds-postgres 5432, VPC Endpoints 443) 요건을 모두 충족하며 표기 순서만 다름. 따라서 [X] 불일치가 아니라 [O]로 재분류함.
-- 변경 요약 (라벨 개수, 라벨 규칙 설명 줄 제외): [O] 74건 / [X] 0건 / [Kiro 후속 작업 필요] 6건 / [운영자 확인 필요] 20건. (Rollback Validation 10건 [O] 포함.)
-- secret value 조회 없음. SecretsManager는 metadata만 사용.
-- AWS 리소스 생성 / 수정 / 삭제 없음 (read-only API만 호출).
-- 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 없음 (`git status --short` 결과 .kiro 외 변경 없음).
-- 본 작업 산출물 갱신 대상: `.kiro/specs/02-aws-network-and-rds/validation-checklist.md`, `.kiro/specs/02-aws-network-and-rds/operation-notes.md`. account-id / RDS endpoint hostname / secret ARN / access key id는 본 작업으로 새로 추가 출력하지 않음. 이미 운영자가 본 파일 상단에 적은 내부 식별자는 외부 공개 전 마스킹 권고.
+- Kiro ReadOnly validation IAM design complete.
+  - User name `portfolio-kiro-readonly-validator` / policy name `PortfolioKiroReadOnlyValidatorPolicy`
+  - Detailed design reference: [`../../docs/kiro-readonly-validator-iam.md`](../../docs/kiro-readonly-validator-iam.md)
+  - Policy includes: ec2 / rds / secretsmanager (metadata only) / iam / cloudwatch / logs / tag ReadOnly
+  - Explicit Deny: `secretsmanager:GetSecretValue`, KMS Decrypt
+- Automated validation run: uses only AWS CLI ReadOnly calls. No resource creation/modification/deletion. SecretsManager calls only DescribeSecret and does not call GetSecretValue.
+- Automatically verifiable items — all match expected values.
+  - VPC / 6 Subnets / IGW attach
+  - NAT not created / NAT-role EC2 not created
+  - 3 Route Tables (rt-public 0/0→IGW, rt-app/rt-data no external route)
+  - 8 SG inventory / sg-rds-postgres inbound SG reference only (no 0/0:5432) / SSH 22 0/0 inbound 0 count
+  - sg-vpc-endpoints inbound / operational SG outbound table match check
+  - 6 VPC Endpoints available + Private DNS + sgroup-vpc-endpoints
+  - RDS subnet group / parameter group / instance (class / storage / public access / backup retention / deletion protection / encryption / parameter group in-sync)
+- Number of completed automated validation items: approximately 38 (Network 13 + SG 16 + VPC Endpoint 8 + RDS 11, including the automatable portions, some sub-items estimated by summation).
+- Number of items requiring manual confirmation: approximately 31 (Pre-flight operator awareness / cost profile decision awareness / RDS PITR Console confirmation / Cost Validation Billing Dashboard / DB SQL not executed / Cutover agreement / Rollback not performed / Documentation human review, etc.).
+- Number of mismatched items: 0. The existing `sgroup-marketconnector-ec2` outbound was a [X] candidate due to a list notation difference in the AWS CLI output structure, but the actual rule satisfies HTTPS 0.0.0.0/0 + sgroup-vpc-endpoints (443) + sgroup-rds-postgres (5432) all, so there is no operational mismatch.
+- No secret value lookup (only DescribeSecret metadata called).
+- No AWS resource creation / modification / deletion (only read-only API called).
+- Validation artifact update targets: `.kiro/docs/kiro-readonly-validator-iam.md`, `.kiro/specs/02-aws-network-and-rds/validation-checklist.md`, `.kiro/specs/02-aws-network-and-rds/operation-notes.md` 3 files. No modification to the 8 MS code / README / AGENTS.md / CHANGELOG / docs / worklog.
+- Follow-up work recommendation
+  - The operator creates the `portfolio-kiro-readonly-validator` IAM User as portadmin + attaches the policy + issues an access key, then registers it in a separate profile in the Kiro environment.
+  - The access key is not written in this document / repo / plaintext file (`[REDACTED]`).
+  - At the time of 03 / 06 spec progress, after executing DB / schema / role SQL, update the Section 6 manual confirmation items to [O].
+  - After registering the Cost Anomaly Detection alert, update the Section 8 items to [O].
 
 
-## 2026-06-08 [Kiro 후속 작업 필요] 항목 추가 검증 및 [O] 격상
+## 2026-06-08 validation-checklist Status Label 4-Type Reclassification
 
-- 대상: 직전 세션에서 [Kiro 후속 작업 필요]로 남겨진 6개 항목.
-- 결과: 4개 항목 [O]로 격상, 2개 항목 [Kiro 후속 작업 필요] 유지(Cost Explorer 데이터 누적 후 재시도 사유 명시).
-- 격상한 항목
-  - §1 aws-paper 대상 작업인지 확인 — operator-decisions.md At a Glance OD-ENV-003 = `aws-paper` 🟢 확정과 본 spec 일관 비교로 [O].
-  - §9 operator-decisions.md 본 spec 결정 상태 일치 — OD-ENV / OD-NET / OD-RDS / OD-DB / OD-CUT / OD-SAFE 카테고리 모든 핵심 결정이 본 spec design / runbook / decision-matrix와 일관(불일치 0건)으로 [O].
-  - §9 risk-register.md mitigation 점검 — R-NET-001~003 / R-SEC-001 / R-DATA-001~002 / R-AUTO-001~002 / R-DOCS-001 / R-COST-001~002 / R-SEC-002~003 mitigation 본문이 본 spec의 design / runbook / validation-checklist 통제와 일관으로 [O].
-  - §9 secret 자리 [REDACTED] 일관성 — `.kiro/**/*.md` 트리에 대해 아래 패턴 grep 모두 0건. [REDACTED-CANDIDATE] 출력 없음. [O]로 격상. repo 외부(콘솔 캡처 / 개인 노트 / 외부 PC 파일)는 §1 [운영자 확인 필요]로 분리 유지.
+- Reclassified the validation-checklist.md status labels from 3 types to 4 types. Removed all existing <span style="color:black">[확인 필요]</span> and split them into <span style="color:green">[Kiro 후속 작업 필요]</span> or <span style="color:black">[운영자 확인 필요]</span>.
+- Since Rollback Validation is currently in a normal state of rollback not performed, all were organized in the form `[O] Rollback 미수행 — 현재 대상 아님`. At the actual future rollback time, [O]/[X] will be updated via AWS API re-validation.
+- Among the Cost / Documentation items, those that Kiro can confirm via additional ReadOnly calls / file grep / document comparison were classified as `[Kiro 후속 작업 필요]`. In this session, ALB 0 count (elbv2 / classic elb), Cost Anomaly Detection alert 0 count, repo grep (AKIA / Slack webhook / JWT / plaintext secret 0 count) were additionally auto-validated and immediately confirmed as [O] or [운영자 확인 필요].
+- Actual operator judgment / cost approval / external exposure / human awareness / future agreement were separated as `[운영자 확인 필요]` (operator-decisions / risk-register awareness, cost line decision, cutover agreement, public document masking, Cost Anomaly Detection registration decision, DB SQL agreement, etc.).
+- Correction of an existing [X] item: `sgroup-marketconnector-ec2` outbound satisfies all the requirements of the design.md table (0.0.0.0/0 broker, sg-rds-postgres 5432, VPC Endpoints 443) and only the notation order differs. Therefore it was reclassified as [O] rather than an [X] mismatch.
+- Change summary (label counts, excluding label-rule description lines): [O] 74 / [X] 0 / [Kiro 후속 작업 필요] 6 / [운영자 확인 필요] 20. (Includes Rollback Validation 10 [O].)
+- No secret value lookup. SecretsManager uses metadata only.
+- No AWS resource creation / modification / deletion (only read-only API called).
+- No modification to the 8 MS code / README / AGENTS.md / CHANGELOG / docs / worklog (`git status --short` result shows no changes outside .kiro).
+- Work artifact update targets: `.kiro/specs/02-aws-network-and-rds/validation-checklist.md`, `.kiro/specs/02-aws-network-and-rds/operation-notes.md`. account-id / RDS endpoint hostname / secret ARN / access key id are not newly output by this work. Internal identifiers the operator already wrote at the top of this file are recommended to be masked before external disclosure.
+
+
+## 2026-06-08 [Kiro 후속 작업 필요] Item Additional Validation and [O] Promotion
+
+- Target: the 6 items left as [Kiro 후속 작업 필요] in the previous session.
+- Result: 4 items promoted to [O], 2 items kept as [Kiro 후속 작업 필요] (stating the reason to retry after Cost Explorer data accumulates).
+- Promoted items
+  - §1 Confirm whether it is an aws-paper target task — [O] by consistent comparison of operator-decisions.md At a Glance OD-ENV-003 = `aws-paper` 🟢 확정 with this spec.
+  - §9 operator-decisions.md matches this spec's decision states — [O] as all core decisions in the OD-ENV / OD-NET / OD-RDS / OD-DB / OD-CUT / OD-SAFE categories are consistent with this spec's design / runbook / decision-matrix (0 mismatches).
+  - §9 risk-register.md mitigation check — [O] as the mitigation text of R-NET-001~003 / R-SEC-001 / R-DATA-001~002 / R-AUTO-001~002 / R-DOCS-001 / R-COST-001~002 / R-SEC-002~003 is consistent with this spec's design / runbook / validation-checklist controls.
+  - §9 secret-position [REDACTED] consistency — grep of the following patterns over the `.kiro/**/*.md` tree all 0 count. No [REDACTED-CANDIDATE] output. Promoted to [O]. Outside the repo (console captures / personal notes / external PC files) is kept separated as §1 [운영자 확인 필요].
     - `(AKIA|ASIA)` access key id
     - Slack incoming webhook URL / JWT
     - `(PASSWORD|SECRET|TOKEN|APP_KEY|APP_SECRET)=값`
     - `aws_secret_access_key=값`
     - `KIS*KEY|SECRET|TOKEN=값`
-    - 계좌번호 평문 패턴
-- 유지한 항목 (Kiro 후속 작업 필요)
-  - §8 Endpoint-Hours 청구 매칭 — Cost Explorer ReadOnly(`ce get-cost-and-usage`)로 USAGE_TYPE 그룹 조회 결과 본 시점 0건(데이터 누적 lag 추정). 며칠 후 재시도하여 [O] / [X]로 갱신 예정.
-  - §8 RDS-InstanceUsage 청구 매칭 — 동일 사유. RDS instance class / Single-AZ는 자동 검증으로 [O] 상태이나 청구 라인 매칭은 데이터 누적 후 재시도.
-- 변경 요약 (라벨 개수, 라벨 규칙 설명 줄 제외): [O] 78건 / [X] 0건 / [Kiro 후속 작업 필요] 2건 / [운영자 확인 필요] 20건.
-- 새로 발견한 리스크 또는 운영자 확인 필요 항목 요약
-  - 신규 리스크 식별 0건. risk-register.md에 추가 row 필요 없음.
-  - operation-notes.md 상단의 RDS endpoint hostname 한 줄과 secret 이름 `/portfolio/paper/rds/master`는 secret value는 아니지만 외부 공개 시 식별자 노출 가능성이 있음. §1 [운영자 확인 필요] 항목 "실제 secret 값이 본 spec / 운영자 노트 / 콘솔 캡처에 노출되지 않았는지 확인"의 보강 사항으로 운영자가 외부 공개 전 마스킹 필요(R-DOCS-001 mitigation 범위).
-- secret value 조회 없음 (DescribeSecret metadata만 사용. GetSecretValue 0회).
-- AWS 리소스 생성 / 수정 / 삭제 없음 (read-only describe / list / get / cost explorer get-cost-and-usage만 호출).
-- 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 없음.
-- 본 작업 산출물 갱신 대상: `.kiro/specs/02-aws-network-and-rds/validation-checklist.md`, `.kiro/specs/02-aws-network-and-rds/operation-notes.md`. account-id / RDS endpoint hostname / secret ARN / access key id는 본 작업으로 새로 추가 출력하지 않음.
+    - account number plaintext pattern
+- Retained items (Kiro 후속 작업 필요)
+  - §8 Endpoint-Hours billing matching — Cost Explorer ReadOnly (`ce get-cost-and-usage`) USAGE_TYPE group query result is 0 count at this point (presumed data accumulation lag). Will retry in a few days and update to [O] / [X].
+  - §8 RDS-InstanceUsage billing matching — same reason. RDS instance class / Single-AZ are in [O] state by automated validation, but billing line matching is retried after data accumulates.
+- Change summary (label counts, excluding label-rule description lines): [O] 78 / [X] 0 / [Kiro 후속 작업 필요] 2 / [운영자 확인 필요] 20.
+- Summary of newly discovered risks or items requiring operator confirmation
+  - 0 new risks identified. No additional row needed in risk-register.md.
+  - The one line of RDS endpoint hostname at the top of operation-notes.md and the secret name `/portfolio/paper/rds/master` are not secret values but carry the possibility of identifier exposure upon external disclosure. As a reinforcement of the §1 [운영자 확인 필요] item "Confirm that no actual secret value is exposed in this spec / operator notes / console captures", the operator needs to mask them before external disclosure (within R-DOCS-001 mitigation scope).
+- No secret value lookup (uses only DescribeSecret metadata. GetSecretValue 0 times).
+- No AWS resource creation / modification / deletion (only read-only describe / list / get / cost explorer get-cost-and-usage called).
+- No modification to the 8 MS code / README / AGENTS.md / CHANGELOG / docs / worklog.
+- Work artifact update targets: `.kiro/specs/02-aws-network-and-rds/validation-checklist.md`, `.kiro/specs/02-aws-network-and-rds/operation-notes.md`. account-id / RDS endpoint hostname / secret ARN / access key id are not newly output by this work.
 
-- 운영 결정: `portfolio-kiro-readonly-validator` IAM User 생성은 우선 보류하고, 기존 AWS CLI 기본 자격증명인 `terraform` IAM User로 Kiro 검증을 진행한다. 단, `terraform`은 AdministratorAccess 권한이므로 Kiro 작업 시 AWS 리소스 생성/수정/삭제 명령은 금지하고 ReadOnly 조회만 허용한다. 향후 보안 정리 단계에서 ReadOnly 전용 IAM 분리를 재검토한다.
+- Operational decision: Creation of the `portfolio-kiro-readonly-validator` IAM User is deferred for now, and Kiro validation proceeds with the `terraform` IAM User, which is the existing AWS CLI default credential. However, since `terraform` has AdministratorAccess permission, AWS resource creation/modification/deletion commands are prohibited during Kiro work and only ReadOnly queries are allowed. Separation of a ReadOnly-only IAM will be reconsidered in a future security cleanup phase.
 
 
-## 2026-06-09 DB Role / 권한 분리 1차 적용
+## 2026-06-09 DB Role / Privilege Separation First Application
 
-본 spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 SQL을 운영자가 직접 실행하고, §5 검증 SQL로 결과를 확인했다. SQL 본문 / 실제 password / endpoint / secret value는 본 문서에 기록하지 않는다.
+The operator directly executed the §4 SQL of this spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md), and confirmed the result with the §5 validation SQL. The SQL body / actual password / endpoint / secret value are not recorded in this document.
 
 ### owner / membership
 
-- `portfolio_owner` 생성 완료(NOLOGIN).
-- `portfolio_admin`에 `portfolio_owner` 멤버십 부여 완료. 이후 `ALTER SCHEMA ... OWNER TO portfolio_owner` 실행 가능 상태로 진입.
-- 9개 도메인 schema(`reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`)의 owner를 `portfolio_owner`로 이관 완료.
-- `public` schema는 변경하지 않음(RDS 정책 / 호환성 유지).
-- 기존 table / sequence / index의 owner는 `portfolio_admin`(restore 실행 계정)으로 그대로 남아 있음.
-  - 본 세션에서는 `REASSIGN OWNED BY portfolio_admin TO portfolio_owner`를 실행하지 않음.
-  - 기존 객체에 대해서는 §4.5 default privileges가 자동 적용되지 않음.
-  - 본 세션에서 §4.4 명시 GRANT만으로 권한 매트릭스를 적용한 상태(이후 새로 만드는 객체는 default privileges 적용 대상).
-  - 후속 세션에서 owner 일괄 이관 여부는 운영자 결정으로 분리 관리한다.
+- `portfolio_owner` creation complete (NOLOGIN).
+- `portfolio_owner` membership grant to `portfolio_admin` complete. Subsequently entered a state where `ALTER SCHEMA ... OWNER TO portfolio_owner` can be executed.
+- Ownership transfer of the 9 domain schemas (`reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`) to `portfolio_owner` complete.
+- The `public` schema is not changed (RDS policy / compatibility retained).
+- The owner of existing table / sequence / index remains as `portfolio_admin` (the restore execution account).
+  - `REASSIGN OWNED BY portfolio_admin TO portfolio_owner` was not executed in this session.
+  - §4.5 default privileges are not automatically applied to existing objects.
+  - In this session, the privilege matrix is applied only via §4.4 explicit GRANT (objects newly created afterward are subject to default privileges).
+  - Whether to bulk-transfer ownership in a follow-up session is managed separately by operator decision.
 
-### app role 7종
+### app role 7 types
 
-- `marketconnector_app`, `view_app`, `crawler_app`, `preprocessor_app`, `decision_app`, `research_app`, `execution_app` 생성 완료.
-- 7종 role 모두 `LOGIN = true`, `SUPERUSER / CREATEDB / CREATEROLE / REPLICATION / BYPASSRLS = false` 확인.
-- 7종 role 모두 `GRANT CONNECT ON DATABASE portfolio` 부여 + `GRANT USAGE ON SCHEMA public` 부여 완료.
+- `marketconnector_app`, `view_app`, `crawler_app`, `preprocessor_app`, `decision_app`, `research_app`, `execution_app` creation complete.
+- All 7 roles confirmed `LOGIN = true`, `SUPERUSER / CREATEDB / CREATEROLE / REPLICATION / BYPASSRLS = false`.
+- All 7 roles granted `GRANT CONNECT ON DATABASE portfolio` + `GRANT USAGE ON SCHEMA public` complete.
 
-### GRANT 매트릭스 / DEFAULT PRIVILEGES / search_path
+### GRANT Matrix / DEFAULT PRIVILEGES / search_path
 
-- §4.4 schema 단위 GRANT (USAGE / SELECT / INSERT-UPDATE-DELETE / sequence USAGE-SELECT) 적용 완료. legacy schema는 의도적으로 생략.
-- §4.5 `ALTER DEFAULT PRIVILEGES FOR ROLE portfolio_owner IN SCHEMA <9개>` 적용 완료. legacy 제외. 이후 `portfolio_owner` 명의로 새 객체가 만들어질 때 권한 매트릭스가 자동 적용됨.
-- §4.6 `ALTER ROLE ... SET search_path` 7건 적용 완료. 각 MS README 정의와 일치(legacy 항목은 호환성 유지용으로 search_path에는 포함되지만 USAGE 미부여라 실제 접근은 차단).
+- §4.4 schema-level GRANT (USAGE / SELECT / INSERT-UPDATE-DELETE / sequence USAGE-SELECT) application complete. The legacy schema is intentionally omitted.
+- §4.5 `ALTER DEFAULT PRIVILEGES FOR ROLE portfolio_owner IN SCHEMA <9개>` application complete. legacy excluded. Subsequently, when new objects are created under `portfolio_owner`, the privilege matrix is automatically applied.
+- §4.6 `ALTER ROLE ... SET search_path` 7 applications complete. Matches each MS README definition (the legacy entry is included in search_path for compatibility retention but, since USAGE is not granted, actual access is blocked).
 
-### 검증 SQL 결과 요약 (§5)
+### Validation SQL Result Summary (§5)
 
-- §5.1 role / 속성: 7개 app role + `portfolio_owner` + `portfolio_admin` 모두 존재 확인. 7개 app role의 superuser / createdb / createrole / replication / bypassrls 모두 false.
-- §5.1 search_path: 7개 role 모두 본 문서 §3 표와 일치.
-- §5.2 schema USAGE / CREATE 매트릭스: §2 표와 불일치 0건. 모든 app role의 `legacy` USAGE = false 확인.
-- §5.3 table 권한 요약 / sequence 권한 요약: §2 표와 불일치 0건.
-- §5.4 실제 connection 검증
-  - `marketconnector_app`: 접속 성공. `connector` 조회 성공, `execution` 조회 성공, `legacy` USAGE = false 확인. `execution` schema에 INSERT / UPDATE / DELETE 시도 → permission denied(기대값 일치).
-  - `execution_app`: 접속 성공. `execution` / `decision` / `connector` 조회 성공, `legacy` USAGE = false 확인. `execution` schema에 INSERT / UPDATE / DELETE 가능(기대값 일치).
-  - `view_app`: 접속 성공. `execution` / `connector` / `decision` 조회 성공, `legacy` USAGE = false 확인. `execution` schema에 INSERT / UPDATE / DELETE 시도 → permission denied(기대값 일치, view write 범위는 현재 `ops` 한정).
+- §5.1 role / attribute: existence of 7 app roles + `portfolio_owner` + `portfolio_admin` all confirmed. superuser / createdb / createrole / replication / bypassrls of the 7 app roles all false.
+- §5.1 search_path: all 7 roles match the §3 table of this document.
+- §5.2 schema USAGE / CREATE matrix: 0 mismatches with the §2 table. `legacy` USAGE = false confirmed for all app roles.
+- §5.3 table privilege summary / sequence privilege summary: 0 mismatches with the §2 table.
+- §5.4 actual connection validation
+  - `marketconnector_app`: connection success. `connector` query success, `execution` query success, `legacy` USAGE = false confirmed. INSERT / UPDATE / DELETE attempt on `execution` schema → permission denied (matches expected value).
+  - `execution_app`: connection success. `execution` / `decision` / `connector` query success, `legacy` USAGE = false confirmed. INSERT / UPDATE / DELETE possible on `execution` schema (matches expected value).
+  - `view_app`: connection success. `execution` / `connector` / `decision` query success, `legacy` USAGE = false confirmed. INSERT / UPDATE / DELETE attempt on `execution` schema → permission denied (matches expected value, the view write scope is currently limited to `ops`).
 
-### 본 세션 안전 제약 점검
+### This Session's Safety Constraint Check
 
-- secret value 조회 없음. 실제 password / endpoint / account-id / 계좌번호 / token / app key / app secret 기록 없음. 모두 `[REDACTED]` 또는 placeholder만 사용.
-- AWS 리소스 생성 / 변경 / 삭제 없음. 본 작업은 RDS 안 SQL 실행과 SQL 결과 기록만 수행.
-- 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 없음.
-- 본 작업 산출물 갱신 대상: 본 파일과 [`./validation-checklist.md`](./validation-checklist.md) 2개 파일.
+- No secret value lookup. No actual password / endpoint / account-id / account number / token / app key / app secret recorded. Only `[REDACTED]` or placeholder used throughout.
+- No AWS resource creation / modification / deletion. This work performs only SQL execution inside RDS and recording of SQL results.
+- No modification to the 8 MS code / README / AGENTS.md / CHANGELOG / docs / worklog.
+- Work artifact update targets: this file and [`./validation-checklist.md`](./validation-checklist.md), 2 files.
 
-### 후속 작업 권고
+### Follow-up Work Recommendation
 
-- 7개 app role 비밀번호의 정식 보관(Secrets Manager / SSM SecureString)과 IAM 매트릭스는 후속 spec `06-secrets-and-iam`에서 정리.
-- 기존 객체(`portfolio_admin` 소유) owner 일괄 이관 여부 결정. 결정에 따라 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4.2.1 옵션 A / 옵션 B 중 선택.
-- 매트릭스 변경 사항(legacy 미부여, `marketconnector_app` execution R only 축소)은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-DB 카테고리에 갱신 제안.
-
-
-## 2026-06-09 Local → RDS Migration & RDS 재생성 실행 기록
-
-본 섹션은 운영자가 2026-06-09에 직접 수행한 Local PostgreSQL → aws-paper RDS migration 결과를 기록한다. 본 문서에는 실제 endpoint hostname / password / secret value / account-id / 계좌번호를 적지 않는다(`[REDACTED]` 또는 placeholder만 사용).
-
-### 실행 요약
-
-- 실행 흐름: Local Windows PC → S3 임시 migration bucket → aws-paper MarketConnector EC2 → private RDS PostgreSQL.
-- Restore Runner: aws-paper MarketConnector EC2(Amazon Linux 2023, public subnet, EIP attach). Kiro는 본 작업에서 ReadOnly 검증과 문서화만 수행했다.
-- 결과: schema / table / index / sequence / FK / trigger / table별 row count 모두 로컬 기준선과 일치(diff 0).
-
-### 1. Local 백업 및 기준선 확보
-
-- pg_dump 결과: `portfolio_full_20260609.dump`(format custom + gzip), 크기 422,334,494 bytes.
-- 보관 위치: `C:\Workspaces\db-backup\portfolio_20260609\` (로컬 PC).
-- 기준선: schema별 table count, table별 row count snapshot, 주요 object count(index / trigger / sequence / FK), 총 table 수 81개.
-
-### 2. private RDS 직접 접속 시도와 결정
-
-- 로컬 PC에서 RDS endpoint로 직접 접속 시 timeout. RDS endpoint가 private IP로 resolve되고 RDS Publicly accessible = No 상태이므로 기대 동작으로 판단.
-- 결정: RDS restore runner를 MarketConnector EC2로 한다. 로컬 PC IP를 RDS Security Group에 직접 허용하지 않는다. RDS Public access = No 유지.
-
-### 3. MarketConnector EC2 준비 (restore runner)
-
-- aws-paper용 EC2 1대 신규 생성: Amazon Linux 2023, public subnet 배치, EIP attach.
-- Security Group: RDS PostgreSQL 5432 inbound source를 MarketConnector EC2 SG로 허용. 0.0.0.0/0 5432 허용 없음.
-- 접속: EC2 Instance Connect 성공. 로컬 SSH 직접 접속은 outbound 22 제한 가능성으로 보류.
-- IAM Role: SSM Session Manager 전환을 위한 기본 managed policy 연결 + 임시 migration bucket read 권한 부여. Access Key는 EC2 내부에 저장하지 않음.
-- 패키지: OS 업데이트 완료, AWS CLI 기본 제공 확인. PostgreSQL client는 처음 15.18 설치 후 dump archive header version 불일치 확인 → 15 client 제거 후 18.4 client로 전환(psql 18.4 / pg_restore 18.4). EC2에서 private RDS psql 접속 성공.
-
-### 4. dump 파일 전송과 메타데이터 확인
-
-- 로컬 dump → S3 임시 bucket 업로드 → MarketConnector EC2로 다운로드.
-- 무결성: 로컬 / S3 / EC2 dump 파일 크기 422,334,494 bytes 일치.
-- pg_restore --list 결과: TOC Entries 812, line count 823, dump source PostgreSQL 18.1, dump format CUSTOM + gzip compression 확인.
-
-### 5. Major version mismatch 발견과 RDS 재생성
-
-- 기존 RDS engine PostgreSQL 16.14 확인. dump source 18.1을 16.14에 restore하는 것은 하위 major version restore라 위험으로 판단.
-- 결정: 기존 PostgreSQL 16.14 RDS를 삭제하고 PostgreSQL 18.4 기준으로 재생성한다. RDS Public access = No 유지, initial database name `portfolio` 지정.
-- 결과: 신규 RDS `portfolio` DB 접속 성공, version PostgreSQL 18.4 확인.
-
-### 6. 1차 restore 실패와 옵션 보정
-
-- 1차 시도 결과: `role "postgres" does not exist` 오류. 원인은 로컬 dump의 object owner가 `postgres`인데 RDS에는 `postgres` role이 없기 때문으로 판단.
-- 보정: `portfolio` DB를 drop / recreate 후 `pg_restore --no-owner --no-privileges` 옵션으로 재실행.
-- 결과: 에러 없이 완료. RDS 객체 owner는 restore 실행 계정(`portfolio_admin`) 기준으로 정리됐다.
-
-### 7. 정합성 검증
-
-- schema별 table count 81개 일치. table / index / sequence / FK(33) / trigger(23) / table별 row count clean CSV 82줄 모두 로컬 기준선과 diff 0.
-- CRLF / LF 차이는 `--strip-trailing-cr` 옵션으로 정규화한 뒤 비교했다.
-
-### 8. 본 세션 안전 제약 / 민감정보 점검
-
-- 실제 password / secret value / endpoint hostname / account-id / 계좌번호 / token / app key / app secret / webhook URL 신규 기록 없음. 모두 `[REDACTED]` 또는 placeholder만 사용.
-- AWS 리소스 변경: 운영자가 직접 진행한 EC2 신규 생성과 기존 RDS 삭제 / 재생성. Kiro는 본 작업으로 AWS 리소스를 변경하지 않았다.
-- 8개 MS 코드 / README / AGENTS.md / CHANGELOG / docs / worklog 수정 없음.
-- 본 작업 산출물 갱신 대상: 본 파일 + [`./validation-checklist.md`](./validation-checklist.md). 결정 변경(legacy 미부여 / marketconnector_app execution R-only / view_app execution R-only / REASSIGN OWNED 미실행)은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-DB-007 ~ OD-DB-010에 별도 누적했다.
-
-### 9. 교훈 / 후속 권고
-
-- PostgreSQL major version mismatch는 시작 단계에서 dump의 `pg_restore --list` 출력과 RDS engine version을 비교해 사전 차단한다(R-DATA-003).
-- private RDS는 로컬에서 직접 접속하지 않는다. 항상 EC2 + SSM Session Manager 또는 EIP 기반 restore runner 경유로 접속한다(R-NET-004).
-- dump owner role과 RDS role이 다르면 `--no-owner --no-privileges`로 우회하고, 권한 / owner 정리는 별도 SQL(본 spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md))로 진행한다(R-DATA-004).
-- 1차 적용에서 `REASSIGN OWNED BY portfolio_admin TO portfolio_owner`를 실행하지 않았으므로, 새 객체에는 default privileges가 자동 적용되지만 기존 객체는 적용되지 않는다. 추가 이관 여부는 운영자 결정으로 후속 분리 관리한다.
+- Formal storage of the 7 app role passwords (Secrets Manager / SSM SecureString) and the IAM matrix are organized in the follow-up spec `06-secrets-and-iam`.
+- Decide whether to bulk-transfer ownership of existing objects (`portfolio_admin`-owned). Depending on the decision, choose between §4.2.1 option A / option B of [`./db-roles-and-grants.md`](./db-roles-and-grants.md).
+- Matrix changes (legacy not granted, `marketconnector_app` execution reduced to R only) are proposed for update in the OD-DB category of [`../_common/operator-decisions.md`](../_common/operator-decisions.md).
 
 
-## 2026-06-13 Local-to-AWS Paper RDS 운영 모드 정리
+## 2026-06-09 Local → RDS Migration & RDS Recreation Execution Record
 
-본 섹션은 2026-06-13 운영자가 결정한 Local 개발 / AWS Paper RDS 운영 원칙을 02 spec 운영 노트에 누적 기록한다.
+This section records the result of the Local PostgreSQL → aws-paper RDS migration the operator directly performed on 2026-06-09. This document does not write the actual endpoint hostname / password / secret value / account-id / account number (only `[REDACTED]` or placeholder used).
 
-- RDS Public access 미허용 정책은 변경 없음(02 spec 1차 적용 결과 / R-SEC-001 / R-NET-004 정합).
-- 로컬 개발 환경에서 AWS Paper RDS 에 접속할 때의 흐름과 guard 조합을 명문화한다.
-- 동일 원칙은 04 spec 2026-06-13 §5(Local-to-AWS Paper RDS) 와 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-ENV-006 / OD-ENV-007 / OD-ENV-008 에 동기화한다.
+### Execution Summary
 
-### 1. Paper 환경 source of truth
+- Execution flow: Local Windows PC → S3 temporary migration bucket → aws-paper MarketConnector EC2 → private RDS PostgreSQL.
+- Restore Runner: aws-paper MarketConnector EC2 (Amazon Linux 2023, public subnet, EIP attach). Kiro performed only ReadOnly validation and documentation in this work.
+- Result: schema / table / index / sequence / FK / trigger / per-table row count all match the local baseline (diff 0).
 
-1. Paper 환경의 source of truth: 완료
-   1) AWS Paper RDS 단일 source of truth 로 고정.
-   2) 로컬에서 실행하더라도 `PORT_ENVIRONMENT=paper` 이면 AWS Paper RDS 를 바라본다.
-   3) AWS 에서 실행하더라도 동일한 AWS Paper RDS 를 사용한다.
-   4) 로컬 PostgreSQL 은 `LOCAL_DEV` fixture / 실험 / 백업 참고용으로만 사용한다.
-   5) local DB 와 AWS Paper RDS 간 주문 / 체결 / 포지션 데이터 병합 또는 동기화는 하지 않는다(R-DATA-007 정합 후속 추가).
+### 1. Local Backup and Baseline Establishment
 
-### 2. 환경 구분 라벨
+- pg_dump result: `portfolio_full_20260609.dump` (format custom + gzip), size 422,334,494 bytes.
+- Storage location: `C:\Workspaces\db-backup\portfolio_20260609\` (local PC).
+- Baseline: per-schema table count, per-table row count snapshot, major object count (index / trigger / sequence / FK), total table count 81.
 
-1. `LOCAL_DEV`: 완료
-   1) local PostgreSQL 사용 가능.
-   2) 개발 / 실험 / fixture 전용.
-   3) 실제 paper 운영 아님.
-   4) 주문 실행 금지.
-2. `PAPER`: 완료
-   1) AWS Paper RDS 사용.
-   2) 로컬 실행도 AWS Paper RDS 사용.
-   3) AWS 실행도 AWS Paper RDS 사용.
-   4) paper 주문 / 체결 / 포지션 source of truth.
-3. `LIVE`: 후속
-   1) 후속 설계 대상(10 spec 통합).
-   2) 실전 운영 source of truth 는 paper 와 분리 필요.
+### 2. private RDS Direct Connection Attempt and Decision
 
-### 3. SSM Port Forwarding 방향
+- Timeout when connecting directly to the RDS endpoint from the local PC. Since the RDS endpoint resolves to a private IP and RDS Publicly accessible = No, judged as expected behavior.
+- Decision: use the MarketConnector EC2 as the RDS restore runner. Do not directly allow the local PC IP in the RDS Security Group. Keep RDS Public access = No.
 
-1. RDS 노출 정책: 완료
-   1) RDS 는 Private 유지(02 spec 1차 적용 결과 / OD-NET-009 / R-SEC-001 정합).
-   2) RDS Public 접근 허용 금지.
-2. 로컬에서 AWS Paper RDS 접속 시: 완료
-   1) SSM Port Forwarding 사용.
-   2) 로컬에서는 `localhost:15433` 같은 포트로 접속하지만 실제 대상은 AWS Paper RDS.
-   3) DB host 가 `localhost` 라고 해서 무조건 local DB 로 판단하면 안 된다.
-   4) 실제 paper 주문 실행 guard 는 `PORT_ENVIRONMENT=paper` + `PORT_DB_TARGET=aws-paper` 조합으로 판단(MarketConnector executor `--execute` guard 정합).
+### 3. MarketConnector EC2 Preparation (restore runner)
 
-### 4. 예시 환경 변수(Local PC + SSM Port Forwarding)
+- Newly created 1 EC2 for aws-paper: Amazon Linux 2023, placed in public subnet, EIP attach.
+- Security Group: allow RDS PostgreSQL 5432 inbound source as the MarketConnector EC2 SG. No 0.0.0.0/0 5432 allowance.
+- Connection: EC2 Instance Connect success. Direct local SSH connection deferred due to possible outbound 22 restriction.
+- IAM Role: attached the default managed policy for SSM Session Manager transition + granted temporary migration bucket read permission. The Access Key is not stored inside the EC2.
+- Packages: OS update complete, AWS CLI confirmed provided by default. For the PostgreSQL client, after first installing 15.18, a dump archive header version mismatch was confirmed → removed the 15 client and switched to the 18.4 client (psql 18.4 / pg_restore 18.4). private RDS psql connection from the EC2 success.
 
-1. 환경 변수 예시: 완료
+### 4. dump File Transfer and Metadata Confirmation
+
+- Local dump → S3 temporary bucket upload → download to MarketConnector EC2.
+- Integrity: local / S3 / EC2 dump file size 422,334,494 bytes match.
+- pg_restore --list result: TOC Entries 812, line count 823, dump source PostgreSQL 18.1, dump format CUSTOM + gzip compression confirmed.
+
+### 5. Major version mismatch Discovery and RDS Recreation
+
+- Existing RDS engine PostgreSQL 16.14 confirmed. Restoring dump source 18.1 to 16.14 is a downgrade major version restore, so judged as risky.
+- Decision: delete the existing PostgreSQL 16.14 RDS and recreate on a PostgreSQL 18.4 basis. Keep RDS Public access = No, specify initial database name `portfolio`.
+- Result: new RDS `portfolio` DB connection success, version PostgreSQL 18.4 confirmed.
+
+### 6. First restore Failure and Option Correction
+
+- First attempt result: `role "postgres" does not exist` error. The cause is judged to be that the local dump's object owner is `postgres` but the RDS has no `postgres` role.
+- Correction: after drop / recreate of the `portfolio` DB, re-executed with the `pg_restore --no-owner --no-privileges` option.
+- Result: completed without error. The RDS object owner was organized on the basis of the restore execution account (`portfolio_admin`).
+
+### 7. Consistency Validation
+
+- per-schema table count 81 match. table / index / sequence / FK (33) / trigger (23) / per-table row count clean CSV 82 lines all diff 0 with the local baseline.
+- CRLF / LF differences were normalized with the `--strip-trailing-cr` option before comparison.
+
+### 8. This Session's Safety Constraint / Sensitive Information Check
+
+- No new recording of actual password / secret value / endpoint hostname / account-id / account number / token / app key / app secret / webhook URL. Only `[REDACTED]` or placeholder used throughout.
+- AWS resource changes: EC2 new creation and existing RDS deletion / recreation the operator directly performed. Kiro did not change AWS resources by this work.
+- No modification to the 8 MS code / README / AGENTS.md / CHANGELOG / docs / worklog.
+- Work artifact update targets: this file + [`./validation-checklist.md`](./validation-checklist.md). Decision changes (legacy not granted / marketconnector_app execution R-only / view_app execution R-only / REASSIGN OWNED not executed) were separately accumulated in OD-DB-007 ~ OD-DB-010 of [`../_common/operator-decisions.md`](../_common/operator-decisions.md).
+
+### 9. Lessons / Follow-up Recommendation
+
+- Prevent PostgreSQL major version mismatch in advance at the starting stage by comparing the dump's `pg_restore --list` output with the RDS engine version (R-DATA-003).
+- private RDS is not connected directly from local. Always connect via EC2 + SSM Session Manager or an EIP-based restore runner (R-NET-004).
+- If the dump owner role and the RDS role differ, bypass with `--no-owner --no-privileges`, and perform privilege / owner cleanup with separate SQL (this spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md)) (R-DATA-004).
+- Since `REASSIGN OWNED BY portfolio_admin TO portfolio_owner` was not executed in the first application, default privileges are automatically applied to new objects but not to existing objects. Whether to additionally transfer is managed separately as a follow-up by operator decision.
+
+
+## 2026-06-13 Local-to-AWS Paper RDS Operation Mode Organization
+
+This section accumulates in the 02 spec operation notes the Local development / AWS Paper RDS operation principles the operator decided on 2026-06-13.
+
+- No change to the RDS Public access not-allowed policy (02 spec first application result / R-SEC-001 / R-NET-004 consistent).
+- Codify the flow and guard combination when connecting to AWS Paper RDS from the local development environment.
+- The same principle is synchronized to 04 spec 2026-06-13 §5 (Local-to-AWS Paper RDS) and OD-ENV-006 / OD-ENV-007 / OD-ENV-008 of [`../_common/operator-decisions.md`](../_common/operator-decisions.md).
+
+### 1. Paper Environment source of truth
+
+1. Paper environment source of truth: complete
+   1) Fixed as the single AWS Paper RDS source of truth.
+   2) Even when running locally, if `PORT_ENVIRONMENT=paper`, it looks at AWS Paper RDS.
+   3) Even when running on AWS, the same AWS Paper RDS is used.
+   4) Local PostgreSQL is used only for `LOCAL_DEV` fixture / experiment / backup reference.
+   5) Order / fill / position data merge or synchronization between the local DB and AWS Paper RDS is not performed (R-DATA-007 consistent, added as follow-up).
+
+### 2. Environment Distinction Labels
+
+1. `LOCAL_DEV`: complete
+   1) local PostgreSQL usable.
+   2) Development / experiment / fixture only.
+   3) Not actual paper operation.
+   4) Order execution prohibited.
+2. `PAPER`: complete
+   1) AWS Paper RDS used.
+   2) Local execution also uses AWS Paper RDS.
+   3) AWS execution also uses AWS Paper RDS.
+   4) paper order / fill / position source of truth.
+3. `LIVE`: follow-up
+   1) Follow-up design target (10 spec integration).
+   2) The live operation source of truth needs to be separated from paper.
+
+### 3. SSM Port Forwarding Direction
+
+1. RDS exposure policy: complete
+   1) RDS kept Private (02 spec first application result / OD-NET-009 / R-SEC-001 consistent).
+   2) RDS Public access allowance prohibited.
+2. When connecting to AWS Paper RDS from local: complete
+   1) Use SSM Port Forwarding.
+   2) Locally connect via a port like `localhost:15433`, but the actual target is AWS Paper RDS.
+   3) The DB host being `localhost` must not be unconditionally judged as the local DB.
+   4) The actual paper order execution guard is judged by the `PORT_ENVIRONMENT=paper` + `PORT_DB_TARGET=aws-paper` combination (MarketConnector executor `--execute` guard consistent).
+
+### 4. Example Environment Variables (Local PC + SSM Port Forwarding)
+
+1. Environment variable example: complete
    1) `PORT_ENVIRONMENT=paper`
    2) `PORT_DB_TARGET=aws-paper`
    3) `INTEREST_DB_HOST=localhost`
    4) `INTEREST_DB_PORT=15433`
    5) `INTEREST_DB_NAME=portfolio`
-2. 표기 정책: 완료
-   1) 비밀번호 / 계정 / 실제 RDS endpoint hostname / 실제 SSM Port Forwarding session id 평문 기록 금지(R-DOCS-001 정합).
-   2) 본 노트 / 후속 spec 산출물에는 placeholder 만 사용한다.
+2. Notation policy: complete
+   1) Plaintext recording of password / account / actual RDS endpoint hostname / actual SSM Port Forwarding session id prohibited (R-DOCS-001 consistent).
+   2) Only placeholder is used in this note / follow-up spec artifacts.
 
-### 5. 금지 사항
+### 5. Prohibited Items
 
-1. local 환경의 paper 주문 실행 금지: 완료
-   1) local PostgreSQL 에서 paper 주문 실행 금지.
-2. local DB 와 AWS Paper RDS 간 동기화 금지: 완료
-   1) `connector_order_request` 병합 금지.
-   2) `connector_fill` 병합 금지.
-   3) `strategy_execution_order` 병합 금지.
-   4) `strategy_position_state` 병합 금지.
+1. paper order execution in the local environment prohibited: complete
+   1) paper order execution on local PostgreSQL prohibited.
+2. synchronization between local DB and AWS Paper RDS prohibited: complete
+   1) `connector_order_request` merge prohibited.
+   2) `connector_fill` merge prohibited.
+   3) `strategy_execution_order` merge prohibited.
+   4) `strategy_position_state` merge prohibited.
 
-### 6. 후속 인계
+### 6. Follow-up Handover
 
-1. SSM Port Forwarding runbook 정리: 후속
-   1) 02 spec runbook 또는 별도 운영 노트에 SSM Port Forwarding → AWS Paper RDS 접속 절차 정식 기재.
-2. 모든 MS 의 환경변수 점검: 후속
-   1) 8개 MS 의 환경변수 인벤토리에서 `PORT_ENVIRONMENT` / `PORT_DB_TARGET` 정합 여부 점검.
-3. aws-live 통합 시점: 후속
-   1) `LIVE` 라벨의 source of truth 는 paper 와 별도 RDS 로 분리(10 spec 통합 시점 결정).
+1. SSM Port Forwarding runbook organization: follow-up
+   1) Formally document the SSM Port Forwarding → AWS Paper RDS connection procedure in the 02 spec runbook or a separate operation note.
+2. Environment variable check of all MS: follow-up
+   1) Check `PORT_ENVIRONMENT` / `PORT_DB_TARGET` consistency in the environment variable inventory of the 8 MS.
+3. aws-live integration timing: follow-up
+   1) The source of truth of the `LIVE` label is separated into an RDS distinct from paper (decided at the 10 spec integration timing).
 
 
-## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 연결 검증 + Runbook
+## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding Connection Validation + Runbook
 
-본 섹션은 같은 일자(2026-06-13)의 Local-to-AWS Paper RDS 운영 모드 정리(앞 섹션) 와 별개로, 운영자가 직접 수행한 SSM Port Forwarding 기반 로컬 → AWS Paper RDS 연결 1차 실증 검증 결과를 누적 기록한다.
+This section, separately from the same-date (2026-06-13) Local-to-AWS Paper RDS Operation Mode Organization (previous section), accumulates the result of the first empirical validation of the SSM Port Forwarding-based local → AWS Paper RDS connection the operator directly performed.
 
-- 본 섹션은 동시에 Local-to-AWS Paper RDS SSM Port Forwarding Runbook 의 1차 본문으로 사용된다.
-- RDS Public access 미허용 정책(R-SEC-001 / R-NET-004) 변경 없음.
-- AWS / RDS / IAM 변경 0건 — 본 일자에는 read-only AWS API 호출과 SSM Port Forwarding 세션 + Python `psycopg2` 접속 검증만 수행했다.
+- This section is simultaneously used as the first body of the Local-to-AWS Paper RDS SSM Port Forwarding Runbook.
+- No change to the RDS Public access not-allowed policy (R-SEC-001 / R-NET-004).
+- 0 AWS / RDS / IAM changes — on this date, only read-only AWS API calls, an SSM Port Forwarding session + Python `psycopg2` connection validation were performed.
 
-### 1. 사전 도구 확인
+### 1. Prerequisite Tool Confirmation
 
-1. AWS CLI 확인: 완료
-   1) 명령어: `aws --version`
-   2) 결과: `aws-cli/2.27.50 Python/3.13.4 Windows/11 exe/AMD64`
-2. Session Manager Plugin 확인: 완료
-   1) 1차 실행 시 `session-manager-plugin` PowerShell 인식 실패 → Plugin 설치 후 재확인.
-   2) 명령어: `session-manager-plugin --version`
-   3) 결과: `1.2.814.0`
-   4) 판단: SSM Port Forwarding session 기동 가능 상태.
+1. AWS CLI confirmation: complete
+   1) Command: `aws --version`
+   2) Result: `aws-cli/2.27.50 Python/3.13.4 Windows/11 exe/AMD64`
+2. Session Manager Plugin confirmation: complete
+   1) On first run, `session-manager-plugin` PowerShell recognition failed → reconfirmed after Plugin installation.
+   2) Command: `session-manager-plugin --version`
+   3) Result: `1.2.814.0`
+   4) Judgment: SSM Port Forwarding session can be started.
 
-### 2. SSM Port Forwarding 표준 경유지 결정
+### 2. SSM Port Forwarding Standard Waypoint Decision
 
-1. 실행 중 EC2 점검: 완료
-   1) 명령어: `aws ec2 describe-instances`
+1. Running EC2 check: complete
+   1) Command: `aws ec2 describe-instances`
    2) `portfolio-paper-marketconnector-ec2`
        - instance id: `i-0fce77927b7397b88`
        - private ip: `10.0.0.181`
@@ -331,204 +331,204 @@
        - instance id: `i-0ff768ea639a91355`
        - private ip: `10.0.0.169`
        - state: `running`
-2. 표준 경유지 결정: 완료
-   1) SSM Port Forwarding 경유지 = `portfolio-paper-marketconnector-ec2` (instance id `i-0fce77927b7397b88`).
-   2) 결정 사유:
-       - 본 EC2 는 2026-06-09 RDS restore runner 로 동일 RDS 접근 검증 이력 보유(앞 섹션 §3 정합).
-       - MarketConnector / Strategy Execution / View 가 바라볼 Paper DB 의 운영 경유지 역할이 자연스러움(03 spec 정합).
-       - `portfolio-paper-crawler-worker` 는 KRX GUI / Windows worker 역할로 유지(08 spec 정합 — 본 EC2 는 SSM Port Forwarding 경유지로 사용하지 않는다).
-   3) 결정 락: OD-NET-010 (SSM Port Forwarding 표준 경유지) 으로 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) 갱신.
+2. Standard waypoint decision: complete
+   1) SSM Port Forwarding waypoint = `portfolio-paper-marketconnector-ec2` (instance id `i-0fce77927b7397b88`).
+   2) Decision reason:
+       - This EC2 holds a history of validating access to the same RDS as the 2026-06-09 RDS restore runner (previous section §3 consistent).
+       - The operational waypoint role for the Paper DB that MarketConnector / Strategy Execution / View will look at is natural (03 spec consistent).
+       - `portfolio-paper-crawler-worker` is kept in the KRX GUI / Windows worker role (08 spec consistent — this EC2 is not used as an SSM Port Forwarding waypoint).
+   3) Decision lock: updated [`../_common/operator-decisions.md`](../_common/operator-decisions.md) with OD-NET-010 (SSM Port Forwarding standard waypoint).
 
-### 3. 대상 EC2 SSM Managed Node 점검
+### 3. Target EC2 SSM Managed Node Check
 
-1. SSM Online 상태 확인: 완료
-   1) 명령어: `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=i-0fce77927b7397b88"`
-   2) 결과:
+1. SSM Online status confirmation: complete
+   1) Command: `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=i-0fce77927b7397b88"`
+   2) Result:
        - instance id: `i-0fce77927b7397b88`
        - ping status: `Online`
        - platform type: `Linux`
        - agent version: `3.3.4515.0`
-   3) 판단: SSM Port Forwarding target 으로 사용 가능.
+   3) Judgment: usable as an SSM Port Forwarding target.
 
-### 4. AWS Paper RDS endpoint 확인
+### 4. AWS Paper RDS endpoint Confirmation
 
-1. RDS metadata 조회: 완료
-   1) 명령어: `aws rds describe-db-instances --db-instance-identifier portfolio-paper-rds`
-   2) 결과:
+1. RDS metadata query: complete
+   1) Command: `aws rds describe-db-instances --db-instance-identifier portfolio-paper-rds`
+   2) Result:
        - DB name: `portfolio`
        - endpoint hostname: `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`
        - port: `5432`
        - publicly accessible: `False`
        - status: `available`
-   3) 판단: RDS 는 Private 유지(OD-NET-009 / R-SEC-001 / R-NET-004 정합). Public 노출 없이 SSM Port Forwarding 으로 로컬 접속 가능.
+   3) Judgment: RDS kept Private (OD-NET-009 / R-SEC-001 / R-NET-004 consistent). Local connection possible via SSM Port Forwarding without Public exposure.
 
-### 5. SSM Port Forwarding 터널 오픈
+### 5. SSM Port Forwarding Tunnel Open
 
-1. 표준 명령어: 완료
-   1) 명령어: `aws ssm start-session --target i-0fce77927b7397b88 --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com",portNumber="5432",localPortNumber="15433"`
-2. 세션 결과: 완료
+1. Standard command: complete
+   1) Command: `aws ssm start-session --target i-0fce77927b7397b88 --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com",portNumber="5432",localPortNumber="15433"`
+2. Session result: complete
    1) session id: `terraform-vjp3fv3nz73konetcevdzjh9de`
    2) local port: `15433`
    3) remote RDS port: `5432`
    4) message: `Port 15433 opened`
    5) message: `Waiting for connections...`
-3. 연결 구조: 완료
+3. Connection structure: complete
    1) Local PC `localhost:15433`
    2) → SSM Session Manager tunnel
    3) → `portfolio-paper-marketconnector-ec2` (instance id `i-0fce77927b7397b88`)
    4) → AWS Paper RDS `portfolio-paper-rds:5432`
 
-### 6. 로컬 psql client 미설치 / PATH 미등록 확인
+### 6. Local psql client Not Installed / PATH Not Registered Confirmation
 
-1. 1차 시도: 실패
-   1) 명령어: `psql -h localhost -p 15433 -U portfolio_admin -d portfolio`
-   2) 결과: PowerShell 에서 `psql` 명령어 인식 실패.
-   3) 판단: AWS / SSM / RDS 정합성 문제 아님. 로컬 PostgreSQL client PATH 미등록 문제(R-AUTO-013 정합 후속 추가).
-2. 보정 방향: 완료(즉시 조치는 보류)
-   1) 즉시 psql 설치 진행하지 않음.
-   2) Python `psycopg2` 로 접속 확인 진행(§7 / §8 / §9).
-   3) psql client 정식 설치 / PATH 등록은 후속(`_common/followups-overview.md` 2026-06-13 §1).
+1. First attempt: failed
+   1) Command: `psql -h localhost -p 15433 -U portfolio_admin -d portfolio`
+   2) Result: `psql` command recognition failed in PowerShell.
+   3) Judgment: not an AWS / SSM / RDS consistency problem. A local PostgreSQL client PATH not-registered problem (R-AUTO-013 consistent, added as follow-up).
+2. Correction direction: complete (immediate action deferred)
+   1) Do not proceed with immediate psql installation.
+   2) Proceed with connection confirmation using Python `psycopg2` (§7 / §8 / §9).
+   3) Formal psql client installation / PATH registration is a follow-up (`_common/followups-overview.md` 2026-06-13 §1).
 
-### 7. Python `psycopg2` 사용 가능 확인
+### 7. Python `psycopg2` Availability Confirmation
 
-1. 모듈 import 점검: 완료
-   1) 명령어: `python -c "import psycopg2; print('psycopg2 OK')"`
-   2) 결과: `psycopg2 OK`
-   3) 판단: Python 기반 DB 접속 테스트 가능.
+1. Module import check: complete
+   1) Command: `python -c "import psycopg2; print('psycopg2 OK')"`
+   2) Result: `psycopg2 OK`
+   3) Judgment: Python-based DB connection test possible.
 
-### 8. `portfolio_admin` 접속 확인
+### 8. `portfolio_admin` Connection Confirmation
 
-1. 접속 파라미터: 완료
+1. Connection parameters: complete
    1) host: `localhost`
    2) port: `15433`
    3) dbname: `portfolio`
    4) user: `portfolio_admin`
-   5) password: 환경변수 `PGPASSWORD` 사용(평문 노출 0건, R-DOCS-001 정합)
-2. 접속 결과: 완료
-   1) 출력 요약(`current_user`, `current_database`, `inet_server_addr`, `inet_server_port`):
+   5) password: uses the `PGPASSWORD` environment variable (0 plaintext exposure, R-DOCS-001 consistent)
+2. Connection result: complete
+   1) Output summary (`current_user`, `current_database`, `inet_server_addr`, `inet_server_port`):
        - `('portfolio_admin', 'portfolio', '10.0.20.165', 5432)`
-   2) 판단:
-       - 로컬 PC 에서 SSM tunnel 을 경유해 AWS Paper RDS 접속 성공.
-       - 실제 RDS private IP = `10.0.20.165` (RDS endpoint resolve 결과).
-       - 실제 RDS port = `5432`.
-       - `localhost:15433` 의 실제 대상이 AWS Paper RDS 임이 1차 실증됨(OD-ENV-007 정합).
+   2) Judgment:
+       - AWS Paper RDS connection success from the local PC via the SSM tunnel.
+       - actual RDS private IP = `10.0.20.165` (RDS endpoint resolve result).
+       - actual RDS port = `5432`.
+       - It was first empirically shown that the actual target of `localhost:15433` is AWS Paper RDS (OD-ENV-007 consistent).
 
-### 9. `execution_app` 접속 확인 (Strategy Execution 포팅 사전 검증)
+### 9. `execution_app` Connection Confirmation (Strategy Execution Porting Prerequisite Validation)
 
-1. 접속 파라미터: 완료
+1. Connection parameters: complete
    1) host: `localhost`
    2) port: `15433`
    3) dbname: `portfolio`
    4) user: `execution_app`
-   5) password: 환경변수 `PGPASSWORD` 사용(평문 노출 0건)
-2. 접속 결과: 완료
+   5) password: uses the `PGPASSWORD` environment variable (0 plaintext exposure)
+2. Connection result: complete
    1) `current_user`: `execution_app`
    2) `current_database`: `portfolio`
    3) `search_path`: `execution, decision, research, connector, preprocessor, interest, reference, legacy, public`
-3. 판단: 완료
-   1) Strategy Execution(`port_strategy_execution`) AWS 포팅 전 단계의 AWS Paper RDS app role 접속 1차 검증 통과.
-   2) `execution_app` 의 search_path 가 [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §3 / OD-DB-006 / OD-DB-007 정합(legacy 는 search_path 에 포함되지만 USAGE 미부여로 실제 접근 차단).
-   3) 본 일자 검증은 SELECT 조회 한정(`current_user` / `current_database` / `inet_server_addr` / `inet_server_port` / `search_path`) — INSERT / UPDATE / DELETE / DDL 0건.
+3. Judgment: complete
+   1) The first validation of AWS Paper RDS app role connection at the stage before Strategy Execution (`port_strategy_execution`) AWS porting passed.
+   2) The search_path of `execution_app` is consistent with [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §3 / OD-DB-006 / OD-DB-007 (legacy is included in search_path but actual access is blocked since USAGE is not granted).
+   3) This date's validation is limited to SELECT queries (`current_user` / `current_database` / `inet_server_addr` / `inet_server_port` / `search_path`) — INSERT / UPDATE / DELETE / DDL 0 count.
 
-### 10. Local-to-AWS Paper RDS SSM Port Forwarding Runbook (1차 본문)
+### 10. Local-to-AWS Paper RDS SSM Port Forwarding Runbook (First Body)
 
-1. 사전 점검 단계: [확인]
-   1) 로컬 AWS CLI 확인 — `aws --version`
-   2) Session Manager Plugin 확인 — `session-manager-plugin --version`
-   3) 대상 EC2 running 상태 확인 — `aws ec2 describe-instances --instance-ids i-0fce77927b7397b88`
-   4) 대상 EC2 SSM Online 상태 확인 — `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=i-0fce77927b7397b88"`
-   5) AWS Paper RDS endpoint / status 확인 — `aws rds describe-db-instances --db-instance-identifier portfolio-paper-rds`
-2. SSM Port Forwarding 터널 오픈 단계: [실행]
-   1) 명령어:
+1. Prerequisite check stage: [확인]
+   1) Local AWS CLI confirmation — `aws --version`
+   2) Session Manager Plugin confirmation — `session-manager-plugin --version`
+   3) Target EC2 running status confirmation — `aws ec2 describe-instances --instance-ids i-0fce77927b7397b88`
+   4) Target EC2 SSM Online status confirmation — `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=i-0fce77927b7397b88"`
+   5) AWS Paper RDS endpoint / status confirmation — `aws rds describe-db-instances --db-instance-identifier portfolio-paper-rds`
+2. SSM Port Forwarding tunnel open stage: [실행]
+   1) Command:
        - `aws ssm start-session --target i-0fce77927b7397b88 --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com",portNumber="5432",localPortNumber="15433"`
-   2) 성공 출력:
+   2) Success output:
        - `Port 15433 opened`
        - `Waiting for connections...`
-   3) tunnel 유지 조건:
-       - 본 PowerShell / 터미널 창을 닫지 않는다(R-AUTO-012 정합).
-       - 추가 작업은 별도 PowerShell 창에서 수행한다.
-3. 로컬 환경변수 표준 export 단계: [준비]
-   1) 본 spec / 다른 산출물 본문에 password / secret 평문 기록 금지(R-DOCS-001 정합).
-   2) 표준 환경변수 키:
+   3) tunnel maintenance conditions:
+       - Do not close this PowerShell / terminal window (R-AUTO-012 consistent).
+       - Additional work is performed in a separate PowerShell window.
+3. Local environment variable standard export stage: [준비]
+   1) Plaintext recording of password / secret in this spec / other artifact bodies prohibited (R-DOCS-001 consistent).
+   2) Standard environment variable keys:
        - `PORT_ENVIRONMENT=paper`
        - `PORT_DB_TARGET=aws-paper`
        - `INTEREST_DB_HOST=localhost`
        - `INTEREST_DB_PORT=15433`
        - `INTEREST_DB_NAME=portfolio`
-   3) `INTEREST_DB_USER` / `INTEREST_DB_PASSWORD` 는 MS 별 app role 로 분리(§10.5).
-4. 접속 검증 단계: [확인]
-   1) Python `psycopg2` 점검 — `python -c "import psycopg2; print('psycopg2 OK')"`
-   2) `portfolio_admin` 접속 확인:
+   3) `INTEREST_DB_USER` / `INTEREST_DB_PASSWORD` are separated by per-MS app role (§10.5).
+4. Connection validation stage: [확인]
+   1) Python `psycopg2` check — `python -c "import psycopg2; print('psycopg2 OK')"`
+   2) `portfolio_admin` connection confirmation:
        - `current_user` = `portfolio_admin`
        - `current_database` = `portfolio`
        - `inet_server_addr` = `10.0.20.165`
        - `inet_server_port` = `5432`
-   3) MS 별 app role 접속 확인(§10.5 표) — `current_user` / `current_database` / `search_path` 출력 검증.
-   4) psql client 가 PATH 에 있는 경우 한해 `psql -h localhost -p 15433 -U <app_role> -d portfolio` 도 사용 가능. 본 일자 시점에는 PATH 미등록(R-AUTO-013 정합).
-5. MS 별 app role 매핑: [준비]
+   3) Per-MS app role connection confirmation (§10.5 table) — validate `current_user` / `current_database` / `search_path` output.
+   4) Only when the psql client is in PATH, `psql -h localhost -p 15433 -U <app_role> -d portfolio` is also usable. At this date's point, PATH not registered (R-AUTO-013 consistent).
+5. Per-MS app role mapping: [준비]
    1) Strategy Execution: `execution_app`
    2) MarketConnector: `marketconnector_app`
    3) Interest Crawler: `crawler_app`
    4) Interest Preprocessor: `preprocessor_app`
    5) View: `view_app`
-   6) password / secret value 본 runbook 본문 / 운영자 노트 / 콘솔 캡처 / 로그 평문 기록 금지(R-DOCS-001 정합).
-6. 성공 기준: [확인]
-   1) SSM tunnel 메시지가 `Port 15433 opened` 상태로 유지됨.
-   2) `portfolio_admin` 으로 AWS Paper RDS 접속 가능.
-   3) `execution_app` 으로 AWS Paper RDS 접속 가능(본 일자 1차 검증 완료).
-   4) `execution_app` search_path = `execution, decision, research, connector, preprocessor, interest, reference, legacy, public` 일치.
-   5) RDS `PubliclyAccessible` 값이 `False` 로 유지됨.
-7. 실패 / 복구: [복구]
-   1) `Port 15433 opened` 메시지가 안 나오면 SSM Plugin 설치 / EC2 SSM Online / IAM Role / VPC Endpoint 5종(`com.amazonaws.<region>.ssm` / `ssmmessages` / `ec2messages`) 점검 후 재시도.
-   2) tunnel 창이 닫혔다면 같은 명령어로 새 session 재기동(R-AUTO-012 정합).
-   3) 접속 단계에서 `password authentication failed` 발생 시 environment 의 `PGPASSWORD` 값 / app role password 정합 점검(평문 출력 금지).
-   4) `relation does not exist` / `permission denied` 발생 시 02 spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 GRANT 매트릭스 / §5 검증 SQL 재확인(R-DATA-005 정합).
+   6) Plaintext recording of password / secret value in this runbook body / operator notes / console captures / logs prohibited (R-DOCS-001 consistent).
+6. Success criteria: [확인]
+   1) The SSM tunnel message is maintained in the `Port 15433 opened` state.
+   2) AWS Paper RDS connection possible with `portfolio_admin`.
+   3) AWS Paper RDS connection possible with `execution_app` (this date's first validation complete).
+   4) `execution_app` search_path = `execution, decision, research, connector, preprocessor, interest, reference, legacy, public` match.
+   5) The RDS `PubliclyAccessible` value is maintained as `False`.
+7. Failure / recovery: [복구]
+   1) If the `Port 15433 opened` message does not appear, retry after checking SSM Plugin installation / EC2 SSM Online / IAM Role / the 5 VPC Endpoints (`com.amazonaws.<region>.ssm` / `ssmmessages` / `ec2messages`).
+   2) If the tunnel window closed, restart a new session with the same command (R-AUTO-012 consistent).
+   3) When `password authentication failed` occurs at the connection stage, check the consistency of the environment's `PGPASSWORD` value / app role password (plaintext output prohibited).
+   4) When `relation does not exist` / `permission denied` occurs, recheck 02 spec [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 GRANT matrix / §5 validation SQL (R-DATA-005 consistent).
 
-### 11. 안전 / 보안 점검 결과
+### 11. Safety / Security Check Result
 
-1. AWS 리소스 생성 / 수정 / 삭제 0건. read-only AWS API(`aws ec2 describe-instances` / `aws ssm describe-instance-information` / `aws rds describe-db-instances`) + SSM Port Forwarding 세션(`aws ssm start-session` 한정) + Python `psycopg2` SELECT 조회만 사용.
-2. RDS DDL/DML 0건. INSERT / UPDATE / DELETE / DDL 0건. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 호출 0건.
-3. 실제 password / secret value / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 IAM access key id / 실제 secret ARN / EIP 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
-4. 본 노트 / runbook 본문에 평문으로 포함된 운영 식별자:
+1. 0 AWS resource creation / modification / deletion. Uses only read-only AWS API (`aws ec2 describe-instances` / `aws ssm describe-instance-information` / `aws rds describe-db-instances`) + an SSM Port Forwarding session (`aws ssm start-session` only) + Python `psycopg2` SELECT queries.
+2. 0 RDS DDL/DML. 0 INSERT / UPDATE / DELETE / DDL. 0 broker / KIS / order / fill / Daily Batch entrypoint calls.
+3. 0 plaintext recording in this note of actual password / secret value / KIS app key / KIS app secret / account number / token / account-id / actual IAM access key id / actual secret ARN / EIP. All `[REDACTED]` or placeholder.
+4. Operational identifiers included in plaintext in this note / runbook body:
    - instance id: `i-0fce77927b7397b88` / `i-0ff768ea639a91355`
    - private IP: `10.0.0.181` / `10.0.0.169` / `10.0.20.165`
    - local port: `15433`
    - SSM session id: `terraform-vjp3fv3nz73konetcevdzjh9de`
    - RDS endpoint hostname: `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`
 
-   사용자 명시 정책에 따라 운영 식별자는 작업 로그 / runbook 에는 기록 가능, 민감정보(secret value / password / token / account-id / KIS 자격)는 절대 평문 기록 금지.
-5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog 본 일자 작업으로 인한 변경 0건.
-6. session id 는 본 일자 검증 세션의 식별자(임시값)이며, 동일 세션 재기동 시 다른 식별자가 생성된다. 본 노트의 session id 는 재현 / 추적 목적의 사실 기록일 뿐 secret 이 아니다.
+   Per the user-specified policy, operational identifiers may be recorded in work logs / runbook, but sensitive information (secret value / password / token / account-id / KIS credentials) must never be recorded in plaintext.
+5. 0 changes to the 8 MS README / AGENTS.md / CHANGELOG / docs / worklog due to this date's work.
+6. The session id is the identifier (temporary value) of this date's validation session, and a different identifier is generated when the same session is restarted. The session id in this note is merely a factual record for reproduction / tracking purposes and is not a secret.
 
-### 12. 본 일자 범위 밖 / 후속 인계
+### 12. Outside This Date's Scope / Follow-up Handover
 
-1. psql client 정식 설치 / PATH 등록: 후속(R-AUTO-013).
-2. 모든 MS 의 Paper mode DB 환경변수 인벤토리 점검: 후속(`_common/followups-overview.md` 2026-06-13 §2).
-3. Strategy Execution(`port_strategy_execution`) AWS 포팅 본 phase: 후속(04 spec 후속 phase).
-4. MarketConnector 신규 executor(`connector_strategy_order_execute.py`) EC2 배포 후보 zip / tag 산출: 후속(03 spec 후속 phase 또는 07 spec).
-5. 평일 또는 안전한 테스트 데이터로 `READY -> REQUESTED -> SUBMITTED` end-to-end dry / integration 검증: 후속(R-AUTO-009 / R-AUTO-010 / R-AUTO-011 정합).
-6. EventBridge Scheduler 정기 trigger / Step Functions hybrid orchestration: 04 / 08 spec 후속 phase.
-7. SSM Port Forwarding session 자동 keep-alive / reconnect: 운영자 확인(현재는 수동 재기동 정책, R-AUTO-012 정합).
+1. Formal psql client installation / PATH registration: follow-up (R-AUTO-013).
+2. Paper mode DB environment variable inventory check of all MS: follow-up (`_common/followups-overview.md` 2026-06-13 §2).
+3. Strategy Execution (`port_strategy_execution`) AWS porting main phase: follow-up (04 spec follow-up phase).
+4. MarketConnector new executor (`connector_strategy_order_execute.py`) EC2 deployment candidate zip / tag production: follow-up (03 spec follow-up phase or 07 spec).
+5. `READY -> REQUESTED -> SUBMITTED` end-to-end dry / integration validation with weekday or safe test data: follow-up (R-AUTO-009 / R-AUTO-010 / R-AUTO-011 consistent).
+6. EventBridge Scheduler regular trigger / Step Functions hybrid orchestration: 04 / 08 spec follow-up phase.
+7. SSM Port Forwarding session automatic keep-alive / reconnect: operator confirmation (currently a manual restart policy, R-AUTO-012 consistent).
 
 
-## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 보강 (psql 18 client + pgAdmin4 접속 검증)
+## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding Reinforcement (psql 18 client + pgAdmin4 Connection Validation)
 
-본 섹션은 같은 일자 앞 섹션(`## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 연결 검증 + Runbook`) §1 ~ §12 의 후속이다.
+This section is a follow-up to §1 ~ §12 of the same-date previous section (`## 2026-06-13 Local-to-AWS Paper RDS SSM Port Forwarding 연결 검증 + Runbook`).
 
-- 운영자가 동일 SSM Port Forwarding tunnel 위에서 추가 client 2종(로컬 PostgreSQL 18 `psql.exe` 직접 경로 실행 + pgAdmin4) 으로 AWS Paper RDS 접속을 1차 실증한 결과를 누적 기록한다.
-- SSM tunnel 자체는 재사용(같은 명령 / 같은 local port `15433` / 새 session id 가능).
-- RDS Public access 미허용 정책 / OD-NET-009 / R-SEC-001 / R-NET-004 본문 변경 없음.
-- AWS / RDS / IAM 변경 0건 — read-only AWS API + SSM Port Forwarding 세션 + psql / pgAdmin4 SELECT 조회만 사용.
+- Accumulates the result of the operator first empirically validating AWS Paper RDS connection with 2 additional clients (local PostgreSQL 18 `psql.exe` direct path execution + pgAdmin4) over the same SSM Port Forwarding tunnel.
+- The SSM tunnel itself is reused (same command / same local port `15433` / a new session id possible).
+- No change to the RDS Public access not-allowed policy / OD-NET-009 / R-SEC-001 / R-NET-004 body.
+- 0 AWS / RDS / IAM changes — uses only read-only AWS API + an SSM Port Forwarding session + psql / pgAdmin4 SELECT queries.
 
-### 1. 로컬 PostgreSQL 18 psql client 접속 검증
+### 1. Local PostgreSQL 18 psql client Connection Validation
 
-1. 로컬 PostgreSQL 설치 인벤토리: 완료
-   1) 경로: `C:\Program Files\PostgreSQL`
-   2) 버전 폴더: `17`, `18`
-2. 직접 경로 실행 명령어: 완료
-   1) 명령어: `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 15433 -U portfolio_admin -d portfolio`
-   2) 일반 `psql` PATH 등록은 여전히 미완료 — full path 직접 실행으로 작업 진행(R-AUTO-013 mitigation 보강 정합).
-3. 접속 결과: 완료
+1. Local PostgreSQL installation inventory: complete
+   1) Path: `C:\Program Files\PostgreSQL`
+   2) Version folders: `17`, `18`
+2. Direct path execution command: complete
+   1) Command: `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 15433 -U portfolio_admin -d portfolio`
+   2) General `psql` PATH registration is still incomplete — work proceeds with full path direct execution (R-AUTO-013 mitigation reinforcement consistent).
+3. Connection result: complete
    1) psql client: `18.1`
    2) server: `18.4`
    3) SSL connection: `TLSv1.3`
@@ -536,36 +536,36 @@
    5) `current_database`: `portfolio`
    6) `inet_server_addr`: `10.0.20.165`
    7) `inet_server_port`: `5432`
-4. 비밀번호 입력 관련 메모: 운영자 확인
-   1) 접속 시 비밀번호를 묻지 않음 — PowerShell 세션의 `PGPASSWORD` 환경변수를 psql 이 사용했기 때문으로 판단.
-   2) 필요 시 `Remove-Item Env:PGPASSWORD` 로 세션 내 비밀번호 환경변수 제거 가능.
-   3) 본 노트 / 콘솔 캡처 / 로그 평문 기록 0건(R-DOCS-001 정합).
-5. 판단: 완료
-   1) 로컬 PostgreSQL 18 psql client → SSM tunnel → AWS Paper RDS 18.4 접속 1차 실증.
-   2) client major 18 / full 18.4 / server 18.4 정합(R-DATA-003 mitigation 정합 / 03 spec design §5 정합).
+4. Password input-related memo: operator confirmation
+   1) No password prompt on connection — judged to be because psql used the `PGPASSWORD` environment variable of the PowerShell session.
+   2) If needed, the in-session password environment variable can be removed with `Remove-Item Env:PGPASSWORD`.
+   3) 0 plaintext recording in this note / console captures / logs (R-DOCS-001 consistent).
+5. Judgment: complete
+   1) Local PostgreSQL 18 psql client → SSM tunnel → AWS Paper RDS 18.4 connection first empirically shown.
+   2) client major 18 / full 18.4 / server 18.4 consistent (R-DATA-003 mitigation consistent / 03 spec design §5 consistent).
 
-### 2. pgAdmin4 접속 검증
+### 2. pgAdmin4 Connection Validation
 
-1. 서버 등록 파라미터: 완료
+1. Server registration parameters: complete
    1) Host name/address: `localhost`
    2) Port: `15433`
    3) Maintenance database: `portfolio`
    4) Username: `portfolio_admin`
-   5) Password: `portfolio_admin` 비밀번호 — 본 노트 / 콘솔 캡처 / 로그 평문 기록 0건(R-DOCS-001 정합).
-   6) SSL mode: `Prefer` 또는 기본 TLS 자동 연결.
-2. SSM tunnel 측 확인: 완료
-   1) 같은 일자 앞 섹션 §5 의 tunnel 창에서 pgAdmin4 접속 시 `Connection accepted for session [...]` 메시지 출력 확인.
-   2) tunnel 창 종료 시 pgAdmin4 연결도 즉시 단절(R-AUTO-012 정합).
-3. 확인 SQL: 완료
+   5) Password: `portfolio_admin` password — 0 plaintext recording in this note / console captures / logs (R-DOCS-001 consistent).
+   6) SSL mode: `Prefer` or default TLS automatic connection.
+2. SSM tunnel-side confirmation: complete
+   1) When pgAdmin4 connects, confirmed the `Connection accepted for session [...]` message output in the tunnel window of §5 of the same-date previous section.
+   2) On tunnel window termination, the pgAdmin4 connection is also immediately severed (R-AUTO-012 consistent).
+3. Confirmation SQL: complete
    1) `select current_user, current_database(), inet_server_addr(), inet_server_port(), current_setting('search_path');`
-4. 확인 결과: 완료
+4. Confirmation result: complete
    1) `current_user`: `portfolio_admin`
    2) `current_database`: `portfolio`
    3) `inet_server_addr`: `10.0.20.165`
    4) `inet_server_port`: `5432`
    5) `search_path`: `"$user", public`
-       - 비고: `portfolio_admin` 은 본 일자 시점에 `ALTER ROLE ... SET search_path` 적용 대상이 아님 — app role(7종) 만 search_path 적용(OD-DB-006 정합 / [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §3 정합). 따라서 `portfolio_admin` 의 `"$user", public` 출력은 정상.
-5. schema / table 조회 가능 확인: 완료
+       - Note: `portfolio_admin` is not a target of `ALTER ROLE ... SET search_path` at this date's point — only the app roles (7 types) have search_path applied (OD-DB-006 consistent / [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §3 consistent). Therefore the `"$user", public` output of `portfolio_admin` is normal.
+5. schema / table query availability confirmation: complete
    1) `connector.connector_account`
    2) `connector.connector_order_request`
    3) `connector.connector_order_event`
@@ -581,125 +581,125 @@
    13) `ops.strategy_daily_batch_step_log`
    14) `preprocessor.pre_agency_analysis`
    15) `preprocessor.pre_news_daily_feature`
-   16) 본 일자 검증은 SELECT 가능 여부 확인까지만 수행 — INSERT / UPDATE / DELETE / DDL 0건.
-6. 판단: 완료
-   1) pgAdmin4 → SSM tunnel → AWS Paper RDS 접속 1차 실증.
-   2) pgAdmin4 는 `localhost:15433` 로 접속하지만 실제 대상은 AWS Private RDS(`10.0.20.165:5432`).
-   3) SSM tunnel 이 유지되는 동안 pgAdmin4 에서 AWS Paper RDS 운영 데이터 조회 가능.
-   4) tunnel 종료 시 pgAdmin4 연결 즉시 단절(R-AUTO-012 detection 보강 정합).
+   16) This date's validation only performs confirmation of SELECT availability — INSERT / UPDATE / DELETE / DDL 0 count.
+6. Judgment: complete
+   1) pgAdmin4 → SSM tunnel → AWS Paper RDS connection first empirically shown.
+   2) pgAdmin4 connects via `localhost:15433` but the actual target is AWS Private RDS (`10.0.20.165:5432`).
+   3) While the SSM tunnel is maintained, AWS Paper RDS operational data can be queried from pgAdmin4.
+   4) On tunnel termination, the pgAdmin4 connection is immediately severed (R-AUTO-012 detection reinforcement consistent).
 
-### 3. Runbook §10 보강(앞 섹션 §10 의 보조 절차)
+### 3. Runbook §10 Reinforcement (Auxiliary Procedure for §10 of the Previous Section)
 
-본 섹션은 앞 섹션 §10 의 Runbook 1차 본문 본문을 변경하지 않고, 추가 client 2종에 대한 보조 절차를 보강한다.
+This section reinforces the auxiliary procedure for the 2 additional clients without changing the first body of the Runbook in §10 of the previous section.
 
-1. 접속 검증 단계 (보조): [확인]
-   1) 로컬 PostgreSQL 18 psql client 직접 경로 실행 — `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 15433 -U portfolio_admin -d portfolio`
-   2) 결과 확인 항목:
-       - psql client major / full / server major / full 일치(client `18.1` / server `18.4`)
+1. Connection validation stage (auxiliary): [확인]
+   1) Local PostgreSQL 18 psql client direct path execution — `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 15433 -U portfolio_admin -d portfolio`
+   2) Result confirmation items:
+       - psql client major / full / server major / full match (client `18.1` / server `18.4`)
        - `SSL connection: TLSv1.3`
-       - `current_user` / `current_database` / `inet_server_addr` / `inet_server_port` 일치
-   3) 일반 `psql` PATH 미등록은 정상 — full path 직접 실행 또는 PATH 등록 후속(R-AUTO-013 정합).
-2. pgAdmin4 서버 등록 단계: [준비]
+       - `current_user` / `current_database` / `inet_server_addr` / `inet_server_port` match
+   3) General `psql` PATH not registered is normal — full path direct execution or PATH registration follow-up (R-AUTO-013 consistent).
+2. pgAdmin4 server registration stage: [준비]
    1) Register Server
        - Name: `AWS Paper RDS - portfolio`
    2) Connection
        - Host name/address: `localhost`
        - Port: `15433`
        - Maintenance database: `portfolio`
-       - Username: `portfolio_admin` 또는 MS 별 app role
-       - Password: 해당 DB 비밀번호 — 본 runbook 본문 / 운영자 노트 / 콘솔 캡처 / 로그 평문 기록 금지(R-DOCS-001 정합).
+       - Username: `portfolio_admin` or per-MS app role
+       - Password: the relevant DB password — plaintext recording in this runbook body / operator notes / console captures / logs prohibited (R-DOCS-001 consistent).
    3) SSL
        - SSL mode: `Prefer`
-   4) 주의:
-       - SSM Port Forwarding PowerShell 창이 열려 있어야 접속 가능(`Port 15433 opened` 유지).
-       - tunnel 종료 / `Ctrl + C` 시 pgAdmin4 연결도 즉시 단절(R-AUTO-012).
-       - pgAdmin4 서버 등록은 RDS endpoint 가 아니라 `localhost:15433` 으로 설정(OD-NET-011 정합).
-3. 성공 기준 보강: [확인]
-   1) psql / pgAdmin4 출력에서 `inet_server_addr = 10.0.20.165` / `inet_server_port = 5432` 일치(앞 섹션 §10.6 성공 기준 보강).
-   2) RDS `PubliclyAccessible` 값 `False` 유지(앞 섹션 §10.6 그대로).
+   4) Caution:
+       - Connection is possible only if the SSM Port Forwarding PowerShell window is open (`Port 15433 opened` maintained).
+       - On tunnel termination / `Ctrl + C`, the pgAdmin4 connection is also immediately severed (R-AUTO-012).
+       - pgAdmin4 server registration is set to `localhost:15433`, not the RDS endpoint (OD-NET-011 consistent).
+3. Success criteria reinforcement: [확인]
+   1) In the psql / pgAdmin4 output, `inet_server_addr = 10.0.20.165` / `inet_server_port = 5432` match (previous section §10.6 success criteria reinforcement).
+   2) RDS `PubliclyAccessible` value maintained as `False` (as in previous section §10.6).
 
-### 4. 안전 / 보안 점검 결과
+### 4. Safety / Security Check Result
 
-1. AWS / RDS / IAM / Secrets Manager / SSM 변경 0건. read-only AWS API + 같은 SSM Port Forwarding tunnel 재사용 + psql / pgAdmin4 SELECT 조회만 사용.
-2. RDS DDL/DML 0건. INSERT / UPDATE / DELETE / DDL 0건. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 호출 0건. `--execute` 실호출 0건.
-3. 실제 password / secret value / KIS app key / KIS app secret / 계좌번호 / token / account-id / 실제 IAM access key id / 실제 secret ARN / EIP 본 노트 평문 기록 0건. 모두 `[REDACTED]` 또는 placeholder.
-4. 운영 식별자(앞 섹션 §11 의 instance id / private IP / local port / SSM session id / RDS endpoint hostname) 그대로 재사용. 본 섹션 추가 운영 식별자: 로컬 PostgreSQL 설치 경로(`C:\Program Files\PostgreSQL\18\bin\psql.exe`) — 로컬 PC 의 도구 경로이며 secret 가 아님.
-5. 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog 본 일자 작업으로 인한 변경 0건. pgAdmin4 / psql 18 client 는 운영자 로컬 PC 도구로 별도 spec 산출물 영향 없음.
+1. 0 AWS / RDS / IAM / Secrets Manager / SSM changes. Uses only read-only AWS API + reuse of the same SSM Port Forwarding tunnel + psql / pgAdmin4 SELECT queries.
+2. 0 RDS DDL/DML. 0 INSERT / UPDATE / DELETE / DDL. 0 broker / KIS / order / fill / Daily Batch entrypoint calls. 0 `--execute` actual calls.
+3. 0 plaintext recording in this note of actual password / secret value / KIS app key / KIS app secret / account number / token / account-id / actual IAM access key id / actual secret ARN / EIP. All `[REDACTED]` or placeholder.
+4. Operational identifiers (instance id / private IP / local port / SSM session id / RDS endpoint hostname of previous section §11) are reused as is. Additional operational identifier of this section: local PostgreSQL installation path (`C:\Program Files\PostgreSQL\18\bin\psql.exe`) — a tool path of the local PC and not a secret.
+5. 0 changes to the 8 MS README / AGENTS.md / CHANGELOG / docs / worklog due to this date's work. pgAdmin4 / psql 18 client are operator local PC tools with no impact on separate spec artifacts.
 
-### 5. 본 일자 범위 밖 / 후속 인계
+### 5. Outside This Date's Scope / Follow-up Handover
 
-1. 일반 `psql` 명령어 PATH 등록 — `C:\Program Files\PostgreSQL\18\bin` 을 시스템 / 사용자 PATH 에 등록(R-AUTO-013 정합 / `_common/followups-overview.md` 2026-06-13 SSM Port Forwarding 후속 메모 보강).
-2. pgAdmin4 의 환경별(paper / live) 서버 분리 등록 정책 — paper 환경에서 잘못해서 live RDS 를 등록하지 않도록 서버 이름 prefix 정책(예: `AWS Paper RDS - portfolio`) 표준화. live 환경은 후속 분리(10 spec).
-3. pgAdmin4 / psql 의 app role 별 비밀번호 보관 — 운영자 로컬 PC 환경 책임. Secrets Manager 에서 직접 주입하지 않음. 운영자 실수 시 R-DOCS-001 위반 방지를 위해 화면 캡처 / 채팅 / 노트에 평문 기록 금지 원칙 유지.
-4. Strategy Execution(`port_strategy_execution`) AWS 포팅 본 phase: 후속(04 spec 후속 phase). 본 일자에는 client 3종(Python `psycopg2` / psql 18 / pgAdmin4) 으로 사전 접속 가능성 1차 실증 완료.
+1. General `psql` command PATH registration — register `C:\Program Files\PostgreSQL\18\bin` in the system / user PATH (R-AUTO-013 consistent / `_common/followups-overview.md` 2026-06-13 SSM Port Forwarding follow-up memo reinforcement).
+2. pgAdmin4 per-environment (paper / live) server separate registration policy — standardize a server name prefix policy (e.g., `AWS Paper RDS - portfolio`) so as not to mistakenly register the live RDS in the paper environment. The live environment is separated as a follow-up (10 spec).
+3. pgAdmin4 / psql per-app-role password storage — the responsibility of the operator's local PC environment. Not injected directly from Secrets Manager. To prevent an R-DOCS-001 violation on operator mistake, the principle of prohibiting plaintext recording in screen captures / chat / notes is maintained.
+4. Strategy Execution (`port_strategy_execution`) AWS porting main phase: follow-up (04 spec follow-up phase). On this date, prerequisite connection availability was first empirically shown complete with 3 clients (Python `psycopg2` / psql 18 / pgAdmin4).
 
 
-## 2026-06-17 Daily AWS 17-step E2E 흐름 중 발견된 DB Role / 권한 / search_path 보정
+## 2026-06-17 DB Role / Privilege / search_path Correction Discovered During the Daily AWS 17-step E2E Flow
 
-운영자가 같은 일자 두 번째 세션(Daily AWS 17-step E2E 완료) 진행 중 발견한 본 spec 범위의 DB Role / 권한 / search_path 보정 사실을 누적 기록한다.
+Accumulates the facts of DB Role / privilege / search_path correction within this spec's scope that the operator discovered during the same-date second session (Daily AWS 17-step E2E complete).
 
-- 본 spec 자체의 추가 결정 0건 / 본문 변경 0건.
-- 결정 정합 검증과 후속 정식 매트릭스 갱신만 사실 기록.
-- 자세한 17 step 전체 진행 상태는 03 / 04 / 06 / 08 / 09 spec operation-notes 의 2026-06-17 섹션 참조.
-- Kiro 는 문서 작성 / 절차 정리만 수행. 실제 GRANT / search_path 변경은 운영자 직접 진행.
-- 본 일자는 `aws-paper` 한정 / aws-live 작업 0건.
-- password / endpoint hostname / account-id / 실제 ARN / 계좌번호 본 노트 평문 기록 0건.
+- 0 additional decisions of this spec itself / 0 body changes.
+- Records only the facts of decision consistency validation and follow-up formal matrix update.
+- For the detailed full 17 step progress status, refer to the 2026-06-17 section of the 03 / 04 / 06 / 08 / 09 spec operation-notes.
+- Kiro performs only document authoring / procedure organization. The actual GRANT / search_path changes are performed directly by the operator.
+- This date is limited to `aws-paper` / 0 aws-live work.
+- 0 plaintext recording in this note of password / endpoint hostname / account-id / actual ARN / account number.
 
-### 1. `execution_app` 의 `interest` schema 권한 보정 (Step 8 영향)
+### 1. `execution_app` `interest` schema Privilege Correction (Step 8 Impact)
 
-1. 1차 실패 사실: 확인
-   1) Daily AWS 17-step 의 8번 `DAILY_BUY_EXECUTION` ECS RunTask 가 1차 실행에서 `execution_app` 의 `interest` schema / table SELECT 권한 누락으로 실패(R-DATA-005 [2026-06-17 보강] 정합).
-   2) 영향 범위: 04 spec operation-notes 2026-06-17 §3 정합. preprocessor 자체(3번 step)는 정상 완료 / 본 권한 누락은 8번 step 영향에 한정.
-2. 운영자 조치 사실: 완료(2026-06-17 §3 운영자 직접 GRANT 보정)
-   1) `execution_app` 에 `interest` schema USAGE 권한 부여.
-   2) `interest.*` table SELECT 권한 부여(execution_app 이 buy execution 흐름에서 interest schema 읽기 필요).
-   3) sequence 권한 부여(필요한 sequence 한정).
-   4) future default privileges 보정(`ALTER DEFAULT PRIVILEGES IN SCHEMA interest GRANT SELECT ON TABLES TO execution_app` 등) — 후속 객체 신규 생성 시 자동 적용.
-3. 02 spec 정식 매트릭스 갱신: 후속
-   1) [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 GRANT / §5 검증 SQL 의 `execution_app` 행에 `interest` schema USAGE / table SELECT / sequence / default privileges 사실 반영은 후속 phase.
-   2) 운영자 직접 GRANT 결과는 본 노트에 사실로만 기록 — 정식 매트릭스 갱신 시점에 02 spec 본문 갱신 / 본 일자에는 본문 변경 없음.
+1. First failure fact: confirmed
+   1) The Daily AWS 17-step's #8 `DAILY_BUY_EXECUTION` ECS RunTask failed on first execution due to `execution_app`'s missing `interest` schema / table SELECT permission (R-DATA-005 [2026-06-17 reinforcement] consistent).
+   2) Impact scope: 04 spec operation-notes 2026-06-17 §3 consistent. preprocessor itself (step #3) completed normally / this permission omission is limited to step #8 impact.
+2. Operator action fact: complete (2026-06-17 §3 operator direct GRANT correction)
+   1) Grant `interest` schema USAGE permission to `execution_app`.
+   2) Grant `interest.*` table SELECT permission (execution_app needs to read the interest schema in the buy execution flow).
+   3) Grant sequence permission (limited to necessary sequences).
+   4) future default privileges correction (`ALTER DEFAULT PRIVILEGES IN SCHEMA interest GRANT SELECT ON TABLES TO execution_app` etc.) — automatically applied when follow-up objects are newly created.
+3. 02 spec formal matrix update: follow-up
+   1) Reflecting the facts of `interest` schema USAGE / table SELECT / sequence / default privileges in the `execution_app` row of §4 GRANT / §5 validation SQL of [`./db-roles-and-grants.md`](./db-roles-and-grants.md) is a follow-up phase.
+   2) The operator direct GRANT result is recorded only as fact in this note — 02 spec body is updated at the formal matrix update time / no body change on this date.
 
-### 2. `marketconnector_app` 의 `legacy` schema / `legacy.holdings` / search_path 보정 (Step 17 영향)
+### 2. `marketconnector_app` `legacy` schema / `legacy.holdings` / search_path Correction (Step 17 Impact)
 
-1. 1차 실패 사실: 확인
-   1) Daily AWS 17-step 의 17번 `BALANCE_REFRESH` SSM RunCommand 가 1차 실행에서 bare `holdings` 의 `relation does not exist` 오류로 실패(R-DATA-011 신규 정합).
-   2) 원인: `marketconnector_app` 의 `legacy` schema USAGE 미부여(OD-DB-007 정합 — legacy schema 모든 app role 미부여 정책의 1건 예외 발생) + `legacy.holdings` DML 미부여 + sequence 미부여 + database search_path 누락.
-   3) 영향 범위: 03 spec operation-notes 2026-06-17 §4 정합.
-2. 운영자 조치 사실: 완료(03 spec §4 운영자 직접 작업 정합)
-   1) `marketconnector_app` 의 database search_path 를 `connector, execution, legacy, reference, public` 로 보정(`ALTER ROLE marketconnector_app IN DATABASE portfolio SET search_path = ...`).
-   2) `legacy` schema USAGE 권한 부여(legacy 운영 데이터 접근 필요 — OD-DB-007 의 1건 예외 / 후속 재검토 후보).
-   3) `legacy.holdings` DML(SELECT / INSERT / UPDATE / DELETE) 권한 부여(legacy 운영 데이터 갱신 최소 권한 한정).
-   4) `legacy` schema sequence 권한 부여 + future default privileges 보정.
-3. 02 spec 정식 매트릭스 갱신: 후속
-   1) [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §4 GRANT / §5 검증 SQL 의 `marketconnector_app` 행에 `legacy` schema USAGE / `legacy.holdings` DML / sequence / database search_path 사실 반영은 후속 phase.
-   2) OD-DB-007(legacy schema 모든 app role 미부여) 정책의 marketconnector_app 한정 1건 예외 사실은 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) Change Log 2026-06-17 두 번째 항목에 사실 기록 / 본문 결정값 변경 후속 분리.
+1. First failure fact: confirmed
+   1) The Daily AWS 17-step's #17 `BALANCE_REFRESH` SSM RunCommand failed on first execution due to a bare `holdings` `relation does not exist` error (R-DATA-011 new consistent).
+   2) Cause: `marketconnector_app`'s `legacy` schema USAGE not granted (OD-DB-007 consistent — 1 exception occurred to the policy of not granting the legacy schema to all app roles) + `legacy.holdings` DML not granted + sequence not granted + database search_path omission.
+   3) Impact scope: 03 spec operation-notes 2026-06-17 §4 consistent.
+2. Operator action fact: complete (03 spec §4 operator direct work consistent)
+   1) Correct `marketconnector_app`'s database search_path to `connector, execution, legacy, reference, public` (`ALTER ROLE marketconnector_app IN DATABASE portfolio SET search_path = ...`).
+   2) Grant `legacy` schema USAGE permission (legacy operational data access needed — 1 exception to OD-DB-007 / follow-up reconsideration candidate).
+   3) Grant `legacy.holdings` DML (SELECT / INSERT / UPDATE / DELETE) permission (limited to minimum permission for legacy operational data update).
+   4) Grant `legacy` schema sequence permission + future default privileges correction.
+3. 02 spec formal matrix update: follow-up
+   1) Reflecting the facts of `legacy` schema USAGE / `legacy.holdings` DML / sequence / database search_path in the `marketconnector_app` row of §4 GRANT / §5 validation SQL of [`./db-roles-and-grants.md`](./db-roles-and-grants.md) is a follow-up phase.
+   2) The fact of the marketconnector_app-limited 1 exception to the OD-DB-007 (legacy schema not granted to all app roles) policy is recorded as fact in the second item of the [`../_common/operator-decisions.md`](../_common/operator-decisions.md) Change Log 2026-06-17 / body decision value change separated as follow-up.
 
-### 3. 검증 SQL 보강 후보 / app role 별 search_path / grants 검증 SQL
+### 3. Validation SQL Reinforcement Candidates / Per-app-role search_path / grants Validation SQL
 
-1. app role 별 search_path 점검 SQL 후보:
-   1) `SELECT rolname, rolconfig FROM pg_roles WHERE rolname IN ('execution_app', 'marketconnector_app', 'decision_app', 'preprocessor_app', 'crawler_app', 'research_app', 'view_app');` — `rolconfig` 에서 `search_path=...` 항목 추출.
-   2) 또는 각 role 로 접속 후 `SHOW search_path;` 직접 실행.
-   3) 본 일자 `marketconnector_app` 의 search_path 가 `connector, execution, legacy, reference, public` 로 보정되었음을 정기 검증 항목으로 추가.
-2. future default privileges 점검 SQL 후보:
-   1) `SELECT * FROM pg_default_acl WHERE defaclnamespace = 'legacy'::regnamespace;` — legacy schema 의 default ACL 확인.
-   2) `SELECT * FROM pg_default_acl WHERE defaclnamespace = 'interest'::regnamespace;` — interest schema 의 default ACL 확인.
-   3) 본 일자 보정 결과로 `execution_app` interest / `marketconnector_app` legacy 에 대한 default privileges 가 적용되었음을 정기 검증.
-3. bare table name 의존 legacy 경로 검증 SQL 후보:
-   1) `SET ROLE marketconnector_app;` `SELECT 1 FROM holdings LIMIT 1;` — bare `holdings` 가 search_path 안에서 탐색되는지 확인.
-   2) BALANCE_REFRESH 진입 전 사전 점검 SQL 로 추가.
-4. R-DATA-011 detection 정합으로 본 검증 SQL 들을 17-step 진입 단계의 정기 항목으로 추가 — 정식 매트릭스 갱신은 후속 phase.
+1. Per-app-role search_path check SQL candidate:
+   1) `SELECT rolname, rolconfig FROM pg_roles WHERE rolname IN ('execution_app', 'marketconnector_app', 'decision_app', 'preprocessor_app', 'crawler_app', 'research_app', 'view_app');` — extract the `search_path=...` item from `rolconfig`.
+   2) Or connect with each role and directly execute `SHOW search_path;`.
+   3) Add as a regular validation item that this date's `marketconnector_app` search_path was corrected to `connector, execution, legacy, reference, public`.
+2. future default privileges check SQL candidate:
+   1) `SELECT * FROM pg_default_acl WHERE defaclnamespace = 'legacy'::regnamespace;` — confirm the default ACL of the legacy schema.
+   2) `SELECT * FROM pg_default_acl WHERE defaclnamespace = 'interest'::regnamespace;` — confirm the default ACL of the interest schema.
+   3) Regularly validate that, as a result of this date's correction, default privileges for `execution_app` interest / `marketconnector_app` legacy were applied.
+3. bare table name-dependent legacy path validation SQL candidate:
+   1) `SET ROLE marketconnector_app;` `SELECT 1 FROM holdings LIMIT 1;` — confirm whether bare `holdings` is resolved within search_path.
+   2) Add as a prerequisite check SQL before BALANCE_REFRESH entry.
+4. By R-DATA-011 detection consistency, add these validation SQLs as regular items at the 17-step entry stage — formal matrix update is a follow-up phase.
 
-### 4. 안전 / 보안 점검 결과
+### 4. Safety / Security Check Result
 
-1. 본 일자 작업으로 8개 MS README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 변경 0건. 02 spec 본문 결정값 변경 0건 — 정식 매트릭스 갱신은 후속.
-2. 아래 민감정보는 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
-   - 실제 password / RDS endpoint hostname / RDS port / database name / username
-   - account-id / 실제 IAM Role ARN / 실제 secret ARN
+1. 0 changes to the 8 MS README / AGENTS.md / CHANGELOG / docs / worklog / source / packaging due to this date's work. 0 changes to 02 spec body decision values — formal matrix update is a follow-up.
+2. The following sensitive information has 0 plaintext recording in this note — all `[REDACTED]` or placeholder.
+   - actual password / RDS endpoint hostname / RDS port / database name / username
+   - account-id / actual IAM Role ARN / actual secret ARN
 
-   운영 식별자만 사실 기록:
-   - role 이름 `execution_app` / `marketconnector_app`
-   - schema 이름 `interest` / `legacy` / table 이름 `holdings`
-   - search_path 값 `connector, execution, legacy, reference, public`
-3. RDS / GRANT / ALTER ROLE 작업은 모두 운영자 직접 수행. Kiro 는 문서 작성 / 절차 정리 / 검증 항목 정리만 수행. `secretsmanager:GetSecretValue` 결과값 평문 기록 0건. CloudWatch Logs 본문 / SSM 응답 본문 / 운영자 PowerShell stdout 전문 본 노트 평문 인용 0건.
-4. RDS DDL 0건(본 spec 범위 — schema 생성 / drop / table 생성 / drop 0건). DML 0건(본 spec 범위 — `legacy.holdings` 직접 변경은 03 spec Step 17 책임). GRANT / REVOKE / ALTER DEFAULT PRIVILEGES / ALTER ROLE 작업이 본 일자에 발생했고 이는 본 노트에 사실로만 기록.
-5. broker / KIS / 주문 / 체결 / Daily Batch entrypoint 직접 호출 0건. live 자동 GRANT / DDL / DML 은 OD-SAFE-002 / OD-SAFE-003 정책에 따라 후속 검증 / 승인 전까지 여전히 금지. 본 일자는 `aws-paper` 한정 / aws-live 작업 0건. R-DATA-005 / R-DATA-011 mitigation 1차 실증 / Status `Mitigated` 갱신 정합.
+   Only operational identifiers recorded as fact:
+   - role names `execution_app` / `marketconnector_app`
+   - schema names `interest` / `legacy` / table name `holdings`
+   - search_path value `connector, execution, legacy, reference, public`
+3. RDS / GRANT / ALTER ROLE work is all performed directly by the operator. Kiro performs only document authoring / procedure organization / validation item organization. 0 plaintext recording of `secretsmanager:GetSecretValue` result values. 0 plaintext quotation in this note of CloudWatch Logs body / SSM response body / operator PowerShell stdout full text.
+4. 0 RDS DDL (this spec's scope — 0 schema creation / drop / table creation / drop). 0 DML (this spec's scope — direct change of `legacy.holdings` is 03 spec Step 17 responsibility). GRANT / REVOKE / ALTER DEFAULT PRIVILEGES / ALTER ROLE work occurred on this date and this is recorded only as fact in this note.
+5. 0 direct broker / KIS / order / fill / Daily Batch entrypoint calls. live automatic GRANT / DDL / DML is still prohibited until follow-up validation / approval per the OD-SAFE-002 / OD-SAFE-003 policy. This date is limited to `aws-paper` / 0 aws-live work. R-DATA-005 / R-DATA-011 mitigation first empirically shown / Status `Mitigated` update consistent.

@@ -1,255 +1,255 @@
 # Operation Notes — 05-port-view-ecs-and-runbook
 
-본 문서는 05-port-view-ecs-and-runbook 진행 중 운영자 / Kiro 가 수행한 작업 결과를 일자별로 누적 기록하는 운영 노트다.
+This document is an operation note that cumulatively records, by date, the work results performed by the operator / Kiro during 05-port-view-ecs-and-runbook.
 
-- 1차 적용 환경 = `aws-paper` / region = `ap-northeast-2`.
-- 대상 = port-view (Spring Boot / Thymeleaf 통합 운영 콘솔).
-- 범위 = port-view 의 ECS Fargate Service 포팅 계획 / 구현 / 검증 결과.
+- First application environment = `aws-paper` / region = `ap-northeast-2`.
+- Target = port-view (Spring Boot / Thymeleaf integrated operations console).
+- Scope = port-view's ECS Fargate Service porting plan / implementation / validation results.
 
-## 기록 형식
+## Record format
 
-- 일자별 섹션을 본 문서에 누적한다.
-- 사실 식별자는 사용자 명시 정책 정합으로 기록 — commit hash / Class 이름 / Controller endpoint path / Spring properties key / StartExecution payload 필드 / Step Functions state name / Slack 이벤트 라벨 등.
-- 아래 항목은 본 문서 평문 기록 금지 (`[REDACTED]` 또는 placeholder):
-  - secret value / KIS app key · KIS app secret / 계좌번호 · 계좌 비밀번호 / token.
-  - RDS password / RDS endpoint hostname / account-id 12자리 원문.
-  - 실제 IAM Role ARN · secret ARN · state machine ARN / IAM access key id / instance-id / EIP.
-  - image digest full sha256 / task ARN / job ARN / broker_order_no 원문.
+- Accumulate dated sections in this document.
+- Factual identifiers are recorded per the user-specified policy — commit hash / Class name / Controller endpoint path / Spring properties key / StartExecution payload field / Step Functions state name / Slack event label, etc.
+- The items below must not be recorded in plaintext in this document (`[REDACTED]` or placeholder):
+  - secret value / KIS app key · KIS app secret / account number · account password / token.
+  - RDS password / RDS endpoint hostname / raw 12-digit account-id.
+  - actual IAM Role ARN · secret ARN · state machine ARN / IAM access key id / instance-id / EIP.
+  - image digest full sha256 / task ARN / job ARN / raw broker_order_no.
   - Slack webhook URL / Administrator password.
-- 본문 평문 인용 금지 (R-DOCS-001 정합):
-  - Lambda 코드 / IAM Policy 전체 / Step Functions ASL 전체 / Lambda 응답 전문.
-  - CloudWatch Logs 전문 / KIS API response body / Spring Boot application log 전문.
-  - Step Functions execution history 본문 / Slack 메시지 본문 / commit diff 본문.
+- No plaintext body quotation (R-DOCS-001 alignment):
+  - Lambda code / full IAM Policy / full Step Functions ASL / full Lambda response.
+  - full CloudWatch Logs / KIS API response body / full Spring Boot application log.
+  - Step Functions execution history body / Slack message body / commit diff body.
 
-## 상단 요약 (Dashboard)
+## Top summary (Dashboard)
 
-### View 실행 위치별 backend 매트릭스
+### Per-View-execution-location backend matrix
 
-| # | 실행 위치 | Backend | Batch 실행 방식 | 사용 조건 | 최근 검증 |
+| # | Execution location | Backend | Batch execution method | Usage condition | Most recent validation |
 |---|---|---|---|---|---|
-| 1 | Local View | `local-file` | Python subprocess + `C:/Workspaces` 로컬 source ProcessBuilder | 운영자 로컬 검증 도구 (Run #46~#48) | 2026-06-29 (1) Step 12~17 local-file |
-| 2 | Local View | `aws-stepfunctions` | Step Functions `StartExecution` (local AWS credential) | Fargate 진입 전 선검증 | 2026-06-30 오전 Step 12~17 approval |
-| 3 | ECS Fargate View | `aws-stepfunctions` | Step Functions `StartExecution` (ECS Task Role) | 운영 View / read-only + 승인 실행 | 2026-06-30 오후 Step 12~17 approval |
+| 1 | Local View | `local-file` | Python subprocess + `C:/Workspaces` local source ProcessBuilder | operator local validation tool (Run #46~#48) | 2026-06-29 (1) Step 12~17 local-file |
+| 2 | Local View | `aws-stepfunctions` | Step Functions `StartExecution` (local AWS credential) | pre-validation before Fargate entry | 2026-06-30 morning Step 12~17 approval |
+| 3 | ECS Fargate View | `aws-stepfunctions` | Step Functions `StartExecution` (ECS Task Role) | operational View / read-only + approval execution | 2026-06-30 afternoon Step 12~17 approval |
 
-### 자동 실행 진입 상태
+### Automatic execution entry state
 
-- 2026-06-30 오후 ECS Fargate View 1차 포팅 완료 후 desiredCount 0 종료 (비용 절감).
-- 2026-07-01 부터 09:01 KST `portfolio-paper-daily-step12-17-order-0901-kst` Scheduler ENABLED — View 수동 승인 없이 자동 실행 진입.
-- port-view 안 Daily Batch AWS Step 12~17 승인 실행 버튼 = 운영자 fallback / 수동 재실행 경로로 역할 재정의.
+- After 2026-06-30 afternoon ECS Fargate View first-porting completion, desiredCount 0 termination (cost saving).
+- From 2026-07-01, at 09:01 KST the `portfolio-paper-daily-step12-17-order-0901-kst` Scheduler is ENABLED — automatic execution entry without View manual approval.
+- The Daily Batch AWS Step 12~17 approval-execute button inside port-view = redefined into the operator fallback / manual re-execution path.
 
-### 일자별 인덱스
+### Per-date index
 
-| 일자 | 핵심 결과 |
+| Date | Key result |
 |---|---|
-| 2026-06-29 (2) | ECS Fargate 포팅 계획 확정 + `StepFunctionsDailyBatchExecutionService` 구현 + Local View `aws-stepfunctions` mode Step 1~11 · Step 12~17 approval 선검증 |
-| 2026-06-30 (오전) | View 운영 경로 4종 정리 + Daily Batch gate 수정 + DB 검증 원칙 |
-| 2026-06-30 (오후, ECS) | ECS Fargate 1차 포팅 완료 (Public IP direct / desiredCount 0 종료) + ECS View → Step 12~17 approval 3차 실증 |
-| 2026-06-30 (오후, Slack) | Daily Brief Slack 자동화 독립 운영 cross-reference (mini state machine + 2개 Scheduler ENABLED) |
-| 2026-07-01 | Step 12~17 Scheduler ENABLED (View 수동 승인 fallback 유지) |
+| 2026-06-29 (2) | ECS Fargate porting plan fixed + `StepFunctionsDailyBatchExecutionService` implementation + Local View `aws-stepfunctions` mode Step 1~11 · Step 12~17 approval pre-validation |
+| 2026-06-30 (morning) | View operational path 4-type organization + Daily Batch gate fix + DB validation principles |
+| 2026-06-30 (afternoon, ECS) | ECS Fargate first-porting complete (Public IP direct / desiredCount 0 termination) + ECS View → Step 12~17 approval third validation |
+| 2026-06-30 (afternoon, Slack) | Daily Brief Slack automation independent-operation cross-reference (mini state machine + 2 Schedulers ENABLED) |
+| 2026-07-01 | Step 12~17 Scheduler ENABLED (View manual approval fallback retained) |
 
-## 2026-06-29 (2) — ECS Fargate 포팅 계획 / 구현 1차 현황 정리
+## 2026-06-29 (2) — ECS Fargate porting plan / implementation first-status organization
 
-6. ECS Fargate 포팅 계획: 완료
- 1) 최종 포팅 방향 확정: 완료
-   (1) View 실행 위치
-       - port-view 는 ECS Fargate Service 로 포팅
-       - View 는 AWS Paper 운영 콘솔 역할 유지
-       - 화면 조회 / 실행 이력 조회 / 승인 트리거 UI 중심으로 구성
-       - Batch 실제 실행 책임은 View local subprocess 가 아니라 Step Functions 로 이관
-   (2) Local File 실행 방식 보존
-       - 로컬 View 에서 local-file 실행 버튼과 실행 경로는 그대로 보존
-       - 기존 Local View 버튼 → 로컬 source ProcessBuilder 실행 → AWS Paper DB 저장 / 조회 흐름은 운영자 로컬 검증 도구로 유지
-       - Fargate 실행환경에서는 local-file backend 를 사용하지 않음
-       - ECS 컨테이너 안에 `C:/Workspaces` 기반 로컬 source 실행 구조를 들고 가지 않음
-   (3) AWS Step Functions backend 추가 방향 확정
-       - `StepFunctionsDailyBatchExecutionService` 를 신규 추가
-       - Daily Batch 실행 backend 를 `local-file` / `aws-stepfunctions` 로 분리
-       - `portfolio.batch.execution-mode` 값으로 실행 backend 를 선택
-       - `aws-stepfunctions` mode 에서는 Python script 직접 실행 없이 `StartExecution` 만 수행
-       - View 는 `executionArn` / 실행 요청 payload / DB run 결과를 화면에 표시
- 2) 로컬 선검증 후 Fargate 진입 순서 확정: 완료
-   (1) 로컬 Step Functions 연동 선검증
-       - Fargate 배포 전에 로컬 View 에서 먼저 Step Functions `StartExecution` 연동을 검증
-       - 로컬 실행환경을 Fargate 로 흉내내는 것이 아니라 Daily Batch backend 만 `aws-stepfunctions` 로 전환해 검증
-       - 로컬에서 Controller / Service / DTO / button gate / payload 생성 / `executionArn` 표시 흐름을 먼저 검증
-       - 이후 Fargate 에서는 컨테이너 / IAM / VPC / Secret / RDS 접근 문제만 분리 검증
-   (2) Step 1~11 우선 연결
-       - 첫 연결 대상은 Step 1~11 `StartExecution`
-       - `allowPaperOrderExecute=false` 기준으로 실행
-       - Step 12~17 은 approval gate 로 차단 유지
-       - 실주문 제출 없는 사전 검증 경로부터 연결
-   (3) Step 12~17 승인형 연결
-       - Step 12~17 은 별도 승인 버튼으로 분리
-       - paper-order gate 뒤에서만 버튼 활성화
-       - 실행 전 REQUESTED `strategy_execution_order` / retryable rejected `connector_order_request` / active `connector_order_request` preflight 확인 정책 유지
-       - 로컬에서 Step 12~17 NO_TARGET 또는 safe path 검증 후 Fargate 연결
- 3) ECS / Fargate 진입 기준 확정: 완료
-   (1) ECS 용 실행 설정 분리
-       - aws-paper-local 은 `127.0.0.1:15433` RDS port forwarding 및 로컬 검증 기준
-       - aws-paper-ecs 는 RDS private endpoint / Secrets Manager 또는 SSM SecureString / ECS Task Role 기준
-       - Fargate 에서는 `portfolio.batch.local-file-execution-enabled=false`
-       - Fargate 초기 기동은 조회-only 또는 Step 1~11 safe trigger 부터 시작
-   (2) Fargate 배포 순서
-       - Dockerfile 작성
+6. ECS Fargate porting plan: complete
+ 1) Final porting direction fixed: complete
+   (1) View execution location
+       - port-view is ported to an ECS Fargate Service
+       - View retains the AWS Paper operations console role
+       - composed around screen query / execution-history query / approval-trigger UI
+       - the actual Batch execution responsibility is transferred to Step Functions, not the View local subprocess
+   (2) Preserve the Local File execution method
+       - the local-file execution button and execution path on the Local View are preserved as is
+       - the existing Local View button → local source ProcessBuilder execution → AWS Paper DB store / query flow is retained as an operator local validation tool
+       - the local-file backend is not used in the Fargate execution environment
+       - the `C:/Workspaces`-based local source execution structure is not carried into the ECS container
+   (3) AWS Step Functions backend addition direction fixed
+       - newly add `StepFunctionsDailyBatchExecutionService`
+       - separate the Daily Batch execution backend into `local-file` / `aws-stepfunctions`
+       - select the execution backend via the `portfolio.batch.execution-mode` value
+       - in `aws-stepfunctions` mode, perform only `StartExecution` without directly running the Python script
+       - View displays `executionArn` / the execution-request payload / the DB run result on the screen
+ 2) Fargate entry order after local pre-validation fixed: complete
+   (1) Local Step Functions integration pre-validation
+       - before Fargate deployment, first validate the Step Functions `StartExecution` integration on the Local View
+       - validate by switching only the Daily Batch backend to `aws-stepfunctions`, not by mimicking the local execution environment as Fargate
+       - first validate the Controller / Service / DTO / button gate / payload creation / `executionArn` display flow locally
+       - afterward, on Fargate, separately validate only the container / IAM / VPC / Secret / RDS access issues
+   (2) Connect Step 1~11 first
+       - the first connection target is Step 1~11 `StartExecution`
+       - execute based on `allowPaperOrderExecute=false`
+       - keep Step 12~17 blocked by the approval gate
+       - connect starting from the pre-validation path without actual order submission
+   (3) Step 12~17 approval-type connection
+       - separate Step 12~17 into a dedicated approval button
+       - activate the button only behind the paper-order gate
+       - retain the policy of confirming, before execution, the REQUESTED `strategy_execution_order` / retryable rejected `connector_order_request` / active `connector_order_request` preflight
+       - connect to Fargate after validating Step 12~17 NO_TARGET or the safe path locally
+ 3) ECS / Fargate entry criteria fixed: complete
+   (1) Separate the execution settings for ECS
+       - aws-paper-local is based on `127.0.0.1:15433` RDS port forwarding and local validation
+       - aws-paper-ecs is based on the RDS private endpoint / Secrets Manager or SSM SecureString / ECS Task Role
+       - on Fargate, `portfolio.batch.local-file-execution-enabled=false`
+       - Fargate initial startup begins from query-only or the Step 1~11 safe trigger
+   (2) Fargate deployment order
+       - author the Dockerfile
        - ECR image push
-       - ECS Task Definition 등록
-       - ECS Service 기동
-       - 조회-only smoke test
-       - Step 1~11 `StartExecution` 검증
-       - 승인형 Step 12~17 검증
-   (3) 안전 기본값
-       - Fargate 초기 `paperOrderEnabled=false` 권장
-       - `fullPipelineExecutionEnabled=false` 부터 시작
-       - Step 12 이상 주문성 구간은 별도 gate / preflight / approval 확인 후 활성화
-       - Snapshot Refresh 는 초기 OFF 또는 별도 trigger 방식으로 제한 검토
- 4) 결론
-   (1) ECS Fargate 포팅 계획 확정
-       - View 는 ECS Fargate Service 로 포팅
-       - local-file batch 실행은 로컬 운영자 도구로 보존
-       - Fargate View 는 Step Functions `StartExecution` 기반 실행 trigger 로 전환
-       - 로컬 `aws-stepfunctions` mode 검증 후 Docker / ECR / ECS Task Definition 단계로 진입
-       - `StepFunctionsDailyBatchExecutionService` 추가 및 `aws-stepfunctions` mode 구현은 1차 완료
-       - 다음 작업은 Docker / ECR / ECS Task Definition / Fargate 조회-only smoke test 진입
+       - register the ECS Task Definition
+       - start the ECS Service
+       - query-only smoke test
+       - Step 1~11 `StartExecution` validation
+       - approval-type Step 12~17 validation
+   (3) Safe defaults
+       - recommend Fargate initial `paperOrderEnabled=false`
+       - start from `fullPipelineExecutionEnabled=false`
+       - activate the order-related segment of Step 12 and beyond only after separate gate / preflight / approval confirmation
+       - review limiting Snapshot Refresh to initially OFF or a separate trigger method
+ 4) Conclusion
+   (1) ECS Fargate porting plan fixed
+       - View is ported to an ECS Fargate Service
+       - local-file batch execution is preserved as a local operator tool
+       - the Fargate View is switched to a Step Functions `StartExecution`-based execution trigger
+       - after local `aws-stepfunctions` mode validation, enter the Docker / ECR / ECS Task Definition stage
+       - the `StepFunctionsDailyBatchExecutionService` addition and `aws-stepfunctions` mode implementation are first-complete
+       - the next work is entering Docker / ECR / ECS Task Definition / Fargate query-only smoke test
 
-7. ECS Fargate 포팅 구현
- 1) Step Functions 실행 backend 구현: 완료
-   (1) `StepFunctionsDailyBatchExecutionService` 추가: 완료
-       - Daily Batch 실행 요청을 Step Functions `StartExecution` 호출로 변환
-       - `local-file` 실행 서비스와 분리
-       - `execution-mode=aws-stepfunctions` 기준으로 동작
-       - Python subprocess / `C:/Workspaces` 로컬 source 직접 실행 없음
-       - AWS SDK v2 Step Functions client 를 사용해 `StartExecution` 호출
-       - `stateMachineArn` 은 `application.properties` 에 직접 고정하지 않고 환경변수로 주입
-   (2) `StartExecution` payload 구성: 완료
-       - `environment=paper` 포함
-       - `dbTarget=aws-paper` 포함
-       - `requestedBy=VIEW_BUTTON` 기준으로 요청 주체 구분
-       - `source=PORT_VIEW` 포함
-       - `requestedFrom=port-view` 포함
-       - `runDate` 는 Asia/Seoul 기준 yyyy-MM-dd 값으로 포함
-       - `fromStepCode` / `toStepCode` 포함
-       - `fromStepOrder` / `toStepOrder` 포함
-       - `startStep` / `endStep` 포함
-       - `allowPaperOrderExecute=false` 기준 Step 1~11 safe trigger 우선 지원
-       - `accountNo` 는 실행 payload 에 포함하되 화면 / 로그 / 문서에는 원문 노출하지 않는 방향 유지
-   (3) `executionArn` 처리: 완료
-       - `StartExecution` 응답의 `executionName` / `executionArn` 수신
-       - 화면 flash message 에는 account-id 를 redaction 한 `executionArn` 표시
-       - 실행 요청 payload 는 서비스 내부에서 구성
-       - 실행 상태 전문은 Step Functions history 직접 노출이 아니라 DB run / step log 요약 기준으로 표시하는 방향 유지
-   (4) 안전 차단 로직: 완료
-       - `aws-stepfunctions` mode 와 start-enabled gate 가 꺼져 있으면 실행 차단
-       - `stateMachineArn` 이 비어 있으면 실행 차단
-       - `minExecutableStepOrder` / `maxExecutableStepOrder` 범위 밖 요청 차단
-       - `allowPaperOrderExecute=false` 상태에서 Step 12 이상 요청 차단
-       - approval 요청은 `paperOrderEnabled=true` 조건에서만 허용하도록 분리
- 2) `aws-stepfunctions` mode 추가: 완료
-   (1) application 설정 추가: 완료
-       - `portfolio.batch.aws-stepfunctions-region` 추가
-       - `portfolio.batch.aws-stepfunctions-state-machine-arn` 추가
-       - `portfolio.batch.aws-stepfunctions-execution-name-prefix` 추가
-       - `portfolio.batch.aws-stepfunctions-start-enabled` 기존 gate 와 연동
-       - `portfolio.batch.aws-stepfunctions-step-start-enabled` 기존 gate 와 연동
-       - `portfolio.batch.local-file-execution-enabled=false` 기준으로 local subprocess 실행 차단 가능
-       - `portfolio.batch.paper-order-enabled=false` 기준으로 주문성 구간 차단 가능
-   (2) 화면 gate 반영: 완료
-       - `/daily-batch` 화면에 AWS Step 1~11 시작 버튼 추가
-       - `hasRunningBatch` 상태에서는 실행 버튼 비활성
-       - `canStartAwsStepfunctions=false` 상태에서는 AWS Step 1~11 버튼 비활성
-       - `aws-stepfunctions` mode 에서는 local-file backend 와 별도 실행 경로 사용
-       - Step 12~17 승인 버튼은 아직 별도 후속 구현 대상으로 분리
-   (3) Controller endpoint 추가: 완료
-       - `/daily-batch/aws-stepfunctions/start-range` POST endpoint 추가
-       - `fromStepCode` / `toStepCode` / `accountNo` 요청값 수신
-       - `DailyBatchProperties` gate 확인 후 `StepFunctionsDailyBatchExecutionService` 호출
-       - `StartExecution` 성공 시 `executionName` 과 redaction 된 `executionArn` 을 flash message 로 표시
-       - 실패 시 원인 메시지를 flash error 로 표시하고 `/daily-batch` 화면으로 redirect
- 3) 로컬 Step 1~11 `StartExecution` 검증: 완료
-   (1) 로컬 실행 조건: 완료
-       - Spring profile `aws-paper` 기준으로 로컬 View 실행
-       - `execution-mode=aws-stepfunctions` 기준으로 backend 전환
-       - `local-file-execution-enabled=false` 기준으로 로컬 subprocess 실행 차단
-       - `paper-order-enabled=false` 기준으로 주문성 구간 차단
-       - AWS Paper RDS tunnel 과 View DB 조회 흐름 유지
-       - Step Functions 호출 권한은 로컬 AWS credential 기준으로 검증
-   (2) 검증 항목: 완료
-       - `/daily-batch` 화면에서 AWS Step 1~11 실행 버튼 확인
-       - View 버튼 클릭으로 Step Functions `StartExecution` 성공 확인
-       - `executionName` 반환 확인
-       - redaction 된 `executionArn` 반환 확인
-       - `allowPaperOrderExecute=false` 기준 실행 확인
-       - Step 1~11 workflow 실행 확인
-       - Step 12~17 approval gate 전 `APPROVAL_REQUIRED` Slack 수신 확인
-       - 신규 broker 주문 제출 없는 safe trigger 경로 확인
-   (3) `runDate` 누락 보완: 완료
-       - 최초 검증에서 Step 1~11 완료 후 `StopCrawlerEc2AfterStep11Success` 상태에서 `States.Runtime` 발생
-       - 원인은 ASL Payload 의 `runDate.$=$.runDate` 참조 대비 View `StartExecution` input 에 `runDate` 누락
-       - `StepFunctionsDailyBatchExecutionService` 에서 Asia/Seoul 기준 `runDate` 를 input JSON 에 추가
-       - 재검증 결과 `StopCrawlerEc2AfterStep11Success` 이후 `SendApprovalRequiredSlack` 까지 통과
-       - Slack `APPROVAL_REQUIRED` 수신으로 local `aws-stepfunctions` end-to-end 검증 완료
-   (4) 구현 커밋: 완료
+7. ECS Fargate porting implementation
+ 1) Step Functions execution backend implementation: complete
+   (1) `StepFunctionsDailyBatchExecutionService` addition: complete
+       - converts the Daily Batch execution request into a Step Functions `StartExecution` call
+       - separated from the `local-file` execution service
+       - operates based on `execution-mode=aws-stepfunctions`
+       - no direct execution of Python subprocess / `C:/Workspaces` local source
+       - calls `StartExecution` using the AWS SDK v2 Step Functions client
+       - `stateMachineArn` is injected via an environment variable, not fixed directly in `application.properties`
+   (2) `StartExecution` payload composition: complete
+       - includes `environment=paper`
+       - includes `dbTarget=aws-paper`
+       - distinguishes the requester via `requestedBy=VIEW_BUTTON`
+       - includes `source=PORT_VIEW`
+       - includes `requestedFrom=port-view`
+       - `runDate` is included as an Asia/Seoul-based yyyy-MM-dd value
+       - includes `fromStepCode` / `toStepCode`
+       - includes `fromStepOrder` / `toStepOrder`
+       - includes `startStep` / `endStep`
+       - prioritizes the Step 1~11 safe trigger based on `allowPaperOrderExecute=false`
+       - `accountNo` is included in the execution payload but kept from being exposed in raw form on the screen / logs / documents
+   (3) `executionArn` handling: complete
+       - receives the `executionName` / `executionArn` of the `StartExecution` response
+       - the screen flash message shows the `executionArn` with the account-id redacted
+       - the execution-request payload is composed inside the service
+       - the full execution state is displayed based on a DB run / step log summary rather than direct exposure of the Step Functions history
+   (4) Safety blocking logic: complete
+       - blocks execution when `aws-stepfunctions` mode and the start-enabled gate are off
+       - blocks execution when `stateMachineArn` is empty
+       - blocks requests outside the `minExecutableStepOrder` / `maxExecutableStepOrder` range
+       - blocks Step 12-and-above requests in the `allowPaperOrderExecute=false` state
+       - separated so that approval requests are allowed only under the `paperOrderEnabled=true` condition
+ 2) `aws-stepfunctions` mode addition: complete
+   (1) application setting additions: complete
+       - added `portfolio.batch.aws-stepfunctions-region`
+       - added `portfolio.batch.aws-stepfunctions-state-machine-arn`
+       - added `portfolio.batch.aws-stepfunctions-execution-name-prefix`
+       - `portfolio.batch.aws-stepfunctions-start-enabled` linked with the existing gate
+       - `portfolio.batch.aws-stepfunctions-step-start-enabled` linked with the existing gate
+       - can block local subprocess execution based on `portfolio.batch.local-file-execution-enabled=false`
+       - can block the order-related segment based on `portfolio.batch.paper-order-enabled=false`
+   (2) Screen gate reflection: complete
+       - added the AWS Step 1~11 start button to the `/daily-batch` screen
+       - the execution button is disabled in the `hasRunningBatch` state
+       - the AWS Step 1~11 button is disabled in the `canStartAwsStepfunctions=false` state
+       - `aws-stepfunctions` mode uses an execution path separate from the local-file backend
+       - the Step 12~17 approval button is still separated as a later implementation target
+   (3) Controller endpoint addition: complete
+       - added the `/daily-batch/aws-stepfunctions/start-range` POST endpoint
+       - receives the `fromStepCode` / `toStepCode` / `accountNo` request values
+       - calls `StepFunctionsDailyBatchExecutionService` after confirming the `DailyBatchProperties` gate
+       - on `StartExecution` success, displays the `executionName` and the redacted `executionArn` as a flash message
+       - on failure, displays the cause message as a flash error and redirects to the `/daily-batch` screen
+ 3) Local Step 1~11 `StartExecution` validation: complete
+   (1) Local execution conditions: complete
+       - run the Local View based on Spring profile `aws-paper`
+       - switch the backend based on `execution-mode=aws-stepfunctions`
+       - block local subprocess execution based on `local-file-execution-enabled=false`
+       - block the order-related segment based on `paper-order-enabled=false`
+       - retain the AWS Paper RDS tunnel and View DB query flow
+       - the Step Functions call privilege is validated based on the local AWS credential
+   (2) Validation items: complete
+       - confirmed the AWS Step 1~11 execution button on the `/daily-batch` screen
+       - confirmed Step Functions `StartExecution` success via the View button click
+       - confirmed `executionName` is returned
+       - confirmed the redacted `executionArn` is returned
+       - confirmed execution based on `allowPaperOrderExecute=false`
+       - confirmed the Step 1~11 workflow execution
+       - confirmed `APPROVAL_REQUIRED` Slack reception before the Step 12~17 approval gate
+       - confirmed the safe trigger path without new broker order submission
+   (3) `runDate` omission correction: complete
+       - in the first validation, `States.Runtime` occurred in the `StopCrawlerEc2AfterStep11Success` state after Step 1~11 completion
+       - the cause was `runDate` missing from the View `StartExecution` input, versus the ASL Payload's `runDate.$=$.runDate` reference
+       - added an Asia/Seoul-based `runDate` to the input JSON in `StepFunctionsDailyBatchExecutionService`
+       - re-validation result: passed from `StopCrawlerEc2AfterStep11Success` through `SendApprovalRequiredSlack`
+       - local `aws-stepfunctions` end-to-end validation complete via Slack `APPROVAL_REQUIRED` reception
+   (4) Implementation commit: complete
        - commit `e72de6f`
        - message `feat(view): add Step Functions daily batch trigger`
-       - 변경 파일은 `pom.xml`, `DailyBatchProperties.java`, `DailyBatchController.java`, `application-aws-paper.properties`, `daily_batch.html`, `StepFunctionsDailyBatchExecutionService.java`
-       - git working tree 정리 완료
-       - 본 노트에 commit diff 본문 / Class 내부 코드 / `application-aws-paper.properties` 본문 평문 인용 0건(R-DOCS-001 정합)
- 4) Step 12~17 승인형 검증: 완료
-   (1) 실행 전 preflight: 완료
-       - REQUESTED / READY `strategy_execution_order` 확인 완료
-       - retryable rejected `connector_order_request` 확인 완료
-       - active `connector_order_request` 확인 완료
-       - strategy-linked active `connector_order_request` 없음 확인 완료
-       - 기존 stale `connector_order_request` ACCEPTED 주문은 2026-04-27 삼성전자 미매핑 주문으로 별도 cleanup 대상으로 분리
-       - Step 12~17 검증 대상 신규 주문 없음 확인 완료
-   (2) 승인 실행 버튼 / endpoint 구현: 완료
-       - AWS Step 12~17 승인 실행 버튼 추가(`daily_batch.html` / safe 버튼과 분리 / safe · approval 활성화 조건 분리)
-       - `POST /daily-batch/aws-stepfunctions/start-approval-range` Controller endpoint 추가
-       - `requestedBy=VIEW_APPROVAL_BUTTON` payload 생성 확인
-       - `allowPaperOrderExecute=true` payload 전달 확인
-       - `paperOrderEnabled=true` payload 전달 확인
-       - `executionName` / redaction 된 `executionArn` 화면 표시 확인
-   (3) Step 12~17 전용 state machine ARN 분리: 완료
-       - 일반 workflow ARN: `portfolio-paper-daily-step1-17-approval`
+       - changed files are `pom.xml`, `DailyBatchProperties.java`, `DailyBatchController.java`, `application-aws-paper.properties`, `daily_batch.html`, `StepFunctionsDailyBatchExecutionService.java`
+       - git working tree cleanup complete
+       - 0 plaintext quotations of the commit diff body / Class internal code / `application-aws-paper.properties` body in this note (R-DOCS-001 alignment)
+ 4) Step 12~17 approval-type validation: complete
+   (1) Pre-execution preflight: complete
+       - REQUESTED / READY `strategy_execution_order` confirmation complete
+       - retryable rejected `connector_order_request` confirmation complete
+       - active `connector_order_request` confirmation complete
+       - confirmed no strategy-linked active `connector_order_request`
+       - the existing stale `connector_order_request` ACCEPTED order is separated as a cleanup target as the 2026-04-27 삼성전자 unmapped order
+       - confirmed no new order subject to Step 12~17 validation
+   (2) Approval-execute button / endpoint implementation: complete
+       - added the AWS Step 12~17 approval-execute button (`daily_batch.html` / separated from the safe button / safe · approval activation conditions separated)
+       - added the `POST /daily-batch/aws-stepfunctions/start-approval-range` Controller endpoint
+       - confirmed `requestedBy=VIEW_APPROVAL_BUTTON` payload creation
+       - confirmed `allowPaperOrderExecute=true` payload transfer
+       - confirmed `paperOrderEnabled=true` payload transfer
+       - confirmed `executionName` / redacted `executionArn` screen display
+   (3) Step 12~17 dedicated state machine ARN separation: complete
+       - general workflow ARN: `portfolio-paper-daily-step1-17-approval`
        - approval workflow ARN: `portfolio-paper-daily-step12-17-approval`
-       - 기존 `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_STATE_MACHINE_ARN` 사용
-       - `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_APPROVAL_STATE_MACHINE_ARN` 신규 환경변수 추가
-       - `application.properties` key 추가: `portfolio.batch.aws-stepfunctions-approval-state-machine-arn`
-       - `DailyBatchProperties` 에 `awsStepfunctionsApprovalStateMachineArn` 필드 + getter / setter 추가
-       - `StepFunctionsDailyBatchExecutionService` 의 `startSafeRange` 는 일반 state machine ARN 사용
-       - `StepFunctionsDailyBatchExecutionService` 의 `startApprovalRange` 는 approval 전용 state machine ARN 사용
-       - approval ARN 이 비어 있으면 승인형 실행 차단(서비스 레벨 안전 gate)
-       - 실제 state machine ARN 의 account-id 부분은 본 노트 평문 기록 0건(`[REDACTED]` 또는 placeholder)
-   (4) payload 타입 보완: 완료
-       - 최초 Step 12~17 approval 실행은 전용 state machine 에 진입했으나 `Step12_CheckApproval` 에서 차단
-       - 원인은 `allowPaperOrderExecute` 와 `paperOrderEnabled` 가 문자열 `"true"` 로 전달된 것
-       - Step Functions Choice `BooleanEquals` 조건과 맞도록 boolean `true` 로 수정
-       - `fromStepOrder` / `toStepOrder` / `startStep` / `endStep` 도 numeric 값으로 수정
-       - 재검증에서 `Step12_CheckApproval` 통과 확인
-       - 본 노트 commit diff / Java 본문 / JSON payload 본문 평문 인용 0건(R-DOCS-001 정합)
-   (5) AWS Step Functions 실행 검증: 완료
+       - uses the existing `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_STATE_MACHINE_ARN`
+       - added the new environment variable `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_APPROVAL_STATE_MACHINE_ARN`
+       - added the `application.properties` key: `portfolio.batch.aws-stepfunctions-approval-state-machine-arn`
+       - added the `awsStepfunctionsApprovalStateMachineArn` field + getter / setter to `DailyBatchProperties`
+       - `startSafeRange` of `StepFunctionsDailyBatchExecutionService` uses the general state machine ARN
+       - `startApprovalRange` of `StepFunctionsDailyBatchExecutionService` uses the approval-dedicated state machine ARN
+       - blocks approval-type execution when the approval ARN is empty (service-level safety gate)
+       - 0 plaintext records of the account-id part of the actual state machine ARN in this note (`[REDACTED]` or placeholder)
+   (4) payload type correction: complete
+       - the first Step 12~17 approval execution entered the dedicated state machine but was blocked at `Step12_CheckApproval`
+       - the cause was that `allowPaperOrderExecute` and `paperOrderEnabled` were passed as the string `"true"`
+       - corrected to boolean `true` to match the Step Functions Choice `BooleanEquals` condition
+       - also corrected `fromStepOrder` / `toStepOrder` / `startStep` / `endStep` to numeric values
+       - confirmed `Step12_CheckApproval` pass on re-validation
+       - 0 plaintext quotations of the commit diff / Java body / JSON payload body in this note (R-DOCS-001 alignment)
+   (5) AWS Step Functions execution validation: complete
        - executionName: `port-view-step12-17-step12-17-20260629-194314-ba5edaf8`
        - state machine: `portfolio-paper-daily-step12-17-approval`
        - status: `SUCCEEDED`
        - start: `2026-06-29T19:43:15.673+09:00`
        - stop: `2026-06-29T19:46:06.546+09:00`
-       - `Step12_CheckApproval` 통과
-       - `Step12_RunMarketConnectorStrategyOrderExecute` 실행
-       - `Step12_GetCommandInvocation` 성공
-       - Step 13~17 전체 진행
-       - `ExecutionSucceeded` 확인
-   (6) DB 안전 후검증: 완료
-       - 운영 marker: `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS`
-       - 오늘 신규 `connector_order_request` 0건
-       - READY / REQUESTED `strategy_execution_order` 0건
-       - 신규 broker 주문 제출 없음
-       - 최근 `connector_order_request` 는 2026-06-22 ~ 2026-06-24 기존 주문만 표시
- 5) 로컬 View 구동 wrapper 정리: 완료
-   (1) 실행 방식 분리: 완료
-       - Local-file 구동 wrapper 와 AWS Step Functions 구동 wrapper 를 분리
-       - 두 wrapper 모두 로컬 View 를 `aws-paper` profile 로 기동
-       - 두 wrapper 모두 Step 1~17 전체 실행 가능하도록 gate 를 구성
-       - safe-only 검증용 wrapper 가 아니라 운영자 선택형 전체 실행 wrapper 로 정리
-   (2) Local-file 구동 명령: 완료
+       - `Step12_CheckApproval` passed
+       - `Step12_RunMarketConnectorStrategyOrderExecute` executed
+       - `Step12_GetCommandInvocation` success
+       - Step 13~17 all proceeded
+       - `ExecutionSucceeded` confirmed
+   (6) DB safety after-check: complete
+       - operational marker: `AFTER_STEP12_17_APPROVAL_SFN_FINAL_CHECK=SUCCESS`
+       - 0 new `connector_order_request` today
+       - 0 READY / REQUESTED `strategy_execution_order`
+       - no new broker order submission
+       - the recent `connector_order_request` shows only existing orders from 2026-06-22 ~ 2026-06-24
+ 5) Local View startup wrapper organization: complete
+   (1) Execution method separation: complete
+       - separated the Local-file startup wrapper and the AWS Step Functions startup wrapper
+       - both wrappers start the Local View with the `aws-paper` profile
+       - both wrappers configure the gate so the full Step 1~17 can be executed
+       - organized into an operator-selectable full-execution wrapper rather than a safe-only validation wrapper
+   (2) Local-file startup command: complete
        - `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Workspaces\portfolio-local-env\Start-PortfolioViewAwsPaperLocalFile.ps1"`
        - `PORTFOLIO_BATCH_EXECUTION_MODE=local-file`
        - `PORTFOLIO_BATCH_EXECUTION_ENABLED=true`
@@ -260,8 +260,8 @@
        - `PORTFOLIO_BATCH_PAPER_ORDER_ENABLED=true`
        - `PORTFOLIO_BATCH_MIN_EXECUTABLE_STEP_ORDER=1`
        - `PORTFOLIO_BATCH_MAX_EXECUTABLE_STEP_ORDER=17`
-       - env loader = `Load-PortfolioViewAwsPaperLocalFileEnv.ps1`(운영자 로컬 도구 폴더 / 본 spec 범위 밖)
-   (3) AWS Step Functions 구동 명령: 완료
+       - env loader = `Load-PortfolioViewAwsPaperLocalFileEnv.ps1` (operator local tool folder / out of scope for this spec)
+   (3) AWS Step Functions startup command: complete
        - `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Workspaces\portfolio-local-env\Start-PortfolioViewAwsPaperStepFunctions.ps1"`
        - `PORTFOLIO_BATCH_EXECUTION_MODE=aws-stepfunctions`
        - `PORTFOLIO_BATCH_EXECUTION_ENABLED=true`
@@ -272,272 +272,272 @@
        - `PORTFOLIO_BATCH_PAPER_ORDER_ENABLED=true`
        - `PORTFOLIO_BATCH_MIN_EXECUTABLE_STEP_ORDER=1`
        - `PORTFOLIO_BATCH_MAX_EXECUTABLE_STEP_ORDER=17`
-       - `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_STATE_MACHINE_ARN` 은 `portfolio-paper-daily-step1-17-approval` 조회값 사용
-       - `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_APPROVAL_STATE_MACHINE_ARN` 은 `portfolio-paper-daily-step12-17-approval` 조회값 사용
-       - env loader = `Load-PortfolioViewAwsPaperStepFunctionsEnv.ps1`(운영자 로컬 도구 폴더 / 본 spec 범위 밖)
-   (4) wrapper 실행 검증: 완료
-       - `Unblock-File` 적용 완료
-       - `ExecutionPolicy Bypass` 방식으로 실행 가능 확인
-       - `VIEW_AWS_PAPER_STEPFUNCTIONS_ENV_READY` 출력 확인
-       - AWS Step Functions ARN set 확인(일반 + approval 2종 모두 set / 실제 ARN 본 노트 평문 기록 0건)
-       - Spring profile `aws-paper` 확인
-       - DB 접속 `jdbc:postgresql://127.0.0.1:15433/portfolio` 확인
-       - View DB user `view_app` 확인
-       - Tomcat 8080 기동 확인
-       - `PortViewApplication started` 확인
- 6) Docker / ECR / ECS Task Definition: 미완료
-   (1) Dockerfile 작성
-       - Spring Boot jar 기반 port-view image 생성
-       - 로컬 `C:/Workspaces` 경로 의존 제거
-       - secret / password / token image 포함 금지
+       - `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_STATE_MACHINE_ARN` uses the `portfolio-paper-daily-step1-17-approval` looked-up value
+       - `PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_APPROVAL_STATE_MACHINE_ARN` uses the `portfolio-paper-daily-step12-17-approval` looked-up value
+       - env loader = `Load-PortfolioViewAwsPaperStepFunctionsEnv.ps1` (operator local tool folder / out of scope for this spec)
+   (4) wrapper execution validation: complete
+       - `Unblock-File` application complete
+       - confirmed executable via the `ExecutionPolicy Bypass` method
+       - confirmed `VIEW_AWS_PAPER_STEPFUNCTIONS_ENV_READY` output
+       - confirmed the AWS Step Functions ARN set (both general + approval set / 0 plaintext records of the actual ARN in this note)
+       - confirmed Spring profile `aws-paper`
+       - confirmed DB connection `jdbc:postgresql://127.0.0.1:15433/portfolio`
+       - confirmed View DB user `view_app`
+       - confirmed Tomcat 8080 startup
+       - confirmed `PortViewApplication started`
+ 6) Docker / ECR / ECS Task Definition: incomplete
+   (1) Author the Dockerfile
+       - create a Spring Boot jar-based port-view image
+       - remove the local `C:/Workspaces` path dependency
+       - prohibit including secret / password / token in the image
    (2) ECR push
-       - `portfolio-view` repository 또는 기존 naming convention 에 맞춰 image push
-       - tag 는 paper 날짜 또는 `paper-latest` 기준으로 관리
-   (3) ECS Task Definition 등록
+       - image push to the `portfolio-view` repository or per the existing naming convention
+       - manage the tag based on the paper date or `paper-latest`
+   (3) Register the ECS Task Definition
        - `SPRING_PROFILES_ACTIVE=aws-paper,aws-paper-ecs`
-       - RDS 접속정보는 Secrets Manager 또는 SSM SecureString 주입
-       - ECS Task Role 에 `states:StartExecution` 최소 권한 부여(특정 state machine ARN 한정 권장 / 일반 + approval 2종 모두 Resource 한정 / R-AUTO-034 신규 mitigation 정합 / 06 spec 후속 phase 책임)
-       - CloudWatch Logs 연결
+       - inject RDS connection info via Secrets Manager or SSM SecureString
+       - grant the ECS Task Role minimal `states:StartExecution` privilege (limiting to a specific state machine ARN recommended / both general + approval limited by Resource / R-AUTO-034 new mitigation alignment / 06 spec follow-up phase responsibility)
+       - connect CloudWatch Logs
        - `local-file-execution-enabled=false`
- 7) Fargate 검증: 미완료
-   (1) 조회-only 기동
-       - ECS Service 기동
-       - `/dashboard` 조회
-       - `/balance-summary` 조회
-       - `/positions` 조회
-       - `/orders` 조회
-       - `/strategy` 조회
-       - `/daily-batch` 조회
+ 7) Fargate validation: incomplete
+   (1) query-only startup
+       - start the ECS Service
+       - query `/dashboard`
+       - query `/balance-summary`
+       - query `/positions`
+       - query `/orders`
+       - query `/strategy`
+       - query `/daily-batch`
    (2) Step 1~11 `StartExecution`
-       - Fargate View 에서 Step 1~11 `StartExecution` 호출
-       - `executionArn` 반환 확인
-       - `allowPaperOrderExecute=false` 확인
-       - Step 12~17 차단 확인
-       - DB run / step log 조회 확인
-   (3) 승인형 Step 12~17
-       - preflight 후 승인 버튼 활성
-       - `allowPaperOrderExecute=true` (boolean) + `paperOrderEnabled=true` (boolean) payload 명시 확인
-       - approval state machine ARN(`portfolio-paper-daily-step12-17-approval`) 사용 확인
-       - Step 12~17 실행 결과 확인
-       - 신규 주문 생성 / broker 제출 여부 후검증
-       - 문제 없을 때만 운영 runbook 에 반영
+       - call Step 1~11 `StartExecution` from the Fargate View
+       - confirm `executionArn` is returned
+       - confirm `allowPaperOrderExecute=false`
+       - confirm Step 12~17 blocking
+       - confirm DB run / step log query
+   (3) approval-type Step 12~17
+       - activate the approval button after preflight
+       - confirm explicit `allowPaperOrderExecute=true` (boolean) + `paperOrderEnabled=true` (boolean) payload
+       - confirm use of the approval state machine ARN (`portfolio-paper-daily-step12-17-approval`)
+       - confirm the Step 12~17 execution result
+       - after-check whether a new order is created / submitted to the broker
+       - reflect into the operational runbook only when there is no problem
 
-### 결론
+### Conclusion
 
-- Local View 기준으로 `local-file` backend 와 `aws-stepfunctions` backend 모두 Step 1~17 전체 실행 가능한 운영자용 wrapper 가 정리되었다.
-- AWS Step Functions backend 는 Step 1~11 safe trigger 와 Step 12~17 approval trigger 를 모두 로컬에서 검증 완료했다.
-- Step 12~17 approval trigger 는 `portfolio-paper-daily-step12-17-approval` state machine 에서 `SUCCEEDED` 로 완료했고, DB 후검증상 신규 주문은 생성되지 않았다.
-- 따라서 Local View 기반 Step Functions 연동 선검증은 완료되었고, 다음 단계는 Docker / ECR / ECS Task Definition / Fargate 조회-only smoke test 이다.
+- On the Local View basis, an operator wrapper capable of full Step 1~17 execution was organized for both the `local-file` backend and the `aws-stepfunctions` backend.
+- The AWS Step Functions backend completed validation locally for both the Step 1~11 safe trigger and the Step 12~17 approval trigger.
+- The Step 12~17 approval trigger completed as `SUCCEEDED` on the `portfolio-paper-daily-step12-17-approval` state machine, and per the DB after-check no new order was created.
+- Therefore the Local View-based Step Functions integration pre-validation is complete, and the next stage is Docker / ECR / ECS Task Definition / Fargate query-only smoke test.
 
-### 결정 / 리스크 매핑
+### Decision / risk mapping
 
-- OD-MS-002(port-view 컴퓨트 = ECS Fargate Service 1순위) 정합 — 본 일자 결정 본문 변경 없음 / 1차 실증 메모 보강.
-- OD-MS-009(Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) 정합 — Batch 실행 책임이 View 내부 subprocess 가 아니라 Step Functions `StartExecution` 으로 이관 / 자동 trigger 는 기존 EventBridge Scheduler 한정 그대로 유지.
-- OD-MS-037(View Local AWS Paper read-only 1차 scope + ECS / Fargate 진입 전 batch 2차 검증 선행 정책) 정합 — Fargate 진입 전 local `aws-stepfunctions` mode Step 1~11 trigger 선검증 완료.
-- OD-SAFE-001 ~ OD-SAFE-004(자동 BUY · SELL E2E 단계적 도입 / 자동 재시도 금지 idempotent 한정) 정합 — `StepFunctionsDailyBatchExecutionService` 의 서비스 레벨 안전 gate 1차 실증.
-- R-AUTO-033 [2026-06-29 보강 (2)] — port-view Step Functions trigger 분리 + Step 1~11 검증 통과 / Status `Mitigated` 유지.
-- R-AUTO-034 신규 — Fargate View `states:StartExecution` 권한 과다 부여 + Step 12 gate 우회 위험 / Status `Open` / Task Role 특정 state machine ARN 한정 + Fargate 안전 기본값 + 서비스 레벨 안전 gate + executionArn redaction + Step 12~17 승인형 / preflight / paper-order gate 분리 mitigation.
+- OD-MS-002 (port-view compute = ECS Fargate Service first priority) alignment — no change to the decision body on this date / first-validation memo reinforced.
+- OD-MS-009 (Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) alignment — the Batch execution responsibility is transferred to Step Functions `StartExecution` rather than a View-internal subprocess / the automatic trigger remains limited to the existing EventBridge Scheduler.
+- OD-MS-037 (View Local AWS Paper read-only first scope + policy of preceding batch second validation before ECS / Fargate entry) alignment — the local `aws-stepfunctions` mode Step 1~11 trigger pre-validation before Fargate entry is complete.
+- OD-SAFE-001 ~ OD-SAFE-004 (staged introduction of automatic BUY · SELL E2E / no-automatic-retry limited to idempotent) alignment — first validation of the service-level safety gate of `StepFunctionsDailyBatchExecutionService`.
+- R-AUTO-033 [2026-06-29 reinforcement (2)] — port-view Step Functions trigger separation + Step 1~11 validation pass / Status `Mitigated` retained.
+- R-AUTO-034 new — Fargate View `states:StartExecution` excessive-privilege grant + Step 12 gate bypass risk / Status `Open` / mitigation of Task Role limited to a specific state machine ARN + Fargate safe defaults + service-level safety gate + executionArn redaction + Step 12~17 approval-type / preflight / paper-order gate separation.
 
-### 본 일자 사실 기록 범위
+### This date's factual recording scope
 
-- 본 일자 Kiro 작업 = 05 spec `operation-notes.md` 신규 생성 + 본 6 · 7 섹션 1차 작성.
-- 운영자 직접 commit `e72de6f`(`feat(view): add Step Functions daily batch trigger`) 의 코드 변경분은 port-view MS 영역으로 cross-service AWS Migration spec 본 일자 작업으로 인한 변경 0건(spec 영역).
-- AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 본 일자 변경 0건.
-- AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 변경 0건.
-- broker / KIS 호출 본 일자 신규 변경 0건(검증 시점은 운영자 직접 로컬 실행 한정 / 신규 broker 주문 제출 0건 / Step 12~17 approval gate 차단 유지 / aws-live 작업 0건).
-- 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN / broker_order_no 원문 / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN) 본 노트 평문 기록 0건.
-- 운영 식별자 (사용자 명시 정책 정합으로 사실 기록 / secret 아님):
+- This date's Kiro work = new creation of 05 spec `operation-notes.md` + first authoring of these sections 6 · 7.
+- The code changes of the operator's direct commit `e72de6f` (`feat(view): add Step Functions daily batch trigger`) are in the port-view MS area, so 0 changes from this date's cross-service AWS Migration spec work (spec area).
+- 0 changes on this date to AWS CLI / boto3 / psql / Spring Boot execution / external API calls.
+- 0 changes on this date to AWS resource creation · modification · deletion.
+- 0 new changes on this date to broker / KIS calls (the validation time was limited to the operator's direct local execution / 0 new broker order submissions / Step 12~17 approval gate blocking retained / 0 aws-live actions).
+- 0 plaintext records in this note of sensitive information (secret value / KIS app key / KIS app secret / account number / account password / token / RDS password / RDS endpoint hostname / raw 12-digit account-id / actual IAM Role ARN / actual secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN / raw broker_order_no / Slack webhook URL / DB password / Administrator password / actual state machine ARN).
+- Operational identifiers (recorded as facts per the user-specified policy / not secrets):
   - port-view commit hash `e72de6f` / commit message `feat(view): add Step Functions daily batch trigger`.
-  - Class 이름 `StepFunctionsDailyBatchExecutionService` / Controller endpoint `/daily-batch/aws-stepfunctions/start-range`.
-  - Spring properties key 라벨 / StartExecution payload 필드 라벨 + `runDate`(Asia/Seoul yyyy-MM-dd).
+  - Class name `StepFunctionsDailyBatchExecutionService` / Controller endpoint `/daily-batch/aws-stepfunctions/start-range`.
+  - Spring properties key labels / StartExecution payload field labels + `runDate` (Asia/Seoul yyyy-MM-dd).
   - Step Functions state name = `StopCrawlerEc2AfterStep11Success` · `SendApprovalRequiredSlack` · `Step6ToStep11_Succeeded` · `Step12_CheckApproval`.
-  - Slack 이벤트 라벨 `APPROVAL_REQUIRED` / 에러 라벨 `States.Runtime` / Spring profile `aws-paper`.
+  - Slack event label `APPROVAL_REQUIRED` / error label `States.Runtime` / Spring profile `aws-paper`.
 
 
-## 2026-06-30 — View 운영 경로 4종 정리 완료 + Daily Batch gate 운영 의도 정합 수정 + DB 검증 쿼리 작성 원칙 추가
+## 2026-06-30 — View operational path 4-type organization complete + Daily Batch gate operational-intent alignment fix + DB validation query authoring principle addition
 
-### 요약
+### Summary
 
-- 운영자 직접 수행 = `DailyBatchController.java` Daily Batch gate 운영 의도 정합 수정.
-- Local View → AWS Step Functions Step 12~17 승인 실행 2차 실증 통과 (05 spec ECS Fargate 포팅 관점).
-- 평문 인용 0건 (R-DOCS-001 정합) — port-view 코드 본문 / IAM Policy / ASL / 응답 본문 / `StartExecution` 입력 JSON 본문 / DB 후검증 raw output 전문.
-- Step Functions 측 상세 사실은 [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md) 2026-06-30 섹션 참조.
+- Operator direct action = `DailyBatchController.java` Daily Batch gate operational-intent alignment fix.
+- Local View → AWS Step Functions Step 12~17 approval execution second validation passed (from the 05 spec ECS Fargate porting perspective).
+- 0 plaintext quotations (R-DOCS-001 alignment) — port-view code body / IAM Policy / ASL / response body / `StartExecution` input JSON body / DB after-check raw output full text.
+- For Step Functions-side detailed facts, see the 2026-06-30 section of [`../04-strategy-batch-stepfunctions/operation-notes.md`](../04-strategy-batch-stepfunctions/operation-notes.md).
 
-8. View 운영 경로 4종 정리: 완료
- 1) Local View 측 운영자 수동 trigger 분리 4종: 완료
-   (1) Local View → Local File Step 1 단독 실행: 완료(2026-06-28 Run #46)
-   (2) Local View → Local File Step 1~11 실행: 완료(2026-06-28 Run #47)
-   (3) Local View → Local File Step 12~17 실행: 완료(2026-06-29 (1) Run #48)
-   (4) Local View → AWS Step Functions Step 12~17 승인 실행: 완료(본 일자)
+8. View operational path 4-type organization: complete
+ 1) Local View-side operator manual trigger separation, 4 types: complete
+   (1) Local View → Local File Step 1 standalone execution: complete (2026-06-28 Run #46)
+   (2) Local View → Local File Step 1~11 execution: complete (2026-06-28 Run #47)
+   (3) Local View → Local File Step 12~17 execution: complete (2026-06-29 (1) Run #48)
+   (4) Local View → AWS Step Functions Step 12~17 approval execution: complete (this date)
        - executionName `port-view-daily-step12-17-20260630-095111-aae2595c`
        - state machine `portfolio-paper-daily-step12-17-approval`
        - status `SUCCEEDED`
        - start `2026-06-30T09:51:11.903+09:00`
        - stop `2026-06-30T09:54:16.484+09:00`
-       - 주문 대상 없음 상태에서 안전 종료
-       - DB 후검증 통과(신규 `connector_order_request` 0건 / 신규 broker 주문 0건)
- 2) 운영 경로 분리 정합: 완료
-   (1) Local File 실행과 AWS Step Functions 실행 분리 동작 정합
-       - Local File 실행 gate: `localFileExecutionEnabled`
-       - AWS Step Functions 실행 gate: `awsStepfunctionsStartEnabled` / `awsStepfunctionsStepStartEnabled`
+       - safe termination in the no-order-target state
+       - DB after-check passed (0 new `connector_order_request` / 0 new broker orders)
+ 2) Operational path separation alignment: complete
+   (1) Local File execution and AWS Step Functions execution separated-operation alignment
+       - Local File execution gate: `localFileExecutionEnabled`
+       - AWS Step Functions execution gate: `awsStepfunctionsStartEnabled` / `awsStepfunctionsStepStartEnabled`
        - approval range gate: `paperOrderEnabled=true` + approval ARN set
-   (2) Step 12~17 주문성 구간 별도 승인형 state machine + paper-order gate 통과 시에만 실행 정합
+   (2) Step 12~17 order-related segment executes only when the separate approval-type state machine + paper-order gate are passed, aligned
 
-9. Daily Batch gate 운영 의도 정합 수정: 완료
- 1) `DailyBatchController.java` 수정: 완료
-   (1) AWS Step Functions 버튼 활성 조건 수정
-       - `fullPipelineExecutionEnabled=true` 상태에서도 AWS Step 12~17 승인 버튼 활성
-       - `paperOrderEnabled=true` 상태에서도 AWS Step 1~11 버튼 조건과 충돌 회피
-       - Local File 실행 gate 와 AWS Step Functions 실행 gate 분리 유지
-       - Step 12~17 은 `paperOrderEnabled=true` + approval range gate 통과 시에만 실행
-       - 본 노트 Java 본문 / commit diff 평문 인용 0건(R-DOCS-001 정합)
-   (2) 검증
-       - mvn compile 성공
-       - Local View `aws-paper` profile 재기동 성공
-       - 화면 표시 통과(Execution ON / Local File OFF / Full Pipeline ON / Paper Order ON / 허용 범위 `1~17` / AWS Step 12~17 승인 실행 버튼 활성)
+9. Daily Batch gate operational-intent alignment fix: complete
+ 1) `DailyBatchController.java` fix: complete
+   (1) AWS Step Functions button activation condition fix
+       - the AWS Step 12~17 approval button is active even in the `fullPipelineExecutionEnabled=true` state
+       - avoid conflict with the AWS Step 1~11 button condition even in the `paperOrderEnabled=true` state
+       - retain the separation of the Local File execution gate and the AWS Step Functions execution gate
+       - Step 12~17 executes only when `paperOrderEnabled=true` + the approval range gate are passed
+       - 0 plaintext quotations of the Java body / commit diff in this note (R-DOCS-001 alignment)
+   (2) Validation
+       - mvn compile success
+       - Local View `aws-paper` profile restart success
+       - screen display passed (Execution ON / Local File OFF / Full Pipeline ON / Paper Order ON / allowed range `1~17` / AWS Step 12~17 approval-execute button active)
 
-10. DB 검증 쿼리 작성 원칙 추가: 미완료 (정식 반영은 후속 phase 책임)
- 1) 본 일자 식별된 운영 원칙: 완료 (사실 기록)
-   (1) 컬럼명 사전 확인 의무화
-       - `information_schema.columns` 로 대상 컬럼 사전 확인 후 SELECT
-       - 본 일자 `connector_position_snapshot.balance_snapshot_id` 컬럼 부재 사례 식별
-   (2) 확인된 컬럼만 SELECT
-       - 관계 컬럼(예: `balance_snapshot_id`) 도 예상 사용 금지
-       - 부재 시 `account_no` + `as_of_date` 같은 자연키로 검증
-   (3) 결과 노출 패턴
-       - 후검증 쿼리는 `DO` / `EXECUTE` 로 결과 숨김 금지
-       - 최종 SELECT 결과가 화면에 직접 나오게 작성
-   (4) Windows / PowerShell / psql 환경 정합
-       - 한글 SQL 은 `psql -c` 직접 실행 대신 UTF-8 No BOM `.sql` 파일 + `psql -f` 패턴 유지
-       - SSM multiline command 는 UTF-8 No BOM JSON 파일 + `--parameters file://...` 패턴 유지
- 2) 정식 반영 후속 (05 spec 후속 phase 책임)
-   (1) `validation-checklist.md` 또는 동등 문서 신규 생성 시 본 원칙 정식 반영
-   (2) Fargate cutover 시점 cross-spec audit 항목으로 등록
-   (3) DB 후검증 쿼리 모음 정리 시 본 원칙 정합
+10. DB validation query authoring principle addition: incomplete (formal reflection is a follow-up phase responsibility)
+ 1) Operational principles identified on this date: complete (factual record)
+   (1) Mandatory prior column-name confirmation
+       - SELECT after confirming the target columns in advance with `information_schema.columns`
+       - identified the `connector_position_snapshot.balance_snapshot_id` column-absence case on this date
+   (2) SELECT only confirmed columns
+       - prohibit expected use of a relation column (e.g. `balance_snapshot_id`) as well
+       - when absent, validate with a natural key such as `account_no` + `as_of_date`
+   (3) Result-exposure pattern
+       - prohibit hiding results with `DO` / `EXECUTE` in after-check queries
+       - author so the final SELECT result appears directly on the screen
+   (4) Windows / PowerShell / psql environment alignment
+       - for Korean SQL, retain the UTF-8 No BOM `.sql` file + `psql -f` pattern instead of direct `psql -c` execution
+       - for SSM multiline command, retain the UTF-8 No BOM JSON file + `--parameters file://...` pattern
+ 2) Formal reflection follow-up (05 spec follow-up phase responsibility)
+   (1) formally reflect these principles when newly creating `validation-checklist.md` or an equivalent document
+   (2) register as a cross-spec audit item at the Fargate cutover time
+   (3) align these principles when organizing the DB after-check query collection
 
-11. Daily Batch 화면 문구 정리: 미완료 (후속 phase 책임)
- 1) `local-file` 중심 문구에서 `aws-stepfunctions` mode 도 명확히 보이도록 정리: 미완료
-   (1) 후속 작업
-       - `daily_batch.html` 의 현재 모드 표시 / 버튼 라벨 / 실행 이력 라벨 등 정리
-       - Fargate 진입 시점에 `local-file` 버튼 제외 또는 별도 운영자 전용 경로 분리 결정
-       - 본 일자 코드 변경 0건 / 추가 변경 시점에 별도 commit
-   (2) 결정 매핑
-       - OD-MS-002 / OD-MS-037 정합
-       - R-AUTO-034 mitigation 확장 결합
+11. Daily Batch screen wording organization: incomplete (follow-up phase responsibility)
+ 1) Organize so that `aws-stepfunctions` mode is also clearly visible in the `local-file`-centered wording: incomplete
+   (1) Follow-up work
+       - organize the current-mode display / button labels / execution-history labels, etc. of `daily_batch.html`
+       - decide, at Fargate entry, whether to exclude the `local-file` button or separate a dedicated operator path
+       - 0 code changes on this date / a separate commit at the time of an additional change
+   (2) Decision mapping
+       - OD-MS-002 / OD-MS-037 alignment
+       - R-AUTO-034 mitigation extension coupling
 
-### 결정 / 리스크 매핑 (2026-06-30)
+### Decision / risk mapping (2026-06-30)
 
-- OD-MS-002 / OD-MS-009 / OD-MS-037 / OD-SAFE-001 ~ OD-SAFE-004 본문 변경 없이 1차 실증 메모 보강(2026-06-29 (3) Change Log 항목 정합 그대로 유지 / 본 일자 신규 결정 없음 / Decision Summary 카운트 변경 없음).
-- R-AUTO-033 [2026-06-30 보강] — Daily Batch gate 운영 의도 정합 + AWS Step Functions Step 12~17 승인 실행 2차 실증 / Status `Mitigated` 유지.
-- R-AUTO-034 [2026-06-30 보강] — View 측 4가지 운영 경로 분리 1차 실증 + DB 검증 쿼리 작성 원칙 보강 / Status `Open` 유지 / Fargate Task Role 권한 분리는 06 spec 후속 phase 책임 그대로 유지.
+- OD-MS-002 / OD-MS-009 / OD-MS-037 / OD-SAFE-001 ~ OD-SAFE-004 first-validation memo reinforced without changing the bodies (the 2026-06-29 (3) Change Log entry alignment retained as is / no new decision on this date / no change to the Decision Summary count).
+- R-AUTO-033 [2026-06-30 reinforcement] — Daily Batch gate operational-intent alignment + AWS Step Functions Step 12~17 approval execution second validation / Status `Mitigated` retained.
+- R-AUTO-034 [2026-06-30 reinforcement] — first validation of the View-side 4 operational path separation + DB validation query authoring principle reinforcement / Status `Open` retained / Fargate Task Role privilege separation remains a 06 spec follow-up phase responsibility.
 
-### 본 일자 사실 기록 범위 (2026-06-30)
+### This date's factual recording scope (2026-06-30)
 
-- 본 일자 Kiro 작업 = 05 spec `operation-notes.md` 본 섹션 누적(8 · 9 · 10 · 11 항목) + 04 spec `operation-notes.md` append(Step Functions 외부 caller 측 사실) + `_common` 2개(`followups-overview.md` 2026-06-30 후속 메모 / `risk-register.md` R-AUTO-033 + R-AUTO-034 보강) + `.kiro` 루트 2개(`WORKLOG.md` / `CHANGELOG.md` 2026-06-30 섹션 prepend).
-- 운영자 직접 변경분(`DailyBatchController.java` Daily Batch gate 수정) 은 port-view MS 영역으로 cross-service AWS Migration spec 본 일자 작업으로 인한 변경 0건(spec 영역).
-- AWS CLI / boto3 / psql / Spring Boot 실행 / 외부 API 호출 본 일자 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 0건 / commit/add/reset/checkout/stash 0건.
-- broker / KIS 호출 = 오전 Step 1~11 자동 trigger 한정(`connector_order_request` 신규 0건) + Local View → AWS Step Functions Step 12~17 승인 실행 1건(`SUCCEEDED` / NO_TARGET / broker 주문 제출 0건) + balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
-- 민감정보(secret value / KIS app key / KIS app secret / 계좌번호 / 계좌 비밀번호 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문 / 실제 IAM Role ARN / 실제 secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN / broker_order_no 원문 / Slack webhook URL / DB password / Administrator password / 실제 state machine ARN) 본 노트 평문 기록 0건 — 모두 `[REDACTED]` 또는 placeholder.
-- 운영 식별자 (사용자 명시 정책 정합으로 사실 기록 / secret 아님):
+- This date's Kiro work = accumulation of these sections in 05 spec `operation-notes.md` (items 8 · 9 · 10 · 11) + append to 04 spec `operation-notes.md` (Step Functions external-caller-side facts) + 2 `_common` files (`followups-overview.md` 2026-06-30 follow-up memo / `risk-register.md` R-AUTO-033 + R-AUTO-034 reinforcement) + 2 `.kiro` root files (prepend of the `WORKLOG.md` / `CHANGELOG.md` 2026-06-30 sections).
+- The operator's direct change (`DailyBatchController.java` Daily Batch gate fix) is in the port-view MS area, so 0 changes from this date's cross-service AWS Migration spec work (spec area).
+- 0 changes on this date to AWS CLI / boto3 / psql / Spring Boot execution / external API calls / 0 AWS resource creation · modification · deletion / 0 commit/add/reset/checkout/stash.
+- broker / KIS calls = morning Step 1~11 automatic trigger only (0 new `connector_order_request`) + 1 Local View → AWS Step Functions Step 12~17 approval execution (`SUCCEEDED` / NO_TARGET / 0 broker order submissions) + balance refresh only / 0 additional BUY · SELL · cancel · modify / 0 fill · position sync automatic retries / 0 aws-live actions.
+- 0 plaintext records in this note of sensitive information (secret value / KIS app key / KIS app secret / account number / account password / token / RDS password / RDS endpoint hostname / raw 12-digit account-id / actual IAM Role ARN / actual secret ARN / IAM access key id / instance-id / EIP / image digest full sha256 / task ARN / job ARN / raw broker_order_no / Slack webhook URL / DB password / Administrator password / actual state machine ARN) — all `[REDACTED]` or placeholder.
+- Operational identifiers (recorded as facts per the user-specified policy / not secrets):
   - executionName `port-view-daily-step12-17-20260630-095111-aae2595c` / state machine `portfolio-paper-daily-step12-17-approval`.
-  - Controller class `DailyBatchController` / Daily Batch gate 라벨 6종 / 화면 표시 라벨.
+  - Controller class `DailyBatchController` / 6 Daily Batch gate labels / screen display labels.
   - balance snapshot `id=281` · `as_of_date=2026-06-30` · `total_eval_amount=8,706,505` · `cash_balance=8,706,505` · `eval_profit=0` · `source_version=connector-intraday-snapshot-refresh-1.0.0`.
-  - DB 컬럼명 `balance_snapshot_id`(부재) · `account_no` · `as_of_date`.
+  - DB column names `balance_snapshot_id` (absent) · `account_no` · `as_of_date`.
   - Run id `#46` · `#47` · `#48` / Spring profile `aws-paper` / start · stop timestamp.
 
 
-3. ECS Fargate 포팅: 완료
- 1) 1차 접근 방식
-   (1) ALB 미사용 Public IP 직접 접근
-       - ECS Fargate task 를 public subnet 에 배치
-       - assign public IP enabled 설정
-       - ALB 는 생성하지 않음
-       - NAT Gateway 는 생성하지 않음
-       - Fargate task public IP 와 port 8080 으로 View 접속
-       - 접근 URL 형식은 `http://<FARGATE_TASK_PUBLIC_IP>:8080`
-       - task 재시작 또는 재배포 시 public IP 가 변경될 수 있음을 전제로 운영
-   (2) 보안 원칙
-       - Security Group inbound 는 TCP 8080 만 허용
-       - source 는 운영자 공인 IP/32 만 허용
-       - 초기 검증 중 0.0.0.0/0 전체 오픈은 금지
-       - 모바일 접근은 같은 Wi-Fi 또는 임시 모바일 공인 IP/32 추가 방식으로 확인
-       - 확인 완료 후 불필요한 inbound rule 은 제거
-   (3) 비용 절감 원칙
-       - ALB 비용 제거
-       - NAT Gateway 비용 제거
-       - public IPv4 비용과 Fargate 실행 시간 비용만 부담
-       - ECS service desired count 는 필요할 때만 1
-       - 확인 완료 후 desired count 0 전환 가능하도록 운영
-       - CloudWatch Logs retention 은 짧게 설정(7일)
- 2) 1차 목표
-   (1) read-only View 배포
-       - Local View 에서 검증된 AWS Paper View 를 ECS Fargate 에 배포
-       - 초기 배포 범위는 read-only View 우선
-       - Dashboard / Balance / Positions / Orders / Reports / Daily 화면 확인
-       - Spring Boot property 구조 변경은 최소화
-       - PowerShell 구동 스크립트에서 주입하던 환경변수를 ECS Task Definition 환경변수로 이관
-   (2) Step Functions 버튼 safe gate 확인
-       - AWS Step 1~11 버튼 표시 여부 확인
-       - AWS Step 12~17 승인 버튼 표시 여부 확인
-       - `fullPipelineExecutionEnabled` / `paperOrderEnabled` 조건 충돌 없음 확인
-       - 실제 Step Functions 실행은 read-only 화면 검증 후 별도 승인 단계에서 진행
-   (3) ECS View 에서 Step Functions 수동 실행 검증
-       - ECS View Daily 화면에서 AWS Step 12~17 승인 실행 버튼 클릭
-       - ECS task role 을 통해 AWS Step Functions `StartExecution` 호출
-       - `portfolio-paper-daily-step12-17-approval` state machine 실행
-       - 실행 완료 후 Slack `DAILY_EXECUTION_SUCCESS` 수신
-       - DB after-check 정상 확인
- 3) 완료 기준
-   (1) ECS 배포 완료 기준
-       - Docker image build 성공
-       - ECR image push 완료
-       - ECS task definition 생성 완료
-       - ECS service desired count 1 기동 성공
-       - ECS task RUNNING 확인
-       - CloudWatch Logs 에서 Spring Boot started 확인
-   (2) 네트워크 완료 기준
-       - Fargate task public IP 확인
-       - `http://<FARGATE_TASK_PUBLIC_IP>:8080` 접속 성공
-       - Security Group inbound TCP 8080 source 운영자 IP/32 확인
-       - ECS task 에서 Private RDS 연결 성공
-       - NAT Gateway 없이 RDS 접근 구성 확인
-   (3) View 완료 기준
-       - Dashboard 조회 성공
-       - Balance 조회 성공
-       - Positions 조회 성공
-       - Orders 조회 성공
-       - Reports 조회 성공
-       - Daily 조회 성공
-       - 최초 접속 및 메뉴 이동 시 기본 계좌번호 정상 반영
-   (4) safe gate 완료 기준
-       - AWS Step 1~11 버튼 조건 확인
-       - AWS Step 12~17 승인 버튼 조건 확인
-       - `fullPipelineExecutionEnabled=true` 상태에서도 Step 12~17 승인 버튼 표시 확인
-       - `paperOrderEnabled=true` 상태에서도 Step 1~11 버튼 조건 충돌 없음 확인
-       - local-file 실행 버튼은 ECS 환경에서 비활성 상태 확인
-       - 전체 실행 버튼은 잠금 상태 확인
-   (5) Step Functions 실행 완료 기준
-       - ECS View 에서 AWS Step 12~17 승인 실행 버튼 클릭 성공
-       - execution `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` 생성 확인
-       - state machine `portfolio-paper-daily-step12-17-approval` 실행 확인
-       - execution status `SUCCEEDED` 확인
-       - Slack `DAILY_EXECUTION_SUCCESS` 수신 확인
-       - after-check 결과 REQUESTED strategy order 0 확인
-       - after-check 결과 retryable rejected strategy order 0 확인
-       - after-check 결과 active connector order 0 확인
-       - after-check 결과 당일 신규 connector order 0 rows 확인
-       - latest connector balance snapshot 기준일 2026-06-30 확인
- 4) 완료 결과
-   (1) AWS 리소스
+3. ECS Fargate porting: complete
+ 1) First approach
+   (1) ALB-free Public IP direct access
+       - place the ECS Fargate task in a public subnet
+       - assign public IP enabled setting
+       - do not create an ALB
+       - do not create a NAT Gateway
+       - access View via the Fargate task public IP and port 8080
+       - the access URL format is `http://<FARGATE_TASK_PUBLIC_IP>:8080`
+       - operate on the premise that the public IP may change on task restart or redeployment
+   (2) Security principles
+       - Security Group inbound allows only TCP 8080
+       - source allows only the operator public IP/32
+       - during initial validation, full 0.0.0.0/0 opening is prohibited
+       - mobile access is confirmed via the same Wi-Fi or by adding a temporary mobile public IP/32
+       - remove unnecessary inbound rules after confirmation is complete
+   (3) Cost-saving principles
+       - remove ALB cost
+       - remove NAT Gateway cost
+       - bear only the public IPv4 cost and Fargate execution-time cost
+       - the ECS service desired count is 1 only when needed
+       - operate so the desired count can be switched to 0 after confirmation is complete
+       - set the CloudWatch Logs retention short (7 days)
+ 2) First goal
+   (1) read-only View deployment
+       - deploy the AWS Paper View validated on the Local View to ECS Fargate
+       - the initial deployment scope prioritizes the read-only View
+       - confirm the Dashboard / Balance / Positions / Orders / Reports / Daily screens
+       - minimize Spring Boot property structure changes
+       - transfer the environment variables that were injected by the PowerShell startup script to ECS Task Definition environment variables
+   (2) Step Functions button safe gate confirmation
+       - confirm whether the AWS Step 1~11 button is displayed
+       - confirm whether the AWS Step 12~17 approval button is displayed
+       - confirm no `fullPipelineExecutionEnabled` / `paperOrderEnabled` condition conflict
+       - actual Step Functions execution proceeds in a separate approval stage after read-only screen validation
+   (3) Step Functions manual execution validation from the ECS View
+       - click the AWS Step 12~17 approval-execute button on the ECS View Daily screen
+       - call AWS Step Functions `StartExecution` via the ECS task role
+       - execute the `portfolio-paper-daily-step12-17-approval` state machine
+       - receive Slack `DAILY_EXECUTION_SUCCESS` after execution completion
+       - confirm the DB after-check is normal
+ 3) Completion criteria
+   (1) ECS deployment completion criteria
+       - Docker image build success
+       - ECR image push complete
+       - ECS task definition creation complete
+       - ECS service desired count 1 startup success
+       - ECS task RUNNING confirmed
+       - Spring Boot started confirmed in CloudWatch Logs
+   (2) Network completion criteria
+       - Fargate task public IP confirmed
+       - `http://<FARGATE_TASK_PUBLIC_IP>:8080` access success
+       - Security Group inbound TCP 8080 source operator IP/32 confirmed
+       - Private RDS connection success from the ECS task
+       - RDS access configuration without a NAT Gateway confirmed
+   (3) View completion criteria
+       - Dashboard query success
+       - Balance query success
+       - Positions query success
+       - Orders query success
+       - Reports query success
+       - Daily query success
+       - the default account number is reflected normally on first access and menu navigation
+   (4) safe gate completion criteria
+       - AWS Step 1~11 button condition confirmed
+       - AWS Step 12~17 approval button condition confirmed
+       - Step 12~17 approval button display confirmed even in the `fullPipelineExecutionEnabled=true` state
+       - no Step 1~11 button condition conflict confirmed even in the `paperOrderEnabled=true` state
+       - the local-file execution button confirmed disabled in the ECS environment
+       - the full-execution button confirmed in the locked state
+   (5) Step Functions execution completion criteria
+       - AWS Step 12~17 approval-execute button click success from the ECS View
+       - execution `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` creation confirmed
+       - state machine `portfolio-paper-daily-step12-17-approval` execution confirmed
+       - execution status `SUCCEEDED` confirmed
+       - Slack `DAILY_EXECUTION_SUCCESS` reception confirmed
+       - after-check result REQUESTED strategy order 0 confirmed
+       - after-check result retryable rejected strategy order 0 confirmed
+       - after-check result active connector order 0 confirmed
+       - after-check result today's new connector order 0 rows confirmed
+       - latest connector balance snapshot reference date 2026-06-30 confirmed
+ 4) Completion result
+   (1) AWS resources
        - ECS cluster: `portfolio-paper-cluster`
        - ECS service: `portfolio-view-service`
        - ECS task definition: `portfolio-view:2`
        - ECR repository: `portfolio-view`
        - CloudWatch Logs group: `/ecs/portfolio-view`
-       - task execution role: `portfolio-paper-ecs-task-execution-role` (실제 ARN 평문 기록 0건 / `[REDACTED_ARN]`)
-       - task role: `portfolio-paper-view-task-role` (실제 ARN 평문 기록 0건 / `[REDACTED_ARN]`)
+       - task execution role: `portfolio-paper-ecs-task-execution-role` (0 plaintext records of the actual ARN / `[REDACTED_ARN]`)
+       - task role: `portfolio-paper-view-task-role` (0 plaintext records of the actual ARN / `[REDACTED_ARN]`)
        - security group: `sgroup-port-view-ecs`
-   (2) ECS task definition 주요 설정
+   (2) ECS task definition main settings
        - launch type: FARGATE
        - network mode: awsvpc
        - cpu: 512
@@ -551,23 +551,23 @@
        - Step Functions step start enabled: true
        - full pipeline execution enabled: true
        - paper order enabled: true
-   (3) 검증된 접속 결과
-       - Fargate public IP 직접 접속 성공(public IP 평문 기록 0건 / `[REDACTED_PUBLIC_IP]`)
-       - Spring Boot started 확인
-       - HikariPool RDS connection 성공
-       - default schema `ops` 확인
-       - Dashboard / Balance / Positions / Orders / Reports / Daily 화면 정상 표시
-       - 기본 계좌번호 누락 문제는 task definition revision 2 에서 env 추가로 보정 완료(`PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO` + `PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO`)
-   (4) 검증된 실행 결과
-       - ECS View Daily 화면에서 AWS Step 12~17 승인 실행 성공
+   (3) Validated access result
+       - Fargate public IP direct access success (0 plaintext records of the public IP / `[REDACTED_PUBLIC_IP]`)
+       - Spring Boot started confirmed
+       - HikariPool RDS connection success
+       - default schema `ops` confirmed
+       - Dashboard / Balance / Positions / Orders / Reports / Daily screens display normally
+       - the default account-number omission issue was corrected by adding env in task definition revision 2 (`PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO` + `PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO`)
+   (4) Validated execution result
+       - AWS Step 12~17 approval execution success on the ECS View Daily screen
        - execution `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8`
        - start: 2026-06-30 14:15:42 KST
        - stop: 2026-06-30 14:18:48 KST
        - status: SUCCEEDED
-       - history 최종 `ExecutionSucceeded`
-       - Slack `DAILY_EXECUTION_SUCCESS` 수신
-       - after-check 정상
-   (5) after-check 결과
+       - history final `ExecutionSucceeded`
+       - Slack `DAILY_EXECUTION_SUCCESS` reception
+       - after-check normal
+   (5) after-check result
        - REQUESTED strategy orders after: 0
        - retryable rejected strategy orders after: 0
        - active connector orders after: 0
@@ -576,249 +576,249 @@
        - latest connector_balance_snapshot as_of_date: 2026-06-30
        - total_eval_amount: 8,706,505
        - cash_balance: 8,706,505
-       - 과거 stale connector order 6건 식별 — 모두 운영 계좌가 아닌 과거 테스트 계좌의 2026-04-27 ACCEPTED 잔여 / 이번 Step 12~17 실행과 무관 / 후속 cleanup 후보로 분리
-   (6) 비용 절감 종료 결과
-       - 검증 완료 후 ECS service desired count 0 전환 완료
-       - Fargate task 종료 완료
-       - public IP 해제 전제로 운영
-       - 다음 기동 시 desired count 1 전환 후 새 public IP 확인 필요
- 5) 보류 항목
-   (1) 1차 포팅 이후로 보류
-       - ALB 생성
-       - HTTPS 정식 구성
-       - Route53 도메인 연결
+       - identified 6 past stale connector orders — all are 2026-04-27 ACCEPTED remainders of a past test account, not the operational account / unrelated to this Step 12~17 execution / separated as a follow-up cleanup candidate
+   (6) Cost-saving termination result
+       - after validation completion, ECS service desired count 0 transition complete
+       - Fargate task termination complete
+       - operate on the premise of public IP release
+       - at next startup, a new public IP must be confirmed after the desired count 1 transition
+ 5) On-hold items
+   (1) On hold until after first porting
+       - ALB creation
+       - formal HTTPS configuration
+       - Route53 domain connection
        - Cloudflare Tunnel
-       - 인증 / 인가 고도화
-       - Slack 문구 개선
-       - property 구조 재정리
-       - application-ecs.yml 신규 분리
+       - authentication / authorization enhancement
+       - Slack wording improvement
+       - property structure reorganization
+       - new application-ecs.yml separation
        - ECS Auto Scaling
-       - Blue/Green 배포
-   (2) 후속 정리 후보
-       - Daily 화면 문구에서 "로컬 실행 검증" 표현을 ECS / AWS mode 에 맞게 수정
-       - stale `connector_order_request` 과거 ACCEPTED 6건 처리 여부 검토
-       - ECS service desired count 0/1 운영 명령 문서화(runbook.md 후속)
-       - 운영자 IP 변경 시 Security Group inbound 갱신 절차 문서화
-       - 필요 시 AWS Step 1~11 ECS View 실행 별도 검증
- 6) 결론
-   (1) 1차 포팅 방향
-       - ALB 없이 ECS Fargate Public IP 직접 접근 방식으로 진행
-       - 최소 비용으로 View ECS 배포 완료
-       - 운영자 IP 제한으로 외부 노출 범위 최소화
-       - Spring Boot property 구조 변경 없이 ECS Task Definition env 이관 방식으로 완료
-       - 이후 필요 시 ALB / HTTPS / Cloudflare Tunnel 은 별도 검토
-   (2) 완료 판정
-       - ECS Fargate View 접속 성공
-       - read-only 화면 정상 조회
-       - Private RDS 연결 정상
-       - 기본 계좌번호 정상 반영
-       - Step Functions 버튼 조건 정상
-       - ECS View 에서 AWS Step 12~17 승인 실행 성공
-       - Slack 성공 알림 수신
-       - DB after-check 정상
-       - desired count 0 종료 완료
-       - **3. ECS Fargate 포팅: 완료**
+       - Blue/Green deployment
+   (2) Follow-up cleanup candidates
+       - modify the "local execution validation" expression on the Daily screen to match the ECS / AWS mode
+       - review whether to handle the 6 past ACCEPTED stale `connector_order_request`
+       - document the ECS service desired count 0/1 operation commands (runbook.md follow-up)
+       - document the Security Group inbound update procedure when the operator IP changes
+       - separately validate AWS Step 1~11 ECS View execution if needed
+ 6) Conclusion
+   (1) First porting direction
+       - proceed with the ALB-free ECS Fargate Public IP direct access method
+       - View ECS deployment complete at minimal cost
+       - minimize the external exposure scope via operator IP restriction
+       - completed via the ECS Task Definition env transfer method without Spring Boot property structure changes
+       - later, if needed, ALB / HTTPS / Cloudflare Tunnel are reviewed separately
+   (2) Completion judgment
+       - ECS Fargate View access success
+       - read-only screen normal query
+       - Private RDS connection normal
+       - default account number reflected normally
+       - Step Functions button condition normal
+       - AWS Step 12~17 approval execution success from the ECS View
+       - Slack success notification received
+       - DB after-check normal
+       - desired count 0 termination complete
+       - **3. ECS Fargate porting: complete**
 
-### 운영 절차 (runbook 후속 책임 / 본 노트는 사실 기록)
+### Operation procedure (runbook follow-up responsibility / this note is a factual record)
 
-운영자 명령 예시는 ARN / task ARN / ENI ID / LOG_STREAM 수동 치환 없이 `list/describe → 변수 추출 → 후속 검증` 패턴을 따른다. 본 노트는 사실 기록만 담고 정식 runbook 은 05 spec 후속 phase 책임.
+Operator command examples follow the `list/describe → extract variable → subsequent verification` pattern without manual substitution of ARN / task ARN / ENI ID / LOG_STREAM. This note contains only factual records, and the formal runbook is a 05 spec follow-up phase responsibility.
 
-ECS View 기동:
- 1) ECS service desired count 1 전환
+ECS View start:
+ 1) ECS service desired count 1 transition
    (1) `aws ecs update-service --cluster portfolio-paper-cluster --service portfolio-view-service --desired-count 1`
-   (2) `aws ecs wait services-stable` 로 `RUNNING` 진입 대기
- 2) public IP 자동 조회
-   (1) `aws ecs list-tasks --cluster portfolio-paper-cluster --service-name portfolio-view-service` → `TASK_ARN` 추출
-   (2) `aws ecs describe-tasks --cluster portfolio-paper-cluster --tasks $TASK_ARN` → `ENI_ID` 추출(`attachments[].details[?name=='networkInterfaceId'].value`)
-   (3) `aws ec2 describe-network-interfaces --network-interface-ids $ENI_ID` → `PUBLIC_IP` 추출(`Association.PublicIp`)
-   (4) 브라우저 접속 URL 출력: `http://$PUBLIC_IP:8080`(본 노트 평문 기록 0건 / `[REDACTED_PUBLIC_IP]`)
+   (2) wait for `RUNNING` entry with `aws ecs wait services-stable`
+ 2) public IP auto-query
+   (1) `aws ecs list-tasks --cluster portfolio-paper-cluster --service-name portfolio-view-service` → extract `TASK_ARN`
+   (2) `aws ecs describe-tasks --cluster portfolio-paper-cluster --tasks $TASK_ARN` → extract `ENI_ID` (`attachments[].details[?name=='networkInterfaceId'].value`)
+   (3) `aws ec2 describe-network-interfaces --network-interface-ids $ENI_ID` → extract `PUBLIC_IP` (`Association.PublicIp`)
+   (4) output the browser access URL: `http://$PUBLIC_IP:8080` (0 plaintext records in this note / `[REDACTED_PUBLIC_IP]`)
 
-ECS View 종료:
- 1) ECS service desired count 0 전환
+ECS View stop:
+ 1) ECS service desired count 0 transition
    (1) `aws ecs update-service --cluster portfolio-paper-cluster --service portfolio-view-service --desired-count 0`
-   (2) Fargate task 종료 / public IP 해제
- 2) 다음 기동 시 주의
-   (1) desired count 0 → 1 전환 시 새로운 public IP 가 발급됨
-   (2) 운영자가 새 public IP 를 다시 조회해 브라우저 URL 갱신
-   (3) Security Group inbound rule 의 운영자 IP/32 는 그대로 유지
+   (2) Fargate task termination / public IP release
+ 2) Caution on next start
+   (1) a new public IP is issued on the desired count 0 → 1 transition
+   (2) the operator re-queries the new public IP and updates the browser URL
+   (3) the operator IP/32 of the Security Group inbound rule is retained as is
 
-### 검증 체크리스트 (validation-checklist 후속 책임 / 본 노트는 사실 기록)
+### Validation checklist (validation-checklist follow-up responsibility / this note is a factual record)
 
-본 일자 검증 통과 항목:
- 1) Docker image build: 완료
- 2) ECR push: 완료
- 3) task definition registration: 완료(revision 1 → 2 보정)
- 4) ECS service `portfolio-view-service` RUNNING: 완료
- 5) CloudWatch Logs `/ecs/portfolio-view` 에서 Spring Boot started: 완료
- 6) RDS connection success(HikariPool start completed): 완료
- 7) Dashboard / Balance / Positions / Orders / Reports / Daily 화면 조회: 완료
- 8) AWS Step 1~11 버튼 표시: 완료
- 9) AWS Step 12~17 승인 버튼 표시: 완료
- 10) ECS View → Step 12~17 execution `SUCCEEDED`: 완료(executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8`)
- 11) Slack `DAILY_EXECUTION_SUCCESS` 수신: 완료
- 12) DB after-check 0건 확인: 완료(REQUESTED / retryable rejected / active / today connector orders 모두 0)
- 13) desired count 0 종료: 완료
+Items that passed validation on this date:
+ 1) Docker image build: complete
+ 2) ECR push: complete
+ 3) task definition registration: complete (revision 1 → 2 correction)
+ 4) ECS service `portfolio-view-service` RUNNING: complete
+ 5) Spring Boot started in CloudWatch Logs `/ecs/portfolio-view`: complete
+ 6) RDS connection success (HikariPool start completed): complete
+ 7) Dashboard / Balance / Positions / Orders / Reports / Daily screen query: complete
+ 8) AWS Step 1~11 button display: complete
+ 9) AWS Step 12~17 approval button display: complete
+ 10) ECS View → Step 12~17 execution `SUCCEEDED`: complete (executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8`)
+ 11) Slack `DAILY_EXECUTION_SUCCESS` reception: complete
+ 12) DB after-check 0 confirmation: complete (REQUESTED / retryable rejected / active / today connector orders all 0)
+ 13) desired count 0 termination: complete
 
-### 결정 / 리스크 매핑 (2026-06-30 오후)
+### Decision / risk mapping (2026-06-30 afternoon)
 
-- OD-MS-002(port-view 컴퓨트 = ECS Fargate Service 1순위) 정합 — 본 일자 실증 완료(ALB 없이 Public IP direct access + 운영자 IP/32 SG inbound + desiredCount 0/1 수동 운영 / 결정 본문 변경 없이 evidence 보강).
-- OD-MS-009(Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) 정합 — ECS View 가 Step Functions `StartExecution` external caller 로 붙는 세 번째 phase 1차 실증(Local View → AWS Step Functions Step 1~11 / Local View → AWS Step Functions Step 12~17 approval / ECS View → AWS Step Functions Step 12~17 approval).
-- OD-MS-037(View Local AWS Paper read-only 1차 scope + ECS / Fargate 진입 전 batch 2차 검증 선행 정책) 정합 — Local 검증(2026-06-27 read-only / 2026-06-28 Step 1 + Step 1~11 / 2026-06-29 (1) Step 12~17 local-file / 2026-06-29 (2) Step 1~11 aws-stepfunctions / 2026-06-29 (3) + 2026-06-30 오전 Step 12~17 approval) 후 본 일자 오후 ECS Fargate 진입 + Step 12~17 ECS View 승인 실행 완료.
-- R-AUTO-033 [2026-06-30 오후 보강] — ECS Fargate Public IP direct access + 운영자 IP/32 SG inbound + ECS View → AWS Step Functions Step 12~17 approval 3차 실증 / Status `Mitigated` 유지.
-- R-AUTO-034 [2026-06-30 오후 보강] — Fargate ECS task role(`portfolio-paper-view-task-role`) 의 `states:StartExecution` 권한이 실제 Fargate 환경에서 1차 실증 통과 / Step 12~17 approval state machine ARN 한정 부여 사실 / Status `Open` 유지(향후 ALB · HTTPS · CloudWatch alarms 도입 시 cross-spec audit / 06 spec 후속 phase 책임).
-- 신규 후속 리스크 보강 (followups-overview 2026-06-30 오후 후속 메모 + risk-register 참조):
-       - Public IP 직접 접근 시 SG inbound 오픈 실수 위험(운영자 IP/32 한정 정책 정합)
-       - desiredCount 1 유지로 인한 불필요한 Fargate / public IPv4 비용 누적 위험(desiredCount 0 종료 운영 정책 정합)
-       - task 재시작 후 public IP 변경으로 접속 URL 이 바뀌는 위험(운영자가 매 기동 시 재조회 정책)
-       - AWS CLI / psql 검증 쿼리에서 추정 컬럼명을 사용해 오진하는 위험(`information_schema.columns` 사전 확인 정책 정합 / 2026-06-29 (1) DB password 노출 + 2026-06-30 오전 `connector_position_snapshot.balance_snapshot_id` 부재 사례 결합)
-       - 과거 stale `connector_order_request` 가 preflight count 를 오염시키는 위험(2026-06-30 오후 식별된 6건 / 후속 cleanup 결정)
+- OD-MS-002 (port-view compute = ECS Fargate Service first priority) alignment — validation complete on this date (ALB-free Public IP direct access + operator IP/32 SG inbound + desiredCount 0/1 manual operation / evidence reinforced without changing the decision body).
+- OD-MS-009 (Daily Batch orchestration = Step Functions + EventBridge Scheduler + ECS RunTask) alignment — the third phase where the ECS View attaches as a Step Functions `StartExecution` external caller, first validated (Local View → AWS Step Functions Step 1~11 / Local View → AWS Step Functions Step 12~17 approval / ECS View → AWS Step Functions Step 12~17 approval).
+- OD-MS-037 (View Local AWS Paper read-only first scope + policy of preceding batch second validation before ECS / Fargate entry) alignment — after local validation (2026-06-27 read-only / 2026-06-28 Step 1 + Step 1~11 / 2026-06-29 (1) Step 12~17 local-file / 2026-06-29 (2) Step 1~11 aws-stepfunctions / 2026-06-29 (3) + 2026-06-30 morning Step 12~17 approval), this date's afternoon ECS Fargate entry + Step 12~17 ECS View approval execution complete.
+- R-AUTO-033 [2026-06-30 afternoon reinforcement] — ECS Fargate Public IP direct access + operator IP/32 SG inbound + ECS View → AWS Step Functions Step 12~17 approval third validation / Status `Mitigated` retained.
+- R-AUTO-034 [2026-06-30 afternoon reinforcement] — the Fargate ECS task role (`portfolio-paper-view-task-role`) `states:StartExecution` privilege passed first validation in the actual Fargate environment / fact of the grant limited to the Step 12~17 approval state machine ARN / Status `Open` retained (cross-spec audit when ALB · HTTPS · CloudWatch alarms are introduced in the future / 06 spec follow-up phase responsibility).
+- New follow-up risk reinforcement (see followups-overview 2026-06-30 afternoon follow-up memo + risk-register):
+       - risk of an SG inbound opening mistake on Public IP direct access (operator IP/32-limited policy alignment)
+       - risk of unnecessary Fargate / public IPv4 cost accumulation from keeping desiredCount 1 (desiredCount 0 termination operation policy alignment)
+       - risk of the access URL changing due to the public IP change after task restart (operator re-query at each startup policy)
+       - risk of misdiagnosis from using an assumed column name in AWS CLI / psql validation queries (`information_schema.columns` prior-confirmation policy alignment / combining the 2026-06-29 (1) DB password exposure + 2026-06-30 morning `connector_position_snapshot.balance_snapshot_id` absence cases)
+       - risk of past stale `connector_order_request` contaminating the preflight count (the 6 identified on 2026-06-30 afternoon / follow-up cleanup decision)
 
-### 본 일자 사실 기록 범위 (2026-06-30 오후)
+### This date's factual recording scope (2026-06-30 afternoon)
 
-- 본 일자 Kiro 작업 범위:
-  - 05 spec `operation-notes.md` 본 섹션(3. ECS Fargate 포팅: 완료) 누적.
-  - `_common` 5개 갱신 (`followups-overview` · `operator-decisions` · `ms-aws-service-decision-matrix` · `cost-simulation` · `risk-register` · `aws-resource-glossary`).
+- This date's Kiro work scope:
+  - accumulation of this section (3. ECS Fargate porting: complete) in 05 spec `operation-notes.md`.
+  - update of 5 `_common` files (`followups-overview` · `operator-decisions` · `ms-aws-service-decision-matrix` · `cost-simulation` · `risk-register` · `aws-resource-glossary`).
   - 04 spec `operation-notes.md` append + 06 spec `operation-notes.md` append.
-  - `.kiro` 루트 3개 (`WORKLOG.md` / `CHANGELOG.md` / `README.md` 짧은 상태 보강) + `.kiro/AGENTS.md` 운영 명령 작성 규칙 보강.
-- 운영자 직접 수행 작업 (port-view MS 및 AWS 운영자 영역 / cross-service AWS Migration spec 본 일자 spec 영역 변경 0건):
-  - Dockerfile / `.dockerignore` 추가 + Docker image build + ECR push.
-  - ECS Task Definition 등록 + ECS Service 생성.
-  - Security Group · CloudWatch Logs · IAM Role 구성.
-  - ECS View 접속 + AWS Step 12~17 승인 실행 클릭 + desiredCount 0 종료.
-- Kiro 측 실행 / 변경 0건 — AWS CLI · boto3 · psql · Spring Boot · 외부 API 실행 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 0건 / commit · add · reset · checkout · stash 0건.
-- broker / KIS 호출 범위:
-  - 오전 Step 1~11 자동 trigger 한정.
-  - Local View → Step 12~17 승인 실행 (2026-06-30 오전).
-  - ECS View → Step 12~17 승인 실행 (2026-06-30 오후 / executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / `SUCCEEDED` / NO_TARGET / broker 주문 제출 0건).
-  - balance refresh 한정 / 추가 BUY · SELL · 취소 · 정정 0건 / fill · position sync 자동 재시도 0건 / aws-live 작업 0건.
-- 민감정보 평문 기록 0건 — 모두 `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]` placeholder:
-  - secret value / KIS app key · KIS app secret / 계좌번호 12자리 · 계좌 비밀번호 / token.
-  - RDS password / RDS endpoint hostname / account-id 12자리 원문.
-  - 실제 IAM Role · secret · state machine ARN / IAM access key id / instance-id / EIP / public IP.
-  - image digest full sha256 / task ARN / ENI ID / job ARN / broker_order_no 원문.
+  - 3 `.kiro` root files (`WORKLOG.md` / `CHANGELOG.md` / `README.md` short status reinforcement) + `.kiro/AGENTS.md` operation command authoring rule reinforcement.
+- Operator direct-performed work (port-view MS and AWS operator area / 0 changes to this date's cross-service AWS Migration spec area):
+  - Dockerfile / `.dockerignore` addition + Docker image build + ECR push.
+  - ECS Task Definition registration + ECS Service creation.
+  - Security Group · CloudWatch Logs · IAM Role configuration.
+  - ECS View access + AWS Step 12~17 approval-execute click + desiredCount 0 termination.
+- 0 Kiro-side execution / changes — 0 AWS CLI · boto3 · psql · Spring Boot · external API execution / 0 AWS resource creation · modification · deletion / 0 commit · add · reset · checkout · stash.
+- broker / KIS call scope:
+  - morning Step 1~11 automatic trigger only.
+  - Local View → Step 12~17 approval execution (2026-06-30 morning).
+  - ECS View → Step 12~17 approval execution (2026-06-30 afternoon / executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / `SUCCEEDED` / NO_TARGET / 0 broker order submissions).
+  - balance refresh only / 0 additional BUY · SELL · cancel · modify / 0 fill · position sync automatic retries / 0 aws-live actions.
+- 0 plaintext records of sensitive information — all `[REDACTED]` / `[REDACTED_ACCOUNT_NO]` / `[REDACTED_PUBLIC_IP]` / `[REDACTED_ARN]` / `[REDACTED_TASK_ARN]` / `[REDACTED_SECRET_ARN]` / `[REDACTED_BROKER_ORDER_NO]` placeholders:
+  - secret value / KIS app key · KIS app secret / 12-digit account number · account password / token.
+  - RDS password / RDS endpoint hostname / raw 12-digit account-id.
+  - actual IAM Role · secret · state machine ARN / IAM access key id / instance-id / EIP / public IP.
+  - image digest full sha256 / task ARN / ENI ID / job ARN / raw broker_order_no.
   - Slack webhook URL / DB password / Administrator password.
-- 운영 식별자 (사용자 명시 정책 정합으로 사실 기록 / secret 아님):
-  - AWS 리소스:
+- Operational identifiers (recorded as facts per the user-specified policy / not secrets):
+  - AWS resources:
     - ECS cluster `portfolio-paper-cluster` / ECS service `portfolio-view-service` / task definition `portfolio-view:2`.
     - ECR repository `portfolio-view` / CloudWatch Logs group `/ecs/portfolio-view` / Security Group `sgroup-port-view-ecs`.
     - task execution role `portfolio-paper-ecs-task-execution-role` / task role `portfolio-paper-view-task-role`.
-  - Step Functions 실행:
+  - Step Functions execution:
     - executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / state machine `portfolio-paper-daily-step12-17-approval` / status `SUCCEEDED`.
     - start · stop timestamp `2026-06-30T14:15:42.899+09:00` ~ `2026-06-30T14:18:48.358+09:00`.
-    - Slack 이벤트 라벨 `DAILY_EXECUTION_SUCCESS`.
-  - 런타임 설정:
+    - Slack event label `DAILY_EXECUTION_SUCCESS`.
+  - Runtime settings:
     - Spring profile `aws-paper` / Tomcat port `8080` / launch type `FARGATE` / network mode `awsvpc` / cpu 512 / memory 1024 / container port 8080 / Spring properties env label.
-  - View 화면 및 DB 상태:
-    - 화면 라벨 6종 (Dashboard / Balance / Positions / Orders / Reports / Daily).
+  - View screen and DB state:
+    - 6 screen labels (Dashboard / Balance / Positions / Orders / Reports / Daily).
     - balance snapshot `id=281` · `as_of_date=2026-06-30` · `total_eval_amount=8,706,505` · `cash_balance=8,706,505`.
-    - stale `connector_order_request` 6건 식별 사실 / `connector_position_snapshot.balance_snapshot_id` 컬럼 부재 사실.
+    - fact of identifying 6 stale `connector_order_request` / fact of the `connector_position_snapshot.balance_snapshot_id` column absence.
 
 
-## 2026-06-30 (오후) — Daily Brief Slack 자동화 독립 운영 cross-reference
+## 2026-06-30 (afternoon) — Daily Brief Slack automation independent-operation cross-reference
 
-### 요약
+### Summary
 
-- 같은 일자 오후의 port-view ECS Fargate 1차 포팅 + ECS View → Step 12~17 승인 실행 (앞의 "3. ECS Fargate 포팅: 완료" block) 과 별도.
-- Daily Brief Slack 자동화가 본 일자 오후에 추가 운영자 직접 작업으로 구성된 사실 cross-reference.
-- 평문 인용 0건 (R-DOCS-001 정합) — Lambda 코드 / Step Functions ASL / Scheduler target JSON / Slack 메시지 / Builder output / Notifier input / CloudWatch Logs / IAM Policy 본문.
+- Separate from the same date's afternoon port-view ECS Fargate first-porting + ECS View → Step 12~17 approval execution (the preceding "3. ECS Fargate porting: complete" block).
+- A cross-reference of the fact that Daily Brief Slack automation was configured as additional operator direct work on this date's afternoon.
+- 0 plaintext quotations (R-DOCS-001 alignment) — Lambda code / Step Functions ASL / Scheduler target JSON / Slack message / Builder output / Notifier input / CloudWatch Logs / IAM Policy body.
 
-12. Daily Brief Slack 자동화 cross-reference: 사실 기록
- 1) Daily Brief 알림은 Daily 본 실행 / ECS View / MarketConnector EC2 와 모두 독립 운영: 완료
-   (1) Daily 본 실행 state machine 과 분리
-       - Daily Brief 알림은 `portfolio-paper-daily-step1-17-approval` / `portfolio-paper-daily-step12-17-approval` 와 별도 mini Step Functions `portfolio-daily-brief-slack-notification` 책임
-       - Daily 본 실행 실패가 Daily Brief Slack 발송에 영향을 주지 않고, Daily Brief Slack 실패가 Daily 본 실행에 영향을 주지 않도록 격리
-       - OD-MS-038 신규 정합
-   (2) MarketConnector EC2 start · stop 과 독립 운영
-       - MarketConnector EC2 의 07:50 KST start / 15:50 KST stop(OD-MS-034 정합) 과 Daily Brief Slack 의 07:50 KST 장전 발송 / 15:50 KST 장후 발송은 시간대만 동일 / Target / Lambda / IAM Role 모두 독립
-       - Daily Brief Builder Lambda `portfolio-daily-brief-slack-summary-builder` 는 RDS read 만 수행 / MarketConnector EC2 가 stop 상태여도 정상 동작
-       - EC2 lifecycle Lambda `portfolio-paper-ec2-lifecycle-dispatcher` 와 책임 분리 / IAM Role / 호출 경로 / Target 모두 독립
-   (3) ECS View 와 독립 운영
-       - ECS View(`portfolio-view-service`) 의 desiredCount 0/1 운영과 무관하게 Daily Brief Slack 은 자동 발사
-       - port-view 의 기존 `SlackNotificationService` 는 제거되지 않고 유지(View Daily Batch 수동 실행 결과 알림 책임)
-       - AWS 공통 Slack notifier(`portfolio-event-notifier`) 는 운영 이벤트 알림 단일 진입점으로 별도 분리(OD-MS-030 정합)
- 2) 본 일자 운영자 직접 신규 작업 사실
-   (1) Builder Lambda 2종 신규
-       - `portfolio-approval-slack-summary-builder` — Daily 본 실행 측 Approval Required Slack builder
-       - `portfolio-daily-brief-slack-summary-builder` — Daily Brief Slack builder(Python 3.12 + `pg8000` + `DB_PASSWORD_SECRET_VALUE_FROM` Secrets Manager `valueFrom`)
-   (2) mini Step Functions 신규
-       - `portfolio-daily-brief-slack-notification`(ACTIVE / 구조 `BuildDailyBriefPayload → SendSlackNotifier`)
-   (3) IAM Role 2종 신규
-       - `portfolio-daily-brief-sfn-role`(Builder + Notifier Lambda invoke 한정 / Resource · Action wildcard 0건)
-       - `portfolio-daily-brief-scheduler-role`(Daily Brief state machine StartExecution 한정 / Resource · Action wildcard 0건)
-   (4) Scheduler 2개 ENABLED 추가
-       - 장전 `portfolio-daily-brief-morning-slack-0750-kst`(cron `cron(50 7 ? * MON-FRI *)` / Asia/Seoul / Flexible OFF / input `MORNING_BRIEF`)
-       - 장후 `portfolio-daily-brief-evening-slack-1550-kst`(cron `cron(50 15 ? * MON-FRI *)` / Asia/Seoul / Flexible OFF / input `EVENING_BRIEF`)
-   (5) Notifier formatter 개선
-       - eventType alias 2종(`MORNING_BRIEF → PRE_MARKET_STATUS` / `EVENING_BRIEF → POST_MARKET_STATUS`)
+12. Daily Brief Slack automation cross-reference: factual record
+ 1) The Daily Brief notification operates independently of the main Daily execution / ECS View / MarketConnector EC2: complete
+   (1) Separated from the main Daily execution state machine
+       - the Daily Brief notification is the responsibility of the mini Step Functions `portfolio-daily-brief-slack-notification`, separate from `portfolio-paper-daily-step1-17-approval` / `portfolio-paper-daily-step12-17-approval`
+       - isolated so that a main Daily execution failure does not affect Daily Brief Slack delivery, and a Daily Brief Slack failure does not affect the main Daily execution
+       - OD-MS-038 new alignment
+   (2) Operates independently of MarketConnector EC2 start · stop
+       - the MarketConnector EC2's 07:50 KST start / 15:50 KST stop (OD-MS-034 alignment) and the Daily Brief Slack's 07:50 KST pre-market delivery / 15:50 KST post-market delivery share only the time window / Target / Lambda / IAM Role are all independent
+       - the Daily Brief Builder Lambda `portfolio-daily-brief-slack-summary-builder` performs only RDS read / operates normally even when the MarketConnector EC2 is in the stop state
+       - responsibility separated from the EC2 lifecycle Lambda `portfolio-paper-ec2-lifecycle-dispatcher` / IAM Role / call path / Target are all independent
+   (3) Operates independently of the ECS View
+       - the Daily Brief Slack fires automatically regardless of the ECS View (`portfolio-view-service`) desiredCount 0/1 operation
+       - port-view's existing `SlackNotificationService` is retained, not removed (responsibility for View Daily Batch manual execution result notifications)
+       - the AWS common Slack notifier (`portfolio-event-notifier`) is separated as a single entry point for operational event notifications (OD-MS-030 alignment)
+ 2) This date's operator direct new-work facts
+   (1) 2 new Builder Lambdas
+       - `portfolio-approval-slack-summary-builder` — the main-Daily-execution-side Approval Required Slack builder
+       - `portfolio-daily-brief-slack-summary-builder` — the Daily Brief Slack builder (Python 3.12 + `pg8000` + `DB_PASSWORD_SECRET_VALUE_FROM` Secrets Manager `valueFrom`)
+   (2) new mini Step Functions
+       - `portfolio-daily-brief-slack-notification` (ACTIVE / structure `BuildDailyBriefPayload → SendSlackNotifier`)
+   (3) 2 new IAM Roles
+       - `portfolio-daily-brief-sfn-role` (limited to Builder + Notifier Lambda invoke / 0 Resource · Action wildcards)
+       - `portfolio-daily-brief-scheduler-role` (limited to Daily Brief state machine StartExecution / 0 Resource · Action wildcards)
+   (4) 2 Schedulers added ENABLED
+       - pre-market `portfolio-daily-brief-morning-slack-0750-kst` (cron `cron(50 7 ? * MON-FRI *)` / Asia/Seoul / Flexible OFF / input `MORNING_BRIEF`)
+       - post-market `portfolio-daily-brief-evening-slack-1550-kst` (cron `cron(50 15 ? * MON-FRI *)` / Asia/Seoul / Flexible OFF / input `EVENING_BRIEF`)
+   (5) Notifier formatter improvement
+       - 2 eventType aliases (`MORNING_BRIEF → PRE_MARKET_STATUS` / `EVENING_BRIEF → POST_MARKET_STATUS`)
        - nested `balance` / `positions` adapter
-       - Builder `title` 우선
-       - 장후 `어제 대비` 표시
-       - 손익 prefix 규칙(음수 `🔵` / 양수 `🔴` / 0 `⚪`) 일관 적용
-   (6) smoke 통과
+       - Builder `title` priority
+       - post-market `어제 대비` display
+       - consistent application of the profit/loss prefix rule (negative `🔵` / positive `🔴` / 0 `⚪`)
+   (6) smoke passed
        - morning smoke `daily-brief-morning-smoke-safe-20260630-193255-68f50aeb` `SUCCEEDED`
        - evening smoke `daily-brief-evening-smoke-safe-20260630-193300-aa2b9a12` `SUCCEEDED`
-       - Slack 장전 · 장후 수신 확인
+       - Slack pre-market · post-market reception confirmed
        - latest balance snapshot `id=281` / `as_of_date=2026-06-30` / `total_eval_amount=8,706,505` / `cash_balance=8,706,505` / `cumulativeProfitRate=-12.94%` / `cumulativeProfitAmount=-1,293,495` / `positionCount=0` / evening delta `0원`
- 3) 본 일자 05 spec 범위 변경 사실
-   (1) port-view ECS Fargate task definition `portfolio-view:2` 변경 0건(Daily Brief 자동화는 ECS View 와 무관 / port-view image / SG / CloudWatch Logs `/ecs/portfolio-view` 변경 0건)
-   (2) ECS service desiredCount 0/1 운영 정책 그대로 유지(검증 후 desiredCount 0 종료 정합)
-   (3) ECS View → AWS Step Functions Step 12~17 승인 실행 흐름 변경 0건
-   (4) MarketConnector EC2 / Crawler EC2 lifecycle 자동화 변경 0건
+ 3) This date's 05 spec scope change facts
+   (1) 0 changes to the port-view ECS Fargate task definition `portfolio-view:2` (Daily Brief automation is unrelated to the ECS View / 0 changes to the port-view image / SG / CloudWatch Logs `/ecs/portfolio-view`)
+   (2) the ECS service desiredCount 0/1 operation policy is retained as is (aligned with desiredCount 0 termination after validation)
+   (3) 0 changes to the ECS View → AWS Step Functions Step 12~17 approval execution flow
+   (4) 0 changes to the MarketConnector EC2 / Crawler EC2 lifecycle automation
 
-### 결정 / 리스크 매핑 (2026-06-30 오후 Slack)
+### Decision / risk mapping (2026-06-30 afternoon Slack)
 
-- OD-MS-002 / OD-MS-009 / OD-MS-030 / OD-MS-031 / OD-MS-037 본문 변경 없이 evidence 보강 / OD-MS-038 신규(Daily Brief Slack mini workflow 운영 방식 / Decision Summary 카운트 96 → 97 / 확정 51 → 52 / 잠정 42 유지)
-- R-AUTO-035 신규(Daily Brief Slack 자동 발송 실패 또는 중복 발송 위험 / Status `Mitigated` / 첫 실 자동 발사 검증은 다음 평일 후속)
-- R-AUTO-024(Slack webhook URL 평문 노출 위험 / `Accepted`) mitigation 그대로 유지 / 운영 안정화 후 Secrets Manager 또는 SSM SecureString 이전(06 spec 후속 phase 책임)
+- OD-MS-002 / OD-MS-009 / OD-MS-030 / OD-MS-031 / OD-MS-037 evidence reinforced without changing the bodies / OD-MS-038 new (Daily Brief Slack mini workflow operation method / Decision Summary count 96 → 97 / confirmed 51 → 52 / provisional 42 retained)
+- R-AUTO-035 new (risk of Daily Brief Slack automatic delivery failure or duplicate delivery / Status `Mitigated` / first live automatic-fire validation is a next-business-day follow-up)
+- R-AUTO-024 (risk of Slack webhook URL plaintext exposure / `Accepted`) mitigation retained as is / migrate to Secrets Manager or SSM SecureString after operation stabilization (06 spec follow-up phase responsibility)
 
-### 본 일자 사실 기록 범위 (2026-06-30 오후 Slack)
+### This date's factual recording scope (2026-06-30 afternoon Slack)
 
-- 본 일자 Kiro 작업 = 05 spec `operation-notes.md` 본 섹션 cross-reference 누적만 수행
-- 운영자 직접 수행 영역 = Builder Lambda 2개 신규 + mini state machine 1개 신규 + Scheduler 2개 ENABLED + IAM Role 2종 신규 + Notifier formatter 개선 + `portfolio-paper-daily-step1-17-approval` ASL update
-- AWS CLI / boto3 / psql / Lambda 실행 / Step Functions 실행 / Slack webhook / KIS API 호출 본 일자 Kiro 측 변경 0건 / AWS 리소스 신규 생성 · 수정 · 삭제 본 일자 Kiro 측 변경 0건
-- Lambda 코드 본문 / Step Functions ASL 본문 / Scheduler target JSON 본문 / Slack 메시지 본문 / Builder output 전문 / Notifier input 전문 / CloudWatch Logs 전문 / IAM Policy 전체 본문 / Slack webhook URL / 실제 IAM Role ARN / 실제 state machine ARN / 계좌번호 12자리 원문 / DB password 평문 인용 0건(R-DOCS-001 정합)
-- 운영 식별자 (사용자 명시 정책 정합으로 사실 기록 / secret 아님):
-  - Builder Lambda 이름 2종 / Notifier Lambda 이름 / mini state machine 이름.
-  - IAM Role 이름 2종 / Scheduler 이름 2종 / cron 표현식 2종 / Asia/Seoul / Flexible OFF.
-  - eventType alias 4종 + 본 라벨 3종.
+- This date's Kiro work = performed only the cross-reference accumulation of this section in 05 spec `operation-notes.md`
+- Operator direct-performed area = 2 new Builder Lambdas + 1 new mini state machine + 2 Schedulers ENABLED + 2 new IAM Roles + Notifier formatter improvement + `portfolio-paper-daily-step1-17-approval` ASL update
+- 0 Kiro-side changes on this date to AWS CLI / boto3 / psql / Lambda execution / Step Functions execution / Slack webhook / KIS API calls / 0 Kiro-side changes on this date to AWS resource creation · modification · deletion
+- 0 plaintext quotations of Lambda code body / Step Functions ASL body / Scheduler target JSON body / Slack message body / Builder output full text / Notifier input full text / CloudWatch Logs full text / full IAM Policy body / Slack webhook URL / actual IAM Role ARN / actual state machine ARN / raw 12-digit account number / DB password (R-DOCS-001 alignment)
+- Operational identifiers (recorded as facts per the user-specified policy / not secrets):
+  - 2 Builder Lambda names / Notifier Lambda name / mini state machine name.
+  - 2 IAM Role names / 2 Scheduler names / 2 cron expressions / Asia/Seoul / Flexible OFF.
+  - 4 eventType aliases + 3 labels here.
   - Lambda runtime `Python 3.12` / DB driver `pg8000`.
-  - DB password 주입 방식 `DB_PASSWORD_SECRET_VALUE_FROM` / Slack webhook 환경변수명 `SLACK_WEBHOOK_URL`.
-  - 손익 prefix 라벨 / smoke execution name 2종 / balance snapshot 요약.
+  - DB password injection method `DB_PASSWORD_SECRET_VALUE_FROM` / Slack webhook environment-variable name `SLACK_WEBHOOK_URL`.
+  - profit/loss prefix labels / 2 smoke execution names / balance snapshot summary.
 
 
-## 2026-07-01 — paper Daily Step 12~17 자동 실행 ENABLED (View 수동 승인 fallback 유지)
+## 2026-07-01 — paper Daily Step 12~17 automatic execution ENABLED (View manual approval fallback retained)
 
-- **ECS View → Step Functions Step 12~17 승인 실행 경로는 2026-06-30 오후에 이미 통과**:
-  - port-view ECS Fargate 1차 포팅 + ECS View 안 Daily Batch AWS Step 12~17 승인 버튼 실행 통과.
+- **The ECS View → Step Functions Step 12~17 approval execution path already passed on 2026-06-30 afternoon**:
+  - port-view ECS Fargate first-porting + Daily Batch AWS Step 12~17 approval-button execution inside the ECS View passed.
   - executionName `port-view-ecs-daily-step12-17-20260630-051537-9550f0e8` / state machine `portfolio-paper-daily-step12-17-approval` / status `SUCCEEDED`.
-  - DB after-check 통과 / `connector_balance_snapshot id=281` / `as_of_date=2026-06-30`.
-  - 05 spec 본문의 "3. ECS Fargate 포팅: 완료" block / R-AUTO-033 · R-AUTO-034 [2026-06-30 오후 보강] 정합.
-- **2026-07-01 은 View 수동 승인 없이 Step 12~17 자동 Scheduler ENABLED**:
-  - Step 12~17 Scheduler `portfolio-paper-daily-step12-17-order-0901-kst` DISABLED → ENABLED 전환 완료.
+  - DB after-check passed / `connector_balance_snapshot id=281` / `as_of_date=2026-06-30`.
+  - aligned with the "3. ECS Fargate porting: complete" block in the 05 spec body / R-AUTO-033 · R-AUTO-034 [2026-06-30 afternoon reinforcement].
+- **2026-07-01 is Step 12~17 automatic Scheduler ENABLED without View manual approval**:
+  - Step 12~17 Scheduler `portfolio-paper-daily-step12-17-order-0901-kst` DISABLED → ENABLED transition complete.
   - LastModificationDate `2026-07-01T13:53:57.160+09:00` / cron `cron(1 9 ? * MON-FRI *)` / Asia/Seoul / FlexibleTimeWindow OFF.
   - Target Lambda `portfolio-paper-daily-scheduler-dispatcher` / Target Input `{"scheduleType":"STEP12_17_ORDER","dryRun":false}`.
-  - 평일 09:01 KST 자동 실행이 Step 12~17 approval workflow(`portfolio-paper-daily-step12-17-approval`) StartExecution 트리거.
-  - 후보 있음 → View 수동 승인 없이 broker 주문 제출까지 자동 진행 / 후보 없음 → NO_TARGET 안전 종료.
-- **port-view 는 조회 · 승인 · 운영 UI 역할 유지** — port-view MS 자체의 컴퓨트(1순위 = ECS Fargate Service / OD-MS-002 정합) 결정 변경 없음 / port-view 화면(Dashboard / Balance / Positions / Orders / Reports / Daily) 조회 · 승인 · 운영 UI 책임 그대로 유지 / port-view `SlackNotificationService` 유지(View Daily Batch 수동 실행 결과 알림 책임 / OD-MS-010 정합).
-- **paper 자동 주문은 09:01 Scheduler 경로 전환** — 2026-06-30 오후까지는 ECS View 또는 Local View → Step Functions StartExecution 경로로 Step 12~17 승인 실행 진입(수동 승인 우선). 2026-07-01 부터는 후보가 있는 회차의 경우 09:01 Scheduler 경로로 자동 실행 / port-view 안 Daily Batch AWS Step 12~17 승인 버튼은 **운영자 fallback / 수동 재실행 경로**로 역할 재정의(운영 회차 중단 없이 View 안에서도 승인 실행 가능한 상태 유지).
-- **View 수동 실행은 운영자 fallback 유지** — 09:01 Scheduler / Dispatcher Lambda / Step Functions execution 실패 · 잘못된 상태 자동 실행 감지 시:
-  - (a) 09:01 Scheduler `disable-schedule` 로 자동 발사 차단 (R-AUTO-025 [2026-07-01 자동 ENABLE 진입] + R-AUTO-037 rollback 정합).
-  - (b) port-view 안 Daily Batch 승인 실행 버튼 또는 Local View wrapper 로 수동 재실행.
-  - (c) DB after-check + Slack 채널 사후 audit 진행.
-  - Step 12~17 Scheduler enable/disable 운영 절차는 [`./runbook.md`](./runbook.md) 참조.
-- **Fargate Task Role 후속** — `portfolio-paper-view-task-role` 의 `states:StartExecution` Resource 패턴은 일반 workflow ARN + approval workflow ARN 2종 모두 한정 부여(Action / Resource wildcard 0건 / 06 spec 후속 phase 책임 그대로 유지) / 본 일자 09:01 Scheduler ENABLE 전환은 View Task Role 권한 변경 없이 진행됨(Dispatcher Lambda 가 별도 IAM Role 로 Step Functions StartExecution 호출 책임 / OD-MS-032 정합).
-- **결정 / 리스크 변경** — 신규 결정 없음 / Decision Summary 카운트 변경 없음(전체 97 / 확정 52 / 잠정 42 유지). OD-MS-002 / OD-MS-009 / OD-MS-032 / OD-MS-033 / OD-MS-037 / OD-SAFE-001 ~ OD-SAFE-004 본문 변경 없이 evidence 보강. R-AUTO-033 · R-AUTO-034 본 일자 mitigation 추가 없음(2026-06-30 오후 보강분 유지) / R-AUTO-025 [2026-07-01 자동 ENABLE 진입] + R-AUTO-037 신규 는 04 spec 후속 책임(port-view 관점에서는 View 수동 실행 fallback 유지 정합만 재확인).
-- **aws-live 정책 변경 없음** — **본 변경은 aws-paper 에 한정된다. aws-live 자동 BUY / SELL 정책은 변경하지 않으며, live 는 후보 + 수동 승인 우선 정책을 유지한다.**(OD-SAFE-002 / OD-SAFE-003 정합)
-- **본 일자 Kiro 측 사실 기록**:
-  - AWS CLI / boto3 / psql / Spring Boot / 외부 API 실행 0건.
-  - AWS 리소스 신규 생성 · 수정 · 삭제 Kiro 측 변경 0건.
-  - broker 주문 제출 0건 / port-view 소스 변경 0건.
-  - port-view README / AGENTS.md / CHANGELOG / docs / worklog 본 일자 변경 0건 (spec 영역 문서 갱신만 수행).
-- **민감정보 평문 기록 0건** — 모두 `[REDACTED]` 계열 placeholder:
+  - the weekday 09:01 KST automatic execution triggers StartExecution of the Step 12~17 approval workflow (`portfolio-paper-daily-step12-17-approval`).
+  - candidate present → proceeds automatically through broker order submission without View manual approval / no candidate → NO_TARGET safe termination.
+- **port-view retains the query · approval · operations UI role** — no change to the port-view MS's own compute decision (first priority = ECS Fargate Service / OD-MS-002 alignment) / the port-view screens (Dashboard / Balance / Positions / Orders / Reports / Daily) query · approval · operations UI responsibility retained as is / port-view `SlackNotificationService` retained (responsibility for View Daily Batch manual execution result notifications / OD-MS-010 alignment).
+- **paper automatic orders switched to the 09:01 Scheduler path** — until 2026-06-30 afternoon, Step 12~17 approval execution was entered via the ECS View or Local View → Step Functions StartExecution path (manual approval first). From 2026-07-01, for rounds with a candidate, automatic execution runs via the 09:01 Scheduler path / the Daily Batch AWS Step 12~17 approval button inside port-view is redefined into the **operator fallback / manual re-execution path** (kept in a state where approval execution is possible inside the View too, without interrupting the operational round).
+- **View manual execution retained as operator fallback** — when a 09:01 Scheduler / Dispatcher Lambda / Step Functions execution failure · wrong-state automatic execution is detected:
+  - (a) block automatic firing with the 09:01 Scheduler `disable-schedule` (R-AUTO-025 [2026-07-01 automatic ENABLE entry] + R-AUTO-037 rollback alignment).
+  - (b) manual re-execution via the Daily Batch approval-execute button inside port-view or the Local View wrapper.
+  - (c) proceed with DB after-check + Slack channel post-audit.
+  - for the Step 12~17 Scheduler enable/disable operation procedure, see [`./runbook.md`](./runbook.md).
+- **Fargate Task Role follow-up** — the `states:StartExecution` Resource pattern of `portfolio-paper-view-task-role` is granted limited to both the general workflow ARN + approval workflow ARN (0 Action / Resource wildcards / 06 spec follow-up phase responsibility retained as is) / this date's 09:01 Scheduler ENABLE transition proceeded without changing the View Task Role privilege (the Dispatcher Lambda is responsible for the Step Functions StartExecution call via a separate IAM Role / OD-MS-032 alignment).
+- **Decision / risk changes** — no new decision / no change to the Decision Summary count (total 97 / confirmed 52 / provisional 42 retained). OD-MS-002 / OD-MS-009 / OD-MS-032 / OD-MS-033 / OD-MS-037 / OD-SAFE-001 ~ OD-SAFE-004 evidence reinforced without changing the bodies. No R-AUTO-033 · R-AUTO-034 mitigation added on this date (the 2026-06-30 afternoon reinforcement retained) / R-AUTO-025 [2026-07-01 automatic ENABLE entry] + R-AUTO-037 new are 04 spec follow-up responsibilities (from the port-view perspective, only the View manual execution fallback retention alignment is re-confirmed).
+- **No aws-live policy change** — **This change is limited to aws-paper. It does not change the aws-live automatic BUY / SELL policy, and live retains the candidate + manual-approval-first policy.** (OD-SAFE-002 / OD-SAFE-003 alignment)
+- **This date's Kiro-side factual record**:
+  - 0 AWS CLI / boto3 / psql / Spring Boot / external API execution.
+  - 0 Kiro-side changes to AWS resource creation · modification · deletion.
+  - 0 broker order submissions / 0 port-view source changes.
+  - 0 changes on this date to port-view README / AGENTS.md / CHANGELOG / docs / worklog (only spec-area document updates performed).
+- **0 plaintext records of sensitive information** — all `[REDACTED]`-family placeholders:
   - Slack webhook URL / DB password / KIS app key · KIS app secret.
-  - 계좌번호 12자리 원문 / token / RDS password / RDS endpoint hostname / account-id 12자리 원문.
-  - 실제 IAM Role · secret · state machine · Lambda ARN / public IP / image digest full sha256 / task ARN / ENI ID / broker_order_no 원문.
-- **운영 식별자** (사용자 명시 정책 정합으로 사실 기록):
-  - Scheduler 이름 · cron · Asia/Seoul · Target Input.
-  - state machine 이름 · executionName · status · start · stop timestamp.
-  - Slack 이벤트 라벨 · balance snapshot id · as_of_date · 금액 · count · 라인업 7종 이름.
+  - raw 12-digit account number / token / RDS password / RDS endpoint hostname / raw 12-digit account-id.
+  - actual IAM Role · secret · state machine · Lambda ARN / public IP / image digest full sha256 / task ARN / ENI ID / raw broker_order_no.
+- **Operational identifiers** (recorded as facts per the user-specified policy):
+  - Scheduler name · cron · Asia/Seoul · Target Input.
+  - state machine name · executionName · status · start · stop timestamp.
+  - Slack event label · balance snapshot id · as_of_date · amount · count · 7 lineup names.

@@ -1,33 +1,33 @@
 # Kiro ReadOnly Validator IAM — Design
 
-본 문서는 운영자가 AWS Console에서 직접 구축한 PORT-STRATEGY-AI Foundation(VPC / Subnet / Route Table / SG / VPC Endpoint / RDS / Secrets metadata)을 Kiro가 **읽기 전용으로만** 검증할 수 있도록 만드는 IAM 사용자 / 정책 / 검증 절차 설계서다. 본 IAM은 어떤 리소스도 만들거나 변경하지 않고, secret 값은 절대 조회하지 않는다.
+This document is a design spec for the IAM user / policy / validation procedure that lets Kiro validate — **read-only only** — the PORT-STRATEGY-AI Foundation (VPC / Subnet / Route Table / SG / VPC Endpoint / RDS / Secrets metadata) that the operator built directly in the AWS Console. This IAM neither creates nor modifies any resource, and never reads secret values.
 
-본 문서에는 실제 secret / password / access key / token / account-id / endpoint hostname 값을 적지 않는다. 모두 `[REDACTED]` 또는 placeholder만 사용한다.
+This document does not record actual secret / password / access key / token / account-id / endpoint hostname values. It uses only `[REDACTED]` or placeholders.
 
-## 1. 목적과 범위
+## 1. Purpose and Scope
 
-- 목적
-  - Kiro가 운영자가 만든 Foundation 결과를 ReadOnly 권한으로 검증해 [`../specs/02-aws-network-and-rds/validation-checklist.md`](../specs/02-aws-network-and-rds/validation-checklist.md)에 결과를 갱신할 수 있도록 한다.
-  - 운영자 결정 / 비용 / DB SQL / cutover / 외부 노출 같은 항목은 자동 검증이 어렵다. 본 IAM 권한으로는 자동 검증 가능한 항목만 다루고, 나머지는 운영자 수동 확인으로 남긴다.
-- 범위
-  - VPC, Subnet, Route Table, IGW, NAT Gateway, EC2 instance(NAT 후보 점검 용도), Security Group, VPC Endpoint, RDS instance / subnet group / parameter group, Secrets Manager metadata, IAM 인벤토리, CloudWatch / CloudWatch Logs metadata, Resource Groups Tagging.
-- 범위 밖
-  - 리소스 생성 / 변경 / 삭제.
-  - Secret value 조회(`secretsmanager:GetSecretValue`).
-  - Decrypt / KMS Decrypt / 데이터 plane 호출.
-  - DB DDL/DML / SQL 실행.
-  - broker / KIS / Slack / 외부 API 호출.
+- Purpose
+  - Enable Kiro to validate the Foundation results the operator built, using ReadOnly permissions, so it can update the results in [`../specs/02-aws-network-and-rds/validation-checklist.md`](../specs/02-aws-network-and-rds/validation-checklist.md).
+  - Items such as operator decisions / cost / DB SQL / cutover / external exposure are hard to validate automatically. With these IAM permissions we handle only the items that can be validated automatically and leave the rest to manual operator confirmation.
+- Scope
+  - VPC, Subnet, Route Table, IGW, NAT Gateway, EC2 instance (for NAT-candidate inspection), Security Group, VPC Endpoint, RDS instance / subnet group / parameter group, Secrets Manager metadata, IAM inventory, CloudWatch / CloudWatch Logs metadata, Resource Groups Tagging.
+- Out of scope
+  - Resource creation / modification / deletion.
+  - Secret value retrieval (`secretsmanager:GetSecretValue`).
+  - Decrypt / KMS Decrypt / data-plane calls.
+  - DB DDL/DML / SQL execution.
+  - broker / KIS / Slack / external API calls.
 
-## 2. 명명 규칙
+## 2. Naming Conventions
 
-- IAM User 이름: `portfolio-kiro-readonly-validator`
-- IAM Policy 이름: `PortfolioKiroReadOnlyValidatorPolicy`
-- (옵션) IAM Role 이름: `portfolio-kiro-readonly-validator-role` — 외부 system / OIDC 연동 시.
-- 환경 매핑: aws-paper에서 시작. aws-live 적용 시 동일 이름에 `-live` suffix를 추가하거나 별도 IAM User로 분리하는 것을 운영자 결정으로 둔다.
+- IAM User name: `portfolio-kiro-readonly-validator`
+- IAM Policy name: `PortfolioKiroReadOnlyValidatorPolicy`
+- (Optional) IAM Role name: `portfolio-kiro-readonly-validator-role` — when integrating with an external system / OIDC.
+- Environment mapping: Start in aws-paper. When applying to aws-live, whether to add a `-live` suffix to the same name or split into a separate IAM User is left to the operator's decision.
 
-## 3. 최소 권한 IAM Policy (JSON)
+## 3. Least-Privilege IAM Policy (JSON)
 
-사용자가 지정한 권한 목록 그대로 ReadOnly만 부여한다. 쓰기 / 변경 / 삭제 / `GetSecretValue` / 데이터 plane은 절대 포함하지 않는다.
+Grant only ReadOnly, exactly as the user-specified permission list. Write / modify / delete / `GetSecretValue` / data-plane are never included.
 
 ```json
 {
@@ -147,38 +147,38 @@
 }
 ```
 
-설계 메모
+Design notes
 
-- `Allow` 블록은 사용자가 지정한 ReadOnly 권한을 그대로 포함한다. `iam:GenerateCredentialReport` / `GenerateServiceLastAccessedDetails`는 Get/List 계열의 ReadOnly 보강 항목으로만 사용.
-- 마지막 `DenyAnyWrite` 블록은 운영자가 IAM 정책을 추가로 attach해 권한이 확대되는 사고를 방지하기 위한 명시 deny. AWS IAM의 `Deny` 우선 순위로 인해 다른 attached policy가 write 권한을 부여하더라도 실제 호출은 차단된다.
-- `secretsmanager:GetSecretValue`와 `secretsmanager:GetSecret*` 패턴은 `Deny` 측에 명시한다. ReadOnly 정책에 우연히 GetSecret API가 들어가는 사고를 차단.
-- 데이터 plane(KMS Decrypt 등) 호출도 명시 차단. Secret value를 우회 복호화하는 경로를 막는다.
+- The `Allow` block includes the ReadOnly permissions the user specified, as-is. `iam:GenerateCredentialReport` / `GenerateServiceLastAccessedDetails` are used only as ReadOnly reinforcements in the Get/List family.
+- The final `DenyAnyWrite` block is an explicit deny to prevent the accident of privilege escalation should the operator attach an additional IAM policy. Because of the `Deny` precedence in AWS IAM, even if another attached policy grants a write permission, the actual call is blocked.
+- The `secretsmanager:GetSecretValue` and `secretsmanager:GetSecret*` patterns are stated on the `Deny` side. This blocks the accident of a GetSecret API accidentally entering the ReadOnly policy.
+- Data-plane calls (KMS Decrypt, etc.) are also explicitly blocked. This closes the path of decrypting a secret value by a workaround.
 
-## 4. AWS Console 생성 절차
+## 4. AWS Console Creation Procedure
 
-운영자(Step 0의 `portadmin` 사용자)가 직접 수행한다.
+The operator (the `portadmin` user from Step 0) performs this directly.
 
-1. Console → IAM → Policies → Create policy → JSON 선택.
-2. 위 § 3 JSON을 그대로 붙여 넣는다.
-3. Next → Tags 추가:
+1. Console → IAM → Policies → Create policy → select JSON.
+2. Paste the § 3 JSON above as-is.
+3. Next → add Tags:
    - `env=paper`
    - `kind=readonly-validator`
    - `project=portfolio`
-4. Policy name: `PortfolioKiroReadOnlyValidatorPolicy`. Description 짧게 기록.
+4. Policy name: `PortfolioKiroReadOnlyValidatorPolicy`. Record a short Description.
 5. Create policy.
 6. IAM → Users → Create user.
 7. User name: `portfolio-kiro-readonly-validator`.
-8. Provide user access to the AWS Management Console: 비활성(콘솔 로그인 비허용. CLI 전용).
-9. Permissions options: `Attach policies directly` → `PortfolioKiroReadOnlyValidatorPolicy` 선택 → Next → Tags → Create user.
-10. 생성된 사용자 → Security credentials → Create access key:
+8. Provide user access to the AWS Management Console: disabled (no console sign-in allowed. CLI only).
+9. Permissions options: `Attach policies directly` → select `PortfolioKiroReadOnlyValidatorPolicy` → Next → Tags → Create user.
+10. Created user → Security credentials → Create access key:
     - Use case: `Command Line Interface (CLI)`.
-    - Confirmation 체크 후 Next → Description tag(예: `kiro-cli`) → Create access key.
-    - Access key / Secret access key는 본 문서 / repo / 노트에 평문 기록 금지(`[REDACTED]`).
-11. (옵션) IAM → Users → `portfolio-kiro-readonly-validator` → Security credentials → MFA: 인간 사용 없으므로 일반적으로 미적용. 다만 운영자 정책에 따라 하드웨어 키 / Authenticator 등록 가능.
+    - After checking the Confirmation, Next → Description tag (e.g., `kiro-cli`) → Create access key.
+    - The Access key / Secret access key must not be recorded in plaintext in this document / repo / notes (`[REDACTED]`).
+11. (Optional) IAM → Users → `portfolio-kiro-readonly-validator` → Security credentials → MFA: generally not applied since there is no human use. However, per operator policy, a hardware key / Authenticator registration is possible.
 
-## 5. AWS CLI 생성 절차
+## 5. AWS CLI Creation Procedure
 
-운영자가 `portadmin` 자격으로 다음 명령을 순서대로 실행한다(Region은 IAM이 글로벌이므로 무관).
+The operator runs the following commands in order with `portadmin` credentials (Region is irrelevant since IAM is global).
 
 ```powershell
 # 1) Policy 파일 준비 (위 § 3 JSON을 portfolio-kiro-readonly.json으로 저장)
@@ -202,13 +202,13 @@ aws iam create-access-key `
   --user-name portfolio-kiro-readonly-validator
 ```
 
-발급 직후 Kiro가 사용할 환경(예: `aws configure --profile portfolio-kiro-readonly`)에 access key / secret access key를 등록한다. 등록 후 access key 값은 즉시 메모리에서 제거하고, 평문 파일에 남기지 않는다.
+Immediately after issuance, register the access key / secret access key in the environment Kiro will use (for example, `aws configure --profile portfolio-kiro-readonly`). After registration, remove the access key value from memory immediately and do not leave it in a plaintext file.
 
-(옵션) IAM Role 형태로 운영하려면 위 정책을 Role의 inline 또는 attached policy로 사용하고, trust policy의 Principal을 외부 system의 OIDC provider 또는 portadmin로 한정한다. 본 spec은 운영 단순성을 위해 IAM User + access key 방식을 1순위로 둔다.
+(Optional) To operate as an IAM Role, use the policy above as the Role's inline or attached policy, and restrict the trust policy's Principal to the external system's OIDC provider or portadmin. For operational simplicity, this spec puts the IAM User + access key approach as the first choice.
 
-## 6. 검증 명령 — AWS CLI ReadOnly
+## 6. Validation Commands — AWS CLI ReadOnly
 
-본 절은 Kiro가 자동 검증 시 호출하는 read-only AWS CLI 명령 모음이다. 각 명령은 운영자 환경에서도 동일하게 재현 가능하다. account-id, RDS endpoint hostname, secret ARN 등 식별자는 출력에서 운영자가 직접 마스킹한다.
+This section is the set of read-only AWS CLI commands Kiro calls during automatic validation. Each command is reproducible identically in the operator environment. Identifiers such as account-id, RDS endpoint hostname, and secret ARN are masked directly by the operator in the output.
 
 ```powershell
 # Region 고정
@@ -276,55 +276,55 @@ aws secretsmanager describe-secret --secret-id /portfolio/paper/rds/master `
   --query "{Name:Name,KmsKeyId:KmsKeyId,RotationEnabled:RotationEnabled,LastChangedDate:LastChangedDate,DeletedDate:DeletedDate,Tags:Tags}" --output json
 ```
 
-## 7. 자동 검증 가능 / 수동 확인 분류
+## 7. Automatically Validatable / Manual Confirmation Classification
 
-### 7-1. 자동 검증 가능 (Kiro가 ReadOnly로 검증)
+### 7-1. Automatically Validatable (Kiro validates via ReadOnly)
 
 - VPC CIDR / state / tags
-- Subnet 6개 이름 / CIDR / AZ / VPC 매핑
-- Internet Gateway attach 상태
-- NAT Gateway 미생성
-- NAT 역할 EC2 인스턴스 미생성
-- Route Table route(0.0.0.0/0 → IGW for `rt-public`, `rt-app`/`rt-data` 외부 라우트 없음) / subnet association
-- Security Group inbound / outbound rule, SSH 22 / 5432 0/0 부재 검사
-- VPC Endpoint state / subnet / private DNS / SG / route table 연결
+- Subnet: 6 names / CIDR / AZ / VPC mapping
+- Internet Gateway attach status
+- NAT Gateway not created
+- NAT-role EC2 instance not created
+- Route Table routes (0.0.0.0/0 → IGW for `rt-public`, no external route for `rt-app`/`rt-data`) / subnet association
+- Security Group inbound / outbound rules, check for absence of SSH 22 / 5432 0/0
+- VPC Endpoint state / subnet / private DNS / SG / route table association
 - RDS Subnet Group status / member subnets / VPC
-- RDS Parameter Group family / 사용자 설정 parameter 값
-- RDS instance status / engine version / class / storage / public access / backup retention / deletion protection / encryption / endpoint 존재 여부 / SG / parameter group 적용
-- Secret `/portfolio/paper/rds/master` 존재 여부와 metadata(KmsKeyId, RotationEnabled, Tags 등) — value는 절대 조회하지 않음
+- RDS Parameter Group family / user-set parameter values
+- RDS instance status / engine version / class / storage / public access / backup retention / deletion protection / encryption / endpoint existence / SG / parameter group applied
+- Secret `/portfolio/paper/rds/master` existence and metadata (KmsKeyId, RotationEnabled, Tags, etc.) — the value is never retrieved
 
-### 7-2. 수동 확인 필요 (운영자 직접)
+### 7-2. Manual Confirmation Required (Operator Directly)
 
-- 운영자 승인 여부(approval required task)
-- Secret이 본 문서 / 캡처 / 운영자 노트에 평문 노출되지 않았는지(외부 file inspection 필요)
-- [`../specs/_common/operator-decisions.md`](../specs/_common/operator-decisions.md) / [`../specs/_common/risk-register.md`](../specs/_common/risk-register.md) 인지 여부(사람의 판독)
-- AWS Billing Dashboard 실제 청구 금액(읽기는 가능하나 비용 프로파일 라인 결정은 사람 판단)
-- Cost Anomaly Detection alert 등록 여부와 운영자 결정
-- DB / schema / role SQL 실행 여부(03 / 06 spec 진행 시점)
-- pg_dump / pg_restore 합의 여부(운영자 노트)
-- Rollback 수행 여부와 사유(사람 결정)
-- Public 문서 / repo 노출 판단
+- Whether operator approval was given (approval required task)
+- Whether a secret was exposed in plaintext in this document / captures / operator notes (external file inspection required)
+- Awareness of [`../specs/_common/operator-decisions.md`](../specs/_common/operator-decisions.md) / [`../specs/_common/risk-register.md`](../specs/_common/risk-register.md) (human reading)
+- The actual billed amount in the AWS Billing Dashboard (readable, but the cost-profile line decision is a human judgment)
+- Whether a Cost Anomaly Detection alert is registered, and the operator decision
+- Whether DB / schema / role SQL was executed (at the time of 03 / 06 spec progress)
+- Whether pg_dump / pg_restore was agreed (operator notes)
+- Whether a Rollback was performed and its reason (human decision)
+- Public document / repo exposure judgment
 
-## 8. validation-checklist 반영 규칙
+## 8. Rules for Reflection into validation-checklist
 
-- AWS API로 명확히 확인된 항목 → `<span style="color:red">[O]</span>`
-- AWS API로 확인 불가하거나 운영자 판단 필요 항목 → `<span style="color:black">[확인 필요]</span> — 수동 확인 필요`
-- 검증 실패 또는 기대값 불일치 항목 → `<span style="color:blue">[X]</span> — 불일치: 실제값 = ..., 기대값 = ...`
-- 기대값 / 결정값 / secret value는 본 문서에서도 임의로 변경하지 않는다.
+- Item clearly confirmed via the AWS API → `<span style="color:red">[O]</span>`
+- Item not confirmable via the AWS API or requiring operator judgment → `<span style="color:black">[확인 필요]</span> — manual confirmation needed`
+- Item that failed validation or does not match the expected value → `<span style="color:blue">[X]</span> — mismatch: actual = ..., expected = ...`
+- Expected values / decision values / secret values are not changed arbitrarily even in this document.
 
-## 9. 보안 / 안전 제약
+## 9. Security / Safety Constraints
 
-- 본 IAM User / Role / Access Key는 ReadOnly. 어떤 리소스 변경 호출도 발생하지 않는다.
-- `secretsmanager:GetSecretValue`는 정책 Allow에 없고 Deny에 명시된다.
-- KMS `Decrypt` / `GenerateDataKey`는 Deny.
-- Access key는 본 문서 / repo / 평문 파일 어디에도 기록하지 않는다(`[REDACTED]`).
-- Region은 `ap-northeast-2`로 고정.
-- access key 노출 의심 시 `aws iam delete-access-key` 후 `create-access-key`로 재발급. 본 문서에는 새 값을 적지 않는다.
+- This IAM User / Role / Access Key is ReadOnly. No resource-modifying call occurs.
+- `secretsmanager:GetSecretValue` is not in the policy Allow and is explicitly stated in Deny.
+- KMS `Decrypt` / `GenerateDataKey` are Deny.
+- The access key is not recorded anywhere in this document / repo / plaintext file (`[REDACTED]`).
+- Region is fixed to `ap-northeast-2`.
+- If an access key exposure is suspected, reissue via `aws iam delete-access-key` then `create-access-key`. Do not record the new value in this document.
 
-## 10. 변경 / 회수 절차
+## 10. Change / Revocation Procedure
 
-- 더 이상 자동 검증이 필요 없을 때
-  1. Access key 비활성: `aws iam update-access-key --user-name portfolio-kiro-readonly-validator --access-key-id [REDACTED] --status Inactive`
-  2. 일정 기간 모니터링 후 삭제: `aws iam delete-access-key`
-  3. Policy detach + Policy 삭제 + User 삭제(필요 시).
-- 권한 부족이 확인되면 Allow에 ReadOnly 항목만 추가한다. Write / Decrypt 항목은 절대 추가하지 않는다.
+- When automatic validation is no longer needed
+  1. Deactivate the access key: `aws iam update-access-key --user-name portfolio-kiro-readonly-validator --access-key-id [REDACTED] --status Inactive`
+  2. Delete after a monitoring period: `aws iam delete-access-key`
+  3. Policy detach + delete Policy + delete User (if needed).
+- If insufficient permissions are found, add only ReadOnly items to Allow. Never add Write / Decrypt items.
