@@ -293,7 +293,7 @@ public class ReportService {
                                 ? ViewMessages.text("report.diagnosis.blockBucket.noData")
                                 : ViewMessages.text(
                                         "report.diagnosis.blockBucket.description",
-                                        safe(worstBlock.holdingBucket()),
+                                        safe(worstBlock.holdingBucketLabel()),
                                         safe(worstBlock.candidateTypeLabel()),
                                         formatPercent(worstBlock.avgReturn())
                                 ),

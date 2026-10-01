@@ -499,7 +499,7 @@
                             </thead>
                             <tbody>
                             <tr th:each="stat : ${page.blockWeakStats()}">
-                                <td th:text="${stat.holdingBucket()}">-</td>
+                                <td th:text="${stat.holdingBucketLabel()}">-</td>
                                 <td>
                                     <strong th:text="${stat.candidateTypeLabel()}">-</strong>
                                     <small th:text="${stat.candidateType()}">-</small>
