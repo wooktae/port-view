@@ -115,7 +115,7 @@ Sensitive information is never recorded verbatim; only `[REDACTED]`-style placeh
 | Operational risk | Per-MS image build timing sync · version drift |
 | Not recommended | ECS · EC2 · Lambda · EKS |
 | Related spec | 07 |
-| Detail | [07 spec folder](../07-cicd-pipelines/) |
+| Detail | Planned; `07-cicd-pipelines` folder not yet created |
 
 ### `port_strategy_decision`
 

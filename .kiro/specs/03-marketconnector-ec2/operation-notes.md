@@ -124,14 +124,14 @@ Accumulates the fact that this EC2 was first validated as the SSM Port Forwardin
 
 1. SSM Port Forwarding standard waypoint: complete
    1) Decision lock: OD-NET-010 (SSM Port Forwarding standard waypoint = `portfolio-paper-marketconnector-ec2`).
-   2) instance id: `i-0fce77927b7397b88`
-   3) private ip: `10.0.0.181`
+   2) instance id: `[REDACTED_RESOURCE_ID]`
+   3) private ip: `[REDACTED_PRIVATE_IP]`
    4) state: `running` (at this date's check point)
    5) SSM Managed Node status: ping `Online` / platform `Linux` / agent `3.3.4515.0`
 2. Usage flow: complete
    1) Local PC `localhost:15433` → SSM Session Manager tunnel → this EC2 → AWS Paper RDS `portfolio-paper-rds:5432`
    2) Connection to AWS Paper RDS from local is possible without RDS Public exposure (`PubliclyAccessible = False`).
-   3) `portfolio-paper-crawler-worker` (instance id `i-0ff768ea639a91355`) is maintained in the KRX GUI / Windows worker role (consistent with 08 spec) — it is not used as an SSM Port Forwarding waypoint.
+   3) `portfolio-paper-crawler-worker` (instance id `[REDACTED_RESOURCE_ID]`) is maintained in the KRX GUI / Windows worker role (consistent with 08 spec) — it is not used as an SSM Port Forwarding waypoint.
 
 ### 2. 03 spec impact
 
@@ -144,8 +144,8 @@ Accumulates the fact that this EC2 was first validated as the SSM Port Forwardin
 
 ### 3. This date's validation result summary
 
-1. SSM Port Forwarding tunnel open: complete (session id `terraform-vjp3fv3nz73konetcevdzjh9de` / local port 15433 / remote 5432).
-2. `portfolio_admin` connection: complete (`current_user` = `portfolio_admin`, `inet_server_addr` = `10.0.20.165`, `inet_server_port` = `5432`).
+1. SSM Port Forwarding tunnel open: complete (session id `[REDACTED_RESOURCE_ID]` / local port 15433 / remote 5432).
+2. `portfolio_admin` connection: complete (`current_user` = `portfolio_admin`, `inet_server_addr` = `[REDACTED_PRIVATE_IP]`, `inet_server_port` = `5432`).
 3. `execution_app` connection: complete (Strategy Execution porting pre-validation passed / search_path = `execution, decision, research, connector, preprocessor, interest, reference, legacy, public`).
 4. 0 broker / KIS / order / fill entrypoint calls. 0 RDS DDL/DML. Limited to SELECT queries.
 
@@ -293,10 +293,10 @@ Kiro only performed documentation / procedure organization. The actual SSM RunCo
    3) `source_run_id` fallback patch applied (operator direct work / the diff is a fact record in this note only).
    4) Entering the paper-environment-limited path per the `--execute` guard (`PORT_ENVIRONMENT=paper` + `PORT_DB_TARGET=aws-paper`) consistency (consistent with R-AUTO-010 [2026-06-17 reinforcement]).
 3. Result of submitting 4 KIS paper BUY: success
-   1) `282330` BGF리테일 — `execution_order_id 26` SUBMITTED / `connector_order_request_id 34` created / `broker_order_no 0000035906`.
-   2) `004990` 롯데지주 — `execution_order_id 27` SUBMITTED / `connector_order_request_id 35` created / `broker_order_no 0000035912`.
-   3) `003490` 대한항공 — `execution_order_id 28` SUBMITTED / `connector_order_request_id 36` created / `broker_order_no 0000035918`.
-   4) `088350` 한화생명 — `execution_order_id 29` SUBMITTED / `connector_order_request_id 37` created / `broker_order_no 0000035932`.
+   1) `282330` BGF리테일 — `execution_order_id 26` SUBMITTED / `connector_order_request_id 34` created / `broker_order_no [REDACTED_BROKER_ORDER_NO]`.
+   2) `004990` 롯데지주 — `execution_order_id 27` SUBMITTED / `connector_order_request_id 35` created / `broker_order_no [REDACTED_BROKER_ORDER_NO]`.
+   3) `003490` 대한항공 — `execution_order_id 28` SUBMITTED / `connector_order_request_id 36` created / `broker_order_no [REDACTED_BROKER_ORDER_NO]`.
+   4) `088350` 한화생명 — `execution_order_id 29` SUBMITTED / `connector_order_request_id 37` created / `broker_order_no [REDACTED_BROKER_ORDER_NO]`.
    5) All 4 paper responses normal / 0 SELL / cancel / modify calls / 0 aws-live work (consistent with OD-MS-016 / OD-MS-021 / OD-SAFE-001 ~ OD-SAFE-004).
    6) The Strategy Execution `READY -> REQUESTED` transition is the responsibility of 04 spec Step 11 `DAILY_AUTO_BUY` / this step handles only the `REQUESTED -> SUBMITTED` transition (first demonstration of the OD-MS-016 responsibility separation).
 4. Follow-up supplement candidates: follow-up
@@ -372,7 +372,7 @@ This step is a separate real execution from the same date's first-session prelim
    - RDS password / RDS endpoint hostname
    - account-id / actual IAM Role ARN / actual secret ARN / IAM access key id
    - instance-id / EIP / image digest full sha256 / task ARN / job ARN
-4. The 4 KIS paper `broker_order_no` (`0000035906` / `0000035912` / `0000035918` / `0000035932`) are broker response values that are operational identifiers — not real-account order numbers / consistent with this note's fact record (consistent with R-DOCS-001 [2026-06-17 reinforcement (17-step E2E)]).
+4. The 4 KIS paper `broker_order_no` (`[REDACTED_BROKER_ORDER_NO]` / `[REDACTED_BROKER_ORDER_NO]` / `[REDACTED_BROKER_ORDER_NO]` / `[REDACTED_BROKER_ORDER_NO]`) are broker response values that are operational identifiers — not real-account order numbers / consistent with this note's fact record (consistent with R-DOCS-001 [2026-06-17 reinforcement (17-step E2E)]).
 5. The diffs of `connector_strategy_order_execute.py` / `connector_order_check.py` that the operator patched / formally deployed directly are recorded in this note only as facts — 0 full-body quotations. 0 changes to the 8 MS README / AGENTS.md / CHANGELOG / docs / worklog / source / packaging due to this date's work.
 6. AWS / SSM / EC2 / RDS / Secrets Manager / SSM Parameter Store / KIS API calls are all performed directly by the operator. Kiro only performed documentation / procedure organization / validation item organization.
    - 0 AWS CLI executions
@@ -610,10 +610,10 @@ This step is the first case where the operator explicitly used the `-AllowPaperO
    1) Re-entered wrapper Step 12 (with the `-AllowPaperOrderExecute` option as-is)
    2) 4 KIS paper BUY submissions succeeded
    3) Stock / mapping:
-       - `004990` 롯데지주 — `strategy_execution_order id 30` SUBMITTED / `connector_order_request id 42` ACCEPTED / `broker_order_no 0000025576`
-       - `023530` 롯데쇼핑 — `strategy_execution_order id 31` SUBMITTED / `connector_order_request id 43` ACCEPTED / `broker_order_no 0000025740`
-       - `003490` 대한항공 — `strategy_execution_order id 32` SUBMITTED / `connector_order_request id 44` ACCEPTED / `broker_order_no 0000025744`
-       - `042660` 한화오션 — `strategy_execution_order id 33` SUBMITTED / `connector_order_request id 45` ACCEPTED / `broker_order_no 0000025747`
+       - `004990` 롯데지주 — `strategy_execution_order id 30` SUBMITTED / `connector_order_request id 42` ACCEPTED / `broker_order_no [REDACTED_BROKER_ORDER_NO]`
+       - `023530` 롯데쇼핑 — `strategy_execution_order id 31` SUBMITTED / `connector_order_request id 43` ACCEPTED / `broker_order_no [REDACTED_BROKER_ORDER_NO]`
+       - `003490` 대한항공 — `strategy_execution_order id 32` SUBMITTED / `connector_order_request id 44` ACCEPTED / `broker_order_no [REDACTED_BROKER_ORDER_NO]`
+       - `042660` 한화오션 — `strategy_execution_order id 33` SUBMITTED / `connector_order_request id 45` ACCEPTED / `broker_order_no [REDACTED_BROKER_ORDER_NO]`
    4) All 4 paper responses normal / 0 SELL · cancel · modify calls / 0 aws-live work
    5) 0 duplicate broker orders — all 4 broker_order_no unique / consistent normal per R-BROKER-004 mitigation
 5. Follow-up handover: follow-up
@@ -688,7 +688,7 @@ This step is the result of first demonstrating whether the 2026-06-17 17-step E2
    - RDS password / RDS endpoint hostname
    - account-id / actual IAM Role ARN / actual secret ARN / IAM access key id
    - instance-id / EIP / image digest full sha256 / task ARN / job ARN
-4. The 4 KIS paper `broker_order_no` (`0000025576` / `0000025740` / `0000025744` / `0000025747`) are broker response values that are operational identifiers — not real-account order numbers / consistent with this note's fact record. SSM commandId `66ec8831-74b9-469c-8410-6ccb11cb3400` is also recorded as a fact as an operational identifier.
+4. The 4 KIS paper `broker_order_no` (`[REDACTED_BROKER_ORDER_NO]` / `[REDACTED_BROKER_ORDER_NO]` / `[REDACTED_BROKER_ORDER_NO]` / `[REDACTED_BROKER_ORDER_NO]`) are broker response values that are operational identifiers — not real-account order numbers / consistent with this note's fact record. SSM commandId `66ec8831-74b9-469c-8410-6ccb11cb3400` is also recorded as a fact as an operational identifier.
 5. The diff of `port_strategy_execution/execution_sync_buy_position.py` that the operator patched / formally deployed directly is recorded in the 04 spec operation-notes only as a fact (0 full-body quotations / consistent with R-DOCS-001). 0 changes to the 8 MS README / AGENTS.md / CHANGELOG / docs / worklog / source / packaging due to this date's work (spec area).
 6. AWS / SSM / EC2 / ECS / Batch / IAM / Secrets Manager / SSM Parameter Store / RDS / GRANT / KIS / S3 / CloudWatch / Docker / ECR calls are all performed directly by the operator. Kiro only performed documentation / procedure organization / validation item organization.
    - 0 AWS CLI / boto3 executions
@@ -750,15 +750,15 @@ This work falls under the following and is consistent with the new decision lock
    3) The current repository's remote push destination is unset → git push not performed
    4) Git remote setup + formal push of commit `75cb804` is separated as a follow-up (followups-overview 2026-06-18 §1)
 3. EC2 reflection (via S3): complete
-   1) S3 bucket `portfolio-paper-migration-yukiever`
+   1) S3 bucket `[REDACTED_BUCKET]`
    2) S3 key `deploy/marketconnector/connector_order_check.py`
    3) File size `39159 bytes`
-   4) EC2 instance id `i-0fce77927b7397b88` (OD-NET-010 standard SSM Port Forwarding standard waypoint / 03 spec formal operational EC2)
+   4) EC2 instance id `[REDACTED_RESOURCE_ID]` (OD-NET-010 standard SSM Port Forwarding standard waypoint / 03 spec formal operational EC2)
    5) EC2 backup file name `connector_order_check.py.bak-20260618-step13-per-order` (consistent with the original-preservation policy)
-   6) SSM commandId `b344d404-07a4-4bb6-9d63-34151e648bab` (SSM RunCommand response identifier)
+   6) SSM commandId `[REDACTED_RESOURCE_ID]` (SSM RunCommand response identifier)
 4. Wrapper standalone execution validation: passed
    1) Command `-StartStep 13 -EndStep 13` (StartStep / EndStep — risk of entering default 1/17 on a FromStep / ToStep mistake / explicit wrapper parameters)
-   2) `connector_order_event` / `connector_fill` created normally based on 1 single direct-only query (`004990` / broker_order_no `0000025576`)
+   2) `connector_order_event` / `connector_fill` created normally based on 1 single direct-only query (`004990` / broker_order_no `[REDACTED_BROKER_ORDER_NO]`)
    3) 0 new broker · KIS order submissions / all query-only calls
 
 ### 4. Decision / risk change summary: complete
@@ -778,7 +778,7 @@ This work falls under the following and is consistent with the new decision lock
 
 ### 5. Safety / security check result (Step 13 `connector_order_check.py` per-order sequential query default): complete
 
-1. broker / KIS call scope: 1 single direct-only query (`004990` / `0000025576`) + 1 wrapper Step 13 standalone execution (`-StartStep 13 -EndStep 13`) — all query-only. 0 new BUY · SELL · cancel · modify · `--execute` calls. 0 SELL position `mark_position_sell_ordered()` calls. 0 fill · position sync automatic retries. 0 aws-live work.
+1. broker / KIS call scope: 1 single direct-only query (`004990` / `[REDACTED_BROKER_ORDER_NO]`) + 1 wrapper Step 13 standalone execution (`-StartStep 13 -EndStep 13`) — all query-only. 0 new BUY · SELL · cancel · modify · `--execute` calls. 0 SELL position `mark_position_sell_ordered()` calls. 0 fill · position sync automatic retries. 0 aws-live work.
 2. 0 RDS DDL. DML is limited to the Step 13 normal flow — the new `connector.connector_order_event` / `connector.connector_fill` rows are consistent with the single direct-only query result.
 3. The sensitive information below has 0 plaintext records in this note — all use `[REDACTED]` or a placeholder.
    - actual secret value / KIS app key / KIS app secret / token / KIS paper login credential
@@ -795,13 +795,13 @@ This work falls under the following and is consistent with the new decision lock
 6. Uses wrapper parameters `StartStep` / `EndStep` (risk of entering default 1/17 on a FromStep / ToStep mistake) — this date's standalone execution proceeded with `-StartStep 13 -EndStep 13` / consistent with the explicit-wrapper-parameter policy.
 7. The operational identifiers below are recorded as facts consistent with the user-specified policy — not secrets.
    - commit `75cb804`
-   - S3 bucket `portfolio-paper-migration-yukiever`
+   - S3 bucket `[REDACTED_BUCKET]`
    - S3 key `deploy/marketconnector/connector_order_check.py`
    - file size `39159 bytes`
-   - EC2 instance id `i-0fce77927b7397b88`
+   - EC2 instance id `[REDACTED_RESOURCE_ID]`
    - EC2 backup file name `connector_order_check.py.bak-20260618-step13-per-order`
-   - SSM commandId `b344d404-07a4-4bb6-9d63-34151e648bab`
-   - stock code `004990` / broker_order_no `0000025576`
+   - SSM commandId `[REDACTED_RESOURCE_ID]`
+   - stock code `004990` / broker_order_no `[REDACTED_BROKER_ORDER_NO]`
    - wrapper options `--broad` · `--active-limit` · `--code` · `--order-no` · `--no-broad`
    - wrapper parameters `StartStep` · `EndStep`
 
@@ -992,7 +992,7 @@ The detailed accumulation of the 04 spec-side steps (Step 6 ~ Step 11 Strategy D
    4) Cases where `broker_order_no IS NOT NULL` or a `connector_fill` already exists are excluded from the recovery target — ensures no conflict with the duplicate order risk of R-BROKER-004 / R-AUTO-001
    5) Recovery handling — `execution_status = REQUESTED` + `connector_order_request_id = NULL` + store the old request history in `result_payload.retry_normalizer` (`old_connector_order_request_id` / `request_status` / `rejection_code` / `recovered_at`, etc., post-hoc-traceable metadata)
 3. EC2 formal deployment + dry-run pass: complete
-   1) EC2 = `portfolio-paper-marketconnector-ec2` (instance id `i-0fce77927b7397b88` / consistent with OD-NET-010 / this note's operational identifier fact record — not a secret)
+   1) EC2 = `portfolio-paper-marketconnector-ec2` (instance id `[REDACTED_RESOURCE_ID]` / consistent with OD-NET-010 / this note's operational identifier fact record — not a secret)
    2) Formal deployment flow = operator direct patch → EC2 deployment (same flow as 2026-06-18 §2 — 0 full-body quotations in this note)
    3) `.venv/bin/python` dry-run pass — currently 0 retry candidates / 0 REQUESTED orders / 0 actual R-AUTO-022 candidate occurrences on this date
    4) Step Functions Step 12 also uses `.venv/bin/python` consistently — because the same entrypoint is called even after the Step Functions transition, the retry-normalizer operates as-is
@@ -1018,7 +1018,7 @@ The detailed accumulation of the 04 spec-side steps (Step 6 ~ Step 11 Strategy D
    1) Step Functions approval gate passed — consistent with the `PaperOrder: True` label of the Step 12 stdout (consistent with R-AUTO-019 mitigation on the Step Functions side / consistent with the new OD-MS-029)
    2) `execution.strategy_execution_order id 40` status `SUBMITTED` → `FILLED`
    3) `connector.connector_order_request id 48` newly created / request_type SELL / order_method MARKET / order_qty 17 / request_status `ACCEPTED` → `FILLED`
-   4) broker_order_no `0000006143` created / broker_branch_code created — 0 plaintext records of the full broker response in this note / consistent with `[REDACTED]` handling (consistent with R-DOCS-001)
+   4) broker_order_no `[REDACTED_BROKER_ORDER_NO]` created / broker_branch_code created — 0 plaintext records of the full broker response in this note / consistent with `[REDACTED]` handling (consistent with R-DOCS-001)
    5) No rejection / KIS paper API normal response / first attempt passed (0 regressions of the 2026-06-18 KIS paper read timeout / R-BROKER-004 / 0 retry-normalizer entries on this date)
 
 ### 3. Step 13 `CONNECTOR_ORDER_CHECK` fill synchronization
@@ -1115,11 +1115,11 @@ The detailed accumulation of the 04 spec-side steps (Step 6 ~ Step 11 Strategy D
 6. The operational identifiers below are recorded as facts consistent with the user-specified policy — not secrets.
    - Step Functions state machine `portfolio-paper-daily-step1-17-approval`
    - `execution.strategy_execution_order id 40` / `connector.connector_order_request id 48`
-   - `broker_order_no 0000006143`
+   - `broker_order_no [REDACTED_BROKER_ORDER_NO]`
    - stock code `282330` / stock name BGF리테일 / quantity 17 / sell method MARKET
    - Step Functions approval gate labels `allowPaperOrderExecute=false` · `allowPaperOrderExecute=true`
    - wrapper stdout label `PaperOrder: True`
-   - EC2 instance id `i-0fce77927b7397b88` (consistent with OD-NET-010 / already recorded as a fact in spec deliverables prior to this date)
+   - EC2 instance id `[REDACTED_RESOURCE_ID]` (consistent with OD-NET-010 / already recorded as a fact in spec deliverables prior to this date)
    - signal_date · run_date `2026-06-23`
    - `server_encoding` · `client_encoding` value `UTF8`
    - KIS error code `EGW00123` · `EGW00215`

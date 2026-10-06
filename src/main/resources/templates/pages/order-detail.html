@@ -44,10 +44,10 @@
                     <div class="order-current-hero">
                         <div class="order-current-main">
                             <div class="section-label" th:text="#{orderDetail.currentOrder}">Current Order</div>
-                            <h2 th:text="${page.titleText}">#21 매수 / 체결</h2>
+                            <h2 th:text="${page.titleText}">#21 Buy / Filled</h2>
                             <p>
                                 <span th:text="#{orderDetail.lifecycle}">Order Lifecycle</span>:
-                                <strong th:text="${page.lifecycleText}">#21 매수</strong>
+                                <strong th:text="${page.lifecycleText}">#21 Buy</strong>
                             </p>
                         </div>
 
@@ -96,7 +96,7 @@
                             <div>
                                 <span th:class="'order-side-pill ' + ${page.currentOrder.requestTypeClass}"
                                       th:text="${page.currentOrder.requestTypeLabel}">
-                                    매수
+                                    Buy
                                 </span>
                             </div>
                         </article>
@@ -106,7 +106,7 @@
                             <div>
                                 <span th:class="'order-status-pill ' + ${page.currentOrder.requestStatusClass}"
                                       th:text="${page.currentOrder.requestStatusLabel}">
-                                    체결
+                                    Filled
                                 </span>
                             </div>
                         </article>
@@ -115,7 +115,7 @@
                             <div class="metric-title" th:text="#{orderDetail.orderQuantity}">Order Quantity</div>
                             <div class="order-summary-value"
                                  th:text="${page.currentOrder.orderQtyText}">
-                                1주
+                                1 share
                             </div>
                         </article>
 
@@ -175,7 +175,7 @@
                                     <div>
                                         <h3>
                                             <span th:text="'#' + ${node.id}">#21</span>
-                                            <span th:text="${node.requestTypeLabel}">매수</span>
+                                            <span th:text="${node.requestTypeLabel}">Buy</span>
                                         </h3>
                                         <p>
                                             <span th:text="#{orderDetail.parentOrder}">Parent Order</span>:
@@ -186,11 +186,11 @@
                                     <div class="chain-badges">
                                         <span th:class="'order-side-pill ' + ${node.requestTypeClass}"
                                               th:text="${node.requestTypeLabel}">
-                                            매수
+                                            Buy
                                         </span>
                                         <span th:class="'order-status-pill ' + ${node.requestStatusClass}"
                                               th:text="${node.requestStatusLabel}">
-                                            체결
+                                            Filled
                                         </span>
                                     </div>
                                 </div>
@@ -260,11 +260,11 @@
                                     <div class="event-badges">
                                         <span th:class="'order-status-pill ' + ${event.eventTypeClass}"
                                               th:text="${event.eventTypeLabel}">
-                                            체결
+                                            Filled
                                         </span>
                                         <span th:class="'order-side-pill ' + ${event.sideClass}"
                                               th:text="${event.sideLabel}">
-                                            매수
+                                            Buy
                                         </span>
                                     </div>
                                 </div>
@@ -320,7 +320,7 @@
                             <div class="fill-main-cell">
                                 <span th:class="'order-side-pill ' + ${fill.sideClass}"
                                       th:text="${fill.sideLabel}">
-                                    매수
+                                    Buy
                                 </span>
                                 <div>
                                     <strong th:text="#{orderDetail.fillNumber(${fill.id})}">Fill #1</strong>

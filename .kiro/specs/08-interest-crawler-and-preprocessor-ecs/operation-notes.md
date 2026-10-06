@@ -1167,11 +1167,11 @@ Safety:
    2) UTF-8 read confirmed
    3) program / shortsell / exit30 marker confirmed
 5. EC2 deployment (via S3 presigned URL): complete
-   1) S3 upload — `s3://portfolio-paper-migration-yukiever/tmp/krx/interest_krx_raw_validate_daily.py`
+   1) S3 upload — `s3://[REDACTED_BUCKET]/tmp/krx/interest_krx_raw_validate_daily.py`
    2) presigned URL creation (URL actual value plaintext recording in this note prohibited / R-DOCS-001 alignment)
    3) Windows crawler worker EC2 download via SSM RunPowerShellScript — deployment target `C:\portfolio\port-interest-crawler\interest_krx_raw_validate_daily.py`
    4) Remote validation — remote py_compile passed / `interest_program_raw` marker confirmed / `interest_shortsell_raw` marker confirmed / `--expected-date` · `--run-date` args confirmed / exit code 30 failure return logic confirmed / `sys.exit(run(parsed_args))` confirmed
-   5) SSM commandId `dd8e0f3e-df9a-4268-b11a-eea3f3df66c3`
+   5) SSM commandId `[REDACTED_RESOURCE_ID]`
 6. EC2 standalone validation: complete
    1) Executed inside the Windows crawler worker EC2
    2) Confirmed AWS RDS connection env loaded via `C:\portfolio\load-crawler-db-env.ps1`
@@ -1180,7 +1180,7 @@ Safety:
    5) DB session — user=`crawler_app` / schema=`interest` / search_path=`interest, reference, legacy, public`
    6) Validation result — `interest_program_raw` expected=`2026-06-19` / max_date=`2026-06-19` / expected_count=`1` / `interest_shortsell_raw` expected=`2026-06-19` / max_date=`2026-06-19` / expected_count=`349`
    7) validation exit code 0 confirmed
-   8) SSM commandId `c844aea5-1429-430a-9510-39fc99f17f05`
+   8) SSM commandId `[REDACTED_RESOURCE_ID]`
 
 ### 4. `step-02-interest-crawler.ps1` DB validation linkage: complete
 
@@ -1221,7 +1221,7 @@ Safety:
    5) CloudWatch log saved — `C:\Temp\portfolio-daily-aws-paper\daily-aws-paper-20260621-204017\logs\ecs-interest-crawler-nongui-78979b5cbb714d0eb94f5946e15a14ce-cloudwatch.txt` (this note records only the file path / 0 body quotations)
 4. KRX GUI worker validation: complete
    1) crawler worker state `running`
-   2) SSM commandId `f9d82fcc-1e26-4710-87c3-1d20483b63ef`
+   2) SSM commandId `[REDACTED_RESOURCE_ID]`
    3) SSM result `Success` / ResponseCode 0
    4) Scheduled Task execution flow — `TaskStatus=Running` confirmed → `TaskStatus=Ready` return / elapsedSeconds=`111` / sawRunning=True
    5) Scheduled Task final status — FinalStatus=`Ready` / FinalLastResult=`0` / Last Result=`0`
@@ -1260,7 +1260,7 @@ Safety:
 4. AWS / SSM / EC2 / S3 / ECS / RDS / KRX calls all performed directly by the operator. Kiro only performs document authoring / procedure organization / validation item organization. 0 AWS CLI / boto3 executions. 0 AWS resource creation / modification / deletion. 0 plaintext quotations of the CloudWatch Logs body / SSM response body / full operator PowerShell stdout.
 5. The `port-interest-crawler/interest_krx_raw_validate_daily.py` / `step-02-interest-crawler.ps1` / `daily-aws-paper.functions.ps1` changes the operator directly wrote / patched are recorded as facts only in this note (0 full-body quotations / R-DOCS-001 alignment). 0 changes to the 8 MS README / AGENTS.md / CHANGELOG / docs / worklog / packaging due to this date's work (spec area).
 6. Only operational identifiers are fact records per the user-specified policy alignment — not secrets:
-   - 4 SSM commandIds: `dd8e0f3e-df9a-4268-b11a-eea3f3df66c3` / `c844aea5-1429-430a-9510-39fc99f17f05` / `2279c6d7-2da6-4317-9c10-7cc77374b317` / `f9d82fcc-1e26-4710-87c3-1d20483b63ef`
+   - 4 SSM commandIds: `[REDACTED_RESOURCE_ID]` / `[REDACTED_RESOURCE_ID]` / `2279c6d7-2da6-4317-9c10-7cc77374b317` / `[REDACTED_RESOURCE_ID]`
    - RunId: `daily-aws-paper-20260621-204017`
    - Task Definition / taskId: `portfolio-paper-interest-crawler:7` / `78979b5cbb714d0eb94f5946e15a14ce`
    - S3 key: `tmp/krx/interest_krx_raw_validate_daily.py`

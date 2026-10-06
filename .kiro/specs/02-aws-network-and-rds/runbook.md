@@ -1,6 +1,6 @@
 # Runbook — 02-aws-network-and-rds
 
-This document is an execution procedure that the operator can follow in order on the AWS Console. This spec's (02) first application environment is `aws-paper`, and `aws-live` is integrated in [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook) (planned).
+This document is an execution procedure that the operator can follow in order on the AWS Console. This spec's (02) first application environment is `aws-paper`, and `aws-live` is integrated in `10-cutover-and-validation-runbook` (planned; no folder yet).
 
 This runbook does not automatically create actual AWS resources. The operator clicks directly one step at a time, and proceeds to the next Step after passing the `create-then-confirm` of each Step.
 
@@ -188,7 +188,7 @@ This Step is a document review, not console work.
 
 This Step is a decision record.
 
-1. CIDR: `10.0.0.0/16` (recommended). Operator decision on in-house conflict.
+1. CIDR: `[EXAMPLE_VPC_CIDR]` (recommended). Operator decision on in-house conflict.
 2. 2 AZs: `ap-northeast-2a`, `ap-northeast-2c` (recommended).
 3. Record the result in the operator notes.
 
@@ -198,7 +198,7 @@ This Step is a decision record.
 
 ### Action on failure
 
-- On CIDR conflict, decide an alternative such as `10.1.0.0/16` and then consistently adjust all subnet CIDRs in this runbook.
+- On CIDR conflict, decide an alternative such as `[EXAMPLE_ALTERNATE_VPC_CIDR]` and then consistently adjust all subnet CIDRs in this runbook.
 
 ## Step 4. Create VPC [실행]
 
@@ -218,7 +218,7 @@ This Step is a decision record.
 2. Your VPCs → click Create VPC.
 3. Resources to create: select `VPC only`.
 4. Name tag: `portfolio-vpc`
-5. IPv4 CIDR block: `10.0.0.0/16`
+5. IPv4 CIDR block: `[EXAMPLE_VPC_CIDR]`
 6. IPv6 CIDR block: `No IPv6 CIDR block`
 7. Tenancy: `Default`
 8. Add Tags:
@@ -230,7 +230,7 @@ This Step is a decision record.
 
 - `portfolio-vpc` shown in the VPC list.
 - State = `Available`.
-- IPv4 CIDR = `10.0.0.0/16`.
+- IPv4 CIDR = `[EXAMPLE_VPC_CIDR]`.
 - The default Route Table / NACL / DHCP option set are auto-created.
 
 ### Action on failure
@@ -255,22 +255,22 @@ This Step is a decision record.
 
 1. VPC → Subnets → click Create subnet.
 2. VPC ID: select `portfolio-vpc`.
-3. Subnet 1: Name `public-a`, AZ `ap-northeast-2a`, IPv4 CIDR `10.0.0.0/24`, Tags `tier=public`, `env=paper`.
-4. Click Add new subnet. Subnet 2: Name `public-b`, AZ `ap-northeast-2c`, IPv4 CIDR `10.0.1.0/24`, same Tags.
+3. Subnet 1: Name `public-a`, AZ `ap-northeast-2a`, IPv4 CIDR `[EXAMPLE_PUBLIC_SUBNET_A_CIDR]`, Tags `tier=public`, `env=paper`.
+4. Click Add new subnet. Subnet 2: Name `public-b`, AZ `ap-northeast-2c`, IPv4 CIDR `[EXAMPLE_PUBLIC_SUBNET_B_CIDR]`, same Tags.
 5. Click Create subnet.
 
 ### Step 5-2. Create 2 private app subnets
 
 1. Click Create subnet (same VPC).
-2. Subnet 1: Name `app-a`, AZ `ap-northeast-2a`, IPv4 CIDR `10.0.10.0/24`, Tags `tier=app`, `env=paper`.
-3. Subnet 2: Name `app-b`, AZ `ap-northeast-2c`, IPv4 CIDR `10.0.11.0/24`, same Tags.
+2. Subnet 1: Name `app-a`, AZ `ap-northeast-2a`, IPv4 CIDR `[EXAMPLE_APP_SUBNET_A_CIDR]`, Tags `tier=app`, `env=paper`.
+3. Subnet 2: Name `app-b`, AZ `ap-northeast-2c`, IPv4 CIDR `[EXAMPLE_APP_SUBNET_B_CIDR]`, same Tags.
 4. Click Create subnet.
 
 ### Step 5-3. Create 2 private data subnets
 
 1. Click Create subnet (same VPC).
-2. Subnet 1: Name `data-a`, AZ `ap-northeast-2a`, IPv4 CIDR `10.0.20.0/24`, Tags `tier=data`, `env=paper`.
-3. Subnet 2: Name `data-b`, AZ `ap-northeast-2c`, IPv4 CIDR `10.0.21.0/24`, same Tags.
+2. Subnet 1: Name `data-a`, AZ `ap-northeast-2a`, IPv4 CIDR `[EXAMPLE_DATA_SUBNET_A_CIDR]`, Tags `tier=data`, `env=paper`.
+3. Subnet 2: Name `data-b`, AZ `ap-northeast-2c`, IPv4 CIDR `[EXAMPLE_DATA_SUBNET_B_CIDR]`, same Tags.
 4. Click Create subnet.
 
 ### Create-then-confirm
@@ -821,7 +821,7 @@ This Step overlaps with the 06 spec, so it can be omitted if 06 was done first.
 
 ### Purpose
 
-- Agree in advance on the dump / restore procedure for the local-dev → aws-paper cutover. Actual cutover is [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook) (planned).
+- Agree in advance on the dump / restore procedure for the local-dev → aws-paper cutover. Actual cutover is `10-cutover-and-validation-runbook` (planned; no folder yet).
 
 ### Pre-check
 
@@ -880,7 +880,7 @@ This Step is a procedure agreement.
 
 ## Step 19. Rollback order (if needed) [복구]
 
-This spec's standalone rollback procedure. cutover rollback is integrated in [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook) (planned).
+This spec's standalone rollback procedure. cutover rollback is integrated in `10-cutover-and-validation-runbook` (planned; no folder yet).
 
 ### 19-1. Delete RDS instance
 
@@ -967,7 +967,7 @@ This appendix is a short collection of lessons for reusing, in follow-up operati
 - A comparison with normalized line breaks such as `diff --strip-trailing-cr` or `git diff --ignore-cr-at-eol` is recommended.
 - 2026-06-09 result: schema / table / index / sequence / FK / trigger / row count all diff 0 after normalized comparison.
 
-This appendix's operational results are used as input when writing the 03 / 06 specs and [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook) (planned).
+This appendix's operational results are used as input when writing the 03 / 06 specs and `10-cutover-and-validation-runbook` (planned; no folder yet).
 
 ## This runbook's work safety constraints
 

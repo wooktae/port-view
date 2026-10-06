@@ -181,23 +181,23 @@ The operator (the `portadmin` user from Step 0) performs this directly.
 The operator runs the following commands in order with `portadmin` credentials (Region is irrelevant since IAM is global).
 
 ```powershell
-# 1) Policy 파일 준비 (위 § 3 JSON을 portfolio-kiro-readonly.json으로 저장)
+# 1) Prepare the policy file (save the JSON from §3 as portfolio-kiro-readonly.json)
 aws iam create-policy `
   --policy-name PortfolioKiroReadOnlyValidatorPolicy `
   --policy-document file://portfolio-kiro-readonly.json `
   --tags Key=env,Value=paper Key=kind,Value=readonly-validator Key=project,Value=portfolio
 
-# 2) IAM User 생성
+# 2) Create the IAM user
 aws iam create-user `
   --user-name portfolio-kiro-readonly-validator `
   --tags Key=env,Value=paper Key=kind,Value=readonly-validator Key=project,Value=portfolio
 
-# 3) Policy attach (account-id는 운영자 직접 치환)
+# 3) Attach the policy (the operator replaces account-id directly)
 aws iam attach-user-policy `
   --user-name portfolio-kiro-readonly-validator `
   --policy-arn arn:aws:iam::[REDACTED-ACCOUNT-ID]:policy/PortfolioKiroReadOnlyValidatorPolicy
 
-# 4) Access key 발급 (출력은 운영자만 보고 안전한 위치에 보관. repo / 본 문서에 적지 않는다)
+# 4) Issue the access key (only the operator views the output and stores it securely; do not record it in the repository or this document)
 aws iam create-access-key `
   --user-name portfolio-kiro-readonly-validator
 ```
@@ -211,16 +211,16 @@ Immediately after issuance, register the access key / secret access key in the e
 This section is the set of read-only AWS CLI commands Kiro calls during automatic validation. Each command is reproducible identically in the operator environment. Identifiers such as account-id, RDS endpoint hostname, and secret ARN are masked directly by the operator in the output.
 
 ```powershell
-# Region 고정
+# Pin the Region
 $Env:AWS_REGION = "ap-northeast-2"
-$Env:AWS_PROFILE = "portfolio-kiro-readonly"  # 운영자 정의
+$Env:AWS_PROFILE = "portfolio-kiro-readonly"  # Defined by the operator
 
 # 6-1. VPC
 aws ec2 describe-vpcs `
   --filters "Name=tag:Name,Values=portfolio-vpc" `
   --query "Vpcs[].{VpcId:VpcId,Cidr:CidrBlock,State:State,Tags:Tags}" --output json
 
-# 6-2. Subnet 6개
+# 6-2. Six subnets
 aws ec2 describe-subnets `
   --filters "Name=vpc-id,Values=<vpc-id>" `
   --query "Subnets[].{Name:Tags[?Key=='Name']|[0].Value,Cidr:CidrBlock,AZ:AvailabilityZone,MapPublicIpOnLaunch:MapPublicIpOnLaunch}" --output json
@@ -230,12 +230,12 @@ aws ec2 describe-internet-gateways `
   --filters "Name=attachment.vpc-id,Values=<vpc-id>" `
   --query "InternetGateways[].{IgwId:InternetGatewayId,Name:Tags[?Key=='Name']|[0].Value,Attachments:Attachments}" --output json
 
-# 6-4. NAT Gateway 미생성
+# 6-4. Confirm no NAT Gateway exists
 aws ec2 describe-nat-gateways `
   --filter "Name=vpc-id,Values=<vpc-id>" `
   --query "NatGateways[]" --output json
 
-# 6-5. NAT 역할 EC2 후보 미생성 (VPC 내 EC2 일반 점검)
+# 6-5. Confirm no NAT-role EC2 candidate exists (general EC2 inspection within the VPC)
 aws ec2 describe-instances `
   --filters "Name=vpc-id,Values=<vpc-id>" `
   --query "Reservations[].Instances[].{InstanceId:InstanceId,Name:Tags[?Key=='Name']|[0].Value,State:State.Name}" --output json
@@ -245,17 +245,17 @@ aws ec2 describe-route-tables `
   --filters "Name=vpc-id,Values=<vpc-id>" `
   --query "RouteTables[].{Name:Tags[?Key=='Name']|[0].Value,Routes:Routes,Assoc:Associations}" --output json
 
-# 6-7. Security Group 인벤토리
+# 6-7. Security Group inventory
 aws ec2 describe-security-groups `
   --filters "Name=vpc-id,Values=<vpc-id>" `
   --query "SecurityGroups[].{Name:GroupName,Id:GroupId}" --output json
 
-# 6-8. RDS SG inbound 0/0:5432 점검 (결과는 비어 있어야 한다)
+# 6-8. Check RDS SG inbound 0/0:5432 (the result must be empty)
 aws ec2 describe-security-groups `
   --filters "Name=vpc-id,Values=<vpc-id>" "Name=ip-permission.cidr,Values=0.0.0.0/0" "Name=ip-permission.from-port,Values=5432" `
   --query "SecurityGroups[].{Name:GroupName,Id:GroupId}" --output json
 
-# 6-9. SSH 22 0/0 점검 (결과는 비어 있어야 한다)
+# 6-9. Check SSH 22 0/0 (the result must be empty)
 aws ec2 describe-security-groups `
   --filters "Name=vpc-id,Values=<vpc-id>" "Name=ip-permission.cidr,Values=0.0.0.0/0" "Name=ip-permission.from-port,Values=22" `
   --query "SecurityGroups[].{Name:GroupName,Id:GroupId}" --output json
@@ -271,7 +271,7 @@ aws rds describe-db-parameter-groups --db-parameter-group-name pg-portfolio-pape
 aws rds describe-db-parameters --db-parameter-group-name pg-portfolio-paper --source user --output json
 aws rds describe-db-instances --db-instance-identifier portfolio-paper-rds --output json
 
-# 6-12. Secrets Manager metadata (절대 GetSecretValue 호출 금지)
+# 6-12. Secrets Manager metadata (never call GetSecretValue)
 aws secretsmanager describe-secret --secret-id /portfolio/paper/rds/master `
   --query "{Name:Name,KmsKeyId:KmsKeyId,RotationEnabled:RotationEnabled,LastChangedDate:LastChangedDate,DeletedDate:DeletedDate,Tags:Tags}" --output json
 ```

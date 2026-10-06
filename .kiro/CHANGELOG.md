@@ -3867,7 +3867,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | First real SELL order | BGF리테일 `282330` 17 shares MARKET |
   | `connector_order_request id 48` | 🟢 **FILLED** |
   | `strategy_execution_order id 40` | 🟢 **FILLED** |
-  | `broker_order_no` | `0000006143` |
+  | `broker_order_no` | `[REDACTED_BROKER_ORDER_NO]` |
   | Latest holdings after Step 17 balance refresh | 4 holdings reflected normally |
   | Step Functions implementation status | Entered operator empirical-validation stage · ms-aws-service-decision-matrix body retained |
   | Accumulation into 03 / 04 spec operation-notes | Separated as follow-up responsibility (second / third pass) |
@@ -4095,7 +4095,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | SFN state machine | `portfolio-paper-daily-step1-17-approval` · `portfolio-paper-daily-step12-17-approval` |
   | `strategy_execution_order id` | `40` |
   | `connector_order_request id` | `48` |
-  | `broker_order_no` | `0000006143` |
+  | `broker_order_no` | `[REDACTED_BROKER_ORDER_NO]` |
   | Ticker code | `282330` (stock name · quantity 17) |
   | approval gate | true · false labels |
   | DB session table name | 4 types |
@@ -4370,7 +4370,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | Validation | row_count + max(trade_date) based on expected trade_date |
   | Failure handling | Return exit code 30 |
   | Local validation | py_compile · UTF-8 read · program · shortsell · exit30 marker passed |
-  | S3 deployment | `s3://portfolio-paper-migration-yukiever/tmp/krx/interest_krx_raw_validate_daily.py` → `C:\portfolio\port-interest-crawler\interest_krx_raw_validate_daily.py` |
+  | S3 deployment | `s3://[REDACTED_BUCKET]/tmp/krx/interest_krx_raw_validate_daily.py` → `C:\portfolio\port-interest-crawler\interest_krx_raw_validate_daily.py` |
   | Standalone EC2 validation | crawler_app · interest schema · search_path `interest, reference, legacy, public` |
   | interest_program_raw | expected=`2026-06-19` · max_date=`2026-06-19` · expected_count=`1` |
   | interest_shortsell_raw | expected=`2026-06-19` · max_date=`2026-06-19` · expected_count=`349` |
@@ -4511,7 +4511,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
 
   | Item | Value |
   | --- | --- |
-  | SSM commandId (4) | `dd8e0f3e-df9a-4268-b11a-eea3f3df66c3` · `c844aea5-1429-430a-9510-39fc99f17f05` · `2279c6d7-2da6-4317-9c10-7cc77374b317` · `f9d82fcc-1e26-4710-87c3-1d20483b63ef` |
+  | SSM commandId (4) | `[REDACTED_RESOURCE_ID]` · `[REDACTED_RESOURCE_ID]` · `2279c6d7-2da6-4317-9c10-7cc77374b317` · `[REDACTED_RESOURCE_ID]` |
   | RunId | `daily-aws-paper-20260621-204017` |
   | taskDefinition | `portfolio-paper-interest-crawler:7` |
   | taskId | `78979b5cbb714d0eb94f5946e15a14ce` |
@@ -4614,9 +4614,9 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | (a) Background | Operational-safety reinforcement for KIS paper fill-query response pattern (`output1 empty` + `output2 summary-only`) · not an operational failure · design change · block propagation of incorrect connector_fill into Steps 15 / 16 |
   | (b) Change | Changed default execution mode · added `--broad` · `--active-limit` options · explicit order-query combination · wrapper ps1 handles execution orchestration only · fill-query method controlled inside `connector_order_check.py` (aligned with new OD-MS-025) |
   | (c) Local validation | `python -m py_compile` passed · confirmed `--help` options · commit `75cb804` |
-  | (d) S3 upload + EC2 deployment | bucket `portfolio-paper-migration-yukiever` · key `deploy/marketconnector/connector_order_check.py` · `39159 bytes` · EC2 backup `connector_order_check.py.bak-20260618-step13-per-order` · ownership restored to `ec2-user:ec2-user` |
-  | (e) EC2 validation + single direct-only query | `python3 connector_order_check.py --code 004990 --order-no 0000025576 --no-broad` · SSM Status 🟢 **Success** · ResponseCode `0` · StdErr empty |
-  | (f) Standalone wrapper Step 13 execution | `.\run-daily-aws-paper.ps1 -Environment aws-paper -RunDate 2026-06-18 -StartStep 13 -EndStep 13` (not `FromStep` / `ToStep`) · SSM commandId `b344d404-07a4-4bb6-9d63-34151e648bab` · status 🟢 **Success** · responseCode `0` · Step 13 🟢 **COMPLETED** |
+  | (d) S3 upload + EC2 deployment | bucket `[REDACTED_BUCKET]` · key `deploy/marketconnector/connector_order_check.py` · `39159 bytes` · EC2 backup `connector_order_check.py.bak-20260618-step13-per-order` · ownership restored to `ec2-user:ec2-user` |
+  | (e) EC2 validation + single direct-only query | `python3 connector_order_check.py --code 004990 --order-no [REDACTED_BROKER_ORDER_NO] --no-broad` · SSM Status 🟢 **Success** · ResponseCode `0` · StdErr empty |
+  | (f) Standalone wrapper Step 13 execution | `.\run-daily-aws-paper.ps1 -Environment aws-paper -RunDate 2026-06-18 -StartStep 13 -EndStep 13` (not `FromStep` / `ToStep`) · SSM commandId `[REDACTED_RESOURCE_ID]` · status 🟢 **Success** · responseCode `0` · Step 13 🟢 **COMPLETED** |
 
 - 🟢 `.kiro/specs/_common/operator-decisions.md`
 
@@ -4663,7 +4663,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | --- | --- |
   | Plaintext recording of secret · KIS · account · token · RDS · account-id · ARN · access key · EIP · image digest · task ARN · job ARN · KIS paper credential | 0 (all `[REDACTED]` or `<account-id>` · `<region>` · `<rds-endpoint>` · `<role-arn>` · `<secret-arn>`) |
   | Quotation of `port-marketconnector/connector_order_check.py` patch body | 0 (aligned with R-DOCS-001 · facts only recorded) |
-  | broker / KIS calls | 1 single direct-only query (`004990` · broker_order_no `0000025576`) + 1 standalone wrapper Step 13 execution (both read-oriented) |
+  | broker / KIS calls | 1 single direct-only query (`004990` · broker_order_no `[REDACTED_BROKER_ORDER_NO]`) + 1 standalone wrapper Step 13 execution (both read-oriented) |
   | New BUY · SELL · cancel · modify · `--execute` | 0 |
   | `mark_position_sell_ordered()` · automatic fill · position sync retries | 0 |
   | Session environment | Limited to `aws-paper` · aws-live work 0 |
@@ -4680,12 +4680,12 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | Item | Value |
   | --- | --- |
   | commit | `75cb804` |
-  | S3 bucket · key · file size | `portfolio-paper-migration-yukiever` · `deploy/marketconnector/connector_order_check.py` · `39159 bytes` |
-  | EC2 instance id | `i-0fce77927b7397b88` |
+  | S3 bucket · key · file size | `[REDACTED_BUCKET]` · `deploy/marketconnector/connector_order_check.py` · `39159 bytes` |
+  | EC2 instance id | `[REDACTED_RESOURCE_ID]` |
   | EC2 backup filename | `connector_order_check.py.bak-20260618-step13-per-order` |
-  | SSM commandId | `b344d404-07a4-4bb6-9d63-34151e648bab` |
+  | SSM commandId | `[REDACTED_RESOURCE_ID]` |
   | Ticker code | `004990` |
-  | broker_order_no | `0000025576` |
+  | broker_order_no | `[REDACTED_BROKER_ORDER_NO]` |
   | wrapper options / parameters | `-StartStep` · `-EndStep` |
 
 </details>
@@ -4702,7 +4702,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | (b) Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE (`-AllowPaperOrderExecute` specified) | First KIS paper API read timeout · connector_order_request ids `38~41` <span style="color:#D1242F">**FAILED**</span> · strategy_execution_order ids `30~33` <span style="color:#D1242F">**FAILED**</span> |
   | (b) Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE (`-AllowPaperOrderExecute` specified) (continued) | Network · DNS · TCP · HTTPS normal → judged temporary KIS paper endpoint latency issue |
   | (b) Controlled REQUESTED recovery | Performed directly by operator after pre-checking existence of `connector_order_request` · `connector_api_call_log` · `broker_order_no` |
-  | (b) Retry submission of 4 KIS paper BUY orders | connector_order_request ids `42~45` 🟢 **ACCEPTED** · broker_order_no `0000025576` 004990 · `0000025740` 023530 · `0000025744` 003490 · `0000025747` 042660 · strategy_execution_order ids `30~33` 🟢 **SUBMITTED** |
+  | (b) Retry submission of 4 KIS paper BUY orders | connector_order_request ids `42~45` 🟢 **ACCEPTED** · broker_order_no `[REDACTED_BROKER_ORDER_NO]` 004990 · `[REDACTED_BROKER_ORDER_NO]` 023530 · `[REDACTED_BROKER_ORDER_NO]` 003490 · `[REDACTED_BROKER_ORDER_NO]` 042660 · strategy_execution_order ids `30~33` 🟢 **SUBMITTED** |
   | (c) Step 13 CONNECTOR_ORDER_CHECK | broad response `output1 empty` + `output2 summary-only` · 4 active candidates · summary fallback guard automatically skipped (first empirical R-AUTO-018 mitigation) → all 4 fills reflected via per-order re-query using `--code` · `--order-no` · `--no-broad` · 4 shares · 8 shares · 6 shares · 11 shares |
   | (d) Step 17 BALANCE_REFRESH | SSM commandId `66ec8831-74b9-469c-8410-6ccb11cb3400` · responseCode 0 · Status Success · `connector.connector_position_snapshot` row_count `36` · max_created_at `2026-06-18 04:33:07.456056+00` |
   | (d) Step 17 BALANCE_REFRESH (continued) | `legacy.holdings` row_count `41` · max_created_at `2026-06-18 04:33:07.420226` · view_app lacked SELECT permission on legacy schema → used `portfolio_admin` as workaround (R-DATA-005 reinforcement · followups retained) |
@@ -4793,7 +4793,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | SELL · cancel · modify · additional `--execute` · `mark_position_sell_ordered()` | 0 |
   | Automatic fill · position sync retries | 0 (rerun after direct operator patch) |
   | Session environment | Limited to `aws-paper` · aws-live work 0 |
-  | KIS paper `broker_order_no` (`0000025576` · `0000025740` · `0000025744` · `0000025747`) | Operational broker-response identifiers · not live-account identifiers |
+  | KIS paper `broker_order_no` (`[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]`) | Operational broker-response identifiers · not live-account identifiers |
   | AWS · SSM · EC2 · ECS · Batch · IAM · Secrets Manager · SSM Parameter Store · RDS · GRANT · KIS · S3 · CloudWatch · Docker · ECR | All performed directly by operator · Kiro only organized documentation · procedures · validation |
   | AWS CLI · boto3 · AWS resource creations · modifications · deletions | 0 |
   | Plaintext recording of `secretsmanager:GetSecretValue` result values | 0 |
@@ -4822,7 +4822,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | `execution_plan_id` | `94` |
   | connector_order_request id | `38~41` (FAILED) + `42~45` (ACCEPTED) |
   | strategy_execution_order id | `30~33` |
-  | broker_order_no | `0000025576` · `0000025740` · `0000025744` · `0000025747` |
+  | broker_order_no | `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` |
   | position_state_id | `7` · `8` · `11` · `12` |
   | SSM commandId | `66ec8831-74b9-469c-8410-6ccb11cb3400` |
   | `connector.connector_position_snapshot` row_count | `36` |
@@ -4941,7 +4941,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | Section | Content |
   | --- | --- |
   | (a) Step 1 CONNECTOR_BALANCE linkage | Factually linked the first session (v5 env injection · `as_of_date 2026-06-17`) as the starting state of the 17-step flow |
-  | (b) Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE final success | 4 KIS paper BUY orders · `execution_order` id `26~29` 🟢 **SUBMITTED** · `connector_order_request` id `34~37` · `broker_order_no 0000035906` · `0000035912` · `0000035918` · `0000035932` |
+  | (b) Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE final success | 4 KIS paper BUY orders · `execution_order` id `26~29` 🟢 **SUBMITTED** · `connector_order_request` id `34~37` · `broker_order_no [REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` |
   | (b) Initial failure · correction reason | `connector_strategy_order_execute.py` not deployed to MC EC2 · system Python lacked `psycopg` → venv Python required · missing UPDATE permission on `execution` table → operator directly corrected GRANT · formally deployed after `source_run_id` fallback patch |
   | (c) Step 13 CONNECTOR_ORDER_CHECK | Initial response `output1 empty` + `output2 aggregate summary` caused multi-active fallback mapping contamination → deleted incorrectly created `connector_order_event` / `connector_fill` rows + restored `connector_order_request` status + patched summary fallback guard (allowed only when exactly one candidate exists |
   | (c) Step 13 CONNECTOR_ORDER_CHECK (continued) | prohibit event / fill / status changes when multiple candidates exist) + fill synchronization succeeded through per-`broker_order_no` single-order queries (`connector_order_request 34~37` FILLED · `connector_fill 26~29` created) |
@@ -5114,7 +5114,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | execution_plan_id | `92` |
   | execution_order id | `26~29` |
   | connector_order_request id | `34~37` |
-  | broker_order_no | `0000035906` · `0000035912` · `0000035918` · `0000035932` |
+  | broker_order_no | `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` |
   | position_state_id | `6~9` |
   | connector_position_snapshot id | `120~123` |
   | Ticker codes | `282330` · `004990` · `003490` · `088350` |
@@ -5247,7 +5247,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
 
   | Item | Value |
   | --- | --- |
-  | (a) BACKTEST_RESEARCH AWS Batch | `portfolio-paper-strategy-research:5` 🟢 **SUCCEEDED** · exitCode 0 · run_id `439d78e7-41fd-4bb7-b455-18564ddff758` · backtest_end_date `2026-06-15` · `strategy_trade_log` 310 · `strategy_backtest_daily` 822 |
+  | (a) BACKTEST_RESEARCH AWS Batch | `portfolio-paper-strategy-research:5` 🟢 **SUCCEEDED** · exitCode 0 · run_id `[REDACTED_RESOURCE_ID]` · backtest_end_date `2026-06-15` · `strategy_trade_log` 310 · `strategy_backtest_daily` 822 |
   | (a) BACKTEST_RESEARCH AWS Batch (continued) | `strategy_backtest_daily_position` 2375 · total_return `4.66534417` · mdd `-0.08941942` · sharpe `2.68071466` · trade_count `310` |
   | (b) BACKTEST_REPORT rev1~rev3 correction | rev1 local-only · rev2 missing wrapper path · rev3 finalized with module-call method |
   | (c) `portfolio-paper-strategy-report:3` SubmitJob | 🟢 **SUCCEEDED** · 4 objects under S3 prefix `strategy-research/reports/20260616/67522706-9b5f-4770-a312-ceb1987c4655/` (`01_요약_리포트` 7,258 bytes · `02_일자별_매매_리포트` 552,540 bytes · `03_거래_상세_리포트` 329,088 bytes |
@@ -5570,8 +5570,8 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | New OD-MS-019 | `port_strategy_research` AWS Batch porting targets = 2 flows: `BACKTEST_RESEARCH` + `BACKTEST_REPORT` (based on View Daily Batch) |
   | OD-MS-019 exclusion | `run_extended_analysis.py` = already executed inside BACKTEST_RESEARCH · excluded as separate AWS Batch porting target + classified as manual auxiliary tool |
   | OD-MS-019 exclusion | 4 `block_watch_*` · `block_exception_buy_*` flows = excluded from AWS Batch porting + heavy-classification follow-up |
-  | Preserve report artifacts | reuse S3 bucket `portfolio-paper-migration-yukiever` · prefix `strategy-research/reports/{YYYYMMDD}/{AWS_BATCH_JOB_ID}/` |
-  | Job Role S3 PutObject | Resource limited to `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` · public read 0 · wildcard 0 |
+  | Preserve report artifacts | reuse S3 bucket `[REDACTED_BUCKET]` · prefix `strategy-research/reports/{YYYYMMDD}/{AWS_BATCH_JOB_ID}/` |
+  | Job Role S3 PutObject | Resource limited to `arn:aws:s3:::[REDACTED_BUCKET]/strategy-research/reports/*` · public read 0 · wildcard 0 |
   | Status | 🟠 **잠정** |
   | Decision Summary | total 76 → 77 · 잠정 31 → 32 |
   | OD-MS-008 | No body change · Strategy Research compute first choice remains AWS Batch · first empirical validation: both BACKTEST_RESEARCH + BACKTEST_REPORT SubmitJob `SUCCEEDED` / exitCode 0 |
@@ -5607,7 +5607,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | Item | Value |
   | --- | --- |
   | BACKTEST_RESEARCH full | 🟢 **SUCCEEDED** · exitCode 0 |
-  | run_id | `a39b0b0c-cfe9-474e-8a4a-4ddb33f09567` |
+  | run_id | `[REDACTED_RESOURCE_ID]` |
   | total_return | `4.55930879` |
   | mdd | `-0.08941942` |
   | sharpe | `2.65561307` |
@@ -5627,13 +5627,13 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
 
   | Item | Value |
   | --- | --- |
-  | S3 bucket | reuse `portfolio-paper-migration-yukiever` |
-  | Job Role permission addition | `s3:PutObject` · Resource `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` · public read 0 · wildcard 0 |
+  | S3 bucket | reuse `[REDACTED_BUCKET]` |
+  | Job Role permission addition | `s3:PutObject` · Resource `arn:aws:s3:::[REDACTED_BUCKET]/strategy-research/reports/*` · public read 0 · wildcard 0 |
   | requirements.txt | added `boto3` · Docker internal import smoke successful |
   | report-wrapper options | skip if `REPORT_S3_BUCKET` unset · default `REPORT_S3_PREFIX` `strategy-research/reports` · separate subpath by `AWS_BATCH_JOB_ID` · default `REPORT_OUTPUT_DIR` remains `/tmp/portfolio-reports` |
   | Docker rebuild + ECR push | image tag `paper-20260615-report-s3` · digest sha256 placeholder · size about 106MB · pushedAt 2026-06-15T17:00:10+09:00 |
   | Job Definition rev3 | image `paper-20260615-report-s3` · TaskRole `portfolio-paper-research-job-role` |
-  | S3 upload SubmitJob | `strategy-research-backtest-report-s3-20260615` · jobId `112f5fe4-02f3-4614-a88c-60a9842e1447` · 🟢 **SUCCEEDED** · exitCode 0 · logStreamName `strategy-research/default/b18e548d46764cd791028088e1d32a6d` |
+  | S3 upload SubmitJob | `strategy-research-backtest-report-s3-20260615` · jobId `[REDACTED_RESOURCE_ID]` · 🟢 **SUCCEEDED** · exitCode 0 · logStreamName `strategy-research/default/[REDACTED_RESOURCE_ID]` |
   | 4 S3 objects | prefix `strategy-research/reports/20260615/112f5fe4-.../` · `01_요약 리포트` ~ `04_추천 리포트` · remained private · public read 0 |
   | 6/13 follow-up closure | full backtest · long-running research · report generation · `REPORT_OUTPUT_DIR` separation · S3 upload reinforcement |
 
@@ -5715,8 +5715,8 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
 - Job Role `portfolio-paper-research-job-role`
 - smoke jobId `81ec3581-...` · `5399aa10-...`
 - S3 upload jobId `112f5fe4-...`
-- logStreamName `strategy-research/default/b18e548d46764cd791028088e1d32a6d`
-- S3 bucket `portfolio-paper-migration-yukiever` · prefix `strategy-research/reports/20260615/112f5fe4-.../`
+- logStreamName `strategy-research/default/[REDACTED_RESOURCE_ID]`
+- S3 bucket `[REDACTED_BUCKET]` · prefix `strategy-research/reports/20260615/112f5fe4-.../`
 - 4 filenames
 - metric values `run_id a39b0b0c-...` · `total_return 4.55930879` · `mdd -0.08941942` · `sharpe 2.65561307` · `trade_count 308`
 - full image digest sha256 → placeholder (`<image-digest>` · truncated form)
@@ -5955,7 +5955,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
 
   | Section | Content |
   | --- | --- |
-  | §1 Direct-path execution of psql 18 client | client `18.1` · server `18.4` · SSL `TLSv1.3` · `inet_server_addr=10.0.20.165` · `inet_server_port=5432` · narrowed the remaining R-AUTO-013 issue to general `psql` PATH not being registered |
+  | §1 Direct-path execution of psql 18 client | client `18.1` · server `18.4` · SSL `TLSv1.3` · `inet_server_addr=[REDACTED_PRIVATE_IP]` · `inet_server_port=5432` · narrowed the remaining R-AUTO-013 issue to general `psql` PATH not being registered |
   | §2 pgAdmin4 Server registration | Name `AWS Paper RDS - portfolio` · Host `localhost` · Port `15433` · Maintenance database `portfolio` · Username `portfolio_admin` · SSL mode `Prefer` |
   | §2 Validation SQL | `current_user` · `current_database` · `inet_server_addr` · `inet_server_port` · `search_path` |
   | §2 Query access confirmation | SELECT available across 6 schemas (connector · decision · execution · interest · ops · preprocessor) · 16 core tables |
@@ -5968,7 +5968,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
 
   | Item | Value |
   | --- | --- |
-  | EC2 used | `portfolio-paper-marketconnector-ec2` · instance id `i-0fce77927b7397b88` |
+  | EC2 used | `portfolio-paper-marketconnector-ec2` · instance id `[REDACTED_RESOURCE_ID]` |
   | Role | SSM Port Forwarding waypoint from the earlier same-date section · 2 additional clients (psql 18 · pgAdmin4) pass through the same tunnel |
   | SG · Instance Role · Instance Profile permission changes | 0 |
   | New EC2 creation · type change · EBS recreation · public-subnet change · EIP detach | 0 (aligned with 03 design §2.3) |
@@ -6037,7 +6037,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
 
 <details><summary>🔵 Operational identifier summary</summary>
 
-- Reused identifiers from prior section: instance id · private IP · local port `15433` · SSM session id `terraform-vjp3fv3nz73konetcevdzjh9de` · RDS endpoint hostname `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`
+- Reused identifiers from prior section: instance id · private IP · local port `15433` · SSM session id `[REDACTED_RESOURCE_ID]` · RDS endpoint hostname `[REDACTED_RDS_ENDPOINT]`
 - Local PostgreSQL installation path: `C:\Program Files\PostgreSQL\18\bin\psql.exe` (operator-local PC tool path · not a secret)
 
 </details>
@@ -6050,13 +6050,13 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | Item | Value |
   | --- | --- |
   | Pre-check tools | AWS CLI `2.27.50` · Session Manager Plugin `1.2.814.0` |
-  | Standard waypoint decision | OD-NET-010 = `portfolio-paper-marketconnector-ec2` · instance id `i-0fce77927b7397b88` · keep `portfolio-paper-crawler-worker` separated as KRX-only |
+  | Standard waypoint decision | OD-NET-010 = `portfolio-paper-marketconnector-ec2` · instance id `[REDACTED_RESOURCE_ID]` · keep `portfolio-paper-crawler-worker` separated as KRX-only |
   | Target EC2 SSM Online | ping `Online` · agent `3.3.4515.0` |
   | RDS endpoint | retain `PubliclyAccessible=False` |
-  | SSM Port Forwarding tunnel | local port `15433` · session id `terraform-vjp3fv3nz73konetcevdzjh9de` · `Port 15433 opened` |
+  | SSM Port Forwarding tunnel | local port `15433` · session id `[REDACTED_RESOURCE_ID]` · `Port 15433 opened` |
   | Local psql client | discovered PATH not registered (R-AUTO-013) |
   | Python `psycopg2` check | `psycopg2 OK` |
-  | `portfolio_admin` connection validation | `inet_server_addr=10.0.20.165` · `inet_server_port=5432` |
+  | `portfolio_admin` connection validation | `inet_server_addr=[REDACTED_PRIVATE_IP]` · `inet_server_port=5432` |
   | `execution_app` connection validation | search_path = `execution, decision, research, connector, preprocessor, interest, reference, legacy, public` (aligned with OD-DB-006 · OD-DB-007) |
   | Initial Runbook body | 7 steps + `[실행]`/`[확인]`/`[준비]`/`[복구]` labels + standard environment variables + app-role mapping by MS + success criteria + failure·recovery |
   | Follow-up handoff | 7 items |
@@ -6086,7 +6086,7 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
   | Item | Value |
   | --- | --- |
   | New OD-NET-010 | Standard Local-to-AWS Paper RDS SSM Port Forwarding waypoint |
-  | Waypoint | single `portfolio-paper-marketconnector-ec2` · instance id `i-0fce77927b7397b88` |
+  | Waypoint | single `portfolio-paper-marketconnector-ec2` · instance id `[REDACTED_RESOURCE_ID]` |
   | local port | `15433` |
   | RDS target | `portfolio-paper-rds:5432` |
   | Status | 🟠 **잠정** |
@@ -6134,11 +6134,11 @@ For the Slack webhook URL, only the environment-variable name (`SLACK_WEBHOOK_UR
 
 <details><summary>🔵 Operational identifier summary</summary>
 
-- instance id `i-0fce77927b7397b88` · `i-0ff768ea639a91355`
-- private IP `10.0.0.181` · `10.0.0.169` · `10.0.20.165`
+- instance id `[REDACTED_RESOURCE_ID]` · `[REDACTED_RESOURCE_ID]`
+- private IP `[REDACTED_PRIVATE_IP]` · `[REDACTED_PRIVATE_IP]` · `[REDACTED_PRIVATE_IP]`
 - local port `15433`
-- SSM session id `terraform-vjp3fv3nz73konetcevdzjh9de` (temporary value · reissued on next session restart)
-- RDS endpoint hostname `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`
+- SSM session id `[REDACTED_RESOURCE_ID]` (temporary value · reissued on next session restart)
+- RDS endpoint hostname `[REDACTED_RDS_ENDPOINT]`
 
 </details>
 ## 2026-06-13 (Strategy Execution / MarketConnector responsibility separation + View Daily Batch 17 steps + Local-to-AWS Paper RDS operating principles)

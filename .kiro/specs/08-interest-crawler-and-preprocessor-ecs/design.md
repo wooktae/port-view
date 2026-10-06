@@ -674,7 +674,7 @@ This change is the core design change of the R-AUTO-016 mitigation update and th
 | StepCode / Status / Runner | `INTEREST_CRAWLER` / `SUCCESS` / `ECS+SSM` |
 | non-GUI ECS taskDefinition / taskId / exitCode | `portfolio-paper-interest-crawler:7` / `78979b5cbb714d0eb94f5946e15a14ce` / `0` |
 | Crawler Worker EC2 state | `running` |
-| KRX worker SSM commandId | `f9d82fcc-1e26-4710-87c3-1d20483b63ef` |
+| KRX worker SSM commandId | `[REDACTED_RESOURCE_ID]` |
 | Scheduled Task | elapsedSeconds=`111` / sawRunning=True / FinalStatus=`Ready` / FinalLastResult=`0` |
 | latest worker log | `C:\portfolio\logs\krx_worker_daily_20260621_114154.log` |
 | KRX raw DB validation SSM commandId | `2279c6d7-2da6-4317-9c10-7cc77374b317` |

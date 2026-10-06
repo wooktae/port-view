@@ -2,7 +2,7 @@
 
 This document is an execution procedure that the operator can follow directly, in order, on the AWS Console / EC2 shell.
 The first application environment is `aws-paper`, the region is `ap-northeast-2`, and the first application target is the MarketConnector EC2.
-`aws-live` is the integrated responsibility of [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook) (planned).
+`aws-live` is the integrated responsibility of `10-cutover-and-validation-runbook` (planned; no folder yet).
 
 This runbook does not automatically create actual AWS resources. The operator clicks / inputs directly one step at a time, and proceeds to the next Step after passing the [확인] of each Step.
 

@@ -37,19 +37,19 @@ Key decisions
 ### VPC Diagram (text)
 
 ```
-VPC: portfolio-vpc (10.0.0.0/16, 서울 ap-northeast-2, AZ a/b)
+VPC: portfolio-vpc ([EXAMPLE_VPC_CIDR], Seoul ap-northeast-2, AZ a/b)
 
 Public Subnets
-  ├─ public-a 10.0.0.0/24  (AZ a) [IGW] [marketconnector EC2 + EIP]
-  └─ public-b 10.0.1.0/24  (AZ b) [(예비)]
+  ├─ public-a [EXAMPLE_PUBLIC_SUBNET_A_CIDR]  (AZ a) [IGW] [marketconnector EC2 + EIP]
+  └─ public-b [EXAMPLE_PUBLIC_SUBNET_B_CIDR]  (AZ b) [(standby)]
 
-Private (app) Subnets — NAT-free, 외부 라우트 없음
-  ├─ app-a    10.0.10.0/24 (AZ a) [ECS Fargate Task]
-  └─ app-b    10.0.11.0/24 (AZ b) [ECS Fargate Task]
+Private (app) Subnets — NAT-free, no external route
+  ├─ app-a    [EXAMPLE_APP_SUBNET_A_CIDR] (AZ a) [ECS Fargate Task]
+  └─ app-b    [EXAMPLE_APP_SUBNET_B_CIDR] (AZ b) [ECS Fargate Task]
 
 Private (data) Subnets
-  ├─ data-a   10.0.20.0/24 (AZ a) [RDS]
-  └─ data-b   10.0.21.0/24 (AZ b) [RDS standby (multi-AZ 시)]
+  ├─ data-a   [EXAMPLE_DATA_SUBNET_A_CIDR] (AZ a) [RDS]
+  └─ data-b   [EXAMPLE_DATA_SUBNET_B_CIDR] (AZ b) [RDS standby (when multi-AZ)]
 
 VPC Endpoints (Interface, app subnet)
   - com.amazonaws.ap-northeast-2.ecr.api
@@ -57,8 +57,8 @@ VPC Endpoints (Interface, app subnet)
   - com.amazonaws.ap-northeast-2.secretsmanager
   - com.amazonaws.ap-northeast-2.ssm
   - com.amazonaws.ap-northeast-2.logs
-  (옵션) com.amazonaws.ap-northeast-2.sts
-  (옵션) com.amazonaws.ap-northeast-2.kms
+  (optional) com.amazonaws.ap-northeast-2.sts
+  (optional) com.amazonaws.ap-northeast-2.kms
 
 VPC Endpoints (Gateway)
   - com.amazonaws.ap-northeast-2.s3
@@ -243,24 +243,24 @@ The value going into `INTEREST_DB_USER` differs per MS. The environment-variable
 ### Validation SQL Candidates
 
 ```
--- schema 목록
+-- schema list
 SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LIKE 'pg_%';
 
--- role 목록
+-- role list
 SELECT rolname FROM pg_roles WHERE rolname NOT LIKE 'pg_%';
 
--- schema별 table 수
+-- table count by schema
 SELECT table_schema, count(*) FROM information_schema.tables
 WHERE table_schema IN ('reference','interest','preprocessor','research','decision','execution','connector','ops','legacy','public')
 GROUP BY table_schema ORDER BY table_schema;
 
--- 핵심 테이블 row count (정합성 점검)
+-- core table row count (consistency check)
 SELECT 'execution.strategy_execution_order'  AS t, count(*) FROM execution.strategy_execution_order  UNION ALL
 SELECT 'connector.connector_order_request'   AS t, count(*) FROM connector.connector_order_request   UNION ALL
 SELECT 'decision.strategy_daily_signal'      AS t, count(*) FROM decision.strategy_daily_signal      UNION ALL
 SELECT 'preprocessor.pre_total_market_daily_feature' AS t, count(*) FROM preprocessor.pre_total_market_daily_feature;
 
--- search_path 확인 (해당 role로 접속 후)
+-- confirm search_path (after connecting as the target role)
 SHOW search_path;
 ```
 
@@ -321,7 +321,7 @@ The concrete table of cost-saving option vs stability-first option is in `decisi
 
 ## AWS Console Step-by-step Flow (summary)
 
-1. Create VPC (`portfolio-vpc`, 10.0.0.0/16, 2 AZs)
+1. Create VPC (`portfolio-vpc`, `[EXAMPLE_VPC_CIDR]`, 2 AZs)
 2. Create Subnets (public / app / data, 2 each)
 3. Create IGW + attach to VPC
 4. NAT not used. No step to create a NAT Gateway / NAT Instance.

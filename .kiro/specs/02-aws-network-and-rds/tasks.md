@@ -15,7 +15,7 @@ Within this spec's scope, actual AWS resource creation, modifying the 8 MS code 
   - _Requirements: 1, 11_
 
 - [ ] 2. Choose CIDR / AZ
-  - Confirm the VPC CIDR (recommended `10.0.0.0/16`) does not conflict with other in-house networks.
+  - Confirm the VPC CIDR (recommended `[EXAMPLE_VPC_CIDR]`) does not conflict with other in-house networks.
   - Decide the 2 AZs to use (recommended `ap-northeast-2a`, `ap-northeast-2c`).
   - _Requirements: 1, 2_
 
@@ -40,7 +40,7 @@ Within this spec's scope, actual AWS resource creation, modifying the 8 MS code 
 
 - [ ] 6. Create VPC (approval required, cost impact 0)
   - Console: VPC → Your VPCs → Create VPC.
-  - Input: name `portfolio-vpc`, CIDR `10.0.0.0/16`, IPv6 disabled, tenancy default.
+  - Input: name `portfolio-vpc`, CIDR `[EXAMPLE_VPC_CIDR]`, IPv6 disabled, tenancy default.
   - Validation: `portfolio-vpc` shown in the VPC list, state `available`.
   - rollback: Delete the VPC. However, deletion is not possible if there are attached resources.
   - _Requirements: 1, 2_

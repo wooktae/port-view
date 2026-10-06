@@ -82,7 +82,7 @@ The decisions of this spec are used as input for the following follow-up specs.
 - [`../05-port-view-ecs-and-runbook`](../05-port-view-ecs-and-runbook) (planned)
 - [`../08-interest-crawler-and-preprocessor-ecs`](../08-interest-crawler-and-preprocessor-ecs) (planned)
 - [`../09-strategy-research-batch`](../09-strategy-research-batch) (planned)
-- [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook) (planned)
+- `10-cutover-and-validation-runbook` (planned; no folder yet)
 
 This document never records the actual values of the items below. Everywhere it uses only `[REDACTED]` or placeholders (`<account-id>`, `<region>`, `<instance-id>`, `<eip>`, `<rds-endpoint>`).
 

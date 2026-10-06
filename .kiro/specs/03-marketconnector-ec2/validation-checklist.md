@@ -131,7 +131,7 @@ Principles
 ### §7B — Step 12 KIS paper BUY 4 submissions details
 
 - `execution_order` id `26 ~ 29` SUBMITTED / `connector_order_request` id `34 ~ 37` generated.
-- `broker_order_no`: `0000035906` / `0000035912` / `0000035918` / `0000035932`.
+- `broker_order_no`: `[REDACTED_BROKER_ORDER_NO]` / `[REDACTED_BROKER_ORDER_NO]` / `[REDACTED_BROKER_ORDER_NO]` / `[REDACTED_BROKER_ORDER_NO]`.
 - 0 SELL / cancel / modify calls / 0 aws-live actions.
 - Correction: passed after formal deployment of `connector_strategy_order_execute.py` to the MarketConnector EC2 + using venv python + correcting `execution` table UPDATE privileges + the `source_run_id` fallback patch.
 - Basis: R-AUTO-009 / R-AUTO-010 [2026-06-17 reinforcement] alignment.

@@ -478,7 +478,7 @@ This section is a second work result accumulated separately from the same date's
    2) MarketConnector new executor `connector_strategy_order_execute.py` `--execute` = handles only the `REQUESTED -> SUBMITTED` / `FAILED` transition.
    3) `connector_order_request_id` is not created / updated on the Strategy Execution side.
 2. SSM Port Forwarding standard waypoint decision input: complete
-   1) OD-NET-010 = `portfolio-paper-marketconnector-ec2` (instance id `i-0fce77927b7397b88`).
+   1) OD-NET-010 = `portfolio-paper-marketconnector-ec2` (instance id `[REDACTED_RESOURCE_ID]`).
    2) Local PC `localhost:15433` → SSM tunnel → this EC2 → AWS Paper RDS `portfolio-paper-rds:5432`.
    3) RDS `PubliclyAccessible = False` maintained.
 
@@ -517,7 +517,7 @@ This section is a second work result accumulated separately from the same date's
 1. This date's work resulted in 0 changes to the README / AGENTS.md / CHANGELOG / docs / worklog / source / packaging of the 8 MS. 0 AWS resource creation / modification / deletion.
 2. 0 plaintext records in this note of password / secret value / KIS app key / KIS app secret / account number / token / account-id / actual IAM access key id / actual secret ARN.
 3. 0 broker / KIS / order / fill entrypoint calls. 0 RDS DDL/DML. 0 `--execute` actual calls.
-4. instance id (`i-0fce77927b7397b88`) / private IP (`10.0.20.165`) / local port (`15433`) / RDS endpoint hostname / SSM session id (`terraform-vjp3fv3nz73konetcevdzjh9de`) are recorded as facts as operational identifiers (consistent with the user-specified policy — not secrets).
+4. instance id (`[REDACTED_RESOURCE_ID]`) / private IP (`[REDACTED_PRIVATE_IP]`) / local port (`15433`) / RDS endpoint hostname / SSM session id (`[REDACTED_RESOURCE_ID]`) are recorded as facts as operational identifiers (consistent with the user-specified policy — not secrets).
 
 
 ## 2026-06-13 Strategy Execution AWS Porting Pre-validation — psql 18 + pgAdmin4 Reinforcement
@@ -532,11 +532,11 @@ This section is a second work result accumulated separately from the same date's
 
 1. Local PostgreSQL 18 psql client: complete
    1) direct-path execution — `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 15433 -U portfolio_admin -d portfolio`
-   2) confirmed output of client `18.1` / server `18.4` / `SSL TLSv1.3` / `inet_server_addr = 10.0.20.165` / `inet_server_port = 5432`.
+   2) confirmed output of client `18.1` / server `18.4` / `SSL TLSv1.3` / `inet_server_addr = [REDACTED_PRIVATE_IP]` / `inet_server_port = 5432`.
    3) A separate `execution_app` psql connection is outside this date's work scope — already passed via the Python `psycopg2` validation (preceding section §2).
 2. pgAdmin4: complete
    1) Server registration — Name `AWS Paper RDS - portfolio` / Host `localhost` / Port `15433` / Maintenance database `portfolio` / Username `portfolio_admin` / SSL mode `Prefer`.
-   2) confirmed output of `current_user` / `current_database` / `inet_server_addr` / `inet_server_port` — `portfolio_admin` / `portfolio` / `10.0.20.165` / `5432`.
+   2) confirmed output of `current_user` / `current_database` / `inet_server_addr` / `inet_server_port` — `portfolio_admin` / `portfolio` / `[REDACTED_PRIVATE_IP]` / `5432`.
    3) confirmed the core schema / table that Strategy Execution will handle are queryable:
        - `execution.strategy_execution_order` (responsibility separation result `READY -> REQUESTED -> SUBMITTED`/`FAILED` status transition target)
        - `execution.strategy_execution_plan`
@@ -1426,7 +1426,7 @@ This step is the largest operational exception in this date's actual wrapper exe
    4) operator result check — this date's Step 7 DAILY_POSITION_SIGNAL BGF리테일 `282330` SELL_HARD_STOP decision / Step 9 DAILY_SELL_EXECUTION `execution.strategy_execution_order id 40` creation / 04 spec-side flow consistency pre-validation passed
 3. true path approval execution: passed
    1) `allowPaperOrderExecute=true` / Step 12 ~ Step 17 approval true path
-   2) Step 12 KIS paper SELL 1 submission = 03 spec 2026-06-23 §2 consistency (`connector.connector_order_request id 48` / `broker_order_no 0000006143` / 04 spec-side `execution.strategy_execution_order id 40` SUBMITTED → FILLED)
+   2) Step 12 KIS paper SELL 1 submission = 03 spec 2026-06-23 §2 consistency (`connector.connector_order_request id 48` / `broker_order_no [REDACTED_BROKER_ORDER_NO]` / 04 spec-side `execution.strategy_execution_order id 40` SUBMITTED → FILLED)
    3) Step 14 SYNC_SELL_FILL / Step 17 BALANCE_REFRESH normal pass — this spec §5 / 03 spec 2026-06-23 §4 consistency
 4. Step Functions-side ECS RunTask / SSM RunCommand / AWS Batch call consistency: confirmed
    1) The ECS RunTask Task Definitions of this spec's responsible steps (6 / 7 / 8 / 9 / 10 / 11 / 14 / 15 / 16) are identical to the wrapper-based ones (2026-06-17 / 2026-06-18 / 2026-06-22) — `portfolio-paper-strategy-decision-buy-signal:1` / `portfolio-paper-strategy-decision-position-signal:1` / `portfolio-paper-strategy-execution:1` + command override (OD-MS-013 / OD-MS-017 consistency / 0 regression)
@@ -1478,7 +1478,7 @@ This step is the largest operational exception in this date's actual wrapper exe
 
 ### 5. Step 14 / Step 15 / Step 16 (Strategy Execution sync)
 
-1. Step 12 ~ Step 13 / Step 17: 03 spec operation-notes 2026-06-23 §2 / §3 / §4 consistency. Outside this spec scope. broker_order_no `0000006143` / `connector.connector_order_request id 48` / after Step 17 BALANCE_REFRESH the 4 held stocks consistency — only fact quotation on this spec side.
+1. Step 12 ~ Step 13 / Step 17: 03 spec operation-notes 2026-06-23 §2 / §3 / §4 consistency. Outside this spec scope. broker_order_no `[REDACTED_BROKER_ORDER_NO]` / `connector.connector_order_request id 48` / after Step 17 BALANCE_REFRESH the 4 held stocks consistency — only fact quotation on this spec side.
 2. Step 14 `SYNC_SELL_FILL`: complete
    1) ECS RunTask (`portfolio-paper-strategy-execution:1` + command override `python execution_sync_sell_fill.py`) exitCode 0
    2) SELL fill sync based on the `connector.connector_fill` row (03 spec 2026-06-23 §3 consistency / SELL side / ticker `282330` BGF리테일) — `execution.strategy_execution_order id 40` execution_status `REQUESTED -> SUBMITTED -> FILLED` transition consistency
@@ -1556,7 +1556,7 @@ This step is the largest operational exception in this date's actual wrapper exe
    2) The Step Functions state machine definition / EventBridge Scheduler periodic trigger / View orchestration mapping enter the demonstration stage this date / formal production automation entry and formal accumulation of the ASL body are a follow-up orchestration phase responsibility.
 6. Operational identifiers (not secrets / fact record):
    1) Step Functions state machine `portfolio-paper-daily-step1-17-approval`.
-   2) `execution.strategy_execution_order id 40` / `connector.connector_order_request id 48` / `broker_order_no 0000006143`.
+   2) `execution.strategy_execution_order id 40` / `connector.connector_order_request id 48` / `broker_order_no [REDACTED_BROKER_ORDER_NO]`.
    3) ticker `282330` BGF리테일 / quantity 17 / sell MARKET / SELL reason `SELL_HARD_STOP`.
    4) approval gate label `allowPaperOrderExecute=false` · `=true` / wrapper stdout label `PaperOrder: True`.
    5) Task Definition `portfolio-paper-strategy-decision-buy-signal:1` · `portfolio-paper-strategy-decision-position-signal:1` · `portfolio-paper-strategy-execution:1`.

@@ -20,7 +20,7 @@
             and !#lists.isEmpty(page.plans)
             and page.plans[0].accountNo() != null
                 ? page.plans[0].accountNo()
-                : '50187518'},
+                : '-'},
         latestPlan=${page != null
             and page.plans != null
             and !#lists.isEmpty(page.plans)
@@ -54,7 +54,7 @@
 
             <th:block th:if="${page != null and !page.empty}">
 
-                <!-- 오늘의 전략 판단 -->
+                <!-- Today's strategy decision -->
                 <section class="dashboard-section strategy-ops-section">
                     <div class="section-head">
                         <div>
@@ -129,7 +129,7 @@
                     </div>
                 </section>
 
-                <!-- 현재 전략 포지션 -->
+                <!-- Current strategy positions -->
                 <section class="dashboard-section strategy-position-section">
                     <div class="section-head">
                         <div>
@@ -178,7 +178,7 @@
                     </div>
                 </section>
 
-                <!-- 최근 실행 기록 -->
+                <!-- Recent execution history -->
                 <section class="dashboard-section strategy-plan-list-section strategy-recent-section">
                     <div class="section-head">
                         <div>

@@ -54,8 +54,8 @@ Do not delete / abridge the following evidence when editing.
 - **full run criteria**: `full` job name prefix + operator direct approval + same timeout / vCPU / memory cap. BACKTEST_RESEARCH performs internal extended analysis together.
 - **attempt = 1 (no automatic retry)**: Job Definition `attempts = 1` maintained. The 0 AWS Batch automatic retry policy is OD-SAFE-004 / R-AUTO-001 alignment.
 - **cost guard (heavy classification blocking)**: `run_extended_analysis.py` / `block_watch_*` / `block_exception_buy_*` are not View Daily Batch execution targets. Excluded from AWS Batch porting targets. Classified as manual auxiliary tools only when needed.
-- **S3 prefix contract**: `strategy-research/reports/{YYYYMMDD}/{AWS_BATCH_JOB_ID}/` (OD-MS-019 alignment). The Job Role `s3:PutObject` Resource is limited to `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*`. 0 public read / 0 wildcards.
-- **key evidence figures**: 2026-06-15 full run `run_id a39b0b0c-cfe9-474e-8a4a-4ddb33f09567` / total_return 4.55930879 / mdd -0.08941942 / sharpe 2.65561307 / trade_count 308. 2026-06-16 re-run `run_id 439d78e7-41fd-4bb7-b455-18564ddff758` / total_return 4.66534417 / sharpe 2.68071466 / trade_count 310. The figures are maintained as an audit trail.
+- **S3 prefix contract**: `strategy-research/reports/{YYYYMMDD}/{AWS_BATCH_JOB_ID}/` (OD-MS-019 alignment). The Job Role `s3:PutObject` Resource is limited to `arn:aws:s3:::[REDACTED_BUCKET]/strategy-research/reports/*`. 0 public read / 0 wildcards.
+- **key evidence figures**: 2026-06-15 full run `run_id [REDACTED_RESOURCE_ID]` / total_return 4.55930879 / mdd -0.08941942 / sharpe 2.65561307 / trade_count 308. 2026-06-16 re-run `run_id [REDACTED_RESOURCE_ID]` / total_return 4.66534417 / sharpe 2.68071466 / trade_count 310. The figures are maintained as an audit trail.
 - **BACKTEST_REPORT formal Job Definition**: `portfolio-paper-strategy-report:3` (rev3 module call method). rev1 local-only / rev2 path absence are preserved only as correction history.
 - **BACKTEST_RESEARCH formal Job Definition**: `portfolio-paper-strategy-research:5` (reused since 2026-06-16). The previous revision 1 is smoke / initial full run history.
 - **Research image boundary**: includes `port_strategy_research` + `port_strategy_common`, excludes `port_strategy_decision` (OD-MS-018). Docker build context `C:\Workspaces` maintained.
@@ -369,7 +369,7 @@ Kiro only organizes documents / procedures / validation items.
    1) name: `portfolio-paper-research-job-role`
    2) trust: `ecs-tasks.amazonaws.com`
    3) Initial smoke-stage permissions: least privilege (secret read is the Execution Role's responsibility / the Job Role itself uses only environment-variable-based + in-container direct access when connecting to RDS)
-   4) S3 PutObject permission addition: added separately at this date's §11 stage (BACKTEST_REPORT S3 upload reinforcement) — Resource limited to `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` / Action limited to `s3:PutObject` / 0 public read permission grants
+   4) S3 PutObject permission addition: added separately at this date's §11 stage (BACKTEST_REPORT S3 upload reinforcement) — Resource limited to `arn:aws:s3:::[REDACTED_BUCKET]/strategy-research/reports/*` / Action limited to `s3:PutObject` / 0 public read permission grants
 3. IAM change 4-line summary (aligned with the operation-notes IAM change record template):
    - 변경 일자: 2026-06-15(KST)
    - 변경자: 운영자(Kiro 직접 수행 0건)
@@ -524,7 +524,7 @@ Role:
    4) exitCode: 0
    5) full backtest execution success — extended analysis also performed together inside `backtest_research_run`
 2. backtest run result metadata:
-   1) `run_id`: `a39b0b0c-cfe9-474e-8a4a-4ddb33f09567`
+   1) `run_id`: `[REDACTED_RESOURCE_ID]`
    2) `total_return`: 4.55930879
    3) `mdd`: -0.08941942
    4) `sharpe`: 2.65561307
@@ -613,7 +613,7 @@ Role:
 ### 11. Reuse existing S3 bucket
 
 1. bucket reuse: complete
-   1) name: `portfolio-paper-migration-yukiever`
+   1) name: `[REDACTED_BUCKET]`
    2) 0 new Strategy Research bucket creations — existing operational bucket reused
    3) prefix used: `strategy-research/reports/` (OD-MS-019 alignment)
 
@@ -621,7 +621,7 @@ Role:
 
 1. IAM change: complete
    1) target Role: `portfolio-paper-research-job-role` (permission added to this date's §6 Job Role body)
-   2) permission scope: `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*`
+   2) permission scope: `arn:aws:s3:::[REDACTED_BUCKET]/strategy-research/reports/*`
    3) allowed Action: `s3:PutObject` limited
    4) 0 public read permission additions (`s3:PutObjectAcl` / `public-read` etc. not granted)
    5) 0 other prefix or other bucket access (0 Resource wildcards / 03 §13 / OD-SEC-006 alignment)
@@ -629,7 +629,7 @@ Role:
    - 변경 일자: 2026-06-15(KST)
    - 변경자: 운영자(Kiro 직접 수행 0건)
    - 변경 사유: BACKTEST_REPORT 산출물 S3 업로드를 위해 Job Role 에 prefix 한정 PutObject 권한 1건 추가
-   - 변경 전 / 후 항목 요약: Job Role inline policy 1개 추가(Resource = `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` / Action = `s3:PutObject` 한정 / public read 0건 / wildcard 0건). 정책 본문 전체 인용 0건. 실제 IAM Role ARN / account-id 본 노트 평문 기록 0건.
+   - 변경 전 / 후 항목 요약: Job Role inline policy 1개 추가(Resource = `arn:aws:s3:::[REDACTED_BUCKET]/strategy-research/reports/*` / Action = `s3:PutObject` 한정 / public read 0건 / wildcard 0건). 정책 본문 전체 인용 0건. 실제 IAM Role ARN / account-id 본 노트 평문 기록 0건.
 
 ### 13. Add boto3 dependency
 
@@ -669,13 +669,13 @@ Role:
    3) image: `paper-20260615-report-s3`
    4) TaskRole: `portfolio-paper-research-job-role` (as-is with this date's §12 permission addition)
    5) No change to the Execution Role / log configuration / network mode / vCPU / memory / timeout / assignPublicIp policy (this date's §3 / §4 / §6 alignment)
-   6) Environment variables: `REPORT_OUTPUT_DIR=/tmp/portfolio-reports`, `REPORT_S3_BUCKET=portfolio-paper-migration-yukiever`, `REPORT_S3_PREFIX=strategy-research/reports` (`AWS_BATCH_JOB_ID` is auto-injected by AWS Batch)
+   6) Environment variables: `REPORT_OUTPUT_DIR=/tmp/portfolio-reports`, `REPORT_S3_BUCKET=[REDACTED_BUCKET]`, `REPORT_S3_PREFIX=strategy-research/reports` (`AWS_BATCH_JOB_ID` is auto-injected by AWS Batch)
 
 ### 17. S3 upload Batch execution validation
 
 1. SubmitJob execution: complete
    1) jobName: `strategy-research-backtest-report-s3-20260615`
-   2) jobId: `112f5fe4-02f3-4614-a88c-60a9842e1447`
+   2) jobId: `[REDACTED_RESOURCE_ID]`
    3) jobDefinition: `portfolio-paper-strategy-research:3`
    4) container override command: BACKTEST_REPORT execution + S3 upload (this date's §14 wrapper option applied)
    5) status: `SUCCEEDED`
@@ -691,16 +691,16 @@ Role:
 ### 18. Confirm 4 S3 files exist
 
 1. Confirm 4 S3 objects: complete
-   1) `s3://portfolio-paper-migration-yukiever/strategy-research/reports/20260615/112f5fe4-02f3-4614-a88c-60a9842e1447/01_요약_리포트_20260615_v1.txt`
-   2) `s3://portfolio-paper-migration-yukiever/strategy-research/reports/20260615/112f5fe4-02f3-4614-a88c-60a9842e1447/02_일자별_매매_리포트_20260615_v1.txt`
-   3) `s3://portfolio-paper-migration-yukiever/strategy-research/reports/20260615/112f5fe4-02f3-4614-a88c-60a9842e1447/03_거래_상세_리포트_20260615_v1.txt`
-   4) `s3://portfolio-paper-migration-yukiever/strategy-research/reports/20260615/112f5fe4-02f3-4614-a88c-60a9842e1447/04_추천_리포트_20260615_v1.txt`
+   1) `s3://[REDACTED_BUCKET]/strategy-research/reports/20260615/[REDACTED_RESOURCE_ID]/01_요약_리포트_20260615_v1.txt`
+   2) `s3://[REDACTED_BUCKET]/strategy-research/reports/20260615/[REDACTED_RESOURCE_ID]/02_일자별_매매_리포트_20260615_v1.txt`
+   3) `s3://[REDACTED_BUCKET]/strategy-research/reports/20260615/[REDACTED_RESOURCE_ID]/03_거래_상세_리포트_20260615_v1.txt`
+   4) `s3://[REDACTED_BUCKET]/strategy-research/reports/20260615/[REDACTED_RESOURCE_ID]/04_추천_리포트_20260615_v1.txt`
 2. ACL / public setting: all 4 kept private (0 public read grants). 0 full-body quotations.
 3. prefix alignment: `strategy-research/reports/{YYYYMMDD}/{AWS_BATCH_JOB_ID}/...` (OD-MS-019 alignment / this date's §14 wrapper option result).
 
 ### 19. First validation completion criteria
 
-1. Reuse existing S3 bucket `portfolio-paper-migration-yukiever` / 0 new bucket creations
+1. Reuse existing S3 bucket `[REDACTED_BUCKET]` / 0 new bucket creations
 2. Add prefix-limited `s3:PutObject` permission to the Job Role (0 wildcards / 0 public read)
 3. boto3 dependency addition + import smoke success
 4. Add the report wrapper's `REPORT_S3_BUCKET` / `REPORT_S3_PREFIX` / `AWS_BATCH_JOB_ID`-based sub-path separation / `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` default option
@@ -726,9 +726,9 @@ Role:
 3. 0 plaintext records in this note of account-id / actual secret ARN / actual IAM Role ARN / actual ECR URI / image digest (full sha256). Only the following operational identifiers are fact records per the user-specified policy alignment — not secrets:
    - image tag: `paper-20260615-report-s3` / image size about 106MB / pushedAt 2026-06-15T17:00:10+09:00
    - jobName: `strategy-research-backtest-report-s3-20260615`
-   - jobId: `112f5fe4-02f3-4614-a88c-60a9842e1447`
+   - jobId: `[REDACTED_RESOURCE_ID]`
    - logStreamName: `strategy-research/default/b18e548d46764cd791028088e1d32a6d`
-   - S3 bucket: `portfolio-paper-migration-yukiever`
+   - S3 bucket: `[REDACTED_BUCKET]`
    - S3 prefix: `strategy-research/reports/20260615/112f5fe4-...`
    - file names: `01_요약 리포트` ~ `04_추천 리포트`
 4. AWS / IAM / Secrets Manager / S3 / Docker / ECR / Batch / RDS / GRANT work all performed directly by the operator. Kiro only performs document authoring / procedure organization / validation item organization. 0 plaintext records of `secretsmanager:GetSecretValue` result values. 0 plaintext secret value output in the CloudWatch Logs body. 0 full-body quotations of S3 objects.
@@ -770,7 +770,7 @@ Safety:
    4) container exitCode: `0`
    5) 0 Batch automatic retries (`attempts = 1` / OD-SAFE-004 / R-AUTO-001 / R-AUTO-015 alignment)
 2. Confirm latest run result: complete
-   1) `research.strategy_backtest_run` latest row run_id: `439d78e7-41fd-4bb7-b455-18564ddff758`
+   1) `research.strategy_backtest_run` latest row run_id: `[REDACTED_RESOURCE_ID]`
    2) backtest_end_date: `2026-06-15` confirmed
    3) `strategy_trade_log` row_count: `310`
    4) `strategy_backtest_daily` row_count: `822`
@@ -805,9 +805,9 @@ Safety:
    3) image tag: `paper-20260615-report-s3` (reused as-is from the 2026-06-15 §15 reinforcement)
    4) Environment variables
        - `REPORT_OUTPUT_DIR=/tmp/portfolio-reports`
-       - `REPORT_S3_BUCKET=portfolio-paper-migration-yukiever`
+       - `REPORT_S3_BUCKET=[REDACTED_BUCKET]`
        - `REPORT_S3_PREFIX=strategy-research/reports`
-   5) Job Role: `portfolio-paper-research-job-role`'s S3 PutObject Resource = `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` limited (2026-06-15 §12 reinforcement reused / 0 public read / 0 wildcards)
+   5) Job Role: `portfolio-paper-research-job-role`'s S3 PutObject Resource = `arn:aws:s3:::[REDACTED_BUCKET]/strategy-research/reports/*` limited (2026-06-15 §12 reinforcement reused / 0 public read / 0 wildcards)
 4. Final decision: the formal BACKTEST_REPORT Job Definition is finalized as `portfolio-paper-strategy-report:3`. rev1 / rev2 are recorded only as closed-nature correction history (R-AUTO-015 mitigation·detection reinforcement).
 
 ### 3. BACKTEST_REPORT rev3 SubmitJob execution validation
@@ -818,7 +818,7 @@ Safety:
    3) status: `SUCCEEDED`
    4) container exitCode: `0`
    5) 0 Batch automatic retries (`attempts = 1`)
-2. Input run_id: `439d78e7-41fd-4bb7-b455-18564ddff758` (§1 alignment)
+2. Input run_id: `[REDACTED_RESOURCE_ID]` (§1 alignment)
 3. Confirm local report 4-file generation: complete
    1) `01_요약_리포트_20260616_v1.txt`
    2) `02_일자별_매매_리포트_20260616_v1.txt`
@@ -830,7 +830,7 @@ Safety:
 
 1. S3 prefix: complete
    1) `strategy-research/reports/20260616/67522706-9b5f-4770-a312-ceb1987c4655/`
-   2) bucket: `portfolio-paper-migration-yukiever` (existing reused / OD-MS-019 alignment)
+   2) bucket: `[REDACTED_BUCKET]` (existing reused / OD-MS-019 alignment)
 2. Confirm 4 S3 objects exist: complete
    1) `01_요약_리포트_20260616_v1.txt` — 7,258 bytes
    2) `02_일자별_매매_리포트_20260616_v1.txt` — 552,540 bytes
@@ -915,7 +915,7 @@ This spec has no separate tasks.md, so this noted per-task completion handling i
 1. AWS Batch SubmitJob execution: complete
    1) Job Definition: `portfolio-paper-strategy-report:3` (rev3 module call method / 2026-06-16 §2 / §3 alignment)
    2) image tag `paper-20260615-report-s3` or a paper image the operator directly updated
-   3) env: `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` / `REPORT_S3_BUCKET=portfolio-paper-migration-yukiever` / `REPORT_S3_PREFIX=strategy-research/reports`
+   3) env: `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` / `REPORT_S3_BUCKET=[REDACTED_BUCKET]` / `REPORT_S3_PREFIX=strategy-research/reports`
 2. Execution result: success
    1) job status: `SUCCEEDED`
    2) container exitCode: `0`
@@ -924,7 +924,7 @@ This spec has no separate tasks.md, so this noted per-task completion handling i
    2) `01_요약_리포트` / `02_일자별_매매_리포트` / `03_거래_상세_리포트` / `04_추천_리포트` all 4 types confirmed to exist
    3) kept private / 0 public read grants / 0 wildcards (R-COST-003 mitigation alignment)
 4. report upload prefix / object count validation: complete
-   1) The Job Role's `s3:PutObject` Resource is `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*`-limited policy alignment (OD-MS-019 / R-COST-003 alignment)
+   1) The Job Role's `s3:PutObject` Resource is `arn:aws:s3:::[REDACTED_BUCKET]/strategy-research/reports/*`-limited policy alignment (OD-MS-019 / R-COST-003 alignment)
    2) 0 PutObject patterns to other prefixes / other buckets
 
 ### 3. Safety / security check results
@@ -969,7 +969,7 @@ This spec has no separate tasks.md, so this noted per-task completion handling i
    1) Same Job Queue / Job Definition `portfolio-paper-strategy-report:3` (prior date alignment / no revision change)
    2) Job Status `SUCCEEDED` / exit code 0
 2. Result alignment: confirmed
-   1) 4 report objects aligned in S3 prefix `s3://portfolio-paper-migration-yukiever/strategy-research/reports/20260622/<aws-batch-job-id>/` (jobId / job ARN placeholder handling)
+   1) 4 report objects aligned in S3 prefix `s3://[REDACTED_BUCKET]/strategy-research/reports/20260622/<aws-batch-job-id>/` (jobId / job ARN placeholder handling)
    2) 0 public read / 0 regression of the Job Role inline policy Resource-limited policy (OD-MS-019 alignment / R-COST-003 mitigation alignment)
 
 ### 3. Daily wrapper 1 ~ 17 second actual full-run alignment

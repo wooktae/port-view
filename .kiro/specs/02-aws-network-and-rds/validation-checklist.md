@@ -28,11 +28,11 @@ Automatic validation updates via AWS API call results using the ReadOnly IAM pri
 
 ## 2. Network Validation
 
-- <span style="color:red">[O]</span> Confirm VPC `portfolio-vpc` creation. State = `Available`. CIDR = `10.0.0.0/16`
+- <span style="color:red">[O]</span> Confirm VPC `portfolio-vpc` creation. State = `Available`. CIDR = `[EXAMPLE_VPC_CIDR]`
 - <span style="color:red">[O]</span> `env=paper`, `project=portfolio` applied to VPC Tags
-- <span style="color:red">[O]</span> 2 Public subnets (`public-a` 10.0.0.0/24, `public-b` 10.0.1.0/24) created
-- <span style="color:red">[O]</span> 2 Private app subnets (`app-a` 10.0.10.0/24, `app-b` 10.0.11.0/24) created
-- <span style="color:red">[O]</span> 2 Private data subnets (`data-a` 10.0.20.0/24, `data-b` 10.0.21.0/24) created
+- <span style="color:red">[O]</span> 2 Public subnets (`public-a` [EXAMPLE_PUBLIC_SUBNET_A_CIDR], `public-b` [EXAMPLE_PUBLIC_SUBNET_B_CIDR]) created
+- <span style="color:red">[O]</span> 2 Private app subnets (`app-a` [EXAMPLE_APP_SUBNET_A_CIDR], `app-b` [EXAMPLE_APP_SUBNET_B_CIDR]) created
+- <span style="color:red">[O]</span> 2 Private data subnets (`data-a` [EXAMPLE_DATA_SUBNET_A_CIDR], `data-b` [EXAMPLE_DATA_SUBNET_B_CIDR]) created
 - <span style="color:red">[O]</span> The AZ mapping (a / c) of the 6 subnets matches the intent — public-a/app-a/data-a = ap-northeast-2a, public-b/app-b/data-b = ap-northeast-2c
 - <span style="color:red">[O]</span> Internet Gateway `portfolio-igw` created + attached to `portfolio-vpc` (State = `available`)
 - <span style="color:red">[O]</span> Confirm NAT Gateway non-creation (NAT Gateways menu empty, R-COST-002)

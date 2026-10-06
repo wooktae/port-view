@@ -20,7 +20,7 @@ This is a one-page summary that operators review quickly on a daily basis. For t
 | Area | Completed Item | Status | Source Document |
 |---|---|---|---|
 | Region | `ap-northeast-2` used | Complete | [Operation Notes](./operation-notes.md) |
-| VPC | `portfolio-vpc` (10.0.0.0/16) | Complete | [Operation Notes](./operation-notes.md) |
+| VPC | `portfolio-vpc` (`[EXAMPLE_VPC_CIDR]`) | Complete | [Operation Notes](./operation-notes.md) |
 | Subnet | public / app / data, 2 each (6 total) | Complete | [Validation Checklist §2](./validation-checklist.md) |
 | Internet Gateway | `portfolio-igw` attach | Complete | [Validation Checklist §2](./validation-checklist.md) |
 | NAT | NAT Gateway / NAT Instance not used | Complete | [Validation Checklist §2](./validation-checklist.md) |

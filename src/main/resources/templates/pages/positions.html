@@ -40,7 +40,7 @@
 
             <th:block th:if="${page != null and page.hasPositions}">
 
-                <!-- 계좌 -->
+                <!-- Account -->
                 <section class="dashboard-section account-section">
                     <div class="account-hero-card">
                         <div class="account-hero-main">
@@ -65,7 +65,7 @@
                     </div>
                 </section>
 
-                <!-- 요약 -->
+                <!-- Summary -->
                 <section class="dashboard-section positions-summary-section">
                     <div class="section-head">
                         <div>
@@ -78,7 +78,7 @@
                         <article class="metric-card metric-cash">
                             <div class="metric-title" th:text="#{positions.totalBuyAmount}">Total Buy Amount</div>
                             <div class="metric-value" th:text="${page.totalBuyAmountText}">
-                                3,236,250원
+                                KRW 3,236,250
                             </div>
                             <div class="metric-subtitle" th:text="#{positions.principalBased}">Based on Position Principal</div>
                         </article>
@@ -86,7 +86,7 @@
                         <article class="metric-card metric-stock">
                             <div class="metric-title" th:text="#{positions.totalEvaluation}">Total Valuation</div>
                             <div class="metric-value" th:text="${page.totalEvalAmountText}">
-                                5,677,500원
+                                KRW 5,677,500
                             </div>
                             <div class="metric-subtitle" th:text="#{positions.currentPriceBased}">Based on Current Prices</div>
                         </article>
@@ -95,7 +95,7 @@
                             <div class="metric-title" th:text="#{positions.totalProfit}">Total Valuation Profit/Loss</div>
                             <div class="metric-value"
                                 th:text="${page.totalEvalProfitText}">
-                                -66,440원
+                                KRW -66,440
                             </div>
                             <div class="metric-subtitle"
                                 th:classappend="${page.pageProfitClass == 'profit' ? ' profit-red' : (page.pageProfitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
@@ -121,7 +121,7 @@
                     </div>
                 </section>
 
-                <!-- 보유 종목 한 줄 요약 -->
+                <!-- One-line position summary -->
                 <section class="dashboard-section positions-list-section">
                     <div class="section-head">
                         <div>
@@ -163,21 +163,21 @@
                             <div class="position-line-metrics">
                                 <div>
                                     <span th:text="#{dashboard.averagePrice}">Average Price</span>
-                                    <strong th:text="${row.avgBuyPriceText}">885,000원</strong>
+                                    <strong th:text="${row.avgBuyPriceText}">KRW 885,000</strong>
                                 </div>
                                 <div>
                                     <span th:text="#{dashboard.currentPrice}">Current Price</span>
-                                    <strong th:text="${row.currentPriceText}">1,628,000원</strong>
+                                    <strong th:text="${row.currentPriceText}">KRW 1,628,000</strong>
                                 </div>
                                 <div>
                                     <span th:text="#{dashboard.evaluationAmount}">Valuation Amount</span>
-                                    <strong th:text="${row.evalAmountText}">4,884,000원</strong>
+                                    <strong th:text="${row.evalAmountText}">KRW 4,884,000</strong>
                                 </div>
                                 <div>
                                     <span th:text="#{dashboard.evaluationProfit}">Valuation Profit/Loss</span>
                                     <strong th:classappend="${row.profitClass == 'profit' ? ' profit-red' : (row.profitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
                                             th:text="${row.evalProfitText}">
-                                        +2,229,000원
+                                        KRW +2,229,000
                                     </strong>
                                 </div>
                                 <div>
@@ -189,7 +189,7 @@
                     </div>
                 </section>
 
-                <!-- 통합 수익률 선 그래프 -->
+                <!-- Combined return line chart -->
                 <section class="dashboard-section positions-combined-chart-section">
                     <div class="section-head">
                         <div>

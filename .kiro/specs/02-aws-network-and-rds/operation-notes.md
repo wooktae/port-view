@@ -1,7 +1,7 @@
 ## 2026-06-08 AWS Foundation Execution Record
 
 - Step 2 cost / environment decision confirmation complete: aws-paper low applied. No secret value recorded.
-- CIDR: 10.0.0.0/16 (recommended)
+- CIDR: [EXAMPLE_VPC_CIDR] (recommended)
 - 2 AZs: ap-northeast-2a, ap-northeast-2c (recommended)
 - 6 Subnets: public-a, public-b, app-a, app-b, data-a, data-b
 - Internet Gateway: portfolio-igw
@@ -26,7 +26,7 @@
  - KMS Key ID: alias/aws/rds
  - RDS creation: complete
  - INTEREST_DB_HOST:
- - DB Endpoint: portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com
+ - DB Endpoint: [REDACTED_RDS_ENDPOINT]
  - DB programming language: changed to PSQL (Windows)
  - Step 15 RDS access security / Parameter / Option confirmation complete: Publicly accessible = No, pg-portfolio-paper applied, backup retention 7 days, deletion protection enabled confirmed. No secret value recorded.
 
@@ -324,15 +324,15 @@ This section, separately from the same-date (2026-06-13) Local-to-AWS Paper RDS 
 1. Running EC2 check: complete
    1) Command: `aws ec2 describe-instances`
    2) `portfolio-paper-marketconnector-ec2`
-       - instance id: `i-0fce77927b7397b88`
-       - private ip: `10.0.0.181`
+       - instance id: `[REDACTED_RESOURCE_ID]`
+       - private ip: `[REDACTED_PRIVATE_IP]`
        - state: `running`
    3) `portfolio-paper-crawler-worker`
-       - instance id: `i-0ff768ea639a91355`
-       - private ip: `10.0.0.169`
+       - instance id: `[REDACTED_RESOURCE_ID]`
+       - private ip: `[REDACTED_PRIVATE_IP]`
        - state: `running`
 2. Standard waypoint decision: complete
-   1) SSM Port Forwarding waypoint = `portfolio-paper-marketconnector-ec2` (instance id `i-0fce77927b7397b88`).
+   1) SSM Port Forwarding waypoint = `portfolio-paper-marketconnector-ec2` (instance id `[REDACTED_RESOURCE_ID]`).
    2) Decision reason:
        - This EC2 holds a history of validating access to the same RDS as the 2026-06-09 RDS restore runner (previous section §3 consistent).
        - The operational waypoint role for the Paper DB that MarketConnector / Strategy Execution / View will look at is natural (03 spec consistent).
@@ -342,9 +342,9 @@ This section, separately from the same-date (2026-06-13) Local-to-AWS Paper RDS 
 ### 3. Target EC2 SSM Managed Node Check
 
 1. SSM Online status confirmation: complete
-   1) Command: `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=i-0fce77927b7397b88"`
+   1) Command: `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=[REDACTED_RESOURCE_ID]"`
    2) Result:
-       - instance id: `i-0fce77927b7397b88`
+       - instance id: `[REDACTED_RESOURCE_ID]`
        - ping status: `Online`
        - platform type: `Linux`
        - agent version: `3.3.4515.0`
@@ -356,7 +356,7 @@ This section, separately from the same-date (2026-06-13) Local-to-AWS Paper RDS 
    1) Command: `aws rds describe-db-instances --db-instance-identifier portfolio-paper-rds`
    2) Result:
        - DB name: `portfolio`
-       - endpoint hostname: `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`
+       - endpoint hostname: `[REDACTED_RDS_ENDPOINT]`
        - port: `5432`
        - publicly accessible: `False`
        - status: `available`
@@ -365,9 +365,9 @@ This section, separately from the same-date (2026-06-13) Local-to-AWS Paper RDS 
 ### 5. SSM Port Forwarding Tunnel Open
 
 1. Standard command: complete
-   1) Command: `aws ssm start-session --target i-0fce77927b7397b88 --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com",portNumber="5432",localPortNumber="15433"`
+   1) Command: `aws ssm start-session --target [REDACTED_RESOURCE_ID] --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="[REDACTED_RDS_ENDPOINT]",portNumber="5432",localPortNumber="15433"`
 2. Session result: complete
-   1) session id: `terraform-vjp3fv3nz73konetcevdzjh9de`
+   1) session id: `[REDACTED_RESOURCE_ID]`
    2) local port: `15433`
    3) remote RDS port: `5432`
    4) message: `Port 15433 opened`
@@ -375,7 +375,7 @@ This section, separately from the same-date (2026-06-13) Local-to-AWS Paper RDS 
 3. Connection structure: complete
    1) Local PC `localhost:15433`
    2) → SSM Session Manager tunnel
-   3) → `portfolio-paper-marketconnector-ec2` (instance id `i-0fce77927b7397b88`)
+   3) → `portfolio-paper-marketconnector-ec2` (instance id `[REDACTED_RESOURCE_ID]`)
    4) → AWS Paper RDS `portfolio-paper-rds:5432`
 
 ### 6. Local psql client Not Installed / PATH Not Registered Confirmation
@@ -406,10 +406,10 @@ This section, separately from the same-date (2026-06-13) Local-to-AWS Paper RDS 
    5) password: uses the `PGPASSWORD` environment variable (0 plaintext exposure, R-DOCS-001 consistent)
 2. Connection result: complete
    1) Output summary (`current_user`, `current_database`, `inet_server_addr`, `inet_server_port`):
-       - `('portfolio_admin', 'portfolio', '10.0.20.165', 5432)`
+       - `('portfolio_admin', 'portfolio', '[REDACTED_PRIVATE_IP]', 5432)`
    2) Judgment:
        - AWS Paper RDS connection success from the local PC via the SSM tunnel.
-       - actual RDS private IP = `10.0.20.165` (RDS endpoint resolve result).
+       - actual RDS private IP = `[REDACTED_PRIVATE_IP]` (RDS endpoint resolve result).
        - actual RDS port = `5432`.
        - It was first empirically shown that the actual target of `localhost:15433` is AWS Paper RDS (OD-ENV-007 consistent).
 
@@ -435,12 +435,12 @@ This section, separately from the same-date (2026-06-13) Local-to-AWS Paper RDS 
 1. Prerequisite check stage: [확인]
    1) Local AWS CLI confirmation — `aws --version`
    2) Session Manager Plugin confirmation — `session-manager-plugin --version`
-   3) Target EC2 running status confirmation — `aws ec2 describe-instances --instance-ids i-0fce77927b7397b88`
-   4) Target EC2 SSM Online status confirmation — `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=i-0fce77927b7397b88"`
+   3) Target EC2 running status confirmation — `aws ec2 describe-instances --instance-ids [REDACTED_RESOURCE_ID]`
+   4) Target EC2 SSM Online status confirmation — `aws ssm describe-instance-information --filters "Key=InstanceIds,Values=[REDACTED_RESOURCE_ID]"`
    5) AWS Paper RDS endpoint / status confirmation — `aws rds describe-db-instances --db-instance-identifier portfolio-paper-rds`
 2. SSM Port Forwarding tunnel open stage: [실행]
    1) Command:
-       - `aws ssm start-session --target i-0fce77927b7397b88 --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com",portNumber="5432",localPortNumber="15433"`
+       - `aws ssm start-session --target [REDACTED_RESOURCE_ID] --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="[REDACTED_RDS_ENDPOINT]",portNumber="5432",localPortNumber="15433"`
    2) Success output:
        - `Port 15433 opened`
        - `Waiting for connections...`
@@ -461,7 +461,7 @@ This section, separately from the same-date (2026-06-13) Local-to-AWS Paper RDS 
    2) `portfolio_admin` connection confirmation:
        - `current_user` = `portfolio_admin`
        - `current_database` = `portfolio`
-       - `inet_server_addr` = `10.0.20.165`
+       - `inet_server_addr` = `[REDACTED_PRIVATE_IP]`
        - `inet_server_port` = `5432`
    3) Per-MS app role connection confirmation (§10.5 table) — validate `current_user` / `current_database` / `search_path` output.
    4) Only when the psql client is in PATH, `psql -h localhost -p 15433 -U <app_role> -d portfolio` is also usable. At this date's point, PATH not registered (R-AUTO-013 consistent).
@@ -490,11 +490,11 @@ This section, separately from the same-date (2026-06-13) Local-to-AWS Paper RDS 
 2. 0 RDS DDL/DML. 0 INSERT / UPDATE / DELETE / DDL. 0 broker / KIS / order / fill / Daily Batch entrypoint calls.
 3. 0 plaintext recording in this note of actual password / secret value / KIS app key / KIS app secret / account number / token / account-id / actual IAM access key id / actual secret ARN / EIP. All `[REDACTED]` or placeholder.
 4. Operational identifiers included in plaintext in this note / runbook body:
-   - instance id: `i-0fce77927b7397b88` / `i-0ff768ea639a91355`
-   - private IP: `10.0.0.181` / `10.0.0.169` / `10.0.20.165`
+   - instance id: `[REDACTED_RESOURCE_ID]` / `[REDACTED_RESOURCE_ID]`
+   - private IP: `[REDACTED_PRIVATE_IP]` / `[REDACTED_PRIVATE_IP]` / `[REDACTED_PRIVATE_IP]`
    - local port: `15433`
-   - SSM session id: `terraform-vjp3fv3nz73konetcevdzjh9de`
-   - RDS endpoint hostname: `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`
+   - SSM session id: `[REDACTED_RESOURCE_ID]`
+   - RDS endpoint hostname: `[REDACTED_RDS_ENDPOINT]`
 
    Per the user-specified policy, operational identifiers may be recorded in work logs / runbook, but sensitive information (secret value / password / token / account-id / KIS credentials) must never be recorded in plaintext.
 5. 0 changes to the 8 MS README / AGENTS.md / CHANGELOG / docs / worklog due to this date's work.
@@ -534,7 +534,7 @@ This section is a follow-up to §1 ~ §12 of the same-date previous section (`##
    3) SSL connection: `TLSv1.3`
    4) `current_user`: `portfolio_admin`
    5) `current_database`: `portfolio`
-   6) `inet_server_addr`: `10.0.20.165`
+   6) `inet_server_addr`: `[REDACTED_PRIVATE_IP]`
    7) `inet_server_port`: `5432`
 4. Password input-related memo: operator confirmation
    1) No password prompt on connection — judged to be because psql used the `PGPASSWORD` environment variable of the PowerShell session.
@@ -561,7 +561,7 @@ This section is a follow-up to §1 ~ §12 of the same-date previous section (`##
 4. Confirmation result: complete
    1) `current_user`: `portfolio_admin`
    2) `current_database`: `portfolio`
-   3) `inet_server_addr`: `10.0.20.165`
+   3) `inet_server_addr`: `[REDACTED_PRIVATE_IP]`
    4) `inet_server_port`: `5432`
    5) `search_path`: `"$user", public`
        - Note: `portfolio_admin` is not a target of `ALTER ROLE ... SET search_path` at this date's point — only the app roles (7 types) have search_path applied (OD-DB-006 consistent / [`./db-roles-and-grants.md`](./db-roles-and-grants.md) §3 consistent). Therefore the `"$user", public` output of `portfolio_admin` is normal.
@@ -584,7 +584,7 @@ This section is a follow-up to §1 ~ §12 of the same-date previous section (`##
    16) This date's validation only performs confirmation of SELECT availability — INSERT / UPDATE / DELETE / DDL 0 count.
 6. Judgment: complete
    1) pgAdmin4 → SSM tunnel → AWS Paper RDS connection first empirically shown.
-   2) pgAdmin4 connects via `localhost:15433` but the actual target is AWS Private RDS (`10.0.20.165:5432`).
+   2) pgAdmin4 connects via `localhost:15433` but the actual target is AWS Private RDS (`[REDACTED_PRIVATE_IP]:5432`).
    3) While the SSM tunnel is maintained, AWS Paper RDS operational data can be queried from pgAdmin4.
    4) On tunnel termination, the pgAdmin4 connection is immediately severed (R-AUTO-012 detection reinforcement consistent).
 
@@ -615,7 +615,7 @@ This section reinforces the auxiliary procedure for the 2 additional clients wit
        - On tunnel termination / `Ctrl + C`, the pgAdmin4 connection is also immediately severed (R-AUTO-012).
        - pgAdmin4 server registration is set to `localhost:15433`, not the RDS endpoint (OD-NET-011 consistent).
 3. Success criteria reinforcement: [확인]
-   1) In the psql / pgAdmin4 output, `inet_server_addr = 10.0.20.165` / `inet_server_port = 5432` match (previous section §10.6 success criteria reinforcement).
+   1) In the psql / pgAdmin4 output, `inet_server_addr = [REDACTED_PRIVATE_IP]` / `inet_server_port = 5432` match (previous section §10.6 success criteria reinforcement).
    2) RDS `PubliclyAccessible` value maintained as `False` (as in previous section §10.6).
 
 ### 4. Safety / Security Check Result

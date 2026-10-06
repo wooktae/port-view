@@ -40,7 +40,7 @@
                 </div>
             </section>
 
-            <!-- 선택한 전략 판단 결과 -->
+            <!-- Selected strategy decision result -->
             <section class="dashboard-section strategy-detail-hero-section">
                 <div class="strategy-detail-hero-card">
                     <div class="strategy-detail-hero-main">
@@ -83,7 +83,7 @@
                 </div>
             </section>
 
-            <!-- 계획 핵심 요약 -->
+            <!-- Plan summary -->
             <section class="dashboard-section strategy-detail-summary-section">
                 <div class="section-head">
                     <div>
@@ -125,7 +125,7 @@
                 </div>
             </section>
 
-            <!-- 시장 운용 판단 분석 -->
+            <!-- Market operations decision analysis -->
             <section class="dashboard-section strategy-market-reason-section"
                     th:if="${marketBlockReason != null and marketBlockReason.hasData()}">
                 <div class="section-head">
@@ -228,7 +228,7 @@
                 </div>
             </section>
 
-            <!-- 계획 기본 정보 -->
+            <!-- Basic plan information -->
             <section class="dashboard-section strategy-plan-info-section">
                 <div class="section-head">
                     <div>
@@ -294,7 +294,7 @@
                 </div>
             </section>
 
-            <!-- 주문 후보 -->
+            <!-- Order candidates -->
             <section class="dashboard-section strategy-order-section">
                 <div class="section-head">
                     <div>
@@ -323,7 +323,7 @@
 
                         <div class="order-stock-main">
                             <strong th:text="${order.stockDisplayName()}">
-                                종목명
+                                Stock Name
                             </strong>
                             <span th:if="${order.showSeparateTicker()}"
                                   th:text="${order.tickerCode() != null and !#strings.isEmpty(order.tickerCode()) ? order.tickerCode() : '-'}">
@@ -440,7 +440,7 @@
                 </div>
             </section>
 
-            <!-- 전략 기준 포지션 -->
+            <!-- Strategy positions -->
             <section class="dashboard-section strategy-position-detail-section">
                 <div class="section-head">
                     <div>
@@ -468,7 +468,7 @@
                              th:each="ps : ${positionStates}">
 
                         <div class="position-state-main">
-                            <strong th:text="${ps['stock_name'] != null ? ps['stock_name'] : '-'}">종목명</strong>
+                            <strong th:text="${ps['stock_name'] != null ? ps['stock_name'] : '-'}">Stock Name</strong>
                             <span th:text="${ps['ticker_code'] != null ? ps['ticker_code'] : '-'}">000000</span>
                             <small>
                                 <span th:text="#{strategyDetail.position}">Position</span>
@@ -541,7 +541,7 @@
                 </div>
             </section>
 
-            <!-- 커넥터 주문 요약 -->
+            <!-- Connector order summary -->
             <section class="dashboard-section connector-summary-section"
                      th:if="${(connectorOrders != null and !#lists.isEmpty(connectorOrders))
                               or (connectorEventsAndFills != null and !#lists.isEmpty(connectorEventsAndFills))}">

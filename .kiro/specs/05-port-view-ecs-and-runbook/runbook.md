@@ -196,14 +196,14 @@ The Scheduler name is decided in advance (`portfolio-paper-daily-step12-17-order
 $Region      = 'ap-northeast-2'
 $SchedName   = 'portfolio-paper-daily-step12-17-order-0901-kst'
 
-# (a) 목록에서 이름 존재 확인
+# (a) Confirm the name exists in the list
 aws scheduler list-schedules `
   --region $Region `
   --name-prefix $SchedName `
   --query "Schedules[?Name=='$SchedName'].{Name:Name,State:State,GroupName:GroupName}" `
   --output table
 
-# (b) 상세 정보(cron · Asia/Seoul · Flexible OFF · Target Lambda · Target Input)
+# (b) Detailed information (cron · Asia/Seoul · Flexible OFF · Target Lambda · Target Input)
 aws scheduler get-schedule `
   --region $Region `
   --name $SchedName `
@@ -227,13 +227,13 @@ Confirm the `scheduleType=STEP12_17_ORDER` + `dryRun=false` alignment inside the
 For the ENABLED transition, specify `--state ENABLED` with `update-schedule`. Because `update-schedule` does not retain existing fields and replaces them with the newly specified values, always back up the existing values with `get-schedule` first, then re-specify the same fields.
 
 ```powershell
-# (a) 기존 정의 백업(운영자 로컬 임시 파일 / 파일 안에 실제 ARN 이 포함되므로 secret 정책 정합 관리)
+# (a) Back up the existing definition (operator-local temporary file; manage it under the secret policy because it contains actual ARNs)
 aws scheduler get-schedule `
   --region $Region `
   --name $SchedName `
   --output json | Out-File -Encoding utf8 "$env:TEMP\schedule-$SchedName-before-enable.json"
 
-# (b) ENABLED 로 전환
+# (b) Transition to ENABLED
 $RoleArn = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.RoleArn' --output text)
 $TargetArn = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.Arn' --output text)
 $TargetInput = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.Input' --output text)
@@ -247,7 +247,7 @@ aws scheduler update-schedule `
   --flexible-time-window '{"Mode":"OFF"}' `
   --target "{\"Arn\":\"$TargetArn\",\"RoleArn\":\"$RoleArn\",\"Input\":\"$TargetInput\"}"
 
-# (c) State ENABLED 재확인
+# (c) Reconfirm State ENABLED
 aws scheduler get-schedule `
   --region $Region `
   --name $SchedName `
@@ -266,13 +266,13 @@ aws scheduler get-schedule `
 If automatic execution is in progress in a wrong state or safety detection fails, transition to DISABLED immediately.
 
 ```powershell
-# (a) 기존 정의 백업
+# (a) Back up the existing definition
 aws scheduler get-schedule `
   --region $Region `
   --name $SchedName `
   --output json | Out-File -Encoding utf8 "$env:TEMP\schedule-$SchedName-before-disable.json"
 
-# (b) DISABLED 로 전환
+# (b) Transition to DISABLED
 $RoleArn = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.RoleArn' --output text)
 $TargetArn = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.Arn' --output text)
 $TargetInput = (aws scheduler get-schedule --region $Region --name $SchedName --query 'Target.Input' --output text)
@@ -286,7 +286,7 @@ aws scheduler update-schedule `
   --flexible-time-window '{"Mode":"OFF"}' `
   --target "{\"Arn\":\"$TargetArn\",\"RoleArn\":\"$RoleArn\",\"Input\":\"$TargetInput\"}"
 
-# (c) State DISABLED 재확인
+# (c) Reconfirm State DISABLED
 aws scheduler get-schedule `
   --region $Region `
   --name $SchedName `

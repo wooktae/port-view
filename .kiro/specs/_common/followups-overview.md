@@ -337,7 +337,7 @@ This section is an index for quickly checking the role and next entry point of s
 | Key follow-ups | Common workflow · image promotion · rollback · package version management |
 | Prerequisite | 02 · 06 · at least 1 deploy-target MS stabilized |
 | Next links | 10 |
-| Detail | [spec folder](../07-cicd-pipelines/) |
+| Detail | Planned; spec folder not yet created |
 
 ### 10-cutover-and-validation-runbook
 
@@ -350,7 +350,7 @@ This section is an index for quickly checking the role and next entry point of s
 | Key follow-ups | Design the live cutover phase after accumulating paper stable cycles |
 | Prerequisite | paper validation complete for the live-target items of 02~09 |
 | Next links | Final operations transition |
-| Detail | [spec folder](../10-cutover-and-validation-runbook/) |
+| Detail | Planned; spec folder not yet created |
 
 ### Dependencies
 

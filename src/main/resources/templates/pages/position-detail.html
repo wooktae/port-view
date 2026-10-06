@@ -82,7 +82,7 @@
                 <div class="metric-grid position-detail-metric-grid">
                     <article class="metric-card metric-cash">
                         <div class="metric-title" th:text="#{positionDetail.heldQuantity}">Held Quantity</div>
-                        <div class="metric-value" th:text="${page.quantityText}">3주</div>
+                        <div class="metric-value" th:text="${page.quantityText}">3 shares</div>
                         <div class="metric-subtitle">
                             <span th:text="#{positions.sellable}">Sellable</span> <span th:text="${page.sellableQuantityText}">3 shares</span>
                         </div>
@@ -90,7 +90,7 @@
 
                     <article class="metric-card metric-stock">
                         <div class="metric-title" th:text="#{positionDetail.averageCurrentPrice}">Average / Current Price</div>
-                        <div class="metric-value compact-metric" th:text="${page.currentPriceText}">1,628,000원</div>
+                        <div class="metric-value compact-metric" th:text="${page.currentPriceText}">KRW 1,628,000</div>
                         <div class="metric-subtitle">
                             <span th:text="#{dashboard.averagePrice}">Average Price</span> <span th:text="${page.avgBuyPriceText}">885,000 KRW</span>
                         </div>
@@ -98,7 +98,7 @@
 
                     <article class="metric-card metric-primary">
                         <div class="metric-title" th:text="#{dashboard.evaluationAmount}">Valuation Amount</div>
-                        <div class="metric-value" th:text="${page.evalAmountText}">4,884,000원</div>
+                        <div class="metric-value" th:text="${page.evalAmountText}">KRW 4,884,000</div>
                         <div class="metric-subtitle">
                             <span th:text="#{positionDetail.buyAmount}">Buy Amount</span> <span th:text="${page.buyAmountText}">2,655,000 KRW</span>
                         </div>
@@ -109,7 +109,7 @@
                         <div class="metric-value"
                              th:classappend="${page.profitClass == 'profit' ? ' profit-red' : (page.profitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
                              th:text="${page.evalProfitText}">
-                            +2,229,000원
+                            KRW +2,229,000
                         </div>
                         <div class="metric-subtitle"
                              th:classappend="${page.profitClass == 'profit' ? ' profit-red' : (page.profitClass == 'loss' ? ' loss-blue' : ' neutral-text')}"
@@ -131,7 +131,7 @@
                 <div class="metric-grid position-insight-metric-grid">
                     <article class="metric-card metric-primary">
                         <div class="metric-title" th:text="#{positionDetail.brokerReports}">Broker Reports</div>
-                        <div class="metric-value" th:text="${page.summary.reportCountText}">0건</div>
+                        <div class="metric-value" th:text="${page.summary.reportCountText}">0 items</div>
                         <div class="metric-subtitle" th:text="#{positionDetail.reportsRecent}">Published in the last 7 days</div>
                     </article>
 
@@ -159,7 +159,7 @@
                     <article class="metric-card metric-primary">
                         <div class="metric-title" th:text="#{positionDetail.newsDistribution}">News Distribution</div>
                         <div class="metric-value compact-metric">
-                            <span th:text="${page.summary.newsCountText}">0건</span>
+                            <span th:text="${page.summary.newsCountText}">0 items</span>
                         </div>
                         <div class="metric-subtitle">
                             <span th:text="#{positionDetail.positive}">Positive</span> <span th:text="${page.summary.positiveNewsCountText}">0 items</span>
@@ -198,7 +198,7 @@
 
                             <div class="insight-score-pill">
                                 <span th:text="${report.recommendation}">BUY</span>
-                                <b th:text="${report.recommendationScoreText}">5.00점</b>
+                                <b th:text="${report.recommendationScoreText}">5.00 points</b>
                             </div>
                         </div>
 
@@ -208,7 +208,7 @@
 
                         <div class="insight-meta-row">
                             <span th:text="#{positionDetail.targetPrice}">Target Price</span>
-                            <strong th:text="${report.targetPriceText}">120,000원</strong>
+                            <strong th:text="${report.targetPriceText}">KRW 120,000</strong>
                         </div>
                     </article>
                 </div>
@@ -248,8 +248,8 @@
                             </div>
 
                             <div class="insight-score-pill">
-                                <span th:text="${news.sentimentLabelText}">긍정</span>
-                                <b th:text="${news.sentimentScoreText}">3.00점</b>
+                                <span th:text="${news.sentimentLabelText}">Positive</span>
+                                <b th:text="${news.sentimentScoreText}">3.00 points</b>
                             </div>
                         </div>
 

@@ -3618,7 +3618,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | Step 12~17 `allowPaperOrderExecute=true` true path | Passed (after prior false-path validation and REQUESTED-state confirmation → approved true-path execution) |
 | First real SELL | BGF리테일 `282330` 17 shares MARKET |
 | `connector_order_request id 48` · `strategy_execution_order id 40` | 🟢 **FILLED** |
-| `broker_order_no` | `0000006143` |
+| `broker_order_no` | `[REDACTED_BROKER_ORDER_NO]` |
 | Holdings after Step 17 balance refresh | 4 securities reflected normally |
 | Decision · risk | New OD-MS-029 · R-AUTO-021 [2026-06-23 reinforcement] |
 
@@ -3865,9 +3865,9 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | (a) `step-02-interest-crawler.ps1` (continued) | <span style="color:#D1242F">**fail-closed**</span> if worker EC2 is not running |
 | (b) non-GUI ECS RunTask overrides | `TEMP=/tmp` · `TMP=/tmp` · `PYTHONUTF8=1` · `PYTHONIOENCODING=utf-8` + shared function `Invoke-DailyAwsPaperEcsTask` `EnvironmentVariables` · `New-SsmParameterFile` `ExecutionTimeoutSeconds` · `Invoke-SsmCommandAndWait` `ExecutionTimeoutSeconds` |
 | (c) New script | `interest_krx_raw_validate_daily.py`<br>Validate expected trade_date for `interest_program_raw` · `interest_shortsell_raw`<br>row_count + max(trade_date) ≥ expected · exit 30 on failure<br>local py_compile + marker passed |
-| (d) S3 presigned-URL deployment | S3 bucket `portfolio-paper-migration-yukiever`<br>key `tmp/krx/interest_krx_raw_validate_daily.py` → EC2<br>SSM commandId `dd8e0f3e-df9a-4268-b11a-eea3f3df66c3` |
+| (d) S3 presigned-URL deployment | S3 bucket `[REDACTED_BUCKET]`<br>key `tmp/krx/interest_krx_raw_validate_daily.py` → EC2<br>SSM commandId `[REDACTED_RESOURCE_ID]` |
 | (e) Standalone EC2 validation | user=`crawler_app` · schema=`interest` · search_path `interest, reference, legacy, public` · `interest_program_raw` `2026-06-19` count=`1` OK · `interest_shortsell_raw` `2026-06-19` count=`349` OK · exit 0 |
-| (e) Standalone EC2 validation (continued) | SSM commandId `c844aea5-1429-430a-9510-39fc99f17f05` |
+| (e) Standalone EC2 validation (continued) | SSM commandId `[REDACTED_RESOURCE_ID]` |
 | (f) Wrapper integration | `step-02-interest-crawler.ps1` calculates `ExpectedKrxRawDate` (prior business day based on RunDate)<br>→ runs worker-EC2 SSM `INTEREST_CRAWLER_KRX_DB_VALIDATE`<br>Step 2 fails on non-zero exit / row_count 0<br>records `KrxDbValidationCommandId` in step result |
 
 - 🟢 **Validation milestone (2026-06-21)**
@@ -3877,7 +3877,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | Standalone wrapper execution | `.\run-daily-aws-paper.ps1 -Environment aws-paper -RunDate 2026-06-20 -StartStep 2 -EndStep 2` |
 | RunId · StepCode · Status · Runner · ExpectedKrxRawDate | `daily-aws-paper-20260621-204017` · `INTEREST_CRAWLER` · 🟢 **SUCCESS** · `ECS+SSM` · `2026-06-19` |
 | (a) non-GUI ECS | taskDefinition `portfolio-paper-interest-crawler:7` · taskId `78979b5cbb714d0eb94f5946e15a14ce` · exitCode 0 · stoppedReason `Essential container in task exited` · CloudWatch log saved |
-| (b) KRX GUI worker | state `running` · commandId `f9d82fcc-1e26-4710-87c3-1d20483b63ef` · 🟢 **Success**<br>`TaskStatus=Running` → `Ready` (elapsedSeconds=111)<br>Logon `Interactive only`<br>Run As `Administrator`<br>latest log `krx_worker_daily_20260621_114154.log` |
+| (b) KRX GUI worker | state `running` · commandId `[REDACTED_RESOURCE_ID]` · 🟢 **Success**<br>`TaskStatus=Running` → `Ready` (elapsedSeconds=111)<br>Logon `Interactive only`<br>Run As `Administrator`<br>latest log `krx_worker_daily_20260621_114154.log` |
 | (c) KRX raw DB validation | SSM `INTEREST_CRAWLER_KRX_DB_VALIDATE` · commandId `2279c6d7-2da6-4317-9c10-7cc77374b317` · 🟢 **Success** · DB user=`crawler_app` · schema=`interest` · `interest_program_raw` `2026-06-19` count=`1` OK |
 | (c) KRX raw DB validation (continued) | `interest_shortsell_raw` `2026-06-19` count=`349` OK |
 
@@ -3949,7 +3949,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 
 | Item | Value |
 | --- | --- |
-| SSM commandId | `dd8e0f3e-df9a-4268-b11a-eea3f3df66c3` · `c844aea5-1429-430a-9510-39fc99f17f05` · `2279c6d7-2da6-4317-9c10-7cc77374b317` · `f9d82fcc-1e26-4710-87c3-1d20483b63ef` |
+| SSM commandId | `[REDACTED_RESOURCE_ID]` · `[REDACTED_RESOURCE_ID]` · `2279c6d7-2da6-4317-9c10-7cc77374b317` · `[REDACTED_RESOURCE_ID]` |
 | RunId | `daily-aws-paper-20260621-204017` |
 | taskDefinition · taskId | `portfolio-paper-interest-crawler:7` · `78979b5cbb714d0eb94f5946e15a14ce` |
 | S3 key | `tmp/krx/interest_krx_raw_validate_daily.py` |
@@ -4045,11 +4045,11 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | --- | --- |
 | Local validation | `python -m py_compile connector_order_check.py` passed · confirmed `--help` options |
 | commit | `75cb804` (`fix(connector): run order checks sequentially per active order` · remote push destination not configured → git push not performed) |
-| EC2 deployment | S3 → MC EC2 (`i-0fce77927b7397b88`) deployment · bucket `portfolio-paper-migration-yukiever` · key `deploy/marketconnector/connector_order_check.py` · 39159 bytes |
+| EC2 deployment | S3 → MC EC2 (`[REDACTED_RESOURCE_ID]`) deployment · bucket `[REDACTED_BUCKET]` · key `deploy/marketconnector/connector_order_check.py` · 39159 bytes |
 | EC2 deployment (continued) | Created backup `connector_order_check.py.bak-20260618-step13-per-order`, replaced file, restored ownership `ec2-user:ec2-user`, confirmed `--broad` · `--active-limit` markers |
 | EC2 validation | Activate `../.venv` + load `/tmp/inject-env.sh` → `python3 -m py_compile` passed · `--help` options confirmed |
-| Single-order direct-only test | `python3 connector_order_check.py --code 004990 --order-no 0000025576 --no-broad` · SSM Status 🟢 **Success** · ResponseCode `0` · StdErr empty |
-| Standalone wrapper Step 13 execution | `-StartStep 13 -EndStep 13` (RunDate `2026-06-18`)<br>Selected `Step 13 CONNECTOR_ORDER_CHECK only`<br>SSM commandId `b344d404-07a4-4bb6-9d63-34151e648bab` · 🟢 **Success** · responseCode `0`<br>Step 13 🟢 **COMPLETED** |
+| Single-order direct-only test | `python3 connector_order_check.py --code 004990 --order-no [REDACTED_BROKER_ORDER_NO] --no-broad` · SSM Status 🟢 **Success** · ResponseCode `0` · StdErr empty |
+| Standalone wrapper Step 13 execution | `-StartStep 13 -EndStep 13` (RunDate `2026-06-18`)<br>Selected `Step 13 CONNECTOR_ORDER_CHECK only`<br>SSM commandId `[REDACTED_RESOURCE_ID]` · 🟢 **Success** · responseCode `0`<br>Step 13 🟢 **COMPLETED** |
 
 - 🟢 **Decision · risk changes**
 
@@ -4110,10 +4110,10 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | Item | Value |
 | --- | --- |
 | commit | `75cb804` |
-| S3 bucket · key · size | `portfolio-paper-migration-yukiever` · `deploy/marketconnector/connector_order_check.py` · `39159 bytes` |
-| EC2 instance · backup file | `i-0fce77927b7397b88` · `connector_order_check.py.bak-20260618-step13-per-order` |
-| SSM commandId | `b344d404-07a4-4bb6-9d63-34151e648bab` |
-| Ticker · broker_order_no | `004990` · `0000025576` |
+| S3 bucket · key · size | `[REDACTED_BUCKET]` · `deploy/marketconnector/connector_order_check.py` · `39159 bytes` |
+| EC2 instance · backup file | `[REDACTED_RESOURCE_ID]` · `connector_order_check.py.bak-20260618-step13-per-order` |
+| SSM commandId | `[REDACTED_RESOURCE_ID]` |
+| Ticker · broker_order_no | `004990` · `[REDACTED_BROKER_ORDER_NO]` |
 | wrapper options | `--broad` · `--active-limit` · `--code` · `--order-no` · `--no-broad` |
 | wrapper parameters | `StartStep` · `EndStep` |
 
@@ -4147,7 +4147,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | Step 9 / Step 10 | Normal skip (no SELL targets) |
 | Step 11 DAILY_AUTO_BUY | 4 rows `READY -> REQUESTED` |
 | Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE | Initial KIS paper API read timeout · requests `38~41` · orders `30~33` <span style="color:#D1242F">**FAILED**</span> · controlled REQUESTED recovery, then retry → 4 BUY 🟢 **ACCEPTED** · requests `42~45` · orders `30~33` 🟢 **SUBMITTED** |
-| Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE (continued) | broker_order_no `0000025576`, `0000025740`, `0000025744`, `0000025747` |
+| Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE (continued) | broker_order_no `[REDACTED_BROKER_ORDER_NO]`, `[REDACTED_BROKER_ORDER_NO]`, `[REDACTED_BROKER_ORDER_NO]`, `[REDACTED_BROKER_ORDER_NO]` |
 | Step 13 CONNECTOR_ORDER_CHECK | broad query returned `output1 empty` + `output2 summary-only` · 4 active candidates · summary fallback 🟢 **skipped** (first R-AUTO-018 mitigation validation) → per-order requery with `--code` / `--order-no` / `--no-broad` reflected 4 fills (created connector_order_event · connector_fill) |
 | Step 14 | Normal skip |
 | Step 15 SYNC_BUY_FILL | strategy_execution_order `30~33` 🟢 **FILLED** |
@@ -4233,7 +4233,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | `execution_plan_id` | `94` |
 | connector_order_request id | `38~41` (FAILED) + `42~45` (ACCEPTED) |
 | strategy_execution_order id | `30~33` |
-| broker_order_no | `0000025576` · `0000025740` · `0000025744` · `0000025747` |
+| broker_order_no | `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` · `[REDACTED_BROKER_ORDER_NO]` |
 | position_state_id | `7` · `8` · `11` · `12` |
 | SSM commandId | `66ec8831-74b9-469c-8410-6ccb11cb3400` |
 | `connector.connector_position_snapshot` row_count | `36` |
@@ -4600,7 +4600,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | Item | Value |
 | --- | --- |
 | BACKTEST_RESEARCH | AWS Batch SUCCEEDED |
-| run_id | `439d78e7-41fd-4bb7-b455-18564ddff758` |
+| run_id | `[REDACTED_RESOURCE_ID]` |
 | end date | 2026-06-15 |
 | total return | 4.66534417 |
 | MDD | -0.08941942 |
@@ -4865,7 +4865,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | Item | Value |
 | --- | --- |
 | Status | 🟢 **SUCCEEDED** · exitCode 0 |
-| run_id | `a39b0b0c-cfe9-474e-8a4a-4ddb33f09567` |
+| run_id | `[REDACTED_RESOURCE_ID]` |
 | total_return · mdd · sharpe · trade_count | `4.55930879` · `-0.08941942` · `2.65561307` · `308` |
 | extended analysis | Included internally |
 | RDS DDL · broker · KIS calls · Batch automatic retry | 0 (aligned with OD-SAFE-004) |
@@ -4883,8 +4883,8 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 
 | Item | Value |
 | --- | --- |
-| bucket | Reuse `portfolio-paper-migration-yukiever` |
-| Job Role permission addition | `s3:PutObject` · Resource `arn:aws:s3:::portfolio-paper-migration-yukiever/strategy-research/reports/*` · public read 0 · wildcard 0 |
+| bucket | Reuse `[REDACTED_BUCKET]` |
+| Job Role permission addition | `s3:PutObject` · Resource `arn:aws:s3:::[REDACTED_BUCKET]/strategy-research/reports/*` · public read 0 · wildcard 0 |
 | requirements.txt | Added `boto3` · Docker internal import smoke succeeded |
 | report-wrapper options | Skip if `REPORT_S3_BUCKET` unset · default `REPORT_S3_PREFIX` = `strategy-research/reports` · separate subpath by `AWS_BATCH_JOB_ID` · retain default `REPORT_OUTPUT_DIR=/tmp/portfolio-reports` |
 | Docker rebuild + ECR push | `paper-20260615-report-s3` · image digest sha256 placeholder · size about 106MB · pushedAt 2026-06-15T17:00:10+09:00 |
@@ -4894,10 +4894,10 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 
 | Item | Value |
 | --- | --- |
-| jobName · jobId | `strategy-research-backtest-report-s3-20260615` · `112f5fe4-02f3-4614-a88c-60a9842e1447` |
+| jobName · jobId | `strategy-research-backtest-report-s3-20260615` · `[REDACTED_RESOURCE_ID]` |
 | Status | 🟢 **SUCCEEDED** · exitCode 0 |
 | logStreamName | `strategy-research/default/b18e548d46764cd791028088e1d32a6d` |
-| 4 S3 objects | `strategy-research/reports/20260615/112f5fe4-.../01_요약_리포트_20260615_v1.txt` · `02_일자별_매매_리포트_20260615_v1.txt` · `03_거래_상세_리포트_20260615_v1.txt` · `04_추천_리포트_20260615_v1.txt` |
+| 4 S3 objects | `strategy-research/reports/20260615/[REDACTED_RESOURCE_ID]/01_요약_리포트_20260615_v1.txt` · `02_일자별_매매_리포트_20260615_v1.txt` · `03_거래_상세_리포트_20260615_v1.txt` · `04_추천_리포트_20260615_v1.txt` |
 | Remained private · public read granted | yes · 0 |
 
 - 🟡 **Decision lock (2026-06-15) · risk updates**
@@ -4943,7 +4943,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
   - Log Group `/portfolio/paper/strategy-research`
   - Secret · Role names
   - jobName · jobId · logStreamName
-  - S3 bucket `portfolio-paper-migration-yukiever` · prefix `strategy-research/reports/20260615/112f5fe4-.../`
+  - S3 bucket `[REDACTED_BUCKET]` · prefix `strategy-research/reports/20260615/[REDACTED_RESOURCE_ID]/`
   - 4 filenames
   - metric values `run_id a39b0b0c-...` · `total_return` · `mdd` · `sharpe` · `trade_count`
 
@@ -5154,7 +5154,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | Command | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 15433 -U portfolio_admin -d portfolio` |
 | client · server | `18.1` · `18.4` |
 | SSL connection | `TLSv1.3` |
-| Output | `current_user=portfolio_admin` · `current_database=portfolio` · `inet_server_addr=10.0.20.165` · `inet_server_port=5432` |
+| Output | `current_user=portfolio_admin` · `current_database=portfolio` · `inet_server_addr=[REDACTED_PRIVATE_IP]` · `inet_server_port=5432` |
 | Alignment | client major 18 · full 18.4 (R-DATA-003 · 03 spec design §5) |
 | General `psql` PATH registration | Incomplete · work proceeded by direct full-path execution |
 | Password handling | `PGPASSWORD` environment variable in PowerShell session · removable with `Remove-Item Env:PGPASSWORD` · 0 plaintext records |
@@ -5181,7 +5181,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | SSL mode | `Prefer` or default TLS |
 | Tunnel-window confirmation | `Connection accepted for session [...]` output |
 | Validation SQL | `select current_user, current_database(), inet_server_addr(), inet_server_port(), current_setting('search_path');` |
-| Result | `portfolio_admin` · `portfolio` · `10.0.20.165` · `5432` · `"$user", public` |
+| Result | `portfolio_admin` · `portfolio` · `[REDACTED_PRIVATE_IP]` · `5432` · `"$user", public` |
 | search_path interpretation | `portfolio_admin` is not a target of `ALTER ROLE ... SET search_path` · `"$user", public` is normal (aligned with OD-DB-006) |
 
 - 🟢 **pgAdmin4 SELECT access confirmed · query scope**
@@ -5199,7 +5199,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | Tunnel required | SSM Port Forwarding PowerShell window must be open before pgAdmin4 accesses AWS Paper RDS · `Port 15433 opened` · `Waiting for connections...` must remain active |
 | Tunnel termination | Closing tunnel window or `Ctrl + C` immediately disconnects pgAdmin4 |
 | Server registration | Direct RDS endpoint registration <span style="color:#D1242F">**Prohibited**</span> · configure only `localhost:15433` |
-| Actual connection target | AWS Private RDS (`10.0.20.165:5432`) |
+| Actual connection target | AWS Private RDS (`[REDACTED_PRIVATE_IP]:5432`) |
 
 - 🟡 **Decision lock (fourth session on 2026-06-13)**
 
@@ -5213,7 +5213,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | Item | Value |
 | --- | --- |
 | 02 spec Runbook §10 | No body change · added auxiliary procedure §13 |
-| Auxiliary procedure | (a) Direct-path execution of PostgreSQL 18 psql client (b) pgAdmin4 Server registration (Name · Host · Port · DB · Username · SSL mode) (c) reinforce success criteria (`inet_server_addr=10.0.20.165` · `inet_server_port=5432` · RDS `PubliclyAccessible=False`) |
+| Auxiliary procedure | (a) Direct-path execution of PostgreSQL 18 psql client (b) pgAdmin4 Server registration (Name · Host · Port · DB · Username · SSL mode) (c) reinforce success criteria (`inet_server_addr=[REDACTED_PRIVATE_IP]` · `inet_server_port=5432` · RDS `PubliclyAccessible=False`) |
 | Strategy Execution pre-validation | First empirical confirmation that all three clients on this date (Python `psycopg2` · psql 18 · pgAdmin4) can access AWS Paper RDS through SSM tunnel · multi-client validation complete before Strategy Execution main phase |
 | R-AUTO-012 detection reinforcement | Monitor pgAdmin4 disconnect patterns · `Connection terminated` · `server closed the connection unexpectedly` + automatic recovery after tunnel restart |
 | R-AUTO-013 mitigation reinforcement | PostgreSQL 18 client already installed (`C:\Program Files\PostgreSQL\18\bin\psql.exe`) · risk narrowed from missing client to unregistered general `psql` PATH · Status 🟢 **Mitigated** retained |
@@ -5246,7 +5246,7 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 
   <details><summary>🔵 Operational identifier summary</summary>
 
-  - Reuse from prior third session: instance id · private IP · local port · SSM session id `terraform-vjp3fv3nz73konetcevdzjh9de` · RDS endpoint hostname
+  - Reuse from prior third session: instance id · private IP · local port · SSM session id `[REDACTED_RESOURCE_ID]` · RDS endpoint hostname
   - Additional: local PostgreSQL install path `C:\Program Files\PostgreSQL\18\bin\psql.exe` (operator-local PC tool · not a secret)
 
   </details>
@@ -5275,8 +5275,8 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 
 | Item | Value |
 | --- | --- |
-| Candidate EC2 1 | `portfolio-paper-marketconnector-ec2` · instance id `i-0fce77927b7397b88` · private ip `10.0.0.181` · running |
-| Candidate EC2 2 | `portfolio-paper-crawler-worker` · instance id `i-0ff768ea639a91355` · private ip `10.0.0.169` · running |
+| Candidate EC2 1 | `portfolio-paper-marketconnector-ec2` · instance id `[REDACTED_RESOURCE_ID]` · private ip `[REDACTED_PRIVATE_IP]` · running |
+| Candidate EC2 2 | `portfolio-paper-crawler-worker` · instance id `[REDACTED_RESOURCE_ID]` · private ip `[REDACTED_PRIVATE_IP]` · running |
 | Decision | `portfolio-paper-marketconnector-ec2` |
 | Reason | Has RDS-access validation history (2026-06-09 RDS restore runner) · natural waypoint for Paper DB access used by MarketConnector / Strategy Execution / View |
 | crawler worker | Retain KRX GUI / Windows-worker role · not used as SSM Port Forwarding waypoint |
@@ -5286,10 +5286,10 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | Item | Value |
 | --- | --- |
 | `describe-instance-information` | ping `Online` · platform `Linux` · agent `3.3.4515.0` |
-| RDS status | DB name `portfolio` · endpoint `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com` · port `5432` · `PubliclyAccessible=False` · status `available` |
+| RDS status | DB name `portfolio` · endpoint `[REDACTED_RDS_ENDPOINT]` · port `5432` · `PubliclyAccessible=False` · status `available` |
 | RDS Private policy | No change (R-SEC-001 · R-NET-004 · OD-NET-009) |
-| `start-session` command | `AWS-StartPortForwardingSessionToRemoteHost` · host `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com` · portNumber `5432` · localPortNumber `15433` |
-| session id · local port | `terraform-vjp3fv3nz73konetcevdzjh9de` · `15433` |
+| `start-session` command | `AWS-StartPortForwardingSessionToRemoteHost` · host `[REDACTED_RDS_ENDPOINT]` · portNumber `5432` · localPortNumber `15433` |
+| session id · local port | `[REDACTED_RESOURCE_ID]` · `15433` |
 | Output | `Port 15433 opened` · `Waiting for connections...` |
 
 - 🟢 **Local psql not recognized · used Python `psycopg2`**
@@ -5307,8 +5307,8 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 | --- | --- |
 | host · port · dbname · user | `localhost` · `15433` · `portfolio` · `portfolio_admin` |
 | password | Used environment variable `PGPASSWORD` · plaintext exposure 0 |
-| Python result | `('portfolio_admin', 'portfolio', '10.0.20.165', 5432)` |
-| Meaning | First validation of local PC → SSM tunnel → AWS Paper RDS passed · confirmed actual target behind `localhost:15433` is AWS Paper RDS via `inet_server_addr=10.0.20.165` · `inet_server_port=5432` (reinforced R-DATA-007 detection) |
+| Python result | `('portfolio_admin', 'portfolio', '[REDACTED_PRIVATE_IP]', 5432)` |
+| Meaning | First validation of local PC → SSM tunnel → AWS Paper RDS passed · confirmed actual target behind `localhost:15433` is AWS Paper RDS via `inet_server_addr=[REDACTED_PRIVATE_IP]` · `inet_server_port=5432` (reinforced R-DATA-007 detection) |
 
 - 🟢 **`execution_app` connection validation**
 
@@ -5363,11 +5363,11 @@ The order-capable Step 12~17 range retains the separate approval state machine +
 
   <details><summary>🔵 Operational identifier summary</summary>
 
-  - instance id `i-0fce77927b7397b88` · `i-0ff768ea639a91355`
-  - private IP `10.0.0.181` · `10.0.0.169` · `10.0.20.165`
+  - instance id `[REDACTED_RESOURCE_ID]` · `[REDACTED_RESOURCE_ID]`
+  - private IP `[REDACTED_PRIVATE_IP]` · `[REDACTED_PRIVATE_IP]` · `[REDACTED_PRIVATE_IP]`
   - local port `15433`
-  - SSM session id `terraform-vjp3fv3nz73konetcevdzjh9de`
-  - RDS endpoint hostname `portfolio-paper-rds.c72ecae22z3y.ap-northeast-2.rds.amazonaws.com`
+  - SSM session id `[REDACTED_RESOURCE_ID]`
+  - RDS endpoint hostname `[REDACTED_RDS_ENDPOINT]`
 
   </details>
 

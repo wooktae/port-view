@@ -65,7 +65,7 @@ Prerequisite / follow-up specs
   - [`../04-strategy-batch-stepfunctions`](../04-strategy-batch-stepfunctions)
   - [`../05-port-view-ecs-and-runbook`](../05-port-view-ecs-and-runbook)
   - [`../09-strategy-research-batch`](../09-strategy-research-batch)
-  - [`../10-cutover-and-validation-runbook`](../10-cutover-and-validation-runbook)
+  - `10-cutover-and-validation-runbook` (planned; no folder yet)
 
 This document does not write the following items. All use only `[REDACTED]` or a placeholder.
 

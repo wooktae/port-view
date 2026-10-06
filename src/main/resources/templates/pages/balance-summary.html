@@ -44,7 +44,7 @@
                 <div class="account-hero-card">
                     <div class="account-hero-main">
                         <div class="section-label" th:text="#{label.account}">Account</div>
-                        <h2 th:text="${resolvedAccountNo}">50187518</h2>
+                        <h2 th:text="${resolvedAccountNo}">-</h2>
                         <p>
                             <span th:text="#{balance.asOfDate}">As-of Date</span>:
                             <span th:text="${b != null and b.asOfDate != null ? b.asOfDate : '-'}">2026-05-08</span>
@@ -85,7 +85,7 @@
                         <div class="metric-title" th:text="#{balance.totalEvaluation}">Total Valuation</div>
                         <div class="metric-value"
                              th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.totalEvalAmount != null ? b.totalEvalAmount : 0, 1, 'COMMA'))}">
-                            9,997,822원
+                            KRW 9,997,822
                         </div>
                         <div class="metric-subtitle" th:text="#{balance.totalEvaluationDescription}">Total valuation from the AWS Paper Snapshot</div>
                     </article>
@@ -94,7 +94,7 @@
                         <div class="metric-title" th:text="#{balance.initialCapital}">Initial Capital</div>
                         <div class="metric-value"
                              th:text="${#messages.msg('unit.money', #numbers.formatInteger(resolvedInitialCapitalAmount, 1, 'COMMA'))}">
-                            10,000,000원
+                            KRW 10,000,000
                         </div>
                         <div class="metric-subtitle" th:text="#{balance.initialCapitalDescription}">Based on the first Balance Snapshot</div>
                     </article>
@@ -125,7 +125,7 @@
                         <div class="metric-title" th:text="#{balance.cash}">Cash</div>
                         <div class="metric-value"
                              th:text="${#messages.msg('unit.money', #numbers.formatInteger(resolvedDisplayCashAmount, 1, 'COMMA'))}">
-                            8,072,062원
+                            KRW 8,072,062
                         </div>
                         <div class="metric-subtitle" th:text="#{balance.cashDescription}">Orderable cash from the AWS Paper Snapshot</div>
                     </article>
@@ -134,7 +134,7 @@
                         <div class="metric-title" th:text="#{balance.stockEvaluation}">Stock Valuation</div>
                         <div class="metric-value"
                              th:text="${#messages.msg('unit.money', #numbers.formatInteger(resolvedStockEvalAmount, 1, 'COMMA'))}">
-                            1,859,060원
+                            KRW 1,859,060
                         </div>
                         <div class="metric-subtitle" th:text="#{balance.stockEvaluationDescription}">Sum of latest Position valuations</div>
                     </article>
@@ -166,7 +166,7 @@
                         <div class="chart-label">
                             <strong th:text="#{balance.totalEvaluation}">Total Valuation</strong>
                             <span th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.totalEvalAmount != null ? b.totalEvalAmount : 0, 1, 'COMMA'))}">
-                                9,931,122원
+                                KRW 9,931,122
                             </span>
                         </div>
                         <div class="chart-track">
@@ -179,7 +179,7 @@
                         <div class="chart-label">
                             <strong th:text="#{balance.cash}">Cash</strong>
                             <span th:text="${#messages.msg('unit.money', #numbers.formatInteger(resolvedDisplayCashAmount, 1, 'COMMA'))}">
-                                8,072,062원
+                                KRW 8,072,062
                             </span>
                         </div>
                         <div class="chart-track">
@@ -198,7 +198,7 @@
                         <div class="chart-label">
                             <strong th:text="#{balance.stockEvaluation}">Stock Valuation</strong>
                             <span th:text="${#messages.msg('unit.money', #numbers.formatInteger(resolvedStockEvalAmount, 1, 'COMMA'))}">
-                                1,859,060원
+                                KRW 1,859,060
                             </span>
                         </div>
                         <div class="chart-track">
@@ -228,27 +228,27 @@
                     <div class="balance-detail-grid">
                         <div class="balance-detail-item">
                             <span th:text="#{balance.buyToday}">Buy Amount Today</span>
-                            <strong th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.buyAmountToday != null ? b.buyAmountToday : 0, 1, 'COMMA'))}">0원</strong>
+                            <strong th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.buyAmountToday != null ? b.buyAmountToday : 0, 1, 'COMMA'))}">KRW 0</strong>
                         </div>
                         <div class="balance-detail-item">
                             <span th:text="#{balance.sellToday}">Sell Amount Today</span>
-                            <strong th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.sellAmountToday != null ? b.sellAmountToday : 0, 1, 'COMMA'))}">0원</strong>
+                            <strong th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.sellAmountToday != null ? b.sellAmountToday : 0, 1, 'COMMA'))}">KRW 0</strong>
                         </div>
                         <div class="balance-detail-item">
                             <span th:text="#{balance.feesToday}">Fees Today</span>
-                            <strong th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.feeTotalToday != null ? b.feeTotalToday : 0, 1, 'COMMA'))}">0원</strong>
+                            <strong th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.feeTotalToday != null ? b.feeTotalToday : 0, 1, 'COMMA'))}">KRW 0</strong>
                         </div>
                         <div class="balance-detail-item">
                             <span th:text="#{balance.previousClose}">Previous Closing Amount</span>
-                            <strong th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.prevClosingAmt != null ? b.prevClosingAmt : 0, 1, 'COMMA'))}">0원</strong>
+                            <strong th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.prevClosingAmt != null ? b.prevClosingAmt : 0, 1, 'COMMA'))}">KRW 0</strong>
                         </div>
                         <div class="balance-detail-item">
                             <span th:text="#{balance.nextSettlement}">Next-Day Settlement Amount</span>
-                            <strong th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.nextdayExecAmt != null ? b.nextdayExecAmt : 0, 1, 'COMMA'))}">0원</strong>
+                            <strong th:text="${#messages.msg('unit.money', #numbers.formatInteger(b.nextdayExecAmt != null ? b.nextdayExecAmt : 0, 1, 'COMMA'))}">KRW 0</strong>
                         </div>
                         <div class="balance-detail-item">
                             <span th:text="#{balance.accountNumber}">Account Number</span>
-                            <strong th:text="${resolvedAccountNo}">50187518</strong>
+                            <strong th:text="${resolvedAccountNo}">-</strong>
                         </div>
                     </div>
                 </article>

@@ -368,18 +368,18 @@ Reference: [`./operation-notes.md`](./operation-notes.md) 2026-06-20 §1 ~ §5 /
 - [x] 108. non-GUI ECS crawler env reinforcement — `daily-aws-paper.functions.ps1` common function + ECS RunTask overrides environment variables → 2026-06-21 `Invoke-DailyAwsPaperEcsTask` `EnvironmentVariables` parameter / ECS RunTask `containerOverrides.environment` passing / `New-SsmParameterFile` `ExecutionTimeoutSeconds` / `Invoke-SsmCommandAndWait` `ExecutionTimeoutSeconds` passing / inject environment variables `TEMP=/tmp` · `TMP=/tmp` · `PYTHONUTF8=1` · `PYTHONIOENCODING=utf-8` ([`./operation-notes.md`](./operation-notes.md) 2026-06-21 §2)
 - [x] 109. `interest_krx_raw_validate_daily.py` operational validation script new creation + local validation + S3 deployment + EC2 standalone validation → 2026-06-21 complete. For detailed results, see [`./operation-notes.md`](./operation-notes.md) 2026-06-21 §3
   - New file creation: operator direct (this spec's deliverable records only the fact) / local py_compile + UTF-8 read + program · shortsell · exit30 marker passed
-  - S3 deployment: `s3://portfolio-paper-migration-yukiever/tmp/krx/interest_krx_raw_validate_daily.py` / EC2 download via presigned URL (SSM commandId `dd8e0f3e-df9a-4268-b11a-eea3f3df66c3`)
+  - S3 deployment: `s3://[REDACTED_BUCKET]/tmp/krx/interest_krx_raw_validate_daily.py` / EC2 download via presigned URL (SSM commandId `[REDACTED_RESOURCE_ID]`)
   - EC2 deployment target: `C:\portfolio\port-interest-crawler\interest_krx_raw_validate_daily.py`
-  - EC2 standalone validation: SSM commandId `c844aea5-1429-430a-9510-39fc99f17f05` / venv `C:\portfolio\venvs\interest-crawler` / Python `3.13.5`
+  - EC2 standalone validation: SSM commandId `[REDACTED_RESOURCE_ID]` / venv `C:\portfolio\venvs\interest-crawler` / Python `3.13.5`
   - DB session: user=`crawler_app` / schema=`interest` / search_path=`interest, reference, legacy, public`
   - interest_program_raw: expected=`2026-06-19` / max_date=`2026-06-19` / expected_count=`1`
   - interest_shortsell_raw: expected=`2026-06-19` / max_date=`2026-06-19` / expected_count=`349` / exit code 0
 - [x] 110. `step-02-interest-crawler.ps1` DB validation integration (`INTEREST_CRAWLER_KRX_DB_VALIDATE`) + Step 2 standalone execution validation → 2026-06-21 complete. For detailed results, see [`./operation-notes.md`](./operation-notes.md) 2026-06-21 §4 ~ §5
   - Integration: `ExpectedKrxRawDate` computation (the previous business day relative to RunDate) → run `load-crawler-db-env.ps1` + venv + `interest_krx_raw_validate_daily.py --expected-date <yyyy-mm-dd>`
   - fail-closed: Step 2 fail on row_count 0 or non-zero exit / `KrxDbValidationCommandId` included in the step result
-  - Step 2 standalone validation: RunId `daily-aws-paper-20260621-204017` / Status `SUCCESS` / Runner `ECS+SSM` / ExpectedKrxRawDate `2026-06-19`
-  - non-GUI ECS: `portfolio-paper-interest-crawler:7` / taskId `78979b5cbb714d0eb94f5946e15a14ce` / exitCode 0
-  - KRX worker SSM: commandId `f9d82fcc-1e26-4710-87c3-1d20483b63ef` / Scheduled Task elapsedSeconds=`111` / sawRunning=True / FinalStatus=Ready / FinalLastResult=0
+  - Step 2 standalone validation: RunId `[REDACTED_RESOURCE_ID]` / Status `SUCCESS` / Runner `ECS+SSM` / ExpectedKrxRawDate `2026-06-19`
+  - non-GUI ECS: `portfolio-paper-interest-crawler:7` / taskId `[REDACTED_RESOURCE_ID]` / exitCode 0
+  - KRX worker SSM: commandId `[REDACTED_RESOURCE_ID]` / Scheduled Task elapsedSeconds=`111` / sawRunning=True / FinalStatus=Ready / FinalLastResult=0
   - latest worker log: `krx_worker_daily_20260621_114154.log` / KRX login · program · shortsell SUCCESS
   - KRX raw DB validation SSM commandId `2279c6d7-2da6-4317-9c10-7cc77374b317` / ResponseCode 0 / interest_program_raw OK / interest_shortsell_raw OK / validation exit code 0
 
