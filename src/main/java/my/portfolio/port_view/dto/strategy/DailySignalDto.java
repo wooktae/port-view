@@ -1,6 +1,7 @@
 package my.portfolio.port_view.dto.strategy;
 
 import my.portfolio.port_view.util.StrategyExecutionLabelUtils;
+import my.portfolio.port_view.util.ViewMessages;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -73,11 +74,11 @@ public record DailySignalDto(
 
     public String signalStatusLabel() {
         return switch (upper(signalStatus)) {
-            case "READY" -> "준비 완료";
-            case "BLOCKED" -> "차단";
-            case "SKIPPED" -> "건너뜀";
-            case "USED" -> "사용됨";
-            case "FAILED" -> "실패";
+            case "READY" -> ViewMessages.text("status.readyComplete");
+            case "BLOCKED" -> ViewMessages.text("status.blocked");
+            case "SKIPPED" -> ViewMessages.text("status.skipped");
+            case "USED" -> ViewMessages.text("status.used");
+            case "FAILED" -> ViewMessages.text("status.failed");
             default -> fallback(signalStatus);
         };
     }

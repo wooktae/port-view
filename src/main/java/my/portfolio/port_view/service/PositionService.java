@@ -12,6 +12,7 @@ import my.portfolio.port_view.repository.ConnectorPositionSnapshotRepository;
 import my.portfolio.port_view.repository.PositionInsightRepository;
 import my.portfolio.port_view.util.ProfitClassUtils;
 import my.portfolio.port_view.util.ViewFormatUtils;
+import my.portfolio.port_view.util.ViewMessages;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,8 +29,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 보유 종목 목록/상세 화면의 평가금액, 수익률, 리서치 보조 정보를 조립한다.
- * Connector 포지션 스냅샷과 리서치 insight 조회 결과를 화면 표시용 DTO로 변환한다.
+ * Assembles valuation amounts, Returns, and supporting Research information for Position list/detail views.
+ * Converts Connector Position Snapshots and Research Insight query results into display DTOs.
  */
 @Service
 public class PositionService {
@@ -76,7 +77,7 @@ public class PositionService {
             page.setTotalEvalAmountText("-");
             page.setTotalEvalProfitText("-");
             page.setTotalProfitRateText("-");
-            page.setBestPositionTitleText("최고 수익 종목");
+            page.setBestPositionTitleText(ViewMessages.text("positions.best"));
             page.setBestPositionName("-");
             page.setBestPositionRateText("-");
             page.setBestPositionProfitClass("neutral");
@@ -138,9 +139,13 @@ public class PositionService {
                 .anyMatch(row -> row.getEvalProfitRate() != null
                         && row.getEvalProfitRate().compareTo(BigDecimal.ZERO) > 0);
 
-        page.setBestPositionTitleText(hasPositivePosition ? "최고 수익 종목" : "최소 손실 종목");
+        page.setBestPositionTitleText(hasPositivePosition
+                ? ViewMessages.text("positions.best")
+                : ViewMessages.text("positions.leastLoss"));
 
-        page.setBestPositionName(best == null ? "-" : ViewFormatUtils.emptyIfNull(best.getStockName()));
+        page.setBestPositionName(best == null
+                ? "-"
+                : ViewMessages.stockDisplayName(best.getTickerCode(), best.getStockName()));
         page.setBestPositionRateText(best == null ? "-" : best.getEvalProfitRateText());
         page.setBestPositionProfitClass(best == null ? "neutral" : best.getProfitClass());
 
@@ -194,6 +199,8 @@ public class PositionService {
         page.setAccountNo(accountNo);
         page.setTickerCode(position.getTickerCode());
         page.setStockName(ViewFormatUtils.emptyIfNull(position.getStockName()));
+        page.setStockDisplayName(ViewMessages.stockDisplayName(position.getTickerCode(), position.getStockName()));
+        page.setShowSeparateTicker(ViewMessages.showSeparateTicker(position.getStockName()));
         page.setMarket(position.getMarket());
         page.setHasPosition(true);
 
@@ -231,6 +238,8 @@ public class PositionService {
         page.setAccountNo(accountNo);
         page.setTickerCode(tickerCode);
         page.setStockName(tickerCode);
+        page.setStockDisplayName(ViewMessages.stockDisplayName(tickerCode, tickerCode));
+        page.setShowSeparateTicker(ViewMessages.showSeparateTicker(tickerCode));
         page.setMarket("-");
         page.setHasPosition(false);
 
@@ -268,6 +277,8 @@ public class PositionService {
 
             row.setTickerCode(p.getTickerCode());
             row.setStockName(ViewFormatUtils.emptyIfNull(p.getStockName()));
+            row.setStockDisplayName(ViewMessages.stockDisplayName(p.getTickerCode(), p.getStockName()));
+            row.setShowSeparateTicker(ViewMessages.showSeparateTicker(p.getStockName()));
             row.setMarket(p.getMarket());
 
             row.setQuantity(nvlInt(p.getQuantity()));
@@ -411,8 +422,8 @@ public class PositionService {
             return recalculated;
         }
 
-        // raw가 0.8395 형태(=83.95%)인지,
-        // 이미 83.95 형태인지 자동 판별
+        // Detect whether raw uses the 0.8395 form (=83.95%)
+        // or is already in the 83.95 form.
         BigDecimal rawAsPercent = raw.multiply(HUNDRED);
 
         BigDecimal diffRaw = raw.subtract(recalculated).abs();
@@ -573,11 +584,11 @@ public class PositionService {
         summary.setNegativeNewsCount(negativeCount);
         summary.setNeutralNewsCount(neutralCount);
 
-        summary.setReportCountText(ViewFormatUtils.formatInteger(reportCount) + "건");
+        summary.setReportCountText(ViewMessages.text("unit.items", ViewFormatUtils.formatInteger(reportCount)));
         summary.setAvgRecommendationScoreText(
                 avgRecommendationScore == null
                         ? "-"
-                        : ViewFormatUtils.formatDecimal2(avgRecommendationScore) + "점"
+                        : ViewMessages.text("unit.points", ViewFormatUtils.formatDecimal2(avgRecommendationScore))
         );
         summary.setAvgTargetPriceText(
                 avgTargetPrice == null
@@ -585,11 +596,11 @@ public class PositionService {
                         : ViewFormatUtils.formatMoney(avgTargetPrice)
         );
 
-        summary.setNewsCountText(ViewFormatUtils.formatInteger(newsCount) + "건");
+        summary.setNewsCountText(ViewMessages.text("unit.items", ViewFormatUtils.formatInteger(newsCount)));
         summary.setAvgSentimentScoreText(
                 avgSentimentScore == null
                         ? "-"
-                        : ViewFormatUtils.formatDecimal2(avgSentimentScore) + "점"
+                        : ViewMessages.text("unit.points", ViewFormatUtils.formatDecimal2(avgSentimentScore))
         );
         summary.setAvgConfidenceScoreText(
                 avgConfidenceScore == null
@@ -597,9 +608,9 @@ public class PositionService {
                         : ViewFormatUtils.formatDecimal2(avgConfidenceScore)
         );
 
-        summary.setPositiveNewsCountText(ViewFormatUtils.formatInteger(positiveCount) + "건");
-        summary.setNegativeNewsCountText(ViewFormatUtils.formatInteger(negativeCount) + "건");
-        summary.setNeutralNewsCountText(ViewFormatUtils.formatInteger(neutralCount) + "건");
+        summary.setPositiveNewsCountText(ViewMessages.text("unit.items", ViewFormatUtils.formatInteger(positiveCount)));
+        summary.setNegativeNewsCountText(ViewMessages.text("unit.items", ViewFormatUtils.formatInteger(negativeCount)));
+        summary.setNeutralNewsCountText(ViewMessages.text("unit.items", ViewFormatUtils.formatInteger(neutralCount)));
     }
 
 }

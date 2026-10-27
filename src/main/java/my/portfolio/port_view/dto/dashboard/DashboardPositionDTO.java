@@ -13,6 +13,8 @@ public class DashboardPositionDTO {
 
     private String tickerCode;
     private String stockName;
+    private String stockDisplayName;
+    private boolean showSeparateTicker;
 
     private Integer quantity;
     private Integer sellableQuantity;

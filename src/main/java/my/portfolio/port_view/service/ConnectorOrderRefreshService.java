@@ -19,9 +19,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 주문 내역 화면 진입 시 미체결/부분체결 주문의 최신 체결 상태를 Connector 스크립트로 확인한다.
- * 화면 조회 자체를 막지 않기 위해 외부 프로세스 실패는 로그로만 남긴다.
- * 작업 디렉터리와 Python 실행 파일은 Daily Batch 설정을 공유한다.
+ * Uses a Connector script to check the latest Fill state of unfilled/partially filled Orders when opening the Orders view.
+ * External process failures are logged only so they do not block the view query itself.
+ * The working directory and Python executable share the Daily Batch configuration.
  */
 @Service
 @RequiredArgsConstructor
@@ -40,7 +40,7 @@ public class ConnectorOrderRefreshService {
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     /**
-     * 최근 주문 중 갱신 대상만 선별해 순차적으로 Connector 주문 조회 스크립트를 실행한다.
+     * Selects only eligible recent Orders and runs the Connector Order query script sequentially.
      */
     public void refreshOpenOrders(String accountNo) {
         System.out.println("[ConnectorOrderRefreshService] refreshOpenOrders called. accountNo=" + accountNo);
@@ -65,7 +65,7 @@ public class ConnectorOrderRefreshService {
                 refreshOne(order);
             }
         } catch (Exception e) {
-            // 화면 진입 자체를 막지 않기 위해 refresh 실패는 로그만 남긴다.
+            // Log Refresh failures only so they do not block entry to the view itself.
             System.err.println("[ConnectorOrderRefreshService] refresh failed: " + e.getMessage());
         } finally {
             running.set(false);
@@ -73,7 +73,7 @@ public class ConnectorOrderRefreshService {
     }
 
     /**
-     * 단일 주문의 broker 주문번호를 기준으로 외부 Connector 주문 확인 스크립트를 호출한다.
+     * Calls the external Connector Order query script using the Broker Order Number of one Order.
      */
     private void refreshOne(ConnectorOrderRequest order) {
         if (order == null) {

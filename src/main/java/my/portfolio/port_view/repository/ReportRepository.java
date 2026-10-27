@@ -13,8 +13,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * 백테스트 리포트 화면에 필요한 요약, 통계, 거래 상세 데이터를 JdbcTemplate로 조회한다.
- * 여러 strategy/research 계열 테이블을 읽으므로 schema search_path 설정에 의존한다.
+ * Uses JdbcTemplate to query the summary, statistics, and Trade Details required by the Backtest Report view.
+ * Depends on the schema search_path because it reads multiple Strategy/Research tables.
  */
 @Repository
 public class ReportRepository {

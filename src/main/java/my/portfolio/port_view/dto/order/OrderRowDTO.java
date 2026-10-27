@@ -15,6 +15,8 @@ public class OrderRowDTO {
 
     private String tickerCode;
     private String stockName;
+    private String stockDisplayName;
+    private boolean showSeparateTicker;
 
     private String requestType;
     private String requestTypeLabel;

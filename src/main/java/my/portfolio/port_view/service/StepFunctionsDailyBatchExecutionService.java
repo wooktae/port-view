@@ -20,8 +20,8 @@ import java.util.UUID;
 /**
  * View -> AWS Step Functions StartExecution adapter.
  *
- * 기존 local-file ProcessBuilder 실행과 분리한다.
- * 이 서비스는 Python source를 직접 실행하지 않는다.
+ * Separated from the existing local-file ProcessBuilder execution path.
+ * This Service does not directly execute Python source.
  */
 @Service
 @RequiredArgsConstructor

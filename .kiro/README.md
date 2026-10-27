@@ -2,188 +2,188 @@
 
 ## Purpose
 
-이 `.kiro` 작업공간은 PORT-STRATEGY-AI 포트폴리오의 AWS Migration 관련 spec을 작성하고 관리하기 위한 공간이다.
+This `.kiro` workspace is the space for authoring and managing the AWS Migration specs of the PORT-STRATEGY-AI portfolio.
 
 ## Scope
 
-디렉터리 자체는 `port-view` 안에 있지만, 여기서 다루는 범위는 `port-view` 단일 MS가 아니라 PORT-STRATEGY-AI의 8개 MS 전체다. 따라서 본 작업공간은 cross-service spec 저장소로 동작한다.
+Although the directory itself lives inside `port-view`, the scope covered here is not the single `port-view` MS but all 8 MS of PORT-STRATEGY-AI. This workspace therefore operates as a cross-service spec repository.
 
-- 각 spec은 자기 범위에만 집중한다.
-- 루트 공통 문서의 큰 내용을 그대로 복사하지 않고, 필요한 부분만 요약한 뒤 루트 공통 문서를 참조한다.
-- 모든 결정사항은 `operator-decisions.md`와 일치시킨다. 결정이 바뀌면 spec에서 임의로 변경하지 않고 `operator-decisions.md`부터 갱신한다.
-- 본 작업공간에서는 실제 구현(코드 변경, AWS 리소스 생성, 운영 entrypoint 실행)을 하지 않는다. 구현이 필요한 절차는 spec 또는 runbook으로만 작성한다.
+- Each spec focuses only on its own scope.
+- Rather than copying large content from the root common documents verbatim, summarize only the necessary parts and then reference the root common documents.
+- Keep all decisions consistent with `operator-decisions.md`. When a decision changes, do not change it arbitrarily in a spec; update `operator-decisions.md` first.
+- This workspace does not perform actual implementation (code changes, AWS resource creation, running operational entrypoints). Procedures that require implementation are written only as a spec or runbook.
 
 ## Current Status Dashboard
 
-본 섹션은 운영자가 한눈에 보기 위한 짧은 진행 상태 요약이다.
+This section is a short progress summary for the operator to see at a glance.
 
-- 자세한 일자별 결과·후속 인계는 `specs/_common/followups-overview.md`와 `WORKLOG.md`에 누적한다.
-- 각 spec의 운영 결과는 해당 spec의 `operation-notes.md`에 누적한다.
-- "완료"는 실제 데이터 적재·최신성 또는 end-to-end 상태 전이를 확인한 경우에만 사용한다.
-- 정합 결정: `OD-MS-020` · `OD-MS-021` · `OD-MS-023` · `OD-MS-026` · `OD-MS-027` · `OD-MS-028` · `OD-MS-029`.
+- Detailed per-date results and follow-up handoffs are accumulated in `specs/_common/followups-overview.md` and `WORKLOG.md`.
+- The operational results of each spec are accumulated in that spec's `operation-notes.md`.
+- "Complete" is used only when actual data load/freshness or an end-to-end state transition has been confirmed.
+- Alignment decisions: `OD-MS-020` · `OD-MS-021` · `OD-MS-023` · `OD-MS-026` · `OD-MS-027` · `OD-MS-028` · `OD-MS-029`.
 
 ### Paper Daily Step 1~11
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 진행 상태 | 🟢 자동 ENABLED |
-| 2026-07-22 회차 | 정상 Scheduler 자동 실행 SUCCEEDED |
-| Crawler Program | 최신 거래일 2026-07-21 · 1건 |
-| Crawler Shortsell | 최신 거래일 2026-07-21 · 349건 |
+| Progress status | 🟢 automatic ENABLED |
+| 2026-07-22 run | Normal Scheduler automatic execution SUCCEEDED |
+| Crawler Program | Latest trade date 2026-07-21 · 1 record |
+| Crawler Shortsell | Latest trade date 2026-07-21 · 349 records |
 | Daily Run | 2026-07-22 COMPLETED · AGGRESSIVE |
-| Execution Plan | READY · 주문 준비 대상 1건 |
-| 날짜 기준 | 2026-07-15 KST 적용 완료 |
-| KRX worker | Python 실패 전파 · expected trade date validator |
-| 안정화 | Paper Daily 1차 안정화 완료 |
-| 최근 검증 일자 | 2026-07-22 |
-| 관련 spec | 04, 08 |
-| 상세 | [operation-notes](specs/04-strategy-batch-stepfunctions/operation-notes.md) |
-| 관련 근거 | [^tz-patch]<br>[^daily-kst-2026-07-15]<br>[^daily-buy-e2e-2026-07-16]<br>[^krx-validator-2026-07-21]<br>[^paper-daily-stable-2026-07-22] |
+| Execution Plan | READY · 1 order-preparation target |
+| Date basis | 2026-07-15 KST applied and complete |
+| KRX worker | Python failure propagation · expected trade date validator |
+| Stabilization | Paper Daily first stabilization complete |
+| Latest validation date | 2026-07-22 |
+| Related spec | 04, 08 |
+| Details | [operation-notes](specs/04-strategy-batch-stepfunctions/operation-notes.md) |
+| Related evidence | [^tz-patch]<br>[^daily-kst-2026-07-15]<br>[^daily-buy-e2e-2026-07-16]<br>[^krx-validator-2026-07-21]<br>[^paper-daily-stable-2026-07-22] |
 
 ### Paper Daily Step 12~17
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 진행 상태 | 🟢 자동 ENABLED |
-| 2026-07-22 회차 | 정상 Scheduler 자동 실행 SUCCEEDED |
-| READY Plan → Order | validator 자동 통과 |
-| 주문·체결 | 한국전력 83주 매수 체결 |
-| Order Chain | validator 자동 통과 |
-| Position | 83주 OPEN |
-| Balance Snapshot | 2026-07-22 생성 |
-| Slack·OPS | 성공 Slack 자동 수신 · 성공 기록 확인 |
-| P1 acceptance | 🟢 다음 정상 자동 회차 end-to-end 관찰 완료 |
-| 안정화 | Paper Daily 1차 안정화 완료 |
-| 2026-07-20 이력 | 매도 2건 · Step 14~17 수동 복구 · P0 강화 |
-| 2026-07-21 이력 | 정상 무주문 자동 회차 FAILED 보존 · `--allow-no-target` 보완 |
-| 최근 검증 일자 | 2026-07-22 |
-| 관련 spec | 04 |
-| 상세 | [operation-notes](specs/04-strategy-batch-stepfunctions/operation-notes.md) |
-| 관련 근거 | [^approval-slack-2026-07-15]<br>[^daily-recovery-2026-07-20]<br>[^daily-exec-slack-2026-07-20]<br>[^daily-p0-2026-07-20]<br>[^daily-noorder-2026-07-21]<br>[^paper-daily-stable-2026-07-22] |
+| Progress status | 🟢 automatic ENABLED |
+| 2026-07-22 run | Normal Scheduler automatic execution SUCCEEDED |
+| READY Plan → Order | validator auto-passed |
+| Order·fill | 한국전력 83 shares BUY filled |
+| Order Chain | validator auto-passed |
+| Position | 83 shares OPEN |
+| Balance Snapshot | 2026-07-22 created |
+| Slack·OPS | Success Slack auto-received · success record confirmed |
+| P1 acceptance | 🟢 next normal automatic run end-to-end observation complete |
+| Stabilization | Paper Daily first stabilization complete |
+| 2026-07-20 history | 2 sells · Step 14~17 manual recovery · P0 reinforcement |
+| 2026-07-21 history | Normal no-order automatic run FAILED preserved · `--allow-no-target` supplemented |
+| Latest validation date | 2026-07-22 |
+| Related spec | 04 |
+| Details | [operation-notes](specs/04-strategy-batch-stepfunctions/operation-notes.md) |
+| Related evidence | [^approval-slack-2026-07-15]<br>[^daily-recovery-2026-07-20]<br>[^daily-exec-slack-2026-07-20]<br>[^daily-p0-2026-07-20]<br>[^daily-noorder-2026-07-21]<br>[^paper-daily-stable-2026-07-22] |
 
 ### Intraday Stop Loss Slack
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 진행 상태 | 🟢 연동 완료 |
-| 최근 검증 일자 | 2026-06-30 |
-| 관련 spec | 03, 04 |
-| 상세 | [operation-notes](specs/03-marketconnector-ec2/operation-notes.md) |
+| Progress status | 🟢 integration complete |
+| Latest validation date | 2026-06-30 |
+| Related spec | 03, 04 |
+| Details | [operation-notes](specs/03-marketconnector-ec2/operation-notes.md) |
 
 ### Daily Brief Slack
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 진행 상태 | 🟢 자동 ENABLED |
-| Holiday Guard | Dispatcher 공통 적용 |
-| 실전 확인 | 장후 Slack 수신 |
-| 최근 검증 일자 | 2026-07-15 |
-| 관련 spec | 04 |
-| 상세 | [operation-notes](specs/04-strategy-batch-stepfunctions/operation-notes.md) |
-| 관련 근거 | [^daily-brief-2026-07-15] |
+| Progress status | 🟢 automatic ENABLED |
+| Holiday Guard | Applied commonly in the Dispatcher |
+| Live confirmation | Post-market Slack received |
+| Latest validation date | 2026-07-15 |
+| Related spec | 04 |
+| Details | [operation-notes](specs/04-strategy-batch-stepfunctions/operation-notes.md) |
+| Related evidence | [^daily-brief-2026-07-15] |
 
 ### port-view ECS Fargate
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 진행 상태 | 🟢 1차 포팅 검증 완료 |
-| OPS Mirror UI | `/daily-batch` consumption 확인 |
-| 현재 범위 | ECS Fargate 1차 실증 상태 유지 |
-| P2 고도화 | 🟠 운영 보안·표시 고도화 미수행 (범위 제외) |
-| 재검토 조건 | 외부 공개 또는 다중 사용자 운영 필요 시 |
-| 최근 검증 일자 | 2026-07-08 |
-| 관련 spec | 05 |
-| 상세 | [operation-notes](specs/05-port-view-ecs-and-runbook/operation-notes.md) |
-| 관련 근거 | [^ops-mirror-ui]<br>[^view-p2-2026-07-22] |
+| Progress status | 🟢 first porting validation complete |
+| OPS Mirror UI | `/daily-batch` consumption confirmed |
+| Current scope | Keep the ECS Fargate first-demonstration state |
+| P2 enhancement | 🟠 operational security·display enhancement not performed (out of scope) |
+| Re-review condition | When external exposure or multi-user operation is needed |
+| Latest validation date | 2026-07-08 |
+| Related spec | 05 |
+| Details | [operation-notes](specs/05-port-view-ecs-and-runbook/operation-notes.md) |
+| Related evidence | [^ops-mirror-ui]<br>[^view-p2-2026-07-22] |
 
-### aws-live BUY/SELL 자동화
+### aws-live BUY/SELL automation
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 진행 상태 | 🔴 미진행 |
-| 최근 검증 일자 | — |
-| 관련 spec | 10 |
-| 상세 | [followups-overview](specs/_common/followups-overview.md) |
+| Progress status | 🔴 not started |
+| Latest validation date | — |
+| Related spec | 10 |
+| Details | [followups-overview](specs/_common/followups-overview.md) |
 
-[^tz-patch]: ECS crawler·preprocessor와 Windows KRX worker의 업무 시간대를 KST로 보정하고 raw 최신성 회복을 확인했다.
-    DB timestamp 저장은 UTC를 유지하고 운영 표시는 KST로 변환한다.
-    Step2B false-success 핵심 축은 2026-07-21 runner DB validator 적용으로 보완했다.
-    상세: `WORKLOG.md` 2026-07-09·2026-07-21, `risk-register.md` R-DATA-010·R-DATA-017·R-AUTO-020.
+[^tz-patch]: Corrected the business time zone of the ECS crawler·preprocessor and the Windows KRX worker to KST and confirmed raw-freshness recovery.
+    DB timestamp storage remains UTC and operational display is converted to KST.
+    The core axis of the Step2B false-success was supplemented by applying the 2026-07-21 runner DB validator.
+    Details: `WORKLOG.md` 2026-07-09·2026-07-21, `risk-register.md` R-DATA-010·R-DATA-017·R-AUTO-020.
 
-[^krx-validator-2026-07-21]: KRX Program·Shortsell Python 실패 결과를 non-zero exit로 전파하고 runner 후단에 expected trade date·row count validator를 추가했다.
-    기준은 Program 정확히 1건, Shortsell 최소 300건이다.
-    단독 검증은 Shortsell 349건·ExitCode 0이었다.
-    상세: `WORKLOG.md` 2026-07-21, `risk-register.md` R-DATA-017·R-AUTO-020, `operator-decisions.md` OD-MS-026.
+[^krx-validator-2026-07-21]: Propagated the KRX Program·Shortsell Python failure result as a non-zero exit and added an expected trade date·row count validator at the runner back end.
+    The criteria are exactly 1 record for Program and at least 300 records for Shortsell.
+    The standalone validation was Shortsell 349 records·ExitCode 0.
+    Details: `WORKLOG.md` 2026-07-21, `risk-register.md` R-DATA-017·R-AUTO-020, `operator-decisions.md` OD-MS-026.
 
-[^ops-mirror-ui]: Step Functions 실행 이력의 OPS Mirror 적재와 `/daily-batch` 화면 소비를 확인했다.
-    run·step log, 실행 모드, 상세 렌더링과 AWS 실행 버튼 표시를 검증했다.
-    payload redaction·계좌번호 masking·UTC→KST 표시는 후속이다.
-    상세: `WORKLOG.md` 2026-07-08, `operator-decisions.md` OD-MS-039, `risk-register.md` R-AUTO-038.
+[^ops-mirror-ui]: Confirmed the OPS Mirror load of the Step Functions execution history and the `/daily-batch` screen consumption.
+    Validated run·step log, execution mode, detail rendering and AWS execution button display.
+    payload redaction·account-number masking·UTC→KST display are follow-ups.
+    Details: `WORKLOG.md` 2026-07-08, `operator-decisions.md` OD-MS-039, `risk-register.md` R-AUTO-038.
 
-[^daily-brief-2026-07-15]: Daily Brief Holiday Guard를 Dispatcher로 통합하고 Builder는 메시지 생성·DB 조회에 집중하도록 정리했다.
-    장후 실전 smoke는 Step Functions SUCCEEDED와 Slack 수신을 확인했다.
-    07:50 장전 자동 수신은 후속이다.
-    상세: `WORKLOG.md` 2026-07-15, `risk-register.md` R-AUTO-035, `operator-decisions.md` OD-MS-032·OD-MS-038.
+[^daily-brief-2026-07-15]: Integrated the Daily Brief Holiday Guard into the Dispatcher and organized the Builder to focus on message generation·DB query.
+    The post-market live smoke confirmed Step Functions SUCCEEDED and Slack reception.
+    The 07:50 pre-market automatic reception is a follow-up.
+    Details: `WORKLOG.md` 2026-07-15, `risk-register.md` R-AUTO-035, `operator-decisions.md` OD-MS-032·OD-MS-038.
 
-[^daily-kst-2026-07-15]: UTC 날짜 오판으로 월요일 BUY 후보가 WEEKEND·NO_TARGET 처리되던 원인을 확인했다.
-    ECS와 MarketConnector EC2의 업무 날짜 판단을 Asia/Seoul 기준으로 통일했다.
-    다음 영업일 자동 재발 여부 관찰은 후속이다.
-    상세: `WORKLOG.md` 2026-07-15, `risk-register.md` R-DATA-010·R-DATA-017, `operator-decisions.md` OD-MS-040.
+[^daily-kst-2026-07-15]: Confirmed the cause where Monday BUY candidates were processed as WEEKEND·NO_TARGET due to a UTC date misjudgment.
+    Unified the business-date judgment of ECS and the MarketConnector EC2 to the Asia/Seoul basis.
+    Observing whether it automatically recurs on the next business day is a follow-up.
+    Details: `WORKLOG.md` 2026-07-15, `risk-register.md` R-DATA-010·R-DATA-017, `operator-decisions.md` OD-MS-040.
 
-[^daily-buy-e2e-2026-07-16]: Paper Daily BUY 2건의 주문·체결·Fill·Position E2E를 확인했다.
-    초기 조회가 빨라 내부 상태가 부분체결·접수에 머문 문제는 Step13·15·16 재실행으로 정합을 복구했다.
-    Step12 후 대기시간은 60초로 조정했다.
-    polling·처리 건수 검증은 후속이다.
-    상세: `WORKLOG.md` 2026-07-16, `risk-register.md` R-AUTO-037·R-AUTO-038·R-BROKER-004.
+[^daily-buy-e2e-2026-07-16]: Confirmed the order·fill·Fill·Position E2E of 2 Paper Daily BUYs.
+    The problem where the early query was too fast and internal state stayed at partial-fill·accepted was recovered to consistency by re-running Step13·15·16.
+    The wait time after Step12 was adjusted to 60 seconds.
+    polling·processed-count validation is a follow-up.
+    Details: `WORKLOG.md` 2026-07-16, `risk-register.md` R-AUTO-037·R-AUTO-038·R-BROKER-004.
 
-[^daily-recovery-2026-07-20]: Step13 다건 주문 조회 중 KIS `EGW00201`이 발생해 자동 실행이 FAILED로 종료됐다.
-    조회 간 5초 대기와 제한 재시도를 적용하고 Step13~17을 수동 복구했다.
-    09:01 자동 실패 이력은 유지하며 수동 복구를 자동 성공으로 기록하지 않는다.
-    상세: `WORKLOG.md` 2026-07-20, `risk-register.md` R-AUTO-001·R-AUTO-037·R-AUTO-038·R-BROKER-004.
+[^daily-recovery-2026-07-20]: KIS `EGW00201` occurred during the Step13 multi-order query and the automatic execution ended as FAILED.
+    Applied a 5-second wait between queries and a limited retry, and manually recovered Step13~17.
+    The 09:01 automatic failure history is preserved and the manual recovery is not recorded as an automatic success.
+    Details: `WORKLOG.md` 2026-07-20, `risk-register.md` R-AUTO-001·R-AUTO-037·R-AUTO-038·R-BROKER-004.
 
-[^daily-exec-slack-2026-07-20]: Daily 실행 성공 Slack에 당일 매수·매도 체결 종목과 수량을 표시하도록 Builder와 Notifier를 보강했다.
-    Builder→Notifier 수동 smoke에서 실제 Slack 수신을 확인했다.
-    이 결과는 09:01 자동 execution 성공을 의미하지 않는다.
-    상세: `WORKLOG.md` 2026-07-20, `risk-register.md` R-AUTO-023, `operator-decisions.md` OD-MS-009·OD-MS-030·OD-MS-031.
+[^daily-exec-slack-2026-07-20]: Reinforced the Builder and Notifier to display the day's bought·sold filled tickers and quantities in the Daily execution success Slack.
+    Confirmed actual Slack reception in the Builder→Notifier manual smoke.
+    This result does not mean the 09:01 automatic execution succeeded.
+    Details: `WORKLOG.md` 2026-07-20, `risk-register.md` R-AUTO-023, `operator-decisions.md` OD-MS-009·OD-MS-030·OD-MS-031.
 
-[^daily-p0-2026-07-20]: Step13 active 주문 polling과 Step14~16 처리 건수 fail-closed를 운영 반영했다.
-    READY Plan·Order 및 전체 주문 체인 validator를 연결했다.
-    Step12 실패 Slack 경로도 운영 반영했다.
-    단독 smoke와 연결 검증은 완료했지만 전체 정상 자동 회차 acceptance는 P1로 남겼다.
-    상세: `WORKLOG.md` 2026-07-20, `risk-register.md` R-AUTO-001·R-AUTO-023·R-AUTO-037·R-AUTO-038·R-BROKER-004.
+[^daily-p0-2026-07-20]: Applied Step13 active-order polling and Step14~16 processed-count fail-closed to operations.
+    Connected the READY Plan·Order and the full order-chain validator.
+    Also applied the Step12 failure Slack path to operations.
+    Standalone smoke and connection validation were completed, but full normal automatic-run acceptance was left as P1.
+    Details: `WORKLOG.md` 2026-07-20, `risk-register.md` R-AUTO-001·R-AUTO-023·R-AUTO-037·R-AUTO-038·R-BROKER-004.
 
-[^daily-noorder-2026-07-21]: 정상 무주문 회차가 `P0_ValidateOrderChain`의 `--allow-no-target` 누락으로 FAILED 처리됐다.
-    State Machine command를 보완하고 validator 단독 smoke에서 target=0·errors=0·ExitCode 0을 확인했다.
-    09:01 자동 실패 이력은 유지하며 전체 Step12~17 재실행은 하지 않았다.
-    상세: `WORKLOG.md` 2026-07-21, `risk-register.md` R-AUTO-001·R-AUTO-037, `operator-decisions.md` OD-SAFE-004·OD-MS-032.
+[^daily-noorder-2026-07-21]: A normal no-order run was processed as FAILED due to the missing `--allow-no-target` in `P0_ValidateOrderChain`.
+    Supplemented the State Machine command and confirmed target=0·errors=0·ExitCode 0 in the validator standalone smoke.
+    The 09:01 automatic failure history is preserved and the full Step12~17 re-run was not performed.
+    Details: `WORKLOG.md` 2026-07-21, `risk-register.md` R-AUTO-001·R-AUTO-037, `operator-decisions.md` OD-SAFE-004·OD-MS-032.
 
-[^approval-slack-2026-07-15]: Approval Required Slack이 서로 다른 Daily Run과 Execution Plan을 혼합하던 문제를 수정했다.
-    단일 `daily_run_id` 기준으로 상태·기준일·신호·후보·Plan을 정합시키고 후보 점수를 구조화했다.
-    Builder→Notifier→Slack E2E는 완료했고 다음 자동 Scheduler 수신은 후속이다.
-    상세: `WORKLOG.md` 2026-07-15, `operator-decisions.md` OD-MS-031.
+[^approval-slack-2026-07-15]: Fixed the problem where the Approval Required Slack mixed different Daily Runs and Execution Plans.
+    Aligned status·reference date·signal·candidate·Plan on a single `daily_run_id` basis and structured the candidate scores.
+    The Builder→Notifier→Slack E2E is complete and the next automatic Scheduler reception is a follow-up.
+    Details: `WORKLOG.md` 2026-07-15, `operator-decisions.md` OD-MS-031.
 
-[^paper-daily-stable-2026-07-22]: 2026-07-22 정상 Scheduler 자동 회차에서 Step 1~11과 Step 12~17이 강제 주문·오류 유발 없이 SUCCEEDED로 완료됐다.
-    Crawler 검증·Daily Run COMPLETED·Execution Plan READY·validator 2개 자동 통과·한국전력 83주 주문·체결·Position 83주 OPEN·Balance Snapshot·성공 Slack·OPS 성공 기록을 확인했다.
-    P1 다음 정상 자동 회차 end-to-end 관찰을 완료 처리하고 Paper Daily를 1차 안정화 완료로 선언한다.
-    aws-live 준비·장기 무장애·전체 AWS Migration 완료를 의미하지 않으며 2026-07-20·2026-07-21 FAILED 이력은 보존한다.
-    상세: `WORKLOG.md` 2026-07-22, `operator-decisions.md` OD-SAFE-001.
+[^paper-daily-stable-2026-07-22]: In the 2026-07-22 normal Scheduler automatic run, Step 1~11 and Step 12~17 completed as SUCCEEDED without forced orders or induced errors.
+    Confirmed Crawler validation·Daily Run COMPLETED·Execution Plan READY·2 validators auto-passed·한국전력 83 shares order·fill·Position 83 shares OPEN·Balance Snapshot·success Slack·OPS success record.
+    The P1 next-normal-automatic-run end-to-end observation is marked complete and Paper Daily is declared first-stabilization complete.
+    This does not mean aws-live readiness·long-term incident-free operation·full AWS Migration completion, and the 2026-07-20·2026-07-21 FAILED history is preserved.
+    Details: `WORKLOG.md` 2026-07-22, `operator-decisions.md` OD-SAFE-001.
 
-[^view-p2-2026-07-22]: 운영자는 P2 View 운영 보안·표시 고도화(ALB·HTTPS·Route53·인증·Auto Scaling·Blue/Green·UI 고도화·외부 공개)를 현재 포트폴리오 범위에서 수행하지 않기로 결정했다.
-    실패나 미완료가 아니라 의도적인 범위 제외이며 port-view는 ECS Fargate 1차 실증 상태를 유지한다.
-    외부 공개 또는 다중 사용자 운영이 필요할 때 재검토한다.
-    상세: `WORKLOG.md` 2026-07-22, `operator-decisions.md` OD-MS-002.
+[^view-p2-2026-07-22]: The operator decided not to perform P2 View operational security·display enhancement (ALB·HTTPS·Route53·authentication·Auto Scaling·Blue/Green·UI enhancement·external exposure) within the current portfolio scope.
+    This is not a failure or incompleteness but an intentional scope exclusion, and port-view keeps the ECS Fargate first-demonstration state.
+    It is re-reviewed when external exposure or multi-user operation is needed.
+    Details: `WORKLOG.md` 2026-07-22, `operator-decisions.md` OD-MS-002.
 
 ## Important Safety Notes
 
-> <span style="color:#D1242F">**aws-live BUY/SELL 자동화는 미진행 상태를 유지한다.**</span>
+> <span style="color:#D1242F">**aws-live BUY/SELL automation remains in the not-started state.**</span>
 >
-> 본 작업공간에서는 실제 구현(코드 변경, AWS 리소스 생성, 운영 entrypoint 실행)을 하지 않는다.
+> This workspace does not perform actual implementation (code changes, AWS resource creation, running operational entrypoints).
 >
-> 각 MS의 소스 코드, README, CHANGELOG, worklog, AGENTS.md 는 본 작업공간의 spec 작업 대상이 아니며, 명시 요청이 없는 한 수정하지 않는다.
+> Each MS's source code, README, CHANGELOG, worklog and AGENTS.md are not spec-work targets of this workspace and are not modified unless explicitly requested.
 >
-> `.kiro/scripts/` 하위 운영자 로컬 PowerShell wrapper 는 운영자 로컬 PC 도구이며 Kiro 자동 실행 대상이 아니고, EC2 / ECS / Batch 내부에서 실행하지도 않는다.
+> The operator-local PowerShell wrappers under `.kiro/scripts/` are operator-local PC tools; they are not Kiro auto-execution targets and are not executed inside EC2 / ECS / Batch either.
 >
-> 실제 secret, password, token, app key, app secret, 계좌번호, webhook URL 은 본 작업공간 어떤 문서에도 절대 작성하지 않으며, 민감정보가 필요한 위치에는 항상 `[REDACTED]` 만 사용한다.
+> Actual secret, password, token, app key, app secret, account number and webhook URL are never written in any document of this workspace, and only `[REDACTED]` is used where sensitive information would be needed.
 
 ## Where to Read More
 
@@ -196,7 +196,7 @@
 
 ## Target Microservices
 
-본 작업공간의 spec이 다루는 마이크로서비스는 아래 8개다.
+The microservices covered by this workspace's specs are the following 8.
 
 - `port-marketconnector`
 - `port-view`
@@ -207,17 +207,17 @@
 - `port_strategy_research`
 - `port_strategy_execution`
 
-각 MS의 소스 코드, README, CHANGELOG, worklog, AGENTS.md는 본 작업공간의 spec 작업 대상이 아니며, 명시 요청이 없는 한 수정하지 않는다.
+Each MS's source code, README, CHANGELOG, worklog and AGENTS.md are not spec-work targets of this workspace and are not modified unless explicitly requested.
 
 ## Directory Map
 
 ```
 .kiro/
-├── AGENTS.md           # Kiro 작업 규칙(범위, 단일 기준 문서, 보안/실행 규칙)
-├── README.md           # 본 문서. .kiro 작업공간 안내
-├── CHANGELOG.md        # spec 문서 변경 이력
-├── WORKLOG.md          # 간단 작업 로그(누적형, 단일 파일)
-└── specs/              # AWS Migration spec 및 루트 공통 참조 문서
+├── AGENTS.md           # Kiro working rules (scope, single source-of-truth documents, security/execution rules)
+├── README.md           # This document. .kiro workspace guide
+├── CHANGELOG.md        # spec document change history
+├── WORKLOG.md          # simple work log (accumulative, single file)
+└── specs/              # AWS Migration specs and root common reference documents
     ├── 01-aws-migration-foundation/
     │   ├── requirements.md
     │   ├── design.md
@@ -246,87 +246,87 @@
 
 ## Key Documents
 
-| 파일 | 역할 |
+| File | Role |
 | --- | --- |
-| `AGENTS.md` | Kiro 작업공간의 작업 규칙.<br>작업 범위, 단일 기준 문서, MS별 `AGENTS.md` 참조, spec 작성, 보안, 실행 규칙을 정의한다. |
-| `README.md` | 본 문서.<br>`.kiro` 작업공간의 목적, 범위, 폴더 구조와 주요 문서 역할을 안내한다. |
-| `CHANGELOG.md` | `.kiro` 안의 spec 문서 변경 이력만 기록한다.<br>각 MS의 코드·문서 변경 이력은 기록하지 않는다. |
-| `WORKLOG.md` | Kiro 작업 세션의 간단 로그를 단일 파일에 누적한다.<br>날짜별 worklog 파일은 만들지 않는다. |
-| `specs/` | AWS Migration spec 폴더와 루트 공통 참조 문서를 담는다. |
+| `AGENTS.md` | The working rules of the Kiro workspace.<br>Defines the work scope, single source-of-truth documents, per-MS `AGENTS.md` references, spec authoring, security and execution rules. |
+| `README.md` | This document.<br>Guides the purpose, scope, folder structure and key document roles of the `.kiro` workspace. |
+| `CHANGELOG.md` | Records only the spec document change history inside `.kiro`.<br>Does not record the code·document change history of each MS. |
+| `WORKLOG.md` | Accumulates a simple log of Kiro work sessions in a single file.<br>Does not create per-date worklog files. |
+| `specs/` | Holds the AWS Migration spec folders and the root common reference documents. |
 
 ## Common Reference Documents
 
-새 spec을 만들거나 기존 spec을 수정하기 전에 아래 단일 기준 문서를 먼저 확인한다.
+Before creating a new spec or modifying an existing spec, first check the following single source-of-truth documents.
 
-| 파일 | 역할 |
+| File | Role |
 | --- | --- |
-| `specs/_common/operator-decisions.md` | 운영자 결정의 단일 기준 문서.<br>환경, 네트워크, RDS, DB schema·role, compute·service placement, security, observability, cutover, safety 결정을 관리한다. |
-| `specs/_common/ms-aws-service-decision-matrix.md` | 8개 MS별 AWS 서비스 권고와 판단 근거의 단일 기준 문서.<br>컴퓨트와 orchestration 1순위 결정을 비교한다. |
-| `specs/_common/cost-simulation.md` | 비용 가정과 환경별 월 예상 비용의 단일 기준 문서.<br>RDS 크기, VPC Endpoint 수, ALB·NAT 사용 여부, Fargate 사용량을 정리한다. |
-| `specs/_common/followups-overview.md` | 후속 spec 03~10의 진행 순서와 의존성 맵을 관리한다. |
-| `specs/_common/aws-resource-glossary.md` | AWS 용어 설명의 단일 기준 문서다. |
-| `specs/_common/risk-register.md` | AWS Migration 운영·보안·비용 Risk의 단일 누적 문서.<br>후속 spec에서 새 Risk가 확인되면 동일 형식으로 추가한다. |
-| `specs/_archive/note-aws-landscape-2021-vs-2026.md` | 2021년 AWS 구성과 2026년 권고안을 비교한 참고 노트다. |
+| `specs/_common/operator-decisions.md` | The single source-of-truth document for operator decisions.<br>Manages environment, network, RDS, DB schema·role, compute·service placement, security, observability, cutover and safety decisions. |
+| `specs/_common/ms-aws-service-decision-matrix.md` | The single source-of-truth document for the per-MS AWS service recommendation and rationale across the 8 MS.<br>Compares the primary compute and orchestration decisions. |
+| `specs/_common/cost-simulation.md` | The single source-of-truth document for cost assumptions and expected monthly cost per environment.<br>Organizes RDS size, VPC Endpoint count, ALB·NAT usage and Fargate usage. |
+| `specs/_common/followups-overview.md` | Manages the progression order and dependency map of follow-up specs 03~10. |
+| `specs/_common/aws-resource-glossary.md` | The single source-of-truth document for AWS terminology explanations. |
+| `specs/_common/risk-register.md` | The single accumulative document for AWS Migration operational·security·cost Risks.<br>When a new Risk is identified in a follow-up spec, it is added in the same format. |
+| `specs/_archive/note-aws-landscape-2021-vs-2026.md` | A reference note comparing the 2021 AWS configuration with the 2026 recommendation. |
 
 ## Spec Document Types
 
-01-aws-migration-foundation, 02-aws-network-and-rds 같은 각 spec은 본문(`requirements.md`, `design.md`, `tasks.md`, 필요 시 `decision-matrix.md`)에 더해 다음 보조 문서를 가질 수 있다.
+Each spec such as 01-aws-migration-foundation and 02-aws-network-and-rds may have the following auxiliary documents in addition to the body (`requirements.md`, `design.md`, `tasks.md`, and `decision-matrix.md` when needed).
 
-- `runbook.md` — 운영자가 AWS Console에서 한 단계씩 따라 할 수 있는 실행 절차서. 각 Step은 아래 5요소로 구성한다.
+- `runbook.md` — An execution procedure the operator can follow step by step in the AWS Console. Each Step consists of the 5 elements below.
 
-  | 항목 | 값 |
+  | Item | Value |
   | --- | --- |
-  | 목적 | 필수 |
-  | 사전 확인 | 필수 |
-  | Console 작업 순서 | 필수 |
-  | 생성 후 확인 | 필수 |
-  | 실패 시 조치 | 필수 |
-- `validation-checklist.md` — runbook을 진행한 뒤 통과 여부를 체크박스 단위로 점검하는 문서.
-- `traceability-matrix.md` — 요구사항 → 설계 → 작업 → 검증 → 운영자 결정의 매핑 표.
-- 루트 공통 `risk-register.md` — 모든 spec에 걸친 리스크를 단일 표로 누적 관리.
+  | Purpose | Required |
+  | Preconditions | Required |
+  | Console operation order | Required |
+  | Post-creation confirmation | Required |
+  | Action on failure | Required |
+- `validation-checklist.md` — A document that checks pass/fail at the checkbox level after running the runbook.
+- `traceability-matrix.md` — A mapping table of requirement → design → task → validation → operator decision.
+- Root common `risk-register.md` — Accumulatively manages risks across all specs in a single table.
 
 ## Update Rules
 
-- 작업공간의 목적, 폴더 구조, 주요 문서 목록이 바뀌면 본 `README.md`를 갱신한다.
-- spec 구조 변경, 루트 공통 문서 변경, 신규 spec 생성, 주요 문서 재구성이 발생하면 `CHANGELOG.md`를 갱신한다.
-- 의미 있는 Kiro 문서 작업 세션이 끝나면 `WORKLOG.md`에 간단히 누적한다.
-- Kiro 작업 규칙(범위, 단일 기준 문서, 보안/실행 정책)이 바뀌면 `AGENTS.md`를 갱신한다.
+- When the workspace's purpose, folder structure or key document list changes, update this `README.md`.
+- When a spec structure change, a root common document change, a new spec creation or a major document reorganization occurs, update `CHANGELOG.md`.
+- When a meaningful Kiro document work session ends, accumulate it briefly in `WORKLOG.md`.
+- When the Kiro working rules (scope, single source-of-truth documents, security/execution policy) change, update `AGENTS.md`.
 
 ## Security Rules
 
-- 실제 secret, password, token, app key, app secret, 계좌번호, webhook URL은 본 작업공간 어떤 문서에도 절대 작성하지 않는다.
-- 민감정보가 필요한 위치에는 항상 `[REDACTED]`만 사용한다.
-- 예시, 표, 요약, 로그, 생성 문서 어디에도 민감정보 값을 출력하지 않는다.
+- Actual secret, password, token, app key, app secret, account number and webhook URL are never written in any document of this workspace.
+- Only `[REDACTED]` is used where sensitive information would be needed.
+- Sensitive-information values are not printed anywhere in examples, tables, summaries, logs or generated documents.
 
-## 운영자 로컬 PowerShell wrapper
+## Operator-local PowerShell wrapper
 
-본 작업공간의 `.kiro/scripts/` 폴더에는 운영자가 로컬 Windows PowerShell에서
-Daily AWS 17-step을 단계별로 재현하기 위한 wrapper가 들어 있다.
+The `.kiro/scripts/` folder of this workspace contains a wrapper for the operator to
+reproduce the Daily AWS 17-step step by step in local Windows PowerShell.
 
-wrapper는 **운영자 로컬 PC 도구**다.
+The wrapper is an **operator-local PC tool**.
 
-- Kiro 자동 실행 대상이 아님
-- EC2 · ECS · Batch 내부에서 실행하지 않음
-- 8개 MS 저장소의 소스 · 패키징 · docs와 분리
-- worklog · README · AGENTS.md · CHANGELOG 영역과 분리
+- Not a Kiro auto-execution target
+- Not executed inside EC2 · ECS · Batch
+- Separated from the source · packaging · docs of the 8 MS repositories
+- Separated from the worklog · README · AGENTS.md · CHANGELOG areas
 
-본 wrapper 의 운영 정책 · 안전 기준 · 후속 책임은 아래 단일 기준 문서에 누적되어 있다. 본 README 섹션은 운영자가 한눈에 보기 위한 짧은 안내만 담는다.
+The operational policy · safety criteria · follow-up responsibilities of this wrapper are accumulated in the single source-of-truth documents below. This README section contains only a short guide for the operator to see at a glance.
 
-| 파일 | 역할 |
+| File | Role |
 |---|---|
 | [`specs/_common/operator-decisions.md`](specs/_common/operator-decisions.md) | `OD-MS-023` |
 | [`specs/_common/risk-register.md`](specs/_common/risk-register.md) | `R-AUTO-019` |
-| [`specs/_common/followups-overview.md`](specs/_common/followups-overview.md) | 2026-06-17 세 번째 후속 메모 |
-| [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) | 2026-06-17 (Daily AWS PowerShell wrapper 구현) 섹션 |
+| [`specs/_common/followups-overview.md`](specs/_common/followups-overview.md) | 2026-06-17 third follow-up memo |
+| [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) | 2026-06-17 (Daily AWS PowerShell wrapper implementation) section |
 
-### 폴더 구조
+### Folder structure
 
 ```
 .kiro/scripts/
 ├── run-daily-aws-paper.ps1                # main wrapper
 ├── daily-aws-paper.config.ps1             # region / cluster / instance id / subnet / SG / task definition / job definition / log group / output path
-├── daily-aws-paper.functions.ps1          # SSM / ECS RunTask / AWS Batch SubmitJob 공통 함수 + Step registry + summary
-├── run-daily-aws-paper-bundled.ps1        # 단일 파일 bundled wrapper (본 일자 미생성 / 후속 선택)
+├── daily-aws-paper.functions.ps1          # SSM / ECS RunTask / AWS Batch SubmitJob common functions + Step registry + summary
+├── run-daily-aws-paper-bundled.ps1        # single-file bundled wrapper (not created on this date / optional follow-up)
 └── steps/
     ├── step-01-connector-balance.ps1
     ├── step-02-interest-crawler.ps1
@@ -337,192 +337,192 @@ wrapper는 **운영자 로컬 PC 도구**다.
     ├── step-07-daily-position-signal.ps1
     ├── step-08-daily-buy-execution.ps1
     ├── step-09-daily-sell-execution.ps1
-    ├── step-10-daily-auto-sell.ps1                                  # --execute = strategy execution 내부 상태 갱신 (broker 직접 제출 아님)
-    ├── step-11-daily-auto-buy.ps1                                   # --execute = strategy execution 내부 상태 갱신 (broker 직접 제출 아님)
-    ├── step-12-marketconnector-strategy-order-execute.ps1           # 실제 KIS paper 주문 제출 가능 — 기본 차단 / -AllowPaperOrderExecute 명시 시에만 허용
-    ├── step-13-connector-order-check.ps1                            # 주문 상태 조회 / DB 상태 갱신 (신규 주문 제출 없음)
-    ├── step-14-sync-sell-fill.ps1                                   # SELL fill / status DB 갱신 (broker 호출 없음)
-    ├── step-15-sync-buy-fill.ps1                                    # BUY fill / status DB 갱신 (broker 호출 없음)
-    ├── step-16-sync-buy-position.ps1                                # BUY position DB 갱신 (broker 호출 없음)
-    └── step-17-balance-refresh.ps1                                  # balance / position snapshot refresh (신규 주문 제출 없음)
+    ├── step-10-daily-auto-sell.ps1                                  # --execute = strategy execution internal state update (not direct broker submission)
+    ├── step-11-daily-auto-buy.ps1                                   # --execute = strategy execution internal state update (not direct broker submission)
+    ├── step-12-marketconnector-strategy-order-execute.ps1           # can submit an actual KIS paper order — blocked by default / allowed only when -AllowPaperOrderExecute is explicit
+    ├── step-13-connector-order-check.ps1                            # order status query / DB status update (no new order submission)
+    ├── step-14-sync-sell-fill.ps1                                   # SELL fill / status DB update (no broker call)
+    ├── step-15-sync-buy-fill.ps1                                    # BUY fill / status DB update (no broker call)
+    ├── step-16-sync-buy-position.ps1                                # BUY position DB update (no broker call)
+    └── step-17-balance-refresh.ps1                                  # balance / position snapshot refresh (no new order submission)
 ```
 
-### 주요 옵션
+### Key options
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| `-RunDate` | 실행 기준 일자(KST).<br>미지정 시 현재 일자 사용 |
-| `-Region` | 기본값 `ap-northeast-2` |
-| `-Environment` | `aws-paper`만 허용<br>`aws-live` 분기는 코드에 없음 |
-| 정책 근거 | R-AUTO-002 mitigation<br>OD-SAFE-002 · OD-SAFE-003 |
-| `-StartStep` · `-EndStep` | 부분 실행 범위 지정 |
-| 부분 실행 예시 | `-StartStep 1 -EndStep 7` |
-| 단독 Step 실행 | 반드시 `-StartStep N -EndStep N` 형식 사용 |
-| 잘못된 파라미터 | `-FromStep` · `-ToStep`은 wrapper에 정의되지 않음 |
-| 오입력 위험 | PowerShell이 미정의 파라미터를 무시할 수 있음<br>기본 범위 `1~17`로 진입할 위험 |
-| 관련 근거 | 2026-06-18 운영 메모<br>OD-MS-023 · OD-MS-025 |
-| `-DryRun` | 실행 계획만 출력 |
-| DryRun 실행 영향 | ECS RunTask 0건<br>Batch SubmitJob 0건<br>SSM command 0건 |
-| DryRun 용도 | 모든 Step의 `FOUND` · `MISSING` 상태 확인 |
-| `-AllowPaperOrderExecute` | Step 12의 KIS paper 주문 제출을 명시적으로 허용 |
-| 기본값 | OFF |
-| 기본 차단 구조 | wrapper 중앙 `PAPER_ORDER_GATE`<br>Step 12 내부 gate |
-| 관련 Risk | R-AUTO-019 mitigation |
-| 운영 원칙 | 운영자가 옵션을 직접 명시한 경우에만 허용 |
+| `-RunDate` | Execution reference date (KST).<br>Uses the current date if unspecified |
+| `-Region` | Default `ap-northeast-2` |
+| `-Environment` | Only `aws-paper` is allowed<br>No `aws-live` branch exists in the code |
+| Policy basis | R-AUTO-002 mitigation<br>OD-SAFE-002 · OD-SAFE-003 |
+| `-StartStep` · `-EndStep` | Specify a partial execution range |
+| Partial execution example | `-StartStep 1 -EndStep 7` |
+| Single Step execution | Always use the `-StartStep N -EndStep N` form |
+| Wrong parameters | `-FromStep` · `-ToStep` are not defined in the wrapper |
+| Misinput risk | PowerShell may ignore an undefined parameter<br>Risk of entering the default range `1~17` |
+| Related basis | 2026-06-18 operation memo<br>OD-MS-023 · OD-MS-025 |
+| `-DryRun` | Print the execution plan only |
+| DryRun execution impact | 0 ECS RunTask<br>0 Batch SubmitJob<br>0 SSM command |
+| DryRun purpose | Confirm the `FOUND` · `MISSING` status of every Step |
+| `-AllowPaperOrderExecute` | Explicitly allow the KIS paper order submission of Step 12 |
+| Default | OFF |
+| Default-block structure | wrapper central `PAPER_ORDER_GATE`<br>Step 12 internal gate |
+| Related Risk | R-AUTO-019 mitigation |
+| Operating principle | Allowed only when the operator explicitly specifies the option |
 
-### Step 12 안전 주의사항
+### Step 12 safety notes
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
 | Step | Step 12 `MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE` |
-| 호출 스크립트 | `connector_strategy_order_execute.py --execute` |
-| 주문 영향 | 실제 KIS paper 주문 제출 가능 |
-| 기본 실행 상태 | 주문 제출 차단 |
-| 차단 위치 | wrapper 중앙 `PAPER_ORDER_GATE`<br>Step 12 내부 gate |
-| 관련 근거 | OD-MS-023<br>R-AUTO-019 |
-| 주문 허용 조건 1 | `-AllowPaperOrderExecute` 명시 |
-| 주문 허용 조건 2 | `Environment=aws-paper` |
-| 주문 허용 조건 3 | `PORT_DB_TARGET=aws-paper` guard 통과 |
-| 관련 Risk | R-AUTO-009<br>R-AUTO-010 |
-| live 자동 BUY·SELL | 후속 검증과 승인 전까지 금지 |
-| live 정책 | OD-SAFE-002<br>OD-SAFE-003 |
+| Called script | `connector_strategy_order_execute.py --execute` |
+| Order impact | Can submit an actual KIS paper order |
+| Default execution state | Order submission blocked |
+| Block location | wrapper central `PAPER_ORDER_GATE`<br>Step 12 internal gate |
+| Related basis | OD-MS-023<br>R-AUTO-019 |
+| Order allowance condition 1 | `-AllowPaperOrderExecute` explicit |
+| Order allowance condition 2 | `Environment=aws-paper` |
+| Order allowance condition 3 | `PORT_DB_TARGET=aws-paper` guard passed |
+| Related Risk | R-AUTO-009<br>R-AUTO-010 |
+| live automatic BUY·SELL | Prohibited until follow-up validation and approval |
+| live policy | OD-SAFE-002<br>OD-SAFE-003 |
 
-### Step 12 운영 실증과 복구 원칙
+### Step 12 operational demonstration and recovery principle
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 최초 실증 일자 | 2026-06-18 |
-| 실행 결과 | 운영자가 paper BUY 4건 제출 |
-| 실행 조건 | `-AllowPaperOrderExecute` 직접 명시 |
-| 최초 장애 | KIS paper API read timeout |
-| 복구 방식 | 통제된 `REQUESTED` 복구 후 재시도 |
-| 실증 Risk | R-BROKER-004 mitigation 1차 실증 |
-| 금지 사항 | 상태 확인 없는 단순 재실행 |
-| 금지 이유 | broker 중복 주문 위험 |
-| 필수 절차 | 사전 점검 패턴 적용 |
-| 상세 근거 | [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) |
+| First demonstration date | 2026-06-18 |
+| Execution result | The operator submitted 4 paper BUYs |
+| Execution condition | `-AllowPaperOrderExecute` explicitly specified |
+| First incident | KIS paper API read timeout |
+| Recovery method | Retry after a controlled `REQUESTED` recovery |
+| Demonstration Risk | R-BROKER-004 mitigation first demonstration |
+| Prohibited | A simple re-run without a status check |
+| Reason for prohibition | Broker duplicate-order risk |
+| Required procedure | Apply the pre-check pattern |
+| Detailed basis | [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) |
 
-### Step 10~17 책임 경계
+### Step 10~17 responsibility boundary
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| Step 10 · Step 11 `--execute` | strategy execution 내부 상태 생성·갱신 |
-| broker 직접 제출 | 없음 |
-| KIS 직접 제출 | 없음 |
-| 관련 결정 | OD-MS-016 |
-| Step 13~17 | DB 상태 갱신·조회·snapshot refresh |
-| 신규 broker 주문 | 0건 |
-| 신규 KIS 주문 | 0건 |
-| Step 13 실증 | broad summary fallback 자동 skip |
-| 체결 반영 방식 | `--code` · `--order-no` · `--no-broad` 단건 조회 |
-| 관련 Risk | R-AUTO-018 |
-| Step 16 보강 | 추가매수 시 unique constraint 충돌 해소 |
-| 수정 파일 | `execution_sync_buy_position.py` |
-| 수정 방식 | merge 처리 |
-| 관련 결정·Risk | OD-MS-024<br>R-DATA-012 |
-| 상세 근거 | [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) |
+| Step 10 · Step 11 `--execute` | strategy execution internal state creation·update |
+| Direct broker submission | None |
+| Direct KIS submission | None |
+| Related decision | OD-MS-016 |
+| Step 13~17 | DB status update·query·snapshot refresh |
+| New broker orders | 0 |
+| New KIS orders | 0 |
+| Step 13 demonstration | broad summary fallback auto-skip |
+| Fill reflection method | `--code` · `--order-no` · `--no-broad` single query |
+| Related Risk | R-AUTO-018 |
+| Step 16 reinforcement | Resolve the unique constraint conflict on additional buys |
+| Modified file | `execution_sync_buy_position.py` |
+| Modification method | merge handling |
+| Related decision·Risk | OD-MS-024<br>R-DATA-012 |
+| Detailed basis | [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) |
 
-### Step 13 안전 주의사항
+### Step 13 safety notes
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
 | Step | Step 13 `CONNECTOR_ORDER_CHECK` |
-| 실행 방식 | MarketConnector EC2 SSM RunCommand |
-| 호출 스크립트 | `connector_order_check.py` |
-| 신규 주문 제출 | 없음 |
-| 책임 | 주문 상태 조회<br>DB 상태 갱신 |
-| 운영 보강 일자 | 2026-06-18 |
-| 기본 동작 변경 | broad 일괄 조회 → active 주문 단건 순차 조회 |
-| 관련 결정 | OD-MS-025 |
-| wrapper 책임 | Step 13 orchestration |
-| 조회 방식 책임 | `connector_order_check.py` 내부 |
-| 관련 Risk | R-AUTO-018 |
+| Execution method | MarketConnector EC2 SSM RunCommand |
+| Called script | `connector_order_check.py` |
+| New order submission | None |
+| Responsibility | Order status query<br>DB status update |
+| Operational reinforcement date | 2026-06-18 |
+| Default behavior change | broad bulk query → active-order single sequential query |
+| Related decision | OD-MS-025 |
+| wrapper responsibility | Step 13 orchestration |
+| Query-method responsibility | Inside `connector_order_check.py` |
+| Related Risk | R-AUTO-018 |
 
-#### `connector_order_check.py` 주요 옵션
+#### `connector_order_check.py` key options
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| `--broad` | legacy·진단용<br>기본값 미사용 |
-| `--active-limit` | active 주문 단건 순차 조회 최대 건수 |
-| `--code {ticker_code}` | 명시 종목코드 |
-| `--order-no {broker_order_no}` | 명시 broker 주문번호 |
-| `--no-broad` | broad 조회 비활성 |
-| 명시 주문 조회 조합 | `--code` + `--order-no` + `--no-broad` |
+| `--broad` | legacy·diagnostic<br>not used by default |
+| `--active-limit` | Max count for active-order single sequential query |
+| `--code {ticker_code}` | Explicit ticker code |
+| `--order-no {broker_order_no}` | Explicit broker order number |
+| `--no-broad` | Disable broad query |
+| Explicit-order query combination | `--code` + `--order-no` + `--no-broad` |
 
-#### Summary fallback 적용 기준
+#### Summary fallback application criteria
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 다건 active 주문 | KIS `inquire-daily-ccld` summary fallback을 DB 반영 근거로 사용하지 않음 |
-| 허용 조건 | `connector_order_request` 후보가 주문번호·종목코드 기준 1건으로 확정 |
-| 관련 Risk | R-AUTO-018 mitigation |
-| 상세 응답 | [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) |
+| Multiple active orders | Does not use the KIS `inquire-daily-ccld` summary fallback as a DB-reflection basis |
+| Allowance condition | The `connector_order_request` candidate is confirmed as 1 record by order number·ticker code |
+| Related Risk | R-AUTO-018 mitigation |
+| Detailed response | [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) |
 
-#### Step 13 단독 실행
+#### Step 13 standalone execution
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| 검증 일자 | 2026-06-18 |
-| 실행 명령 | `./run-daily-aws-paper.ps1 -Environment aws-paper -RunDate 2026-06-18 -StartStep 13 -EndStep 13` |
-| 결과 | Step 13 `COMPLETED` |
-| 사용 파라미터 | `-StartStep` · `-EndStep` |
-| 금지 파라미터 | `-FromStep` · `-ToStep` |
-| 오입력 위험 | 기본 `1~17` 범위 진입 가능 |
-| 상세 결과 | [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) |
+| Validation date | 2026-06-18 |
+| Execution command | `./run-daily-aws-paper.ps1 -Environment aws-paper -RunDate 2026-06-18 -StartStep 13 -EndStep 13` |
+| Result | Step 13 `COMPLETED` |
+| Parameters used | `-StartStep` · `-EndStep` |
+| Prohibited parameters | `-FromStep` · `-ToStep` |
+| Misinput risk | Can enter the default `1~17` range |
+| Detailed result | [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) |
 
-### Windows KRX crawler worker 와 Step 2 동작
+### Windows KRX crawler worker and Step 2 behavior
 
-- Step 2 (`INTEREST_CRAWLER`) 는 아래 3개 흐름을 함께 처리한다.
+- Step 2 (`INTEREST_CRAWLER`) handles the following 3 flows together.
   - (a) non-GUI ECS · Fargate Task Definition `portfolio-paper-interest-crawler:7` RunTask
-  - (b) Windows KRX crawler worker 의 `Portfolio-KRX-Worker-Daily` Scheduled Task trigger
+  - (b) `Portfolio-KRX-Worker-Daily` Scheduled Task trigger of the Windows KRX crawler worker
   - (c) **KRX raw DB validation** (`interest_krx_raw_validate_daily.py` SSM step `INTEREST_CRAWLER_KRX_DB_VALIDATE`)
-- **2026-06-21 성공판정 강화** (OD-MS-026 신규 · R-AUTO-020 신규 mitigation 정합) — Scheduled Task trigger 성공만으로 Step 2 SUCCESS 처리하지 않는다.
-- 아래 5-단계 gate 를 모두 통과해야 SUCCESS 처리한다.
+- **2026-06-21 success-judgment reinforcement** (OD-MS-026 new · R-AUTO-020 new mitigation alignment) — Step 2 is not marked SUCCESS on the Scheduled Task trigger success alone.
+- SUCCESS is marked only when all of the following 5-stage gate pass.
 
-  | Step | 결과 |
+  | Step | Result |
   |---|---|
-  | 1 | Scheduled Task 상태 polling |
-  | 2 | `Last Result` 검사 |
-  | 3 | KRX worker 로그 확인 |
-  | 4 | `ExpectedKrxRawDate` 기준 `interest_program_raw` DB 검증 |
-  | 5 | `ExpectedKrxRawDate` 기준 `interest_shortsell_raw` DB 검증 |
-- 상세 gate 정의 및 실행 결과는 [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) 참조.
-- **crawler worker EC2 fail-closed** (R-AUTO-016 mitigation 갱신) — Windows KRX crawler worker 의 EC2 instance state 가 `running` 이 아니면 Step 2 는 즉시 실패 처리한다.
-- 이전 "wrapper 안에서 KRX GUI Scheduled Task trigger 를 자동 skip" 동작은 본 일자에 폐지.
-- 실패 메시지에 `instanceId` · `state` 출력 · KRX GUI worker · DB validation 미수행 상태에서 Step 2 SUCCESS 진입 차단.
-- KRX GUI 경로는 SSM direct python 실행이 아니라 Windows Administrator interactive Scheduled Task 흐름을 유지한다 (OD-MS-022 · OD-MS-026 정합).
+  | 1 | Scheduled Task status polling |
+  | 2 | `Last Result` check |
+  | 3 | KRX worker log check |
+  | 4 | `interest_program_raw` DB validation on the `ExpectedKrxRawDate` basis |
+  | 5 | `interest_shortsell_raw` DB validation on the `ExpectedKrxRawDate` basis |
+- For the detailed gate definition and execution result, see [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md).
+- **crawler worker EC2 fail-closed** (R-AUTO-016 mitigation update) — If the EC2 instance state of the Windows KRX crawler worker is not `running`, Step 2 fails immediately.
+- The previous "auto-skip the KRX GUI Scheduled Task trigger inside the wrapper" behavior was abolished on this date.
+- The failure message prints `instanceId` · `state` · blocks Step 2 SUCCESS entry while the KRX GUI worker · DB validation is not performed.
+- The KRX GUI path keeps the Windows Administrator interactive Scheduled Task flow rather than direct SSM python execution (OD-MS-022 · OD-MS-026 alignment).
   - `schtasks /Run /TN Portfolio-KRX-Worker-Daily` → `powershell.exe -ExecutionPolicy Bypass -File C:\portfolio\run_krx_worker_daily.ps1`
-- non-GUI ECS RunTask 는 worker 상태와 무관하게 진행하되, `containerOverrides.environment` 로 아래 4개 환경변수를 주입한다(Windows · Linux 인코딩 차이 완화 · UTF-8 기준 명확화).
+- The non-GUI ECS RunTask proceeds regardless of worker state, but injects the following 4 environment variables via `containerOverrides.environment` (mitigate Windows · Linux encoding differences · clarify the UTF-8 basis).
 
-  | 항목 | 값 |
+  | Item | Value |
   |---|---|
   | `TEMP` | `/tmp` |
   | `TMP` | `/tmp` |
   | `PYTHONUTF8` | `1` |
   | `PYTHONIOENCODING` | `utf-8` |
-- **Step 2 단독 실행 명령** — `.\run-daily-aws-paper.ps1 -Environment aws-paper -RunDate 2026-06-20 -StartStep 2 -EndStep 2`.
-- 2026-06-21 단독 실행 검증 통과 (Status `SUCCESS`).
-- `-FromStep` · `-ToStep` 미정의 파라미터로 실수 입력 시 default 1 · 17 진입 위험이 있다.
-- 반드시 `-StartStep` · `-EndStep` 형식만 사용한다.
-- 상세 RunId · Runner · DB after-check 결과는 [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md) 참조.
+- **Step 2 standalone execution command** — `.\run-daily-aws-paper.ps1 -Environment aws-paper -RunDate 2026-06-20 -StartStep 2 -EndStep 2`.
+- 2026-06-21 standalone execution validation passed (Status `SUCCESS`).
+- If mistakenly entered with the undefined parameters `-FromStep` · `-ToStep`, there is a risk of entering the default 1 · 17.
+- Always use only the `-StartStep` · `-EndStep` form.
+- For the detailed RunId · Runner · DB after-check result, see [`specs/03-marketconnector-ec2/operation-notes.md`](specs/03-marketconnector-ec2/operation-notes.md).
 
 ### bundled wrapper
 
-- `run-daily-aws-paper-bundled.ps1` 단일 파일 bundled wrapper 는 본 일자 미생성.
-- 17개 step 별 파일 검증 완료 후 필요 시 생성 가능하다.
-- **기본 개발 · 검증 · 운영 기준은 분리 파일 구조를 유지한다** (OD-MS-023 정합).
+- The `run-daily-aws-paper-bundled.ps1` single-file bundled wrapper was not created on this date.
+- It can be created if needed after per-file validation of the 17 steps is complete.
+- **The default development · validation · operation basis keeps the split-file structure** (OD-MS-023 alignment).
 
-### 산출물 위치
+### Output location
 
-- run id 별 로그 · overrides JSON · summary 는 `C:\Temp\portfolio-daily-aws-paper\<run-id>\` 하위 `logs/` · `overrides/` · `summary/run-summary.txt` 에 저장한다.
-- wrapper summary · overrides JSON · SSM stdout · stderr 파일에는 아래 민감정보 카테고리 평문 출력 **0건**(R-DOCS-001 [2026-06-17 wrapper 보강] mitigation 정합).
+- Per-run-id logs · overrides JSON · summary are stored under `C:\Temp\portfolio-daily-aws-paper\<run-id>\` in `logs/` · `overrides/` · `summary/run-summary.txt`.
+- The wrapper summary · overrides JSON · SSM stdout · stderr files have **0** plaintext outputs of the following sensitive-information categories (R-DOCS-001 [2026-06-17 wrapper reinforcement] mitigation alignment).
 
-  | 항목 | 값 |
+  | Item | Value |
   | --- | --- |
-  | secret value | 평문 출력 0건 |
-  | KIS app key | 평문 출력 0건 |
-  | KIS app secret | 평문 출력 0건 |
-  | 계좌번호 | 평문 출력 0건 |
-  | token | 평문 출력 0건 |
-  | RDS password | 평문 출력 0건 |
-  | RDS endpoint hostname | 평문 출력 0건 |
+  | secret value | 0 plaintext outputs |
+  | KIS app key | 0 plaintext outputs |
+  | KIS app secret | 0 plaintext outputs |
+  | account number | 0 plaintext outputs |
+  | token | 0 plaintext outputs |
+  | RDS password | 0 plaintext outputs |
+  | RDS endpoint hostname | 0 plaintext outputs |

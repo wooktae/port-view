@@ -16,11 +16,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Portfolio 메인 대시보드 Controller.
+ * Controller for the main Portfolio Dashboard.
  *
- * AWS Paper 조회-only 원칙:
- * - 화면 진입 시 Connector/KIS snapshot refresh를 실행하지 않는다.
- * - Dashboard는 이미 저장된 AWS Paper RDS snapshot / strategy / report 데이터를 조회만 한다.
+ * AWS Paper read-only principles:
+ * - Do not run a Connector/KIS Snapshot Refresh when entering the view.
+ * - Dashboard only queries previously stored AWS Paper RDS Snapshot, Strategy, and Report data.
  */
 @Controller
 public class DashboardController {

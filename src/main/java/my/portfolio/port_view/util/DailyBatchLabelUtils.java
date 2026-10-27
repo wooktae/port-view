@@ -1,12 +1,12 @@
 package my.portfolio.port_view.util;
 
 /**
- * Daily Batch 화면 표시용 Label Utility.
+ * Label Utility for Daily Batch view presentation.
  *
- * 목적:
- * - DB status/code 값을 화면용 한글 라벨로 변환
- * - Thymeleaf에서 영어 status가 그대로 노출되는 문제 방지
- * - badge/pill CSS class 결정
+ * Purpose:
+ * - Convert DB status/code values into Korean display labels
+ * - Prevent raw English status values from being exposed in Thymeleaf
+ * - Determine badge/pill CSS classes
  */
 public final class DailyBatchLabelUtils {
 

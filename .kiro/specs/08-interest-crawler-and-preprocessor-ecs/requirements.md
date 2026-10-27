@@ -2,241 +2,241 @@
 
 ## Introduction
 
-본 spec 은 이미 운영 중인 `port-interest-crawler`, `port-interest-preprocessor` 두 Python MS 를 `aws-paper` 환경의 ECS / ECR 위에서 1차 실행 검증할 수 있도록 절차 / 검증 항목 / 실패 원인 후보 작성 기준을 확정한다.
+This spec confirms the procedure / validation items / failure-cause candidate authoring criteria so that the two already-operating Python MS `port-interest-crawler` and `port-interest-preprocessor` can be first-execution-validated on ECS / ECR in the `aws-paper` environment.
 
-핵심 한 줄: ECR repository 2개 생성 → Dockerfile 점검 → 로컬 이미지 빌드(preprocessor 우선) → ECR push → ECS Cluster·Role 준비 → preprocessor ECS Task 1회 실행 검증 → crawler 의 Selenium / Chrome / KRX / Naver / yfinance outbound 리스크 별도 관리.
+Core one line: create 2 ECR repositories → inspect the Dockerfile → build the local image (preprocessor first) → ECR push → prepare the ECS Cluster·Role → validate one preprocessor ECS Task run → manage the crawler's Selenium / Chrome / KRX / Naver / yfinance outbound risk separately.
 
-선행 입력: [`../02-aws-network-and-rds`](../02-aws-network-and-rds)(VPC / Subnet / SG / VPC Endpoint / RDS), [`../06-secrets-and-iam`](../06-secrets-and-iam)(Secrets / SSM / Role 정책), [`../03-marketconnector-ec2`](../03-marketconnector-ec2)(EC2 → ECS 운영 패턴 매핑 §13). 1차 적용 환경 = `aws-paper`, region `ap-northeast-2`.
+Prerequisite input: [`../02-aws-network-and-rds`](../02-aws-network-and-rds) (VPC / Subnet / SG / VPC Endpoint / RDS), [`../06-secrets-and-iam`](../06-secrets-and-iam) (Secrets / SSM / Role policy), [`../03-marketconnector-ec2`](../03-marketconnector-ec2) (EC2 → ECS operation pattern mapping §13). First application environment = `aws-paper`, region `ap-northeast-2`.
 
-본 08 초기 문서 phase 산출물은 [`./requirements.md`](./requirements.md) / [`./design.md`](./design.md) / [`./tasks.md`](./tasks.md) 3개로 한정한다. runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md 는 운영자 실행 이후 별도 작성한다.
+The deliverables of this 08 initial-document phase are limited to the 3: [`./requirements.md`](./requirements.md) / [`./design.md`](./design.md) / [`./tasks.md`](./tasks.md). runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md are authored separately after operator execution.
 
-본 문서는 실제 secret value, account-id, RDS endpoint, KIS app key, KIS app secret, 계좌번호, IAM access key id, 실제 ARN, ECR repository URI 의 account-id 부, image digest 실값, ECS Cluster / Task / Service 의 실제 ARN, instance-id 를 평문으로 기록하지 않는다. 모두 `[REDACTED]` 또는 placeholder(`<account-id>`, `<region>`, `<ecr-repo-uri>`, `<image-tag>`, `<task-arn>`, `<rds-endpoint>`) 만 사용한다.
+This document does not record in plaintext the actual secret value, account-id, RDS endpoint, KIS app key, KIS app secret, account number, IAM access key id, actual ARN, the account-id part of the ECR repository URI, the actual image digest, the actual ARN of the ECS Cluster / Task / Service, or the instance-id. All use only `[REDACTED]` or a placeholder (`<account-id>`, `<region>`, `<ecr-repo-uri>`, `<image-tag>`, `<task-arn>`, `<rds-endpoint>`).
 
 ## Glossary
 
-- **Crawler MS**: `port-interest-crawler`. Naver / yfinance / KRX 등 외부 원천에서 raw 데이터를 수집하는 Python MS. Selenium / Chrome 의존 가능성 있음.
-- **Preprocessor MS**: `port-interest-preprocessor`. 수집된 raw 를 읽어 pre feature 테이블로 가공하는 Python MS. 외부 API / Selenium 의존 없음. RDS read / write 중심.
-- **ECR Repository**: AWS Elastic Container Registry. 본 spec 시점에 두 MS 별로 별도 repository 생성. 이름: `portfolio-interest-crawler`, `portfolio-interest-preprocessor`.
-- **ECS Cluster**: 본 spec 시점에 신규 생성하는 Fargate 기반 ECS Cluster. aws-paper 단일.
-- **Task Execution Role**: ECR pull / CloudWatch Logs write / Secret 주입에 사용되는 ECS 공용 실행 역할.
-- **Task Role**: 컨테이너 안 application 이 사용하는 권한(Secrets / SSM read, RDS 접속용 SG 정책). MS 별로 분리.
-- **NAT-free 구조**: NAT Gateway 미사용. ECS Fargate Task 는 public subnet + assignPublicIp 로 외부 outbound 를 처리.
-- **단발 실행 검증**: ECS Service / Step Functions 자동 기동 없이 운영자가 직접 1회 RunTask 만 수행하는 검증 단계.
+- **Crawler MS**: `port-interest-crawler`. The Python MS that collects raw data from external sources such as Naver / yfinance / KRX. May depend on Selenium / Chrome.
+- **Preprocessor MS**: `port-interest-preprocessor`. The Python MS that reads the collected raw and processes it into pre feature tables. No external API / Selenium dependency. Centered on RDS read / write.
+- **ECR Repository**: AWS Elastic Container Registry. At the time of this spec, a separate repository is created per MS. Names: `portfolio-interest-crawler`, `portfolio-interest-preprocessor`.
+- **ECS Cluster**: The Fargate-based ECS Cluster newly created at the time of this spec. A single aws-paper one.
+- **Task Execution Role**: The ECS shared execution role used for ECR pull / CloudWatch Logs write / Secret injection.
+- **Task Role**: The permissions the application inside the container uses (Secrets / SSM read, SG policy for RDS connection). Separated per MS.
+- **NAT-free structure**: No NAT Gateway. The ECS Fargate Task handles external outbound with public subnet + assignPublicIp.
+- **Single-run validation**: A validation stage where the operator directly performs only one RunTask, without ECS Service / Step Functions automatic start.
 
 ## Role Split at a Glance (Hybrid Execution Model)
 
-본 spec 은 단일 runtime 이 아니라 GUI 요구 여부에 따라 두 runtime 을 결합한다. 자세한 근거는 R7 / R8 / R12 / R13 / design.md §12 ~ §15 참조.
+This spec combines two runtimes depending on whether GUI is required, not a single runtime. For the detailed basis, see R7 / R8 / R12 / R13 / design.md §12 ~ §15.
 
-| Workload | Runtime | 성공 판정 기준 | 결정 락 |
+| Workload | Runtime | Success judgment criterion | Decision lock |
 |---|---|---|---|
-| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task (single-run) | `awsvpc` + public subnet + `assignPublicIp=ENABLED`, exit code 0, CloudWatch Logs 확인, `preprocessor_app` RDS 접속 성공 | OD-MS-011 |
-| non-GUI crawler (news / agency / foreignindex / commodity / macroeconomic / price / investorflow / marketbreadth) | ECS Fargate Task (Task Definition `portfolio-paper-interest-crawler:7` = daily 운영) | RunTask exit code 0, 8종 non-GUI step SUCCESS, raw `max(trade_date)` 정합 | OD-MS-011 / OD-MS-020 |
+| Preprocessor MS (`port-interest-preprocessor`) | ECS Fargate Task (single-run) | `awsvpc` + public subnet + `assignPublicIp=ENABLED`, exit code 0, CloudWatch Logs confirmed, `preprocessor_app` RDS connection success | OD-MS-011 |
+| non-GUI crawler (news / agency / foreignindex / commodity / macroeconomic / price / investorflow / marketbreadth) | ECS Fargate Task (Task Definition `portfolio-paper-interest-crawler:7` = daily operation) | RunTask exit code 0, 8 non-GUI steps SUCCESS, raw `max(trade_date)` consistency | OD-MS-011 / OD-MS-020 |
 | KRX GUI crawler (`interest_program` / `interest_shortsell`) | Windows EC2 worker (Autologon + Administrator console + Scheduled Task) | SSM RunCommand → `schtasks /Run` → Running→Ready + Last Result 0 + latest worker log + KRX raw DB validation (`interest_program_raw` / `interest_shortsell_raw` `max(trade_date)` ≥ ExpectedKrxRawDate) | OD-MS-022 / OD-MS-026 |
-| ECS Task Definition rev6 (smoke 전용) | ECS Fargate (참조 이력) | Selenium Chrome smoke 통과 시점 그대로 유지 / 운영 대상 아님 | 2026-06-13 §5 정합 |
+| ECS Task Definition rev6 (smoke-only) | ECS Fargate (reference history) | Kept as-is at the Selenium Chrome smoke pass point / not an operation target | Consistent with 2026-06-13 §5 |
 
-**핵심 원칙** — SSM direct Python 실행은 SYSTEM Session 0 부적합으로 채택 거부. SSM 은 `schtasks /Run` trigger 역할만 담당. Scheduled Task trigger 성공 ≠ Step 2 SUCCESS.
+**Core principle** — SSM direct Python execution is rejected as unsuitable for SYSTEM Session 0. SSM handles only the `schtasks /Run` trigger role. Scheduled Task trigger success ≠ Step 2 SUCCESS.
 
 ## Requirements
 
-### Requirement 1: 본 spec 의 범위와 범위 밖
+### Requirement 1: This spec's scope and out-of-scope
 
-**User Story:** As 운영자, I want 본 spec 의 범위와 범위 밖을 명시적으로 받기, so that 후속 spec 또는 후속 phase 가 작업 경계를 한눈에 파악할 수 있다.
-
-#### Acceptance Criteria
-
-1. WHEN design.md 가 작성되면, THE design.md SHALL 1차 적용 환경을 `aws-paper` / `ap-northeast-2` 로 명시하고, `aws-live` 와 10 spec 통합 cutover 는 본 spec 범위 밖임을 명시해야 한다.
-2. WHEN design.md 가 작성되면, THE design.md SHALL 본 spec 범위 안으로 다음을 명시해야 한다: ECR repository 2개 생성 기준 / Dockerfile 점검 / 로컬 이미지 빌드 / ECR push / ECS Cluster·Role / preprocessor 단발 실행 검증 / crawler outbound·Selenium 리스크 별도 관리.
-3. WHEN design.md 가 작성되면, THE design.md SHALL 본 spec 범위 밖으로 다음을 명시해야 한다: ECS Service / Step Functions 자동 기동, aws-live 적용(10 spec), CI/CD OIDC / GitHub Actions Role(07 spec), 두 MS 의 README / AGENTS.md / 소스 / `requirements.txt` 수정, crawler Selenium·Chrome 운영 안정화 100% 보장.
-4. WHEN 본 08 초기 문서 phase 가 진행되면, THE 본 phase SHALL requirements.md / design.md / tasks.md 3개를 산출물로 한정하고, runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md 는 운영자 실행 이후 별도 작성해야 한다.
-
-### Requirement 2: ECR Repository 생성 기준
-
-**User Story:** As 운영자, I want 두 MS 용 ECR repository 의 생성 기준을 받기, so that image push / pull 경로가 일관되게 정해진다.
+**User Story:** As an operator, I want to explicitly receive this spec's scope and out-of-scope, so that a follow-up spec or follow-up phase can grasp the work boundary at a glance.
 
 #### Acceptance Criteria
 
-1. WHEN design.md 가 작성되면, THE design.md SHALL ECR repository 를 다음 2개로 명시해야 한다: `portfolio-interest-crawler`, `portfolio-interest-preprocessor`.
-2. THE design.md SHALL 두 repository 의 region 을 `<region>` (`ap-northeast-2`) 로 명시하고, image scan on push 활성화를 권고해야 한다.
-3. THE design.md SHALL repository URI 표기를 `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-crawler:<image-tag>`, `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-preprocessor:<image-tag>` placeholder 만 사용하고, 실제 account-id 를 평문 기록하지 않아야 한다.
-4. WHERE 두 MS 가 공통 base image 를 공유할 가능성이 있는 경우, THE design.md SHALL 공통 base image repository 분리 여부를 본 spec 범위 밖(후속 검토) 으로 명시해야 한다.
-5. THE design.md SHALL ECR repository 를 paper / live 환경별로 분리하지 않고 동일 image artifact 를 환경별 중복 repository 에 push 하지 않으며, paper / live 구분은 image tag / ECS Task Definition / Secrets Manager·SSM Parameter Store path / IAM Task Role / environment variables / RDS·broker 설정 6개 항목에서 처리한다는 점을 명시해야 한다.
+1. WHEN design.md is authored, THE design.md SHALL specify the first application environment as `aws-paper` / `ap-northeast-2`, and specify that `aws-live` and the 10 spec integrated cutover are out of this spec's scope.
+2. WHEN design.md is authored, THE design.md SHALL specify the following as in this spec's scope: 2 ECR repository creation criteria / Dockerfile inspection / local image build / ECR push / ECS Cluster·Role / preprocessor single-run validation / separate management of the crawler outbound·Selenium risk.
+3. WHEN design.md is authored, THE design.md SHALL specify the following as out of this spec's scope: ECS Service / Step Functions automatic start, aws-live application (10 spec), CI/CD OIDC / GitHub Actions Role (07 spec), modifying the two MS's README / AGENTS.md / source / `requirements.txt`, 100% guarantee of crawler Selenium·Chrome operational stabilization.
+4. WHEN this 08 initial-document phase proceeds, THE this phase SHALL limit the deliverables to the 3 requirements.md / design.md / tasks.md, and author runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md separately after operator execution.
 
-### Requirement 3: Dockerfile 기준 점검
+### Requirement 2: ECR Repository creation criteria
 
-**User Story:** As 운영자, I want 두 MS 의 Dockerfile 기준 점검 항목을 받기, so that 빌드 / 실행 시점에 발견되는 결함을 사전에 식별할 수 있다.
-
-#### Acceptance Criteria
-
-1. THE design.md SHALL 두 MS repo 안에 Dockerfile 이 존재하는지 여부와 base image, requirements 설치 방식, entrypoint / CMD, 환경변수 주입 방식을 점검 항목으로 명시해야 한다.
-2. WHERE Crawler MS 가 Selenium / Chrome 의존이 필요한 경우, THE design.md SHALL Dockerfile 안 Chrome / chromedriver 설치 단계 존재 여부를 점검 항목으로 명시해야 한다.
-3. THE design.md SHALL Preprocessor MS Dockerfile 의 RDS 접속 환경변수(`INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD`) 주입 호환성을 점검 항목으로 명시해야 한다.
-4. IF Dockerfile 이 부재하거나 entrypoint 가 부정확한 경우, THEN THE design.md SHALL 본 spec 작업이 두 MS 소스 / Dockerfile 을 직접 수정하지 않고 후속 spec 또는 운영자 단계 책임으로 분리한다는 점을 명시해야 한다.
-
-### Requirement 4: 로컬 이미지 빌드 (preprocessor 우선)
-
-**User Story:** As 운영자, I want 로컬 이미지 빌드 절차와 우선 순위를 받기, so that ECS 실행 검증 전에 빌드 단계에서 결함이 차단된다.
+**User Story:** As an operator, I want to receive the ECR repository creation criteria for the two MS, so that the image push / pull path is consistently determined.
 
 #### Acceptance Criteria
 
-1. THE design.md SHALL 로컬 이미지 빌드 순서를 (1) Preprocessor MS → (2) Crawler MS 로 명시해야 한다.
-2. WHEN 로컬 빌드가 실패하는 경우, THE design.md SHALL 실패 원인 후보로 다음을 명시해야 한다: requirements.txt 호환성 / Python version mismatch / import path / system package 부족 / Crawler MS 의 Selenium·Chrome 의존성.
-3. THE design.md SHALL Crawler MS 빌드 실패 시 Selenium / Chrome 의존성 결함은 Crawler 전용 리스크로 분리하고, Preprocessor 빌드를 차단하지 않는다는 점을 명시해야 한다.
-4. THE design.md SHALL 빌드 결과(성공 / 실패 / image id 존재 여부) 만 산출물에 기록하고, 빌드 로그 stdout / stderr 본문은 본 spec 산출물에 평문 인용하지 않는다는 정책을 명시해야 한다.
+1. WHEN design.md is authored, THE design.md SHALL specify the ECR repositories as the following 2: `portfolio-interest-crawler`, `portfolio-interest-preprocessor`.
+2. THE design.md SHALL specify the region of the two repositories as `<region>` (`ap-northeast-2`) and recommend enabling image scan on push.
+3. THE design.md SHALL use only the repository URI notation placeholders `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-crawler:<image-tag>`, `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-preprocessor:<image-tag>`, and not record the actual account-id in plaintext.
+4. WHERE the two MS may share a common base image, THE design.md SHALL specify whether to separate the common base image repository as out of this spec's scope (follow-up review).
+5. THE design.md SHALL specify that the ECR repository is not separated per paper / live environment and the same image artifact is not pushed to per-environment duplicate repositories, and that the paper / live distinction is handled by the 6 items image tag / ECS Task Definition / Secrets Manager·SSM Parameter Store path / IAM Task Role / environment variables / RDS·broker settings.
 
-### Requirement 5: ECR Push 기준
+### Requirement 3: Dockerfile baseline inspection
 
-**User Story:** As 운영자, I want ECR push 기준과 실패 원인 후보를 받기, so that aws-paper 용 image tag 와 digest 가 일관되게 관리된다.
-
-#### Acceptance Criteria
-
-1. THE design.md SHALL ECR push 시 사용되는 tag 를 `paper-<yyyymmdd>` 또는 `paper-latest` 형태의 placeholder `<image-tag>` 로 명시하고, 실제 tag 결정은 운영자 직접 단계로 분리해야 한다.
-2. THE design.md SHALL push 순서를 (1) Preprocessor MS push → (2) Crawler MS push (또는 실패 원인 후보 기록) 로 명시해야 한다.
-3. WHEN push 가 성공하는 경우, THE design.md SHALL image digest(`sha256:...`) 확인을 점검 항목으로 명시하되, 실제 digest 값은 본 문서에 평문 기록하지 않고 placeholder 만 사용해야 한다.
-4. IF push 가 실패하는 경우, THEN THE design.md SHALL 실패 원인 후보로 다음을 명시해야 한다: ECR login token 만료 / Task Execution Role 미부여 / repository 미생성 / Docker daemon 미기동 / region 불일치.
-5. THE design.md SHALL image tag 전략과 push target URI 표기를 다음과 같이 명시해야 한다: aws-paper 1차 검증 tag = `paper-<yyyymmdd>` / `paper-latest`, 향후 aws-live tag = `live-<yyyymmdd>` / `live-latest`, 향후 CI/CD 성숙 단계 tag = `git-<sha>` 추가 가능, push target URI = `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-crawler:<image-tag>` 와 `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-preprocessor:<image-tag>`.
-
-### Requirement 6: ECS Cluster / Role / Log Group 준비
-
-**User Story:** As 운영자, I want ECS Cluster 와 Role / Log Group 준비 기준을 받기, so that Task 실행 시점에 권한 / log 채널 누락이 발생하지 않는다.
+**User Story:** As an operator, I want to receive the Dockerfile baseline inspection items for the two MS, so that defects found at build / execution time can be identified in advance.
 
 #### Acceptance Criteria
 
-1. THE design.md SHALL aws-paper 용 ECS Cluster 1개 생성 기준(이름 `<cluster-name>`, Fargate 기반) 을 명시해야 한다.
-2. THE design.md SHALL Task Execution Role 1개를 명시하고 다음 권한을 포함해야 한다: ECR pull, CloudWatch Logs write, Secrets Manager / SSM read(주입 경로).
-3. THE design.md SHALL Crawler / Preprocessor 별로 분리된 Task Role 2개를 명시하고, 각 Role 이 service prefix(`/portfolio/paper/crawler/*`, `/portfolio/paper/preprocessor/*`) 의 Secrets / SSM read 권한과 RDS 접속 SG 통과 권한만 갖도록 명시해야 한다.
-4. THE design.md SHALL CloudWatch Log Group 2개를 명시해야 한다: `/portfolio/paper/crawler`, `/portfolio/paper/preprocessor`. log group 사전 생성은 운영자 직접 단계로 분리.
-5. WHERE Resource / Action wildcard(`*`) 가 정책에 등장하는 경우, THE design.md SHALL 03 spec §13 의 wildcard 금지 정책(Resource wildcard 금지 / Action wildcard 금지) 을 그대로 따른다는 점을 명시해야 한다.
-6. THE design.md SHALL Task Definition `secrets` 필드 주입용 Secrets / SSM read 권한은 Task Execution Role, application runtime 의 AWS SDK 직접 조회 권한은 Task Role 로 구분하고, 본 1차 검증은 Task Definition `secrets` 주입을 우선 사용한다는 점을 명시해야 한다.
+1. THE design.md SHALL specify, as inspection items, whether a Dockerfile exists inside the two MS repos, and the base image, the requirements install method, the entrypoint / CMD and the environment-variable injection method.
+2. WHERE the Crawler MS needs a Selenium / Chrome dependency, THE design.md SHALL specify, as an inspection item, whether the Chrome / chromedriver install step exists in the Dockerfile.
+3. THE design.md SHALL specify, as an inspection item, the RDS connection environment-variable (`INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD`) injection compatibility of the Preprocessor MS Dockerfile.
+4. IF the Dockerfile is absent or the entrypoint is incorrect, THEN THE design.md SHALL specify that this spec's work does not directly modify the two MS's source / Dockerfile and separates it into the responsibility of a follow-up spec or operator stage.
 
-### Requirement 7: Preprocessor 단일 Task 실행 검증
+### Requirement 4: Local image build (preprocessor first)
 
-**User Story:** As 운영자, I want Preprocessor MS 의 ECS Task 단발 실행 검증 기준을 받기, so that 본 spec 시점의 1차 검증 대상이 명확해진다.
+**User Story:** As an operator, I want to receive the local image build procedure and priority, so that defects are blocked at the build stage before ECS execution validation.
 
 #### Acceptance Criteria
 
-1. THE design.md SHALL Preprocessor Task 의 networkMode 를 `awsvpc` 로 명시하고, public subnet + `assignPublicIp = ENABLED` 로 NAT-free outbound 를 처리한다는 점을 명시해야 한다.
-2. WHEN Preprocessor Task 가 1회 RunTask 로 실행되면, THE 검증 SHALL `marketconnector_app` 가 아닌 `preprocessor_app` 기준 RDS 접속 성공 여부, CloudWatch Logs 출력 여부, Task exit code(0) 를 점검 항목으로 포함해야 한다.
-3. THE design.md SHALL 본 spec 시점의 Preprocessor 실행은 단발(`aws ecs run-task` 1회) 만 수행하고, ECS Service 상시 가동 / EventBridge Scheduler 정기 기동은 본 spec 범위 밖임을 명시해야 한다.
-4. IF Preprocessor Task 가 실패하는 경우, THEN THE design.md SHALL 실패 원인 후보로 다음을 명시해야 한다: 환경변수 주입 누락 / Secret read 권한 누락 / RDS SG inbound 미허용 / VPC Endpoint 누락 / image entrypoint 결함.
+1. THE design.md SHALL specify the local image build order as (1) Preprocessor MS → (2) Crawler MS.
+2. WHEN the local build fails, THE design.md SHALL specify the following as failure-cause candidates: requirements.txt compatibility / Python version mismatch / import path / insufficient system package / the Crawler MS's Selenium·Chrome dependency.
+3. THE design.md SHALL specify that on a Crawler MS build failure, the Selenium / Chrome dependency defect is separated as a Crawler-only risk and does not block the Preprocessor build.
+4. THE design.md SHALL specify the policy that only the build result (success / failure / whether an image id exists) is recorded in the deliverable, and the build log stdout / stderr body is not quoted in plaintext in this spec's deliverables.
 
-### Requirement 8: Crawler Selenium / Chrome / 외부 outbound 리스크 별도 관리
+### Requirement 5: ECR Push criteria
 
-**User Story:** As 운영자, I want Crawler MS 의 Selenium / Chrome / KRX / Naver / yfinance outbound 리스크를 별도 섹션으로 받기, so that Preprocessor 검증과 Crawler 안정화 책임이 분리된다.
-
-#### Acceptance Criteria
-
-1. THE design.md SHALL Crawler MS 의 Selenium / Chrome 필요 여부를 1차 검토 항목으로 명시해야 한다.
-2. THE design.md SHALL KRX, Naver, yfinance outbound 접근 경로를 NAT-free 구조에서 public subnet + `assignPublicIp` 로 처리한다는 점을 명시하고, KRX 로그인 / rate limit / Selenium 안정성 미달 가능성을 리스크 후보로 분리해야 한다.
-3. THE design.md SHALL Crawler 운영 안정화 100% 보장은 본 spec 범위 밖이며, 본 spec 시점에는 1차 검토(Dockerfile / 빌드 가능 여부 / outbound 도달 여부) 까지만 수행한다는 점을 명시해야 한다.
-4. WHERE Crawler 1차 검토에서 Selenium / Chrome 의존성 결함이 발견되는 경우, THE design.md SHALL 후속 spec 또는 후속 phase 책임으로 분리하고, Preprocessor 검증 흐름을 차단하지 않는다는 점을 명시해야 한다.
-5. WHERE KRX GUI 의존 수집(예: KRX program / KRX shortsell)이 ECS Fargate Task 의 GUI / Chrome download / OTP 세션 흐름과 호환되지 않는 경우, THE design.md SHALL 해당 KRX GUI 의존 crawler 가 ECS Fargate Task 대신 Windows EC2 worker 위에서 실행될 수 있음을 명시하고, non-GUI crawler 와 KRX GUI 의존 crawler 의 runtime 분리(hybrid execution model) 를 명시해야 한다.
-6. WHEN KRX GUI 수집 자동화가 운영 단계로 진입하는 경우, THE design.md SHALL 다음 4개 조건을 명시해야 한다(2026-06-16 결과 정합 / OD-MS-022 정합): (a) KRX GUI 수집은 Windows interactive session 이 필수다 / (b) SSM 은 직접 Python 실행이 아니라 Scheduled Task trigger 역할로만 사용한다 / (c) Autologon 은 paper 전용 운영 예외(보안 예외)다 / (d) KRX program · shortsell 완료 기준은 DB max date 와 row count 증가로 검증한다.
-7. WHEN non-GUI crawler 의 ECS Fargate 운영 경로가 분리되는 경우, THE design.md SHALL 다음 4개 조건을 명시해야 한다(2026-06-16 결과 정합 / OD-MS-011 / OD-MS-022 정합): (a) ECS / Fargate Task 의 entrypoint / Python 모듈 import 에서 KRX GUI 의존 모듈을 제외한다 / (b) non-GUI step 별 SUCCESS 로그를 CloudWatch Logs 로 확인한다 / (c) raw table 별 최신성을 SQL 로 검증한다 / (d) 회복된 raw 입력으로 Preprocessor 가 재실행 가능한지 판단한다.
-
-### Requirement 9: NAT-free 정책 강제
-
-**User Story:** As 운영자, I want NAT-free 정책을 본 spec 시점에 다시 강제하기, so that NAT Gateway 비용이 발생하지 않는다.
+**User Story:** As an operator, I want to receive the ECR push criteria and failure-cause candidates, so that the aws-paper image tag and digest are consistently managed.
 
 #### Acceptance Criteria
 
-1. THE design.md SHALL NAT Gateway 사용을 금지하고, 본 spec 의 모든 ECS Fargate Task 가 public subnet + `assignPublicIp = ENABLED` 로 outbound 를 처리한다는 점을 명시해야 한다.
-2. THE design.md SHALL 외부 API(Naver / yfinance / KRX / holiday) outbound 도 동일 경로로 처리한다는 점을 명시해야 한다.
-3. IF 본 spec 운영 도중 NAT Gateway 가 발견되는 경우, THEN THE design.md SHALL 본 spec 임의 결정 대신 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-NET-001 / OD-NET-002 를 재확인 후 운영자 결정으로만 처리한다는 점을 명시해야 한다.
+1. THE design.md SHALL specify the tag used at ECR push as the placeholder `<image-tag>` of the form `paper-<yyyymmdd>` or `paper-latest`, and separate the actual tag decision into a direct operator stage.
+2. THE design.md SHALL specify the push order as (1) Preprocessor MS push → (2) Crawler MS push (or record the failure-cause candidate).
+3. WHEN push succeeds, THE design.md SHALL specify image digest (`sha256:...`) confirmation as an inspection item, but not record the actual digest value in plaintext in this document and use only a placeholder.
+4. IF push fails, THEN THE design.md SHALL specify the following as failure-cause candidates: ECR login token expiration / Task Execution Role not granted / repository not created / Docker daemon not started / region mismatch.
+5. THE design.md SHALL specify the image tag strategy and the push target URI notation as follows: aws-paper first-validation tag = `paper-<yyyymmdd>` / `paper-latest`, future aws-live tag = `live-<yyyymmdd>` / `live-latest`, future CI/CD maturity-stage tag = `git-<sha>` addable, push target URI = `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-crawler:<image-tag>` and `<account-id>.dkr.ecr.<region>.amazonaws.com/portfolio-interest-preprocessor:<image-tag>`.
 
-### Requirement 10: 안전 제약 (작업 분담 / 민감정보 / 외부 호출)
+### Requirement 6: ECS Cluster / Role / Log Group preparation
 
-**User Story:** As 운영자, I want 본 spec 작업의 안전 제약을 명시적으로 받기, so that 코드 / 운영 데이터 / AWS 리소스 / 외부 호출이 본 spec 작업으로 인해 변경되지 않는다.
-
-#### Acceptance Criteria
-
-1. WHEN 본 spec 의 모든 phase 가 진행되는 동안, THE 작업 SHALL 실제 AWS 리소스(ECR repository, ECS Cluster / Task Definition / Service, IAM Role / Policy, CloudWatch Log Group, Secrets / SSM Parameter, RDS) 의 생성 / 변경 / 삭제를 직접 수행하지 않고 운영자 직접 작업으로만 처리해야 한다.
-2. WHEN 본 spec 의 모든 phase 가 진행되는 동안, THE 작업 SHALL 8개 MS(`port-view`, `port-marketconnector`, `port-interest-crawler`, `port-interest-preprocessor`, `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research`) 의 README / AGENTS.md / CHANGELOG / docs / worklog / 소스 / 패키징 파일을 수정하지 않아야 한다.
-3. WHEN 본 spec 의 모든 phase 가 진행되는 동안, THE 작업 SHALL 외부 호출(KRX / Naver / yfinance / Selenium / Chrome / KIS API) 0건, 크롤링 0건, 주문 / 매수 / 매도 / 취소 / 정정 0건, RDS DDL/DML 0건을 유지해야 한다.
-4. WHEN 본 spec 산출물이 secret / 식별자를 다루는 경우, THE 산출물 SHALL 실제 secret value / password / KIS app key / app secret / 계좌번호 / token / RDS endpoint hostname / account-id / 실제 ARN / image digest / IAM access key id / instance-id 를 평문으로 적지 않고 모두 `[REDACTED]` 또는 placeholder(`<account-id>`, `<region>`, `<ecr-repo-uri>`, `<image-tag>`, `<task-arn>`, `<rds-endpoint>`) 만 사용해야 한다.
-5. WHEN secret 조회를 다루는 경우, THE 산출물 SHALL `secretsmanager:GetSecretValue` 호출은 운영자만 수행하고 Kiro 자동 검증은 `secretsmanager:DescribeSecret` metadata 만 사용한다는 점을 명시해야 한다(06 spec §11 정합).
-
-### Requirement 11: 본 spec 초기 문서 phase 산출물 한정
-
-**User Story:** As 운영자, I want 본 spec 초기 문서 phase 산출물 범위를 한정 받기, so that 후속 phase 와 운영자 실행 단계 간 책임 경계가 명확해진다.
+**User Story:** As an operator, I want to receive the ECS Cluster and Role / Log Group preparation criteria, so that permission / log channel omissions do not occur at Task execution time.
 
 #### Acceptance Criteria
 
-1. WHEN 본 08 초기 문서 phase 가 진행되는 동안, THE 작업 SHALL 산출물을 requirements.md / design.md / tasks.md 3개로 한정해야 한다.
-2. WHEN 본 08 초기 문서 phase 가 진행되는 동안, THE 작업 SHALL runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md(또는 `docs/worklog/YYYY-MM-DD.md`) 를 본 phase 에서 작성하지 않고 운영자 실행 이후 별도 작성으로 분리해야 한다.
-3. WHEN 각 phase 호출이 진행되는 동안, THE 작업 SHALL 해당 호출의 단일 phase 문서(requirements 호출 → requirements.md, design 호출 → design.md, tasks 호출 → tasks.md) 만 갱신하고 나머지 phase 문서는 후속 호출 책임으로 분리해야 한다.
-4. WHEN 본 phase 가 진행되는 동안, THE 작업 SHALL [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/risk-register.md`](../_common/risk-register.md), [`../_common/followups-overview.md`](../_common/followups-overview.md) 의 실제 갱신을 수행하지 않고, 갱신 후보만 후속 phase(design / tasks) 에서 식별하도록 분리해야 한다.
+1. THE design.md SHALL specify the criteria for creating 1 ECS Cluster for aws-paper (name `<cluster-name>`, Fargate-based).
+2. THE design.md SHALL specify 1 Task Execution Role and include the following permissions: ECR pull, CloudWatch Logs write, Secrets Manager / SSM read (injection path).
+3. THE design.md SHALL specify 2 Task Roles separated per Crawler / Preprocessor, and specify that each Role has only the Secrets / SSM read permission for the service prefix (`/portfolio/paper/crawler/*`, `/portfolio/paper/preprocessor/*`) and the RDS-connection SG-pass permission.
+4. THE design.md SHALL specify 2 CloudWatch Log Groups: `/portfolio/paper/crawler`, `/portfolio/paper/preprocessor`. Log group pre-creation is separated into a direct operator stage.
+5. WHERE a Resource / Action wildcard (`*`) appears in a policy, THE design.md SHALL specify that it follows the 03 spec §13 wildcard prohibition policy (Resource wildcard prohibited / Action wildcard prohibited) as-is.
+6. THE design.md SHALL distinguish the Secrets / SSM read permission for Task Definition `secrets` field injection as the Task Execution Role, and the AWS SDK direct-query permission of the application runtime as the Task Role, and specify that this first validation preferentially uses Task Definition `secrets` injection.
 
+### Requirement 7: Preprocessor single Task execution validation
 
-## 2026-06-16 보강 — KRX GUI 수집 / non-GUI crawler 요구사항 강화
-
-본 절은 2026-06-16 운영자 검증 결과(`./operation-notes.md` 2026-06-16 §1 ~ §6)를 입력으로 R8(Crawler Selenium / Chrome / 외부 outbound 리스크 별도 관리)과 R6 / R7(ECS Cluster / Role / Log Group / Preprocessor 단발 실행)에 대한 추가 acceptance criteria 를 보강 메모로 명시한다. 기존 R1 ~ R11 결정값(SHALL / SHALL NOT) 은 변경하지 않으며, 본 절은 hybrid execution model 1차 자동화 진입점과 non-GUI 운영 경로 신규 생성에 따른 검증 기준만 보강한다. 결정 락은 OD-MS-022(신규) + OD-MS-011 / OD-MS-015 / OD-MS-020 1차 실증 메모 보강 정합.
-
-### Requirement 12: KRX GUI 수집 운영 방식 (R8 보강)
-
-**User Story:** As 운영자, I want KRX GUI 의존 수집의 운영 방식 기준을 받기, so that SSM direct 실행 / Headless 수집 같은 부적합 방식이 운영에 잘못 들어가지 않는다.
+**User Story:** As an operator, I want to receive the ECS Task single-run validation criteria of the Preprocessor MS, so that the first-validation target at the time of this spec becomes clear.
 
 #### Acceptance Criteria
 
-1. WHEN KRX GUI 의존 수집(KRX program / KRX shortsell)이 운영 방식으로 진입하는 경우, THE design.md SHALL Windows EC2 worker 위의 **Administrator console interactive session** 이 필수 조건임을 명시해야 한다.
-2. THE design.md SHALL SSM RunCommand 가 KRX GUI 경로에서 사용되는 방식을 **`schtasks /Run` 트리거 역할** 로만 제한하고, SSM RunCommand 가 wrapper / Python 을 SYSTEM Session 0 / 비대화형 세션에서 직접 실행하는 방식은 **운영 방식에서 제외** 한다는 점을 명시해야 한다(2026-06-13 §13.2 / 2026-06-16 §15.3 정합).
-3. WHERE Administrator console interactive session 이 부재한 경우, THE 운영 방식 SHALL Autologon bootstrap 으로 EC2 부팅 후 자동 생성된 Administrator console session 을 사용한다는 점을 명시하고, Autologon 사용은 paper 전용 Windows worker 한정 보안 예외(R-SEC-009 정합)임을 명시해야 한다.
-4. WHEN KRX GUI 수집 결과의 완료 기준을 다루는 경우, THE 검증 SHALL DB max date 와 row count 증가를 함께 점검(예: `interest_program_raw` 의 max date = 직전 거래일 / row count 증가량 = 영업일 수, `interest_shortsell_raw` 의 max date = 직전 거래일 / row count 증가량 = 영업일 수 × 종목 수) 하는 SQL 점검을 통과해야 한다.
-5. THE design.md SHALL Headless / 비대화형 KRX 수집은 로컬 검증상 제외 / 운영 방식에서 제외(2026-06-16 §15.3 정합)임을 명시하고, "장기 후보" 표현은 본 일자 보정으로 더 이상 사용하지 않는다는 점을 명시해야 한다.
+1. THE design.md SHALL specify the Preprocessor Task's networkMode as `awsvpc`, and specify that NAT-free outbound is handled with public subnet + `assignPublicIp = ENABLED`.
+2. WHEN the Preprocessor Task is executed with one RunTask, THE validation SHALL include, as inspection items, whether the RDS connection succeeds on the `preprocessor_app` basis (not `marketconnector_app`), whether CloudWatch Logs output occurs, and the Task exit code (0).
+3. THE design.md SHALL specify that the Preprocessor execution at the time of this spec performs only a single run (`aws ecs run-task` once), and that ECS Service always-on operation / EventBridge Scheduler periodic start are out of this spec's scope.
+4. IF the Preprocessor Task fails, THEN THE design.md SHALL specify the following as failure-cause candidates: missing environment-variable injection / missing Secret read permission / RDS SG inbound not allowed / missing VPC Endpoint / image entrypoint defect.
 
-### Requirement 13: non-GUI Interest Crawler 운영 방식 (R8 보강)
+### Requirement 8: Separate management of the crawler Selenium / Chrome / external outbound risk
 
-**User Story:** As 운영자, I want non-GUI Interest Crawler 의 ECS / Fargate 운영 방식 기준을 받기, so that smoke 검증과 daily 운영용 Task Definition 이 분리되고 raw 최신성 검증이 빠지지 않는다.
-
-#### Acceptance Criteria
-
-1. WHEN non-GUI crawler 가 ECS / Fargate 위에서 daily 운영으로 실행되는 경우, THE Task Definition SHALL KRX GUI 의존 import(`interest_krx_login_new` / `interest_program` / `interest_shortsell`) 를 **제외** 해야 한다(2026-06-16 §15.2 정합).
-2. THE Task Definition SHALL non-GUI step(`interest_news` / `interest_agency` / `interest_foreignindex` / `interest_commodity` / `interest_macroeconomic` / `interest_price` / `interest_investorflow` / `interest_marketbreadth`)별로 **CloudWatch Logs 안 SUCCESS** 메시지 또는 동등한 step 종료 신호를 확인할 수 있어야 한다.
-3. THE 검증 SHALL ECS / Fargate smoke 전용 revision(예: revision 6 / log stream prefix `ecs-selenium-chrome-smoke`) 과 daily 운영용 revision(예: revision 7 / log stream prefix `ecs-crawler-nongui-daily`) 을 **분리 명시** 하고, smoke 통과만으로 daily 운영 완료를 단정하지 않아야 한다(R-DATA-009 mitigation 정합).
-4. THE 검증 SHALL 각 raw table 의 max date 가 직전 거래일과 일치하는지(또는 거래일 N±1 범위 안인지) SQL 로 확인하고, row count 증가량이 영업일 수 × 종목 수 / 영업일 수 × 지수 수 / 영업일 수 × 카테고리 수 와 부합하는지 함께 점검해야 한다.
-5. WHEN raw 최신성 검증을 통과한 경우, THE 검증 SHALL Preprocessor ECS RunTask 의 입력 가능 여부(직전 거래일까지 적재 + max date 일치 + 신규 row 생성 확인)를 함께 판단해야 한다(R-DATA-010 mitigation 정합).
-
-### Requirement 14: hybrid execution model 자동 로그인 기반 운영 방식 보안 (R10 보강)
-
-**User Story:** As 운영자, I want hybrid execution model 에서 paper 전용 Windows worker 의 자동 로그인 보안 예외 기준을 받기, so that 운영자 노트 / spec 산출물 / 채팅 / CloudWatch Logs 어디에도 자동 로그인 자격 증명이 평문 기록되지 않는다.
+**User Story:** As an operator, I want to receive the crawler MS's Selenium / Chrome / KRX / Naver / yfinance outbound risk as a separate section, so that the Preprocessor validation and the crawler stabilization responsibility are separated.
 
 #### Acceptance Criteria
 
-1. WHEN Autologon 자격 증명을 다루는 경우, THE 산출물 SHALL DefaultUserName / DefaultPassword / Administrator password 를 평문으로 적지 않고 모두 `[REDACTED]` 또는 placeholder 만 사용해야 한다.
-2. THE design.md SHALL Autologon 사용을 **paper 전용 Windows worker 한정 보안 예외** 로 분류하고, 일반 운영 환경 standard 가 아니라는 점을 명시해야 한다(R-SEC-009 정합).
-3. THE design.md SHALL Autologon 적용 대상 EC2 의 **RDP inbound 제한**(0.0.0.0/0 금지 / 운영자 단일 IP 또는 SSM Session Manager 우선 / OD-NET-009 정합) 을 함께 명시해야 한다.
-4. THE 검증 SHALL `query user` 결과의 Administrator console session Active 여부, SSM managed instance Online 여부, Scheduled Task 의 Last Result 코드를 함께 점검해야 한다.
-5. WHEN EC2 worker 작업이 종료되는 경우, THE 후속 작업 SHALL EC2 stop 절차(idle 비용 절감) / Chrome process 정리 옵션 / 추후 전용 local user 검토 후보를 함께 후속 인계로 명시해야 한다(R-AUTO-017 / R-SEC-009 mitigation 정합).
+1. THE design.md SHALL specify whether the Crawler MS needs Selenium / Chrome as a first-review item.
+2. THE design.md SHALL specify that the KRX, Naver, yfinance outbound access paths are handled with public subnet + `assignPublicIp` in the NAT-free structure, and separate, as risk candidates, the possibility of KRX login / rate limit / insufficient Selenium stability.
+3. THE design.md SHALL specify that a 100% guarantee of crawler operational stabilization is out of this spec's scope, and that at the time of this spec only the first review (Dockerfile / whether it can build / whether outbound is reachable) is performed.
+4. WHERE a Selenium / Chrome dependency defect is found in the Crawler first review, THE design.md SHALL separate it into the responsibility of a follow-up spec or follow-up phase and specify that it does not block the Preprocessor validation flow.
+5. WHERE KRX GUI-dependent collection (e.g., KRX program / KRX shortsell) is incompatible with the ECS Fargate Task's GUI / Chrome download / OTP session flow, THE design.md SHALL specify that that KRX GUI-dependent crawler can run on a Windows EC2 worker instead of an ECS Fargate Task, and specify the runtime separation (hybrid execution model) of the non-GUI crawler and the KRX GUI-dependent crawler.
+6. WHEN KRX GUI collection automation enters the operation stage, THE design.md SHALL specify the following 4 conditions (consistent with the 2026-06-16 result / OD-MS-022): (a) KRX GUI collection requires a Windows interactive session / (b) SSM is used only as a Scheduled Task trigger role, not direct Python execution / (c) Autologon is a paper-only operational exception (security exception) / (d) the KRX program · shortsell completion criterion is validated by the DB max date and row count increase.
+7. WHEN the non-GUI crawler's ECS Fargate operation path is separated, THE design.md SHALL specify the following 4 conditions (consistent with the 2026-06-16 result / OD-MS-011 / OD-MS-022): (a) exclude the KRX GUI-dependent modules from the ECS / Fargate Task's entrypoint / Python module import / (b) confirm the per-non-GUI-step SUCCESS log via CloudWatch Logs / (c) validate the freshness per raw table with SQL / (d) judge whether the Preprocessor can be re-run with the recovered raw input.
 
+### Requirement 9: Enforce the NAT-free policy
 
-## Addendum (2026-06-16) — NAT-free 정책 보강 (R9 보강)
-
-본 부록은 2026-06-16 운영자 검증 결과 기준으로 R9(NAT-free 정책 강제) 의 적용 범위를 명시한다. KRX GUI 수집 및 non-GUI crawler 요구사항 보강은 §Requirement 12 / §Requirement 13(위 절)에서 이미 다뤘으므로 본 부록은 R9(NAT-free) 항목만 남긴다. R1 ~ R11 본문은 변경하지 않는다. 자세한 결과는 [`./operation-notes.md`](./operation-notes.md) 2026-06-16 § / 결정 락 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-022 + OD-NET-001 / OD-NET-002 참조.
-
-#### Acceptance Criteria 보강 (R9)
-
-1. THE design.md SHALL non-GUI crawler ECS Task Definition revision 7 이 public subnet + `assignPublicIp = ENABLED` 로 NAT-free outbound 를 처리한다는 점을 명시해야 한다(2026-06-16 RunTask 결과 정합 / NAT Gateway 0건 유지).
-2. THE design.md SHALL Windows EC2 worker(KRX GUI crawler) 의 outbound 도 NAT-free 정책을 따른다는 점을 명시해야 한다(public subnet + EIP 또는 동등 방식 / OD-NET-001 / OD-NET-002 정합).
-3. IF NAT Gateway 가 본 spec 운영 도중 발견되는 경우, THEN THE design.md SHALL 본 spec 임의 결정 대신 [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-NET-001 / OD-NET-002 를 재확인 후 운영자 결정으로만 처리한다는 R9.3 정책을 그대로 유지한다.
-
-
-
-## 2026-06-21 보강 — Step 2 INTEREST_CRAWLER 성공판정 강화
-
-본 절은 2026-06-21 운영자 검증 결과(`./operation-notes.md` 2026-06-21 §1 ~ §8)를 입력으로 R8 / R12 / R13(KRX GUI 수집 운영 방식 / non-GUI Interest Crawler 운영 방식)에 대한 추가 acceptance criteria 를 보강 메모로 명시한다. 기존 R1 ~ R13 결정값(SHALL / SHALL NOT) 은 변경하지 않으며, 본 절은 wrapper Step 2 의 성공 조건과 worker stopped fail-closed 설계 변경, KRX raw DB validation guard 도입에 따른 검증 기준만 보강한다. 결정 락은 OD-MS-026(신규) + OD-MS-022 / OD-MS-023 정합. 신규 R-AUTO-020 + R-AUTO-007 / R-AUTO-016 / R-AUTO-017 mitigation·detection 보강.
-
-### Requirement 15: wrapper Step 2 성공판정 강화 (R8 / R12 / R13 보강)
-
-**User Story:** As 운영자, I want wrapper Step 2 의 성공 판정 기준을 받기, so that Scheduled Task trigger 성공만으로 Step 2 SUCCESS 처리되어 KRX raw 미적재가 Step 3 이후 흐름으로 전파되는 위험이 차단된다.
+**User Story:** As an operator, I want to re-enforce the NAT-free policy at the time of this spec, so that no NAT Gateway cost is incurred.
 
 #### Acceptance Criteria
 
-1. WHEN wrapper Step 2 (`INTEREST_CRAWLER`) 가 실행되는 경우, THE wrapper SHALL Scheduled Task trigger 성공만으로 Step 2 SUCCESS 로 처리하지 않아야 한다(OD-MS-026 / R-AUTO-020 mitigation 정합).
-2. WHEN wrapper Step 2 가 실행되는 경우, THE wrapper SHALL 다음 6개 조건을 모두 통과시켜야 Step 2 SUCCESS 처리해야 한다 — (a) non-GUI ECS crawler exitCode 0, (b) Crawler Worker EC2 `running`, (c) Windows Scheduled Task `Running` → `Ready` 복귀(`sawRunning` 로그 출력 + timeout 시 Step 2 실패), (d) Last Result 0 또는 0x0, (e) latest worker log path / last write time / size / tail 출력, (f) KRX raw DB validation 통과(`interest_program_raw` / `interest_shortsell_raw` `ExpectedKrxRawDate` 기준 row_count + `max(trade_date)`).
-3. WHEN Crawler Worker EC2 instance state 가 `running` 이 아닌 경우, THE wrapper SHALL Step 2 를 즉시 fail-closed 처리하고 instanceId / state 를 실패 메시지에 출력해야 한다(skip 후 Step 2 SUCCESS 진입 금지 / R-AUTO-016 mitigation 갱신).
-4. WHEN wrapper Step 2 의 KRX raw DB validation step 이 실행되는 경우, THE wrapper SHALL `INTEREST_CRAWLER_KRX_DB_VALIDATE` SSM step 으로 Windows crawler worker EC2 안에서 `load-crawler-db-env.ps1` + `venvs/interest-crawler` venv + `interest_krx_raw_validate_daily.py --expected-date <ExpectedKrxRawDate>` 를 실행해야 한다.
-5. WHEN `interest_krx_raw_validate_daily.py` 가 실행되는 경우, THE script SHALL `interest_program_raw` / `interest_shortsell_raw` 의 expected trade_date 기준 row_count 가 0 이거나 `max(trade_date)` 가 expected date 미만이면 exit code 30 으로 종료해야 한다.
-6. WHEN wrapper Step 2 의 KRX raw DB validation 결과가 non-zero exit 또는 row_count 0 인 경우, THE wrapper SHALL Step 2 를 실패 처리하고 step result 에 `KrxDbValidationCommandId` 를 포함해야 한다.
-7. WHEN wrapper Step 2 가 KRX worker 를 실행하기 직전 단계에서, THE wrapper SHALL Chrome / chromedriver stale process 의 best-effort reset 을 수행하고, reset 실패는 즉시 중단하지 않고 warning 로그만 남기고 진행해야 한다(R-AUTO-017 mitigation 정합).
-8. WHEN wrapper Step 2 의 KRX GUI worker 가 실행되는 경우, THE wrapper SHALL `Portfolio-KRX-Worker-Daily` Scheduled Task 를 `schtasks /Run` 으로 trigger 하는 경로를 유지해야 한다(SSM direct python 실행 채택 거부 / OD-MS-022 / OD-MS-026 정합).
-9. WHEN wrapper Step 2 가 non-GUI ECS RunTask 를 실행하는 경우, THE wrapper SHALL ECS RunTask `containerOverrides.environment` 로 `TEMP=/tmp` / `TMP=/tmp` / `PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8` 를 주입해야 한다(Windows / Linux 인코딩 차이 완화 / 임시 파일 경로 의존성 명시화).
-10. THE wrapper SHALL `Invoke-DailyAwsPaperEcsTask` `EnvironmentVariables` 파라미터 / `New-SsmParameterFile` `ExecutionTimeoutSeconds` 파라미터 / `Invoke-SsmCommandAndWait` `ExecutionTimeoutSeconds` 전달을 지원해 KRX worker · DB validation 장시간 실행 시 SSM timeout 을 제어할 수 있어야 한다.
+1. THE design.md SHALL prohibit NAT Gateway usage and specify that all ECS Fargate Tasks of this spec handle outbound with public subnet + `assignPublicIp = ENABLED`.
+2. THE design.md SHALL specify that external API (Naver / yfinance / KRX / holiday) outbound is also handled by the same path.
+3. IF a NAT Gateway is found during this spec's operation, THEN THE design.md SHALL specify that, instead of an arbitrary decision in this spec, it is handled only as an operator decision after re-confirming [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-NET-001 / OD-NET-002.
+
+### Requirement 10: Safety constraints (work division / sensitive information / external calls)
+
+**User Story:** As an operator, I want to explicitly receive this spec's work safety constraints, so that code / operational data / AWS resources / external calls are not changed due to this spec's work.
+
+#### Acceptance Criteria
+
+1. WHILE all phases of this spec are in progress, THE work SHALL not directly perform creation / change / deletion of actual AWS resources (ECR repository, ECS Cluster / Task Definition / Service, IAM Role / Policy, CloudWatch Log Group, Secrets / SSM Parameter, RDS) and handle it only as direct operator work.
+2. WHILE all phases of this spec are in progress, THE work SHALL not modify the README / AGENTS.md / CHANGELOG / docs / worklog / source / packaging files of the 8 MS (`port-view`, `port-marketconnector`, `port-interest-crawler`, `port-interest-preprocessor`, `port_strategy_common`, `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research`).
+3. WHILE all phases of this spec are in progress, THE work SHALL maintain 0 external calls (KRX / Naver / yfinance / Selenium / Chrome / KIS API), 0 crawls, 0 orders / buys / sells / cancels / modifies, 0 RDS DDL/DML.
+4. WHEN this spec's deliverables handle a secret / identifier, THE deliverable SHALL not write the actual secret value / password / KIS app key / app secret / account number / token / RDS endpoint hostname / account-id / actual ARN / image digest / IAM access key id / instance-id in plaintext, and use only `[REDACTED]` or a placeholder (`<account-id>`, `<region>`, `<ecr-repo-uri>`, `<image-tag>`, `<task-arn>`, `<rds-endpoint>`).
+5. WHEN handling secret query, THE deliverable SHALL specify that the `secretsmanager:GetSecretValue` call is performed only by the operator and Kiro's automatic validation uses only `secretsmanager:DescribeSecret` metadata (consistent with 06 spec §11).
+
+### Requirement 11: Limit this spec's initial-document phase deliverables
+
+**User Story:** As an operator, I want to receive a limited scope of this spec's initial-document phase deliverables, so that the responsibility boundary between the follow-up phase and the operator execution stage becomes clear.
+
+#### Acceptance Criteria
+
+1. WHILE this 08 initial-document phase is in progress, THE work SHALL limit the deliverables to the 3 requirements.md / design.md / tasks.md.
+2. WHILE this 08 initial-document phase is in progress, THE work SHALL not author runbook.md / validation-checklist.md / operation-notes.md / CHANGELOG.md / WORKLOG.md (or `docs/worklog/YYYY-MM-DD.md`) in this phase and separate it into separate authoring after operator execution.
+3. WHILE each phase call is in progress, THE work SHALL update only the single-phase document of that call (requirements call → requirements.md, design call → design.md, tasks call → tasks.md) and separate the remaining phase documents into the responsibility of a follow-up call.
+4. WHILE this phase is in progress, THE work SHALL not perform the actual update of [`../_common/operator-decisions.md`](../_common/operator-decisions.md), [`../_common/risk-register.md`](../_common/risk-register.md), [`../_common/followups-overview.md`](../_common/followups-overview.md), and separate it so that only the update candidates are identified in the follow-up phase (design / tasks).
+
+
+## 2026-06-16 Reinforcement — Strengthen the KRX GUI collection / non-GUI crawler requirements
+
+This section specifies, as reinforcement memos, additional acceptance criteria for R8 (separate management of the crawler Selenium / Chrome / external outbound risk) and R6 / R7 (ECS Cluster / Role / Log Group / Preprocessor single-run), using the 2026-06-16 operator validation result (`./operation-notes.md` 2026-06-16 §1 ~ §6) as input. The existing R1 ~ R11 decision values (SHALL / SHALL NOT) are not changed, and this section reinforces only the validation criteria arising from the hybrid execution model first-automation entry point and the new creation of the non-GUI operation path. The decision lock is consistent with OD-MS-022 (new) + OD-MS-011 / OD-MS-015 / OD-MS-020 first-demonstration memo reinforcement.
+
+### Requirement 12: KRX GUI collection operation method (R8 reinforcement)
+
+**User Story:** As an operator, I want to receive the operation-method criteria for KRX GUI-dependent collection, so that unsuitable methods such as SSM direct execution / Headless collection do not wrongly enter operation.
+
+#### Acceptance Criteria
+
+1. WHEN KRX GUI-dependent collection (KRX program / KRX shortsell) enters the operation method, THE design.md SHALL specify that an **Administrator console interactive session** on the Windows EC2 worker is a required condition.
+2. THE design.md SHALL limit the way SSM RunCommand is used in the KRX GUI path to only the **`schtasks /Run` trigger role**, and specify that the way SSM RunCommand directly executes the wrapper / Python in a SYSTEM Session 0 / non-interactive session is **excluded from the operation method** (consistent with 2026-06-13 §13.2 / 2026-06-16 §15.3).
+3. WHERE an Administrator console interactive session is absent, THE operation method SHALL specify using the Administrator console session automatically created after EC2 boot via Autologon bootstrap, and specify that Autologon usage is a paper-only Windows worker-limited security exception (consistent with R-SEC-009).
+4. WHEN handling the completion criterion of the KRX GUI collection result, THE validation SHALL pass the SQL check that inspects the DB max date and row count increase together (e.g., `interest_program_raw` max date = previous trade day / row count increase = number of business days, `interest_shortsell_raw` max date = previous trade day / row count increase = number of business days × number of tickers).
+5. THE design.md SHALL specify that Headless / non-interactive KRX collection is excluded from local validation / excluded from the operation method (consistent with 2026-06-16 §15.3), and specify that the "long-term candidate" wording is no longer used per this date's correction.
+
+### Requirement 13: non-GUI Interest Crawler operation method (R8 reinforcement)
+
+**User Story:** As an operator, I want to receive the ECS / Fargate operation-method criteria for the non-GUI Interest Crawler, so that the smoke validation and the daily operation Task Definition are separated and raw freshness validation is not missed.
+
+#### Acceptance Criteria
+
+1. WHEN the non-GUI crawler runs as daily operation on ECS / Fargate, THE Task Definition SHALL **exclude** the KRX GUI-dependent imports (`interest_krx_login_new` / `interest_program` / `interest_shortsell`) (consistent with 2026-06-16 §15.2).
+2. THE Task Definition SHALL be able to confirm the **SUCCESS message in CloudWatch Logs** or an equivalent step-termination signal per non-GUI step (`interest_news` / `interest_agency` / `interest_foreignindex` / `interest_commodity` / `interest_macroeconomic` / `interest_price` / `interest_investorflow` / `interest_marketbreadth`).
+3. THE validation SHALL **separately specify** the ECS / Fargate smoke-only revision (e.g., revision 6 / log stream prefix `ecs-selenium-chrome-smoke`) and the daily operation revision (e.g., revision 7 / log stream prefix `ecs-crawler-nongui-daily`), and not conclude daily operation completion from a smoke pass alone (consistent with R-DATA-009 mitigation).
+4. THE validation SHALL confirm with SQL whether each raw table's max date matches the previous trade day (or is within the trade-day N±1 range), and check together whether the row count increase matches number of business days × number of tickers / number of business days × number of indices / number of business days × number of categories.
+5. WHEN the raw freshness validation passes, THE validation SHALL judge together whether the Preprocessor ECS RunTask can be input (loaded up to the previous trade day + max date match + new row creation confirmed) (consistent with R-DATA-010 mitigation).
+
+### Requirement 14: hybrid execution model auto-login-based operation-method security (R10 reinforcement)
+
+**User Story:** As an operator, I want to receive the auto-login security-exception criteria for the paper-only Windows worker in the hybrid execution model, so that the auto-login credentials are not recorded in plaintext anywhere in the operator notes / spec deliverables / chat / CloudWatch Logs.
+
+#### Acceptance Criteria
+
+1. WHEN handling the Autologon credentials, THE deliverable SHALL not write DefaultUserName / DefaultPassword / Administrator password in plaintext and use only `[REDACTED]` or a placeholder.
+2. THE design.md SHALL classify Autologon usage as a **paper-only Windows worker-limited security exception** and specify that it is not the general operating-environment standard (consistent with R-SEC-009).
+3. THE design.md SHALL also specify the **RDP inbound restriction** (no 0.0.0.0/0 / prefer a single operator IP or SSM Session Manager / consistent with OD-NET-009) of the EC2 to which Autologon applies.
+4. THE validation SHALL check together whether the Administrator console session is Active in the `query user` result, whether the SSM managed instance is Online, and the Last Result code of the Scheduled Task.
+5. WHEN the EC2 worker work ends, THE follow-up work SHALL specify, as follow-up handoff, the EC2 stop procedure (idle cost reduction) / Chrome process cleanup option / a future dedicated local user review candidate (consistent with R-AUTO-017 / R-SEC-009 mitigation).
+
+
+## Addendum (2026-06-16) — NAT-free policy reinforcement (R9 reinforcement)
+
+This addendum specifies the application scope of R9 (enforce the NAT-free policy) based on the 2026-06-16 operator validation result. Since the KRX GUI collection and non-GUI crawler requirements reinforcement was already covered in §Requirement 12 / §Requirement 13 (the sections above), this addendum keeps only the R9 (NAT-free) item. The R1 ~ R11 body is not changed. For detailed results, see [`./operation-notes.md`](./operation-notes.md) 2026-06-16 § / decision lock [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-MS-022 + OD-NET-001 / OD-NET-002.
+
+#### Acceptance Criteria reinforcement (R9)
+
+1. THE design.md SHALL specify that the non-GUI crawler ECS Task Definition revision 7 handles NAT-free outbound with public subnet + `assignPublicIp = ENABLED` (consistent with the 2026-06-16 RunTask result / 0 NAT Gateways maintained).
+2. THE design.md SHALL specify that the outbound of the Windows EC2 worker (KRX GUI crawler) also follows the NAT-free policy (public subnet + EIP or an equivalent method / consistent with OD-NET-001 / OD-NET-002).
+3. IF a NAT Gateway is found during this spec's operation, THEN THE design.md SHALL keep the R9.3 policy as-is that, instead of an arbitrary decision in this spec, it is handled only as an operator decision after re-confirming [`../_common/operator-decisions.md`](../_common/operator-decisions.md) OD-NET-001 / OD-NET-002.
+
+
+
+## 2026-06-21 Reinforcement — Strengthen the Step 2 INTEREST_CRAWLER success judgment
+
+This section specifies, as reinforcement memos, additional acceptance criteria for R8 / R12 / R13 (KRX GUI collection operation method / non-GUI Interest Crawler operation method), using the 2026-06-21 operator validation result (`./operation-notes.md` 2026-06-21 §1 ~ §8) as input. The existing R1 ~ R13 decision values (SHALL / SHALL NOT) are not changed, and this section reinforces only the validation criteria arising from the wrapper Step 2 success condition, the worker stopped fail-closed design change, and the introduction of the KRX raw DB validation guard. The decision lock is consistent with OD-MS-026 (new) + OD-MS-022 / OD-MS-023. New R-AUTO-020 + R-AUTO-007 / R-AUTO-016 / R-AUTO-017 mitigation·detection reinforcement.
+
+### Requirement 15: Strengthen the wrapper Step 2 success judgment (R8 / R12 / R13 reinforcement)
+
+**User Story:** As an operator, I want to receive the wrapper Step 2 success judgment criteria, so that the risk of Step 2 being marked SUCCESS on the Scheduled Task trigger success alone and KRX raw non-loading propagating to the Step 3 and later flow is blocked.
+
+#### Acceptance Criteria
+
+1. WHEN wrapper Step 2 (`INTEREST_CRAWLER`) runs, THE wrapper SHALL not mark Step 2 as SUCCESS on the Scheduled Task trigger success alone (consistent with OD-MS-026 / R-AUTO-020 mitigation).
+2. WHEN wrapper Step 2 runs, THE wrapper SHALL mark Step 2 SUCCESS only when all of the following 6 conditions pass — (a) non-GUI ECS crawler exitCode 0, (b) Crawler Worker EC2 `running`, (c) Windows Scheduled Task `Running` → `Ready` return (`sawRunning` log output + Step 2 failure on timeout), (d) Last Result 0 or 0x0, (e) latest worker log path / last write time / size / tail output, (f) KRX raw DB validation pass (`interest_program_raw` / `interest_shortsell_raw` row_count + `max(trade_date)` on the `ExpectedKrxRawDate` basis).
+3. WHEN the Crawler Worker EC2 instance state is not `running`, THE wrapper SHALL immediately fail-closed Step 2 and print instanceId / state in the failure message (no Step 2 SUCCESS entry after skip / R-AUTO-016 mitigation update).
+4. WHEN the KRX raw DB validation step of wrapper Step 2 runs, THE wrapper SHALL run `load-crawler-db-env.ps1` + `venvs/interest-crawler` venv + `interest_krx_raw_validate_daily.py --expected-date <ExpectedKrxRawDate>` inside the Windows crawler worker EC2 via the `INTEREST_CRAWLER_KRX_DB_VALIDATE` SSM step.
+5. WHEN `interest_krx_raw_validate_daily.py` runs, THE script SHALL exit with exit code 30 if the row_count of `interest_program_raw` / `interest_shortsell_raw` on the expected trade_date basis is 0 or `max(trade_date)` is below the expected date.
+6. WHEN the KRX raw DB validation result of wrapper Step 2 is a non-zero exit or row_count 0, THE wrapper SHALL fail Step 2 and include `KrxDbValidationCommandId` in the step result.
+7. WHEN wrapper Step 2 is at the stage right before running the KRX worker, THE wrapper SHALL perform a best-effort reset of stale Chrome / chromedriver processes, and not immediately stop on a reset failure but leave only a warning log and proceed (consistent with R-AUTO-017 mitigation).
+8. WHEN the KRX GUI worker of wrapper Step 2 runs, THE wrapper SHALL keep the path that triggers the `Portfolio-KRX-Worker-Daily` Scheduled Task with `schtasks /Run` (SSM direct python execution rejected / consistent with OD-MS-022 / OD-MS-026).
+9. WHEN wrapper Step 2 runs a non-GUI ECS RunTask, THE wrapper SHALL inject `TEMP=/tmp` / `TMP=/tmp` / `PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8` via ECS RunTask `containerOverrides.environment` (mitigate Windows / Linux encoding differences / make the temporary-file path dependency explicit).
+10. THE wrapper SHALL support passing the `Invoke-DailyAwsPaperEcsTask` `EnvironmentVariables` parameter / `New-SsmParameterFile` `ExecutionTimeoutSeconds` parameter / `Invoke-SsmCommandAndWait` `ExecutionTimeoutSeconds` so it can control the SSM timeout during a long-running KRX worker · DB validation.

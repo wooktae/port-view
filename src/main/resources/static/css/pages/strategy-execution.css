@@ -453,7 +453,7 @@
     }
 }
 
-/* 실행 계획 히스토리 스크롤 영역 */
+/* Scrollable Execution Plan history area */
 .strategy-plan-list-section {
     padding-bottom: 16px;
 }
@@ -466,7 +466,7 @@
     scroll-behavior: smooth;
 }
 
-/* 스크롤바 디자인 */
+/* Scrollbar design */
 .strategy-plan-list::-webkit-scrollbar {
     width: 8px;
 }
@@ -485,7 +485,7 @@
     border-radius: 999px;
 }
 
-/* 카드가 스크롤바에 너무 붙지 않게 */
+/* Keep cards from sitting too close to the scrollbar */
 .strategy-plan-row {
     margin-right: 2px;
 }
@@ -1297,10 +1297,10 @@
 
 /* =========================================================
    Strategy Ops redesign
-   - 전략 운영 현황
-   - 오늘의 전략 판단
-   - 현재 전략 포지션
-   - 최근 실행 기록
+   - Strategy Operations
+   - Today's Strategy Decision
+   - Current Strategy Positions
+   - Recent Execution History
    ========================================================= */
 
 .strategy-ops-section {

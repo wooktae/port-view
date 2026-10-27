@@ -4,9 +4,9 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
- * strategy_daily_batch_run 화면 표시용 DTO.
+ * DTO for displaying strategy_daily_batch_run in the view.
  *
- * Daily Pipeline 실행 1회 전체 상태를 표현한다.
+ * Represents the overall state of one Daily Pipeline execution.
  */
 public record DailyBatchRunDto(
         Long id,

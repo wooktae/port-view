@@ -3,10 +3,10 @@ package my.portfolio.port_view.dto.dailybatch;
 import java.util.List;
 
 /**
- * Daily Batch 화면 전체 모델.
+ * Complete model for the Daily Batch view.
  *
- * /daily-batch 화면에서 최신 실행, 단계별 로그, 최근 실행 히스토리,
- * Block Watch 후보를 한 번에 표시한다.
+ * Displays the latest execution, step logs, recent execution history,
+ * and Block Watch Candidates together on the /daily-batch view.
  */
 public record DailyBatchPageDto(
         DailyBatchRunDto selectedRun,

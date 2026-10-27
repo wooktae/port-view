@@ -7,209 +7,207 @@ public final class StrategyExecutionLabelUtils {
 
     public static String planStatusLabel(String value) {
         return switch (upper(value)) {
-            case "CREATED" -> "생성됨";
-            case "READY" -> "실행 후보 있음";
-            case "VALIDATED" -> "검증됨";
-            case "BLOCKED" -> "차단";
-            case "PARTIALLY_BLOCKED" -> "부분 차단";
-            case "NO_CANDIDATE" -> "실행 후보 없음";
-            case "FAILED" -> "실패";
-            case "ERROR" -> "오류";
+            case "CREATED" -> text("status.created");
+            case "READY" -> text("status.executionCandidate");
+            case "VALIDATED" -> text("status.validated");
+            case "BLOCKED" -> text("status.blocked");
+            case "PARTIALLY_BLOCKED" -> text("status.partiallyBlocked");
+            case "NO_CANDIDATE" -> text("status.noCandidate");
+            case "FAILED" -> text("status.failed");
+            case "ERROR" -> text("status.error");
             default -> fallback(value);
         };
     }
 
     public static String executionStatusLabel(String value) {
         return switch (upper(value)) {
-            case "CANDIDATE" -> "후보";
-            case "READY" -> "주문 대기";
-            case "SUBMITTED" -> "전송 완료";
-            case "SENT" -> "전송됨";
-            case "ACCEPTED" -> "접수 완료";
-            case "FILLED" -> "체결 완료";
-            case "PARTIAL_FILLED" -> "부분 체결";
-            case "BLOCKED" -> "차단";
-            case "SKIPPED" -> "건너뜀";
-            case "FAILED" -> "실패";
-            case "ERROR" -> "오류";
-            case "CANCELED" -> "취소 완료";
-            case "CANCEL_ACCEPTED" -> "취소 접수";
+            case "CANDIDATE" -> text("status.candidate");
+            case "READY" -> text("status.orderPending");
+            case "SUBMITTED" -> text("status.submitted");
+            case "SENT" -> text("status.sent");
+            case "ACCEPTED" -> text("status.accepted");
+            case "FILLED" -> text("status.filled");
+            case "PARTIAL_FILLED" -> text("status.partialFilled");
+            case "BLOCKED" -> text("status.blocked");
+            case "SKIPPED" -> text("status.skipped");
+            case "FAILED" -> text("status.failed");
+            case "ERROR" -> text("status.error");
+            case "CANCELED" -> text("status.canceled");
+            case "CANCEL_ACCEPTED" -> text("status.cancelAccepted");
             default -> fallback(value);
         };
     }
 
     public static String positionStatusLabel(String value) {
         return switch (upper(value)) {
-            case "OPEN" -> "보유 중";
-            case "SELL_READY" -> "매도 준비";
-            case "SELL_ORDERED" -> "매도 주문 중";
-            case "CLOSED" -> "청산 완료";
-            case "SKIPPED" -> "건너뜀";
+            case "OPEN" -> text("status.openHolding");
+            case "SELL_READY" -> text("status.sellReady");
+            case "SELL_ORDERED" -> text("status.sellOrdered");
+            case "CLOSED" -> text("status.closed");
+            case "SKIPPED" -> text("status.skipped");
             default -> fallback(value);
         };
     }
 
     public static String actionTypeLabel(String value) {
         return switch (upper(value)) {
-            case "BUY" -> "매수";
-            case "SELL" -> "매도";
-            case "HOLD" -> "보유";
-            case "SKIP" -> "건너뜀";
+            case "BUY" -> text("action.buy");
+            case "SELL" -> text("action.sell");
+            case "HOLD" -> text("action.hold");
+            case "SKIP" -> text("action.skip");
             default -> fallback(value);
         };
     }
 
     public static String signalTypeLabel(String value) {
         return switch (upper(value)) {
-            case "BUY" -> "매수 신호";
-            case "SELL" -> "매도 신호";
-            case "HOLD" -> "보유 신호";
-            case "POSITION_SELL" -> "포지션 매도";
-            case "TRADE_LOG_BUY" -> "백테스트 매수";
-            case "TRADE_LOG_SELL" -> "백테스트 매도";
-            case "DAILY_SIGNAL_BUY" -> "오늘 매수 신호";
-            case "MANUAL_TEST" -> "수동 테스트";
-            case "DAILY_POSITION_SELL" -> "Daily 포지션 매도";
-            case "INTRADAY_STOP_SELL" -> "장중 손절 매도";
+            case "BUY" -> text("signal.buy");
+            case "SELL" -> text("signal.sell");
+            case "HOLD" -> text("signal.hold");
+            case "POSITION_SELL" -> text("signal.positionSell");
+            case "TRADE_LOG_BUY" -> text("signal.backtestBuy");
+            case "TRADE_LOG_SELL" -> text("signal.backtestSell");
+            case "DAILY_SIGNAL_BUY" -> text("signal.dailyBuy");
+            case "MANUAL_TEST" -> text("signal.manualTest");
+            case "DAILY_POSITION_SELL" -> text("signal.dailyPositionSell");
+            case "INTRADAY_STOP_SELL" -> text("signal.intradayStopSell");
             default -> fallback(value);
         };
     }
 
     public static String sourceTypeLabel(String value) {
         return switch (upper(value)) {
-            case "TRADE_LOG_BUY" -> "백테스트 매수";
-            case "TRADE_LOG_SELL" -> "백테스트 매도";
-            case "POSITION_SELL" -> "수동 포지션 매도";
-            case "DAILY_SIGNAL_BUY" -> "Daily 매수 신호";
-            case "DAILY_POSITION_SELL" -> "Daily 포지션 매도";
-            case "INTRADAY_STOP_SELL" -> "장중 손절 매도";
-            case "MANUAL_TEST" -> "수동 테스트";
-            case "STRATEGY_SIGNAL" -> "전략 신호";
+            case "TRADE_LOG_BUY" -> text("signal.backtestBuy");
+            case "TRADE_LOG_SELL" -> text("signal.backtestSell");
+            case "POSITION_SELL" -> text("source.manualPositionSell");
+            case "DAILY_SIGNAL_BUY" -> text("signal.buy");
+            case "DAILY_POSITION_SELL" -> text("signal.dailyPositionSell");
+            case "INTRADAY_STOP_SELL" -> text("signal.intradayStopSell");
+            case "MANUAL_TEST" -> text("signal.manualTest");
+            case "STRATEGY_SIGNAL" -> text("source.strategySignal");
             default -> fallback(value);
         };
     }
 
     public static String orderMethodLabel(String value) {
         return switch (upper(value)) {
-            case "MARKET" -> "시장가";
-            case "LIMIT" -> "지정가";
+            case "MARKET" -> text("order.method.market");
+            case "LIMIT" -> text("order.method.limit");
             default -> fallback(value);
         };
     }
 
     public static String marketSignalLabel(String value) {
         return switch (upper(value)) {
-            case "AGGRESSIVE" -> "공격 운용";
-            case "NEUTRAL" -> "선별 진입";
-            case "DEFENSIVE" -> "방어 운용";
-            case "BLOCK" -> "신규 매수 차단";
-            case "UNKNOWN" -> "미확인";
+            case "AGGRESSIVE" -> text("market.aggressive");
+            case "NEUTRAL" -> text("market.neutral");
+            case "DEFENSIVE" -> text("market.defensive");
+            case "BLOCK" -> text("market.block");
+            case "UNKNOWN" -> text("label.unknown");
             default -> fallback(value);
         };
     }
 
     public static String riskRegimeLabel(String value) {
         return switch (upper(value)) {
-            case "RISK_ON" -> "위험 선호";
-            case "RISK_OFF" -> "위험 회피";
-            case "NEUTRAL" -> "중립";
-            case "UNKNOWN" -> "미확인";
+            case "RISK_ON" -> text("risk.on");
+            case "RISK_OFF" -> text("risk.off");
+            case "NEUTRAL" -> text("risk.neutral");
+            case "UNKNOWN" -> text("label.unknown");
             default -> fallback(value);
         };
     }
 
     public static String requestTypeLabel(String value) {
         return switch (upper(value)) {
-            case "BUY" -> "매수";
-            case "SELL" -> "매도";
-            case "MODIFY" -> "정정";
-            case "CANCEL" -> "취소";
+            case "BUY" -> text("action.buy");
+            case "SELL" -> text("action.sell");
+            case "MODIFY" -> text("action.modify");
+            case "CANCEL" -> text("action.cancel");
             default -> fallback(value);
         };
     }
 
     public static String requestStatusLabel(String value) {
         return switch (upper(value)) {
-            case "PENDING" -> "대기";
-            case "SUBMITTED" -> "전송 완료";
-            case "ACCEPTED" -> "접수 완료";
-            case "FILLED" -> "체결 완료";
-            case "PARTIAL_FILLED" -> "부분 체결";
-            case "REJECTED" -> "거절";
-            case "FAILED" -> "실패";
-            case "CANCELED" -> "취소 완료";
-            case "CANCEL_ACCEPTED" -> "취소 접수";
+            case "PENDING" -> text("status.pending");
+            case "SUBMITTED" -> text("status.submitted");
+            case "ACCEPTED" -> text("status.accepted");
+            case "FILLED" -> text("status.filled");
+            case "PARTIAL_FILLED" -> text("status.partialFilled");
+            case "REJECTED" -> text("status.rejected");
+            case "FAILED" -> text("status.failed");
+            case "CANCELED" -> text("status.canceled");
+            case "CANCEL_ACCEPTED" -> text("status.cancelAccepted");
             default -> fallback(value);
         };
     }
 
     public static String eventTypeLabel(String value) {
         return switch (upper(value)) {
-            case "ORDER_ACCEPTED" -> "주문 접수";
-            case "FILLED" -> "체결 완료";
-            case "PARTIAL_FILLED" -> "부분 체결";
-            case "SUMMARY_ONLY_FILLED" -> "요약 기준 체결";
-            case "SUMMARY_ONLY_ORDER_ACCEPTED" -> "요약 기준 주문 접수";
-            case "CANCELED" -> "취소 완료";
-            case "CANCEL_ACCEPTED" -> "취소 접수";
-            case "SUMMARY_ONLY_CANCEL_ACCEPTED" -> "요약 기준 취소 접수";
+            case "ORDER_ACCEPTED" -> text("status.orderAccepted");
+            case "FILLED" -> text("status.filled");
+            case "PARTIAL_FILLED" -> text("status.partialFilled");
+            case "SUMMARY_ONLY_FILLED" -> text("status.summaryFilled");
+            case "SUMMARY_ONLY_ORDER_ACCEPTED" -> text("status.summaryOrderAccepted");
+            case "CANCELED" -> text("status.canceled");
+            case "CANCEL_ACCEPTED" -> text("status.cancelAccepted");
+            case "SUMMARY_ONLY_CANCEL_ACCEPTED" -> text("status.summaryCancelAccepted");
             default -> fallback(value);
         };
     }
 
     public static String executionModeLabel(String value) {
         return switch (upper(value)) {
-            case "DRY_RUN" -> "검증 전용";
-            case "MANUAL_TEST" -> "수동 테스트";
-            case "PAPER_STRATEGY" -> "모의 전략 실행";
-            case "LIVE_STRATEGY" -> "실전 전략 실행";
+            case "DRY_RUN" -> text("execution.mode.dryRun");
+            case "MANUAL_TEST" -> text("execution.mode.manualTest");
+            case "PAPER_STRATEGY" -> text("execution.mode.paper");
+            case "LIVE_STRATEGY" -> text("execution.mode.live");
             default -> fallback(value);
         };
     }
 
     public static String sellReasonLabel(String value) {
         return switch (upper(value)) {
-            case "INTRADAY_ENTRY_HARD_STOP" -> "진입가 대비 장중 손절";
-            case "INTRADAY_PREV_CLOSE_HARD_STOP" -> "전일종가 대비 장중 급락 손절";
-            case "HOLD_MIN_HOLDING_DAYS" -> "최소 보유일 미충족";
-            case "SELL_FILLED" -> "매도 체결 완료";
-            case "POSITION_SELL" -> "포지션 매도";
-            case "DAILY_POSITION_SELL" -> "Daily 포지션 매도";
-            case "INTRADAY_STOP_SELL" -> "장중 손절 매도";
-            case "MARKET_BLOCK_WEAK" -> "시장 약세 차단";
-            case "QUALITY_DROP" -> "품질 점수 하락";
-            case "HARD_STOP" -> "손절 기준 도달";
-            case "PROFIT_PROTECT" -> "수익 보호";
-            case "MAX_HOLDING_DAYS" -> "최대 보유일 도달";
+            case "INTRADAY_ENTRY_HARD_STOP" -> text("reason.intradayEntryHardStop");
+            case "INTRADAY_PREV_CLOSE_HARD_STOP" -> text("reason.intradayPrevCloseHardStop");
+            case "HOLD_MIN_HOLDING_DAYS" -> text("reason.minHoldingDays");
+            case "SELL_FILLED" -> text("reason.sellFilled");
+            case "POSITION_SELL" -> text("reason.positionSell");
+            case "DAILY_POSITION_SELL" -> text("signal.dailyPositionSell");
+            case "INTRADAY_STOP_SELL" -> text("signal.intradayStopSell");
+            case "MARKET_BLOCK_WEAK" -> text("reason.marketBlockWeak");
+            case "QUALITY_DROP" -> text("reason.qualityDrop");
+            case "HARD_STOP" -> text("reason.hardStop");
+            case "PROFIT_PROTECT" -> text("reason.profitProtect");
+            case "MAX_HOLDING_DAYS" -> text("reason.maxHoldingDays");
             default -> fallback(value);
         };
     }
 
     public static String blockReasonLabel(String value) {
         return switch (upper(value)) {
-            case "NO_SELLABLE_QTY" -> "매도 가능 수량 없음";
-            case "LATEST_CONNECTOR_POSITION_SNAPSHOT_NOT_FOUND" -> "최신 보유 스냅샷 없음";
-            case "LATEST_POSITION_QTY_ZERO" -> "최신 보유 수량 0";
-            case "LATEST_SELLABLE_QTY_ZERO" -> "최신 매도 가능 수량 0";
-            case "ORDER_QTY_GT_LATEST_SELLABLE_QTY" -> "주문 수량이 최신 매도 가능 수량보다 큼";
-            case "STRATEGY_ORDER_QTY_ZERO" -> "전략 주문 수량 0";
-            case "TEST_INTRADAY_STOP_SELL_CANDIDATE" -> "테스트 장중 손절 후보 정리";
-            case "ALL EXECUTION ORDERS BLOCKED" -> "모든 주문 후보 차단";
+            case "NO_SELLABLE_QTY" -> text("reason.noSellableQty");
+            case "LATEST_CONNECTOR_POSITION_SNAPSHOT_NOT_FOUND" -> text("reason.latestPositionMissing");
+            case "LATEST_POSITION_QTY_ZERO" -> text("reason.latestPositionQtyZero");
+            case "LATEST_SELLABLE_QTY_ZERO" -> text("reason.latestSellableQtyZero");
+            case "ORDER_QTY_GT_LATEST_SELLABLE_QTY" -> text("reason.orderQtyExceedsSellable");
+            case "STRATEGY_ORDER_QTY_ZERO" -> text("reason.strategyOrderQtyZero");
+            case "TEST_INTRADAY_STOP_SELL_CANDIDATE" -> text("reason.testIntradayStopCandidate");
+            case "ALL EXECUTION ORDERS BLOCKED" -> text("reason.allOrdersBlocked");
             default -> fallback(value);
         };
     }
 
     public static String upper(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.trim().toUpperCase();
+        return value == null ? "" : value.trim().toUpperCase();
     }
 
     public static String fallback(String value) {
-        if (value == null || value.isBlank()) {
-            return "-";
-        }
-        return value;
+        return value == null || value.isBlank() ? "-" : value;
+    }
+
+    private static String text(String key) {
+        return ViewMessages.text(key);
     }
 }

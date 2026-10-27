@@ -11,6 +11,8 @@ public class SlackProperties {
 
     private String webhookUrl = "";
 
+    private String locale = "en";
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -25,5 +27,13 @@ public class SlackProperties {
 
     public void setWebhookUrl(String webhookUrl) {
         this.webhookUrl = webhookUrl;
+    }
+
+    public String getLocale() {
+        return locale;
+    }
+
+    public void setLocale(String locale) {
+        this.locale = locale;
     }
 }

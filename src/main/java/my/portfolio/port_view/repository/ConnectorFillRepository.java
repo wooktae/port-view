@@ -10,7 +10,7 @@ import java.util.List;
 public interface ConnectorFillRepository extends JpaRepository<ConnectorFill, Long> {
 
     /**
-     * 주문 chain에 포함된 request id 기준 체결내역 조회.
+     * Queries Fill History by the request IDs included in an Order Chain.
      */
     @Query(
             value = """
@@ -27,7 +27,7 @@ public interface ConnectorFillRepository extends JpaRepository<ConnectorFill, Lo
 
     /**
      * fallback:
-     * order_request_id가 없는 fill 보완용.
+     * Supplements Fills that have no order_request_id.
      */
     @Query(
             value = """

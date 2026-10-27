@@ -14,6 +14,7 @@ import my.portfolio.port_view.util.OrderLabelUtils;
 import my.portfolio.port_view.util.ViewFormatUtils;
 import my.portfolio.port_view.util.ProfitClassUtils;
 import my.portfolio.port_view.util.ViewTextUtils;
+import my.portfolio.port_view.util.ViewMessages;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,8 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 대시보드 화면에 표시할 잔고, 보유 종목, 최근 주문, 수익률 지표를 조립한다.
- * Connector 스냅샷과 주문/포지션 repository 결과를 화면 전용 DTO로 변환한다.
+ * Assembles the Balance, Positions, recent Orders, and Return metrics displayed on the Dashboard.
+ * Converts Connector Snapshot and Order/Position Repository results into view-specific DTOs.
  */
 @Service
 public class DashboardService {
@@ -85,12 +86,12 @@ public class DashboardService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             /*
-            * 화면 표시용 현금.
+            * Cash displayed in the view.
             *
-            * KIS cash_balance(dnca_tot_amt)는 주식 매수 후에도 예수금 성격으로 크게 남아 보일 수 있음.
-            * 대시보드에서는 사용자가 기대하는 "총 평가금액에서 현재 주식 평가금액을 제외한 현금성 금액"을 표시.
+            * KIS cash_balance(dnca_tot_amt) may appear high after a Stock purchase because it retains deposit-like semantics.
+            * The Dashboard displays the expected cash-like amount: total valuation minus current Stock valuation.
             *
-            * 예: 2026-05-27
+            * Example: 2026-05-27
             * totalEvalAmount 9,931,122 - stockEvalAmount 1,859,060 = 8,072,062
             */
             BigDecimal cashBalance = totalEvalAmount.subtract(stockEvalAmount);
@@ -143,13 +144,15 @@ public class DashboardService {
             BigDecimal evalProfit = nvl(p.getEvalProfit());
 
             /*
-             * 화면 수익률은 DB eval_profit_rate보다 eval_profit / buy_amount 기준으로 계산.
-             * DB scale 변경 이슈가 있어도 화면은 안정적으로 표시 가능.
+             * Calculate the view Return from eval_profit / buy_amount instead of DB eval_profit_rate.
+             * This keeps the view stable even if the DB scale changes.
              */
             BigDecimal evalProfitRatePercent = safeRate(nvl(p.getEvalProfit()), nvl(p.getBuyAmount()));
 
             dto.setTickerCode(p.getTickerCode());
             dto.setStockName(ViewFormatUtils.emptyIfNull(p.getStockName()));
+            dto.setStockDisplayName(ViewMessages.stockDisplayName(p.getTickerCode(), p.getStockName()));
+            dto.setShowSeparateTicker(ViewMessages.showSeparateTicker(p.getStockName()));
             dto.setQuantity(p.getQuantity());
             dto.setSellableQuantity(p.getSellableQuantity());
             dto.setAvgBuyPrice(p.getAvgBuyPrice());
@@ -223,28 +226,28 @@ public class DashboardService {
         List<DashboardMetricDTO> metrics = new ArrayList<>();
 
         metrics.add(new DashboardMetricDTO(
-                "총 평가금액",
+                ViewMessages.text("dashboard.totalEvaluation"),
                 dashboard.getTotalEvalAmountText(),
-                "현금 + 주식 평가금액",
+                ViewMessages.text("dashboard.cashPlusStocks"),
                 "primary"
         ));
 
         metrics.add(new DashboardMetricDTO(
-                "현금",
+                ViewMessages.text("dashboard.cash"),
                 dashboard.getCashBalanceText(),
-                "주문 가능 재원",
+                ViewMessages.text("dashboard.orderableResources"),
                 "cash"
         ));
 
         metrics.add(new DashboardMetricDTO(
-                "주식 평가금액",
+                ViewMessages.text("dashboard.stockEvaluation"),
                 dashboard.getStockEvalAmountText(),
-                "현재 보유종목 기준",
+                ViewMessages.text("dashboard.currentPositionsBased"),
                 "stock"
         ));
 
         metrics.add(new DashboardMetricDTO(
-                "평가손익",
+                ViewMessages.text("dashboard.evaluationProfit"),
                 dashboard.getEvalProfitText(),
                 dashboard.getTotalProfitRateText(),
                 dashboard.getProfitClass()

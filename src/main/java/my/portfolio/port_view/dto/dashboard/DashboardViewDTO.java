@@ -46,7 +46,7 @@ public class DashboardViewDTO {
     private List<DashboardPositionDTO> positions = new ArrayList<>();
 
     /**
-     * Dashboard 하단 최근 주문 5건.
+     * Five most recent Orders displayed at the bottom of the Dashboard.
      */
     private List<DashboardRecentOrderDTO> recentOrders = new ArrayList<>();
 }

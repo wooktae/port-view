@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import my.portfolio.port_view.common.ViewNames;
 import my.portfolio.port_view.service.StrategyExecutionSubmitService;
 import my.portfolio.port_view.service.StrategyExecutionViewService;
+import my.portfolio.port_view.util.ViewMessages;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -55,7 +56,7 @@ public class StrategyExecutionViewController {
         if (!submitEnabled) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "AWS Paper 조회-only 모드에서는 Connector 주문 전송이 비활성화되어 있습니다."
+                    ViewMessages.text("strategy.submit.disabled")
             );
 
             return "redirect:/strategy/execution/plans/" + planId;
@@ -66,12 +67,12 @@ public class StrategyExecutionViewController {
 
             redirectAttributes.addFlashAttribute(
                     "successMessage",
-                    "Connector 주문 전송 완료: #" + connectorOrderRequestId
+                    ViewMessages.text("strategy.submit.success", connectorOrderRequestId)
             );
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
-                    "Connector 주문 전송 실패: " + e.getMessage()
+                    ViewMessages.text("strategy.submit.failure", e.getMessage())
             );
         }
 

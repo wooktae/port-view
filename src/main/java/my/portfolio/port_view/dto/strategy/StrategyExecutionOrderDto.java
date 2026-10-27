@@ -1,6 +1,7 @@
 package my.portfolio.port_view.dto.strategy;
 
 import my.portfolio.port_view.util.StrategyExecutionLabelUtils;
+import my.portfolio.port_view.util.ViewMessages;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -44,6 +45,14 @@ public record StrategyExecutionOrderDto(
         OffsetDateTime updatedAt
 ) {
 
+    public String stockDisplayName() {
+        return ViewMessages.stockDisplayName(tickerCode, stockName);
+    }
+
+    public boolean showSeparateTicker() {
+        return ViewMessages.showSeparateTicker(stockName);
+    }
+
     public String actionTypeLabel() {
         return StrategyExecutionLabelUtils.actionTypeLabel(actionType);
     }
@@ -77,7 +86,9 @@ public record StrategyExecutionOrderDto(
     //}
 
     public String connectorStatusLabel() {
-        return connectorOrderRequestId == null ? "미전송" : "커넥터 연결";
+        return connectorOrderRequestId == null
+                ? ViewMessages.text("status.notSubmitted")
+                : ViewMessages.text("status.connectorLinked");
     }
 
     public boolean hasDailySignalSource() {

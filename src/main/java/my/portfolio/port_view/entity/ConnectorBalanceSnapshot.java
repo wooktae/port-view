@@ -12,8 +12,8 @@ import java.time.OffsetDateTime;
 /**
  * connector_balance_snapshot
  *
- * Connector MS가 수집한 계좌 잔고 스냅샷.
- * View MS에서는 최신 잔고 카드 표시용으로 사용.
+ * Account Balance Snapshot collected by the Connector MS.
+ * Used by the View MS to display the latest Balance card.
  */
 @Getter
 @Setter

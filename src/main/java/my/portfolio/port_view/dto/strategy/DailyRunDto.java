@@ -1,6 +1,7 @@
 package my.portfolio.port_view.dto.strategy;
 
 import my.portfolio.port_view.util.StrategyExecutionLabelUtils;
+import my.portfolio.port_view.util.ViewMessages;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -35,11 +36,11 @@ public record DailyRunDto(
 
     public String runStatusLabel() {
         return switch (upper(runStatus)) {
-            case "CREATED" -> "생성됨";
-            case "RUNNING" -> "실행 중";
-            case "COMPLETED" -> "완료";
-            case "FAILED" -> "실패";
-            case "ERROR" -> "오류";
+            case "CREATED" -> ViewMessages.text("status.created");
+            case "RUNNING" -> ViewMessages.text("status.running");
+            case "COMPLETED" -> ViewMessages.text("status.completed");
+            case "FAILED" -> ViewMessages.text("status.failed");
+            case "ERROR" -> ViewMessages.text("status.error");
             default -> fallback(runStatus);
         };
     }

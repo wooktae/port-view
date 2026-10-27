@@ -6,21 +6,17 @@ public final class OrderLabelUtils {
     }
 
     public static String requestTypeLabel(String requestType) {
-        String type = upper(requestType);
-
-        return switch (type) {
-            case "BUY" -> "매수";
-            case "SELL" -> "매도";
-            case "MODIFY" -> "정정";
-            case "CANCEL" -> "취소";
+        return switch (upper(requestType)) {
+            case "BUY" -> ViewMessages.text("action.buy");
+            case "SELL" -> ViewMessages.text("action.sell");
+            case "MODIFY" -> ViewMessages.text("action.modify");
+            case "CANCEL" -> ViewMessages.text("action.cancel");
             default -> blankTo(requestType, "UNKNOWN");
         };
     }
 
     public static String requestTypeClass(String requestType) {
-        String type = upper(requestType);
-
-        return switch (type) {
+        return switch (upper(requestType)) {
             case "BUY" -> "buy";
             case "SELL" -> "sell";
             case "MODIFY" -> "modify";
@@ -30,27 +26,23 @@ public final class OrderLabelUtils {
     }
 
     public static String statusLabel(String status) {
-        String s = upper(status);
-
-        return switch (s) {
-            case "REQUESTED" -> "요청";
-            case "ACCEPTED" -> "접수";
-            case "ORDER_ACCEPTED" -> "주문접수";
-            case "FILLED" -> "체결";
-            case "PARTIALLY_FILLED" -> "부분체결";
-            case "CANCELED" -> "취소완료";
-            case "CANCEL_ACCEPTED" -> "취소접수";
-            case "MODIFY_ACCEPTED" -> "정정접수";
-            case "MODIFIED" -> "정정됨";
-            case "REJECTED" -> "거절";
+        return switch (upper(status)) {
+            case "REQUESTED" -> ViewMessages.text("status.requested");
+            case "ACCEPTED" -> ViewMessages.text("order.simple.accepted");
+            case "ORDER_ACCEPTED" -> ViewMessages.text("order.simple.orderAccepted");
+            case "FILLED" -> ViewMessages.text("order.simple.filled");
+            case "PARTIALLY_FILLED" -> ViewMessages.text("order.simple.partialFilled");
+            case "CANCELED" -> ViewMessages.text("order.simple.canceled");
+            case "CANCEL_ACCEPTED" -> ViewMessages.text("order.simple.cancelAccepted");
+            case "MODIFY_ACCEPTED" -> ViewMessages.text("order.simple.modifyAccepted");
+            case "MODIFIED" -> ViewMessages.text("order.simple.modified");
+            case "REJECTED" -> ViewMessages.text("order.simple.rejected");
             default -> blankTo(status, "UNKNOWN");
         };
     }
 
     public static String statusClass(String status) {
-        String s = upper(status);
-
-        return switch (s) {
+        return switch (upper(status)) {
             case "FILLED", "PARTIALLY_FILLED" -> "filled";
             case "ACCEPTED", "ORDER_ACCEPTED", "REQUESTED" -> "accepted";
             case "MODIFY_ACCEPTED" -> "modify";
@@ -63,59 +55,37 @@ public final class OrderLabelUtils {
     }
 
     public static String eventTypeLabel(String eventType) {
-        String e = upper(eventType);
-
-        return switch (e) {
-            case "ORDER_ACCEPTED", "SUMMARY_ONLY_ORDER_ACCEPTED" -> "주문접수";
-            case "FILLED", "SUMMARY_ONLY_FILLED" -> "체결";
-            case "CANCELED", "SUMMARY_ONLY_CANCELED" -> "취소완료";
-            case "CANCEL_ACCEPTED", "SUMMARY_ONLY_CANCEL_ACCEPTED" -> "취소접수";
-            case "MODIFY_ACCEPTED", "SUMMARY_ONLY_MODIFY_ACCEPTED" -> "정정접수";
+        return switch (upper(eventType)) {
+            case "ORDER_ACCEPTED", "SUMMARY_ONLY_ORDER_ACCEPTED" -> ViewMessages.text("order.simple.orderAccepted");
+            case "FILLED", "SUMMARY_ONLY_FILLED" -> ViewMessages.text("order.simple.filled");
+            case "CANCELED", "SUMMARY_ONLY_CANCELED" -> ViewMessages.text("order.simple.canceled");
+            case "CANCEL_ACCEPTED", "SUMMARY_ONLY_CANCEL_ACCEPTED" -> ViewMessages.text("order.simple.cancelAccepted");
+            case "MODIFY_ACCEPTED", "SUMMARY_ONLY_MODIFY_ACCEPTED" -> ViewMessages.text("order.simple.modifyAccepted");
             default -> blankTo(eventType, "EVENT");
         };
     }
 
     public static String eventTypeClass(String eventType) {
-        String e = upper(eventType);
-
-        if (e.contains("FILLED")) {
-            return "filled";
-        }
-
-        if (e.contains("CANCEL_ACCEPTED")) {
-            return "cancel-accepted";
-        }
-
-        if (e.contains("CANCELED")) {
-            return "canceled";
-        }
-
-        if (e.contains("MODIFY")) {
-            return "modify";
-        }
-
-        if (e.contains("ORDER_ACCEPTED")) {
-            return "accepted";
-        }
-
+        String event = upper(eventType);
+        if (event.contains("FILLED")) return "filled";
+        if (event.contains("CANCEL_ACCEPTED")) return "cancel-accepted";
+        if (event.contains("CANCELED")) return "canceled";
+        if (event.contains("MODIFY")) return "modify";
+        if (event.contains("ORDER_ACCEPTED")) return "accepted";
         return "unknown";
     }
 
     public static String sideLabel(String side) {
-        String s = upper(side);
-
-        return switch (s) {
-            case "BUY" -> "매수";
-            case "SELL" -> "매도";
-            case "UNKNOWN" -> "미확인";
+        return switch (upper(side)) {
+            case "BUY" -> ViewMessages.text("action.buy");
+            case "SELL" -> ViewMessages.text("action.sell");
+            case "UNKNOWN" -> ViewMessages.text("label.unknown");
             default -> blankTo(side, "-");
         };
     }
 
     public static String sideClass(String side) {
-        String s = upper(side);
-
-        return switch (s) {
+        return switch (upper(side)) {
             case "BUY" -> "buy";
             case "SELL" -> "sell";
             default -> "unknown";

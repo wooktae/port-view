@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Connector 기반 보유종목 화면 Controller
+ * Controller for Connector-backed Position views.
  *
  * URL:
  * - /positions

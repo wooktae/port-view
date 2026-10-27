@@ -1,6 +1,6 @@
 /* =========================================================
    Daily Batch Page v2
-   - 실행 전에도 꽉 차 보이는 운영 콘솔형 화면
+   - Production console-style view that appears complete even before execution
    ========================================================= */
 
 .daily-batch-main {
@@ -1567,8 +1567,8 @@
 
 /* =========================================================
    Daily Batch Local Polish - 2026-06-29
-   - 현재 daily_batch.html 구조(step-time-cell/step-log-cell) 호환
-   - 실행 이력 카드형 정리
+   - Compatible with the current daily_batch.html structure (step-time-cell/step-log-cell)
+   - Card-style execution history
    ========================================================= */
 
 .daily-batch-main .dashboard-stage {
@@ -1666,7 +1666,7 @@
     color: #334155;
 }
 
-/* 현재 Step Logs HTML 호환 */
+/* Compatible with the current Step Logs HTML */
 .batch-step-row {
     grid-template-columns:
         48px
@@ -1825,7 +1825,7 @@
     font-family: "Cascadia Mono", "Consolas", monospace;
 }
 
-/* 실행 이력 카드형 */
+/* Card-style execution history */
 .batch-history-section {
     background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.96));
 }
@@ -1848,7 +1848,7 @@
     text-transform: uppercase;
 }
 
-/* HTML 교체 실패 시 table도 최소한 예쁘게 보이도록 fallback */
+/* Fallback styling keeps the table presentable if HTML replacement fails */
 .batch-history-section .table-responsive {
     border-radius: 18px;
     border: 1px solid #e2e8f0;
@@ -1921,10 +1921,10 @@
 
 /* =========================================================
    Daily Batch Status Color Polish - 2026-06-29
-   - rendered text only 상태 pill 색상 보정
+   - Adjust status pill colors when only rendered text is available
    ========================================================= */
 
-/* 기본 pill을 조금 더 선명하게 */
+/* Make the default pill slightly more prominent */
 .batch-status-pill {
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45);
 }
@@ -1949,7 +1949,7 @@
     border-color: #bbf7d0;
 }
 
-/* NO_TARGET - 화면상 NO_TARGET 텍스트는 첫 step에 주로 등장하므로 stdout/no-target row를 따뜻한 노랑으로 */
+/* NO_TARGET - Because visible NO_TARGET text usually appears in the first step, use warm yellow for the stdout/no-target row */
 .batch-step-row:has(.batch-status-pill):has(.step-main-cell span):has(pre) .batch-status-pill {
     background: #dcfce7;
     color: #166534;
@@ -1957,29 +1957,29 @@
 }
 
 
-/* CSS :contains 미지원 fallback: Step 12 / 첫 row NO_TARGET 보정 */
+/* Fallback because CSS does not support :contains: adjust Step 12 / first-row NO_TARGET */
 .batch-step-list .batch-step-row:first-child .step-status-cell .batch-status-pill {
     background: #fef3c7;
     color: #92400e;
     border-color: #fde68a;
 }
 
-/* History FAILED rows: 실패 카운트가 1 이상인 row를 빨강 tone으로 */
+/* History FAILED rows: use a red tone when the failure count is at least one */
 .batch-history-row:has(.history-status .batch-status-pill):has(.history-counts div:nth-child(3) strong:not(:empty)) {
     position: relative;
 }
 
-/* 실패 row는 렌더링상 FAILED pill 텍스트가 있으므로 selected/normal 모두 강조 */
+/* Because failed rows render a FAILED pill, emphasize both selected and normal rows */
 .batch-history-row:has(.history-status .batch-status-pill):has(.history-status small) .history-status .batch-status-pill {
     font-weight: 950;
 }
 
-/* FAILED: 실패 count strong이 1인 히스토리 row */
+/* FAILED: history row where the failure count strong value is 1 */
 .batch-history-row:has(.history-counts div:nth-child(3) strong) .history-counts div:nth-child(3) strong {
     color: #991b1b;
 }
 
-/* 실패 count가 0이 아닌 row는 붉은 왼쪽 bar */
+/* Use a red left bar when the failure count is not zero */
 .batch-history-row:has(.history-counts div:nth-child(3) strong:not(:empty)) {
     border-left: 4px solid transparent;
 }
@@ -1988,8 +1988,9 @@
     border-left-color: #22c55e;
 }
 
-/* 정확한 텍스트 기반 선택이 CSS만으로 제한적이라 FAILED pill은 JS 없이 HTML class가 최선.
-   대신 현재 렌더링의 FAILED 행은 href/id 주변에서 실패 count가 1이고, SUCCESS 행은 실패 count 0이라 시각 차이를 추가. */
+/* Exact text-based selection is limited in CSS, so an HTML class is the best option for the FAILED pill.
+   Instead, the current rendered FAILED row has a failure count of 1 near its href/id, while a SUCCESS row
+   has a failure count of 0; add a visual distinction based on that difference. */
 .batch-history-row:has(.history-counts div:nth-child(3) strong) .history-counts div:nth-child(3) {
     background: #fff1f2;
     border-color: #fecaca;
@@ -2003,7 +2004,7 @@
     color: #be123c;
 }
 
-/* 성공/대상 없음/실패/건너뜀 count 카드 색 */
+/* Success/no-target/failure/skipped count card colors */
 .history-counts div:nth-child(1) {
     background: #f0fdf4;
     border-color: #bbf7d0;
@@ -2044,7 +2045,7 @@
     color: #64748b;
 }
 
-/* 선택된 row 강조 */
+/* Emphasize the selected row */
 .batch-history-row.selected {
     border-color: #14b8a6;
     background:
@@ -2058,7 +2059,7 @@
     color: #0f766e;
 }
 
-/* Status text에 따른 색상은 HTML class가 있으면 더 정확히 적용 */
+/* Apply more accurate colors when an HTML class is available for the Status text */
 .batch-status-pill.success,
 .batch-status-pill.SUCCESS {
     background: #dcfce7;

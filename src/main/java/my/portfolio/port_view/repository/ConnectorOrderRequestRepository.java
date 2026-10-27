@@ -10,9 +10,9 @@ import java.util.List;
 public interface ConnectorOrderRequestRepository extends JpaRepository<ConnectorOrderRequest, Long> {
 
     /**
-     * 계좌별 최근 주문 요청 목록.
+     * Recent Order Request list for an account.
      *
-     * /orders 리스트 화면에서 사용.
+     * Used by the /orders list view.
      */
     @Query(
             value = """
@@ -30,8 +30,8 @@ public interface ConnectorOrderRequestRepository extends JpaRepository<Connector
     );
 
     /**
-     * 계좌별 오늘 주문 요청 목록.
-     * 지금 Step3에서는 요약 계산용으로 사용 가능.
+     * Today's Order Request list for an account.
+     * Currently available for summary calculations in Step3.
      */
     @Query(
             value = """
@@ -46,7 +46,7 @@ public interface ConnectorOrderRequestRepository extends JpaRepository<Connector
     List<ConnectorOrderRequest> findTodayOrdersByAccountNo(@Param("accountNo") String accountNo);
     
     /**
-     * 주문 상세 화면: 특정 주문 1건 조회.
+     * Order Details view: queries one specific Order.
      */
     @Query(
             value = """
@@ -63,12 +63,12 @@ public interface ConnectorOrderRequestRepository extends JpaRepository<Connector
     );
 
     /**
-     * 주문 상세 화면: parent/child chain 조회.
+     * Order Details view: queries a parent/child chain.
      *
-     * 정책:
-     * - 선택 주문에서 parent를 계속 따라 root를 찾음.
-     * - root와 그 하위 children을 모두 조회.
-     * - 현재 데이터 구조는 BUY -> MODIFY -> CANCEL 단일 chain이므로 이 방식이면 충분.
+     * Policy:
+     * - Follow parent links from the selected Order until the root is found.
+     * - Query the root and all its children.
+     * - This is sufficient because the current data structure is a single BUY -> MODIFY -> CANCEL chain.
      */
     @Query(
             value = """
@@ -117,12 +117,12 @@ public interface ConnectorOrderRequestRepository extends JpaRepository<Connector
     );
 
     /**
-     * View 매매 내역 진입 시 최신 체결 확인이 필요한 주문 목록.
+     * Orders that require a latest Fill check when entering View Trading History.
      *
-     * 대상:
-     * - ACCEPTED / SUBMITTED / PENDING / PARTIAL_FILLED 상태
-     * - broker_order_no가 있는 주문
-     * - 최근 N일 이내 주문
+     * Targets:
+     * - Orders in ACCEPTED / SUBMITTED / PENDING / PARTIAL_FILLED state
+     * - Orders with a broker_order_no
+     * - Orders within the most recent N days
      */
     @Query(
         value = """

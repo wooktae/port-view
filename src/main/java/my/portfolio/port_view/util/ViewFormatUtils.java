@@ -67,7 +67,7 @@ public final class ViewFormatUtils {
             return EMPTY_TEXT;
         }
 
-        return INTEGER_FORMAT.format(value) + "원";
+        return ViewMessages.text("unit.money", INTEGER_FORMAT.format(value));
     }
 
     public static String formatMoneyWithoutUnit(Number value) {
@@ -83,7 +83,7 @@ public final class ViewFormatUtils {
             return EMPTY_TEXT;
         }
 
-        return INTEGER_FORMAT.format(value) + "주";
+        return ViewMessages.text("unit.shares", INTEGER_FORMAT.format(value));
     }
 
     public static String formatQtyWithoutUnit(Number value) {
@@ -155,7 +155,7 @@ public final class ViewFormatUtils {
         }
 
         BigDecimal amount = toBigDecimal(value);
-        String formatted = INTEGER_FORMAT.format(amount.abs()) + "원";
+        String formatted = ViewMessages.text("unit.money", INTEGER_FORMAT.format(amount.abs()));
 
         if (amount.compareTo(BigDecimal.ZERO) > 0) {
             return "+" + formatted;
@@ -165,7 +165,7 @@ public final class ViewFormatUtils {
             return "-" + formatted;
         }
 
-        return "0원";
+        return ViewMessages.text("unit.money", "0");
     }
 
     public static String formatDate(LocalDate value) {
@@ -227,7 +227,7 @@ public final class ViewFormatUtils {
             return EMPTY_TEXT;
         }
 
-        return value ? "예" : "아니오";
+        return value ? ViewMessages.text("label.yes") : ViewMessages.text("label.no");
     }
 
     public static BigDecimal round2(Number value) {

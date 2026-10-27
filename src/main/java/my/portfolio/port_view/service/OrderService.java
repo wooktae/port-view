@@ -12,8 +12,10 @@ import my.portfolio.port_view.entity.ConnectorOrderRequest;
 import my.portfolio.port_view.repository.ConnectorFillRepository;
 import my.portfolio.port_view.repository.ConnectorOrderEventRepository;
 import my.portfolio.port_view.repository.ConnectorOrderRequestRepository;
+import my.portfolio.port_view.util.ConnectorLabelUtils;
 import my.portfolio.port_view.util.OrderLabelUtils;
 import my.portfolio.port_view.util.ViewFormatUtils;
+import my.portfolio.port_view.util.ViewMessages;
 import my.portfolio.port_view.util.ViewTextUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,7 +80,7 @@ public class OrderService {
 
         if (current == null) {
             page.setFound(false);
-            page.setTitleText("주문을 찾을 수 없음");
+            page.setTitleText(ViewMessages.text("orderDetail.notFound"));
             page.setLifecycleText("-");
             page.setFinalStatusText("-");
             return page;
@@ -207,6 +209,7 @@ public class OrderService {
             node.setRequestStatusClass(OrderLabelUtils.statusClass(order.getRequestStatus()));
 
             node.setOrderMethod(ViewTextUtils.blankTo(order.getOrderMethod(), "-"));
+            node.setOrderMethodLabel(ConnectorLabelUtils.orderMethodLabel(order.getOrderMethod()));
             node.setOrderPriceText(ViewFormatUtils.formatMoney(order.getOrderPrice()));
             node.setOrderQtyText(ViewFormatUtils.formatQty(order.getOrderQty()));
 
@@ -332,6 +335,8 @@ public class OrderService {
 
         row.setTickerCode(ViewTextUtils.nvl(order.getTickerCode()));
         row.setStockName(ViewTextUtils.blankTo(order.getStockName(), "-"));
+        row.setStockDisplayName(ViewMessages.stockDisplayName(order.getTickerCode(), order.getStockName()));
+        row.setShowSeparateTicker(ViewMessages.showSeparateTicker(order.getStockName()));
 
         row.setRequestType(ViewTextUtils.nvl(order.getRequestType()));
         row.setRequestTypeLabel(OrderLabelUtils.requestTypeLabel(order.getRequestType()));

@@ -9,6 +9,7 @@ import my.portfolio.port_view.dto.dailybatch.DailyBatchStepLogDto;
 import my.portfolio.port_view.dto.dailybatch.DailyBatchStepOptionDto;
 import my.portfolio.port_view.dto.dailybatch.IntradayPositionCheckDto;
 import my.portfolio.port_view.repository.DailyBatchRepository;
+import my.portfolio.port_view.util.ViewMessages;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -557,18 +558,18 @@ public class DailyBatchService {
         String stdout = result.stdout() == null ? "" : result.stdout();
 
         if (stdout.contains("[ALERT]")) {
-            return "장중 포지션 점검 완료: 손절 후보가 감지됨. Strategy Execution 화면에서 후보 확인 필요.";
+            return ViewMessages.text("intraday.monitor.alert");
         }
 
         if (stdout.contains("[NO_TARGET]")) {
-            return "장중 포지션 점검 완료: 손절 후보 없음.";
+            return ViewMessages.text("intraday.monitor.noTarget");
         }
 
         if (stdout.contains("장중 모니터링 대상 OPEN 포지션 없음")) {
-            return "장중 포지션 점검 완료: 점검 대상 OPEN 포지션 없음.";
+            return ViewMessages.text("intraday.monitor.noOpen");
         }
 
-        return "장중 포지션 점검 완료.";
+        return ViewMessages.text("intraday.monitor.completed");
     }
 
     private void sendDailyBatchSlackSafely(Long batchRunId) {

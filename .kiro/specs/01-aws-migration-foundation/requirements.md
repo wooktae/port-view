@@ -2,160 +2,160 @@
 
 ## Introduction
 
-이 문서는 PORT-STRATEGY-AI 포트폴리오 자동매매 시스템을 구성하는 8개 마이크로서비스(이하 8개 MS)를 AWS 환경으로 이전하기 위한 기반(foundation) 단계의 요구사항을 정의한다.
+This document defines the requirements for the foundation stage of migrating the 8 microservices (hereafter the 8 MS) that make up the PORT-STRATEGY-AI portfolio automated trading system to the AWS environment.
 
-대상 8개 MS는 다음과 같다.
+The 8 target MS are as follows.
 
-- `port-marketconnector` (Python/Flask, KIS 국내 주식 API 연동, 주문/잔고/시세, 단일 access token 파일 기반 세션)
-- `port-view` (Spring Boot 4.1 / Thymeleaf, 통합 운영 콘솔, Daily Batch orchestration, Slack 알림)
-- `port-interest-crawler` (Python, Naver / yfinance / KRX 수집, Selenium/Chrome 의존)
-- `port-interest-preprocessor` (Python, raw → pre feature 가공, 외부 holiday API)
-- `port_strategy_common` (Python 라이브러리, 순수 함수형 전략 코어, DB/HTTP/IO 없음)
-- `port_strategy_decision` (Python, daily BUY signal 및 daily position HOLD/SELL decision)
-- `port_strategy_research` (Python, backtest run / analysis / 텍스트 리포트 생성)
-- `port_strategy_execution` (Python, execution order 생성, connector 주문 호출, fill/position sync, intraday monitor)
+- `port-marketconnector` (Python/Flask, KIS domestic stock API integration, orders/balance/quotes, single access token file-based session)
+- `port-view` (Spring Boot 4.1 / Thymeleaf, integrated operations console, Daily Batch orchestration, Slack notifications)
+- `port-interest-crawler` (Python, Naver / yfinance / KRX collection, Selenium/Chrome dependency)
+- `port-interest-preprocessor` (Python, raw → pre feature processing, external holiday API)
+- `port_strategy_common` (Python library, pure functional strategy core, no DB/HTTP/IO)
+- `port_strategy_decision` (Python, daily BUY signal and daily position HOLD/SELL decision)
+- `port_strategy_research` (Python, backtest run / analysis / text report generation)
+- `port_strategy_execution` (Python, execution order creation, connector order calls, fill/position sync, intraday monitor)
 
-8개 MS는 모두 단일 PostgreSQL `portfolio` 데이터베이스를 공유하며, 도메인별 schema 와 MS별 `search_path` 우선순위로 동작한다.
+All 8 MS share a single PostgreSQL `portfolio` database and operate with per-domain schemas and per-MS `search_path` priority.
 
-- 도메인 schema: `reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`, `public`
-- 각 MS는 `INTEREST_DB_*` 환경변수와 broker / Slack / 외부 API credential을 사용한다.
+- Domain schemas: `reference`, `interest`, `preprocessor`, `research`, `decision`, `execution`, `connector`, `ops`, `legacy`, `public`
+- Each MS uses the `INTEREST_DB_*` environment variables and broker / Slack / external API credentials.
 
-이번 spec은 다음을 산출물로 한다.
+The artifacts of this spec are as follows.
 
-- 8개 MS 각각의 AWS 배포 후보 비교와 권고
-- 공통 기반(네트워크, RDS, Secrets, ECR, 관측, CI/CD, 알림, Runbook)의 권고 구조
-- 후속 spec에서 실제 IaC 작성과 배포로 이어질 수 있는 작업 계획
+- A comparison and recommendation of AWS deployment candidates for each of the 8 MS
+- A recommended structure for the common foundation (network, RDS, Secrets, ECR, observability, CI/CD, alerting, Runbook)
+- A work plan that can lead to actual IaC authoring and deployment in follow-up specs
 
-이번 spec은 **문서 산출물(requirements.md, design.md, tasks.md)만** 만든다. 실제 AWS 리소스 생성, 코드 수정, 기존 README/AGENTS.md/docs/CHANGELOG/worklog 수정은 본 spec 범위에서 수행하지 않는다.
+This spec produces **only document artifacts (requirements.md, design.md, tasks.md)**. Actual AWS resource creation, code changes, and modification of existing README/AGENTS.md/docs/CHANGELOG/worklog are not performed within the scope of this spec.
 
 ## Glossary
 
-- **Foundation 단계**: 실제 배포/리소스 생성 전, 8개 MS의 AWS 매핑/네트워크/데이터/관측/CI/CD/Runbook 권고 구조를 문서로 확정하는 단계.
-- **MS**: 마이크로서비스. 본 시스템에서는 8개 저장소 단위.
-- **Daily Batch**: `port-view`에서 시작하는 일일 파이프라인. 현재 외부 MS의 Python 절대경로를 subprocess로 호출하는 구조.
-- **단일 portfolio DB / schema-per-domain**: 모든 MS가 동일한 PostgreSQL 데이터베이스 `portfolio`를 공유하고, 도메인 schema와 MS별 `search_path`로 테이블을 해석하는 구조.
+- **Foundation stage**: The stage before actual deployment/resource creation, in which the AWS mapping/network/data/observability/CI/CD/Runbook recommended structure for the 8 MS is finalized as documents.
+- **MS**: Microservice. In this system, the unit of the 8 repositories.
+- **Daily Batch**: The daily pipeline that starts in `port-view`. Currently a structure that calls the Python absolute paths of external MS via subprocess.
+- **Single portfolio DB / schema-per-domain**: A structure in which all MS share the same PostgreSQL database `portfolio` and resolve tables via domain schemas and per-MS `search_path`.
 
 ## Requirements
 
-### Requirement 1: 8개 MS별 AWS 배포 후보 매핑
+### Requirement 1: Per-MS AWS deployment candidate mapping
 
-**Objective**: As 운영자, I want 각 MS의 워크로드 특성에 맞는 AWS 컴퓨트 후보를 비교해 받기, so that 무리한 통일 없이 합리적인 컴퓨트 선택을 결정할 수 있다.
+**Objective**: As an operator, I want to receive a comparison of AWS compute candidates suited to each MS's workload characteristics, so that I can decide on a reasonable compute choice without forced uniformity.
 
 #### Acceptance Criteria
 
-1. WHEN 본 spec이 완료되면 THEN design.md SHALL 8개 MS 각각에 대해 최소 2개 AWS 컴퓨트 후보(예: EC2 / ECS Fargate / AWS Batch / Lambda / Elastic Beanstalk / App Runner / Step Functions + EventBridge Scheduler)를 비교한 표와 권고를 포함해야 한다.
-2. WHEN `port-marketconnector` MS를 평가하는 경우 THEN design.md SHALL KIS broker 세션, 단일 access token 파일, 고정 outbound IP 가능성을 근거로 EC2 후보를 1순위 후보 중 하나로 평가해야 한다.
-3. WHEN `port-view` MS를 평가하는 경우 THEN design.md SHALL Elastic Beanstalk, ECS Fargate, App Runner를 후보로 비교하고 Daily Batch가 외부 MS Python 경로를 직접 호출하는 현 구조의 영향을 명시해야 한다.
-4. WHEN `port_strategy_decision`, `port_strategy_execution`, `port_strategy_research` MS를 평가하는 경우 THEN design.md SHALL 아래 후보를 비교하고 daily / intraday / backtest의 실행 빈도와 지속 시간을 근거로 권고를 명시해야 한다.
+1. WHEN this spec is complete THEN design.md SHALL include, for each of the 8 MS, a table comparing at least 2 AWS compute candidates (e.g., EC2 / ECS Fargate / AWS Batch / Lambda / Elastic Beanstalk / App Runner / Step Functions + EventBridge Scheduler) and a recommendation.
+2. WHEN evaluating the `port-marketconnector` MS THEN design.md SHALL evaluate EC2 as one of the top-tier candidates, based on the KIS broker session, the single access token file, and the possibility of a fixed outbound IP.
+3. WHEN evaluating the `port-view` MS THEN design.md SHALL compare Elastic Beanstalk, ECS Fargate, and App Runner as candidates and state the impact of the current structure in which Daily Batch directly calls external MS Python paths.
+4. WHEN evaluating the `port_strategy_decision`, `port_strategy_execution`, and `port_strategy_research` MS THEN design.md SHALL compare the candidates below and state a recommendation based on the execution frequency and duration of daily / intraday / backtest.
    - ECS Fargate Task
    - AWS Batch
    - Step Functions + EventBridge Scheduler
-5. WHEN `port-interest-crawler` MS를 평가하는 경우 THEN design.md SHALL Lambda, ECS Task, EC2 후보를 비교하고 Selenium/Chrome 의존성과 KRX 로그인 흐름을 근거로 Lambda 사용 한계를 명시해야 한다.
-6. WHEN `port-interest-preprocessor` MS를 평가하는 경우 THEN design.md SHALL Lambda, ECS Task 후보를 비교하고 holiday API 호출 및 long-running upsert 가능성을 근거로 권고를 명시해야 한다.
-7. WHEN `port_strategy_common` MS를 평가하는 경우 THEN design.md SHALL 순수 라이브러리 특성과 별도 컴퓨트 배포 대상이 아니라는 결론, 그리고 다른 MS 컨테이너 이미지에 포함시키는 packaging 권고를 명시해야 한다.
-8. IF 어떤 MS를 컨테이너 서비스가 아닌 EC2로 권고하는 경우 THEN design.md SHALL 그 사유를 broker IP, 세션, 라이선스, 운영 비용 중 어느 항목에서 비롯된 것인지 명확히 적어야 한다.
+5. WHEN evaluating the `port-interest-crawler` MS THEN design.md SHALL compare Lambda, ECS Task, and EC2 candidates and state the limits of using Lambda, based on the Selenium/Chrome dependency and the KRX login flow.
+6. WHEN evaluating the `port-interest-preprocessor` MS THEN design.md SHALL compare Lambda and ECS Task candidates and state a recommendation based on the holiday API calls and the possibility of long-running upsert.
+7. WHEN evaluating the `port_strategy_common` MS THEN design.md SHALL state the conclusion that, given its pure-library nature, it is not a separate compute deployment target, along with a packaging recommendation to include it in the other MS container images.
+8. IF a given MS is recommended for EC2 rather than a container service THEN design.md SHALL clearly state which of broker IP, session, license, or operating cost the rationale stems from.
 
-### Requirement 2: 단일 PostgreSQL `portfolio` DB의 RDS 전환 전략
+### Requirement 2: RDS migration strategy for the single PostgreSQL `portfolio` DB
 
-**Objective**: As 운영자, I want 단일 portfolio DB와 schema-per-domain 구조를 유지하면서 AWS RDS for PostgreSQL로 옮기는 전략, so that 기존 SQL과 `search_path` 기반 동작이 깨지지 않는다.
-
-#### Acceptance Criteria
-
-1. WHEN design.md가 작성되면 THEN design.md SHALL RDS for PostgreSQL 단일 인스턴스를 기본으로 한 권고와, dev / paper / live 환경 분리 방식을 포함해야 한다.
-2. WHEN schema 구성을 다루는 경우 THEN design.md SHALL `reference, interest, preprocessor, research, decision, execution, connector, ops, legacy, public` 10개 schema가 그대로 유지되어야 함을 명시해야 한다.
-3. WHEN 각 MS의 DB 사용자 권한을 다루는 경우 THEN design.md SHALL MS별 DB role(예: `marketconnector_app`, `crawler_app`, ...)과 schema-level 최소 권한 권고를 포함하되, 기존 `INTEREST_DB_USER` 환경변수 키는 유지하는 방식으로 적어야 한다.
-4. WHEN 각 MS의 `search_path` 정책을 다루는 경우 THEN design.md SHALL 8개 MS README에 정의된 `search_path` 순서를 변경하지 않고 그대로 유지하는 방식임을 명시해야 한다.
-5. WHEN 데이터 이전 절차를 다루는 경우 THEN design.md SHALL `pg_dump` / `pg_restore` 또는 AWS DMS 후보를 비교하고, 1순위 권고와 cutover 단계 개요를 포함해야 한다.
-6. WHEN 백업과 복원을 다루는 경우 THEN design.md SHALL RDS automated backup, manual snapshot, point-in-time recovery 사용 권고와 보존 기간 권고를 포함해야 한다.
-7. IF 비용 최적화를 위해 multi-AZ를 비활성화하는 경우 THEN design.md SHALL live 환경에서는 multi-AZ를 권고하고 dev / paper에서만 single-AZ 허용 가능을 명시해야 한다.
-
-### Requirement 3: 민감정보 외부화
-
-**Objective**: As 운영자, I want broker / DB / Slack / 외부 API credential을 코드와 문서 밖으로 분리하기, so that 8개 MS 모두에서 secret이 source control 또는 로그에 남지 않는다.
+**Objective**: As an operator, I want a strategy to move to AWS RDS for PostgreSQL while preserving the single portfolio DB and schema-per-domain structure, so that the existing SQL and `search_path`-based behavior does not break.
 
 #### Acceptance Criteria
 
-1. WHEN design.md가 작성되면 THEN design.md SHALL Secrets Manager와 SSM Parameter Store의 사용 기준을 정의하고 어떤 항목을 어디에 저장하는지 매핑 표를 포함해야 한다.
-2. WHEN KIS app key, app secret, base URL, 계좌번호, 계좌 상품 코드, access token 파일을 다루는 경우 THEN design.md SHALL Secrets Manager에 저장하고 EC2 또는 ECS Task의 IAM Role을 통해 주입하는 방식을 권고해야 한다.
-3. WHEN PostgreSQL 접속 password를 다루는 경우 THEN design.md SHALL Secrets Manager에 저장하고 자동 rotation 가능성을 권고로 표시해야 한다.
-4. WHEN Slack webhook URL을 다루는 경우 THEN design.md SHALL Secrets Manager 또는 SSM Parameter Store SecureString 사용 권고를 포함해야 한다.
-5. WHEN Naver API client id/secret, Chrome / ChromeDriver 경로 같은 환경 의존 값을 다루는 경우 THEN design.md SHALL SSM Parameter Store 사용 권고를 포함해야 한다.
-6. WHEN 기존 환경변수 키 호환성을 다루는 경우 THEN design.md SHALL 아래 키 이름을 그대로 유지하는 정책을 명시해야 한다.
+1. WHEN design.md is authored THEN design.md SHALL include a recommendation based on a single RDS for PostgreSQL instance, and a method for separating the dev / paper / live environments.
+2. WHEN addressing the schema configuration THEN design.md SHALL state that the 10 schemas `reference, interest, preprocessor, research, decision, execution, connector, ops, legacy, public` must be preserved as-is.
+3. WHEN addressing each MS's DB user permissions THEN design.md SHALL include per-MS DB roles (e.g., `marketconnector_app`, `crawler_app`, ...) and a schema-level least-privilege recommendation, written in a way that preserves the existing `INTEREST_DB_USER` environment variable key.
+4. WHEN addressing each MS's `search_path` policy THEN design.md SHALL state that the `search_path` order defined in the 8 MS READMEs is preserved as-is without change.
+5. WHEN addressing the data migration procedure THEN design.md SHALL compare `pg_dump` / `pg_restore` and AWS DMS candidates and include a first-choice recommendation and a cutover-stage outline.
+6. WHEN addressing backup and restore THEN design.md SHALL include recommendations for using RDS automated backup, manual snapshot, and point-in-time recovery, along with a retention-period recommendation.
+7. IF multi-AZ is disabled for cost optimization THEN design.md SHALL recommend multi-AZ for the live environment and state that single-AZ may be allowed only for dev / paper.
+
+### Requirement 3: Externalizing sensitive information
+
+**Objective**: As an operator, I want to separate broker / DB / Slack / external API credentials out of code and documents, so that in all 8 MS no secret remains in source control or logs.
+
+#### Acceptance Criteria
+
+1. WHEN design.md is authored THEN design.md SHALL define the usage criteria for Secrets Manager and SSM Parameter Store and include a mapping table of which item is stored where.
+2. WHEN addressing the KIS app key, app secret, base URL, account number, account product code, and access token file THEN design.md SHALL recommend storing them in Secrets Manager and injecting them via the IAM Role of the EC2 or ECS Task.
+3. WHEN addressing the PostgreSQL connection password THEN design.md SHALL recommend storing it in Secrets Manager and mark automatic rotation as a possibility recommendation.
+4. WHEN addressing the Slack webhook URL THEN design.md SHALL include a recommendation to use Secrets Manager or SSM Parameter Store SecureString.
+5. WHEN addressing environment-dependent values such as the Naver API client id/secret and Chrome / ChromeDriver paths THEN design.md SHALL include a recommendation to use SSM Parameter Store.
+6. WHEN addressing existing environment variable key compatibility THEN design.md SHALL state a policy of preserving the following key names as-is.
    - RDS: `INTEREST_DB_HOST`, `INTEREST_DB_PORT`, `INTEREST_DB_NAME`, `INTEREST_DB_USER`, `INTEREST_DB_PASSWORD`, `PORTFOLIO_DB_NAME`
-   - 브로커 / 계정: `PORT_ACCOUNT_NO`, `PORT_BROKER_NAME`
-   - 환경: `PORT_ENVIRONMENT`
-   - 전략: `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION`, `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT`
-7. WHEN 문서에 secret을 인용해야 하는 경우 THEN design.md와 tasks.md SHALL 모든 secret 자리에 `[REDACTED]`만 사용하고 실제 값을 절대 적지 않아야 한다.
-8. WHEN `access_token.txt`를 다루는 경우 THEN design.md SHALL 단일 파일 토큰을 EFS, S3, 또는 Secrets Manager 중 어디에 보관할지 비교하고 broker 세션 단일성 제약을 근거로 1순위 권고를 명시해야 한다.
+   - Broker / account: `PORT_ACCOUNT_NO`, `PORT_BROKER_NAME`
+   - Environment: `PORT_ENVIRONMENT`
+   - Strategy: `PORT_STRATEGY_NAME`, `PORT_STRATEGY_VERSION`, `PORT_MAX_ORDER_AMOUNT_RATIO`, `PORT_MIN_ORDER_AMOUNT`
+7. WHEN a secret must be cited in a document THEN design.md and tasks.md SHALL use only `[REDACTED]` in every secret position and never write actual values.
+8. WHEN addressing `access_token.txt` THEN design.md SHALL compare whether to keep the single-file token in EFS, S3, or Secrets Manager and state a first-choice recommendation based on the broker session singularity constraint.
 
-### Requirement 4: 네트워크 및 외부 접근 경로 설계
+### Requirement 4: Network and external access path design
 
-**Objective**: As 운영자, I want VPC / Subnet / Security Group 구조와 broker, KRX, Naver, yfinance, Slack 같은 외부 접근 경로를 정의하기, so that 보안 경계가 명확하고 broker IP 정책에 맞는 outbound가 보장된다.
-
-#### Acceptance Criteria
-
-1. WHEN design.md가 작성되면 THEN design.md SHALL 단일 VPC와 public / private subnet 구분, NAT Gateway 또는 NAT Instance 권고, RDS 전용 subnet group을 포함해야 한다.
-2. WHEN `port-marketconnector`의 outbound IP를 다루는 경우 THEN design.md SHALL Elastic IP를 EC2에 부여하거나 NAT Gateway의 EIP를 broker에 등록하는 후보를 비교하고 1순위 권고를 명시해야 한다.
-3. WHEN `port-view`에서 `port-marketconnector`로 호출하는 경로를 다루는 경우 THEN design.md SHALL 동일 VPC 내부 호출, ALB 경유, Service Discovery 후보 중 권고와 그 사유를 포함해야 한다.
-4. WHEN `port-interest-crawler`의 KRX / Naver / yfinance 접근을 다루는 경우 THEN design.md SHALL outbound 전용이고 inbound 노출이 없어야 함을 명시해야 한다.
-5. WHEN Slack webhook 호출을 다루는 경우 THEN design.md SHALL outbound HTTPS만 필요하며 별도 inbound 노출이 없어야 함을 명시해야 한다.
-6. WHEN 운영자 접속을 다루는 경우 THEN design.md SHALL EC2 SSH 직접 노출 대신 SSM Session Manager 사용을 권고해야 한다.
-7. IF design.md가 production / non-production VPC 분리를 권고하지 않는 경우 THEN design.md SHALL 단일 VPC 내에서 environment tag와 subnet 분리로 환경을 구분하는 정책을 명시해야 한다.
-
-### Requirement 5: 컨테이너 이미지와 CI/CD 파이프라인
-
-**Objective**: As 운영자, I want 8개 MS에 대해 일관된 컨테이너 이미지 빌드와 배포 파이프라인을 정의하기, so that 코드 변경 → 빌드 → 배포 흐름이 표준화된다.
+**Objective**: As an operator, I want to define the VPC / Subnet / Security Group structure and external access paths such as broker, KRX, Naver, yfinance, and Slack, so that the security boundary is clear and outbound conforming to the broker IP policy is guaranteed.
 
 #### Acceptance Criteria
 
-1. WHEN design.md가 작성되면 THEN design.md SHALL 8개 MS 중 컨테이너 배포 대상 MS의 ECR repository 명명 규칙(예: `port-marketconnector`, `port-view`, ...)을 포함해야 한다.
-2. WHEN `port_strategy_common`의 배포를 다루는 경우 THEN design.md SHALL 자체 컨테이너가 아니라 다른 MS Dockerfile에서 git submodule 또는 wheel/sdist로 packaging되는 방식 중 1순위 권고를 명시해야 한다.
-3. WHEN CI/CD 도구를 다루는 경우 THEN design.md SHALL CodePipeline + CodeBuild + CodeDeploy 조합과 GitHub Actions + ECR + 배포 스크립트 조합을 비교하고 1순위 권고와 그 사유를 명시해야 한다.
-4. WHEN 빌드 단계의 secret 처리를 다루는 경우 THEN design.md SHALL build 시점에 secret을 이미지에 굽지 않고 runtime에 IAM Role과 Secrets Manager / Parameter Store로 주입하는 정책을 명시해야 한다.
-5. WHEN 환경별 배포를 다루는 경우 THEN design.md SHALL dev / paper / live 환경에 대한 promotion 흐름과 manual approval 권고를 포함해야 한다.
-6. IF `port-marketconnector` 또는 다른 MS가 EC2 기반으로 권고되는 경우 THEN design.md SHALL 해당 MS에 대해서는 컨테이너 배포가 아닌 AMI 또는 systemd unit + S3 / CodeDeploy 기반 배포 후보를 별도로 명시해야 한다.
+1. WHEN design.md is authored THEN design.md SHALL include a single VPC, a public / private subnet distinction, a NAT Gateway or NAT Instance recommendation, and a dedicated RDS subnet group.
+2. WHEN addressing the outbound IP of `port-marketconnector` THEN design.md SHALL compare the candidates of assigning an Elastic IP to the EC2 or registering the NAT Gateway EIP with the broker, and state a first-choice recommendation.
+3. WHEN addressing the call path from `port-view` to `port-marketconnector` THEN design.md SHALL include a recommendation and its rationale among the candidates of same-VPC internal call, ALB routing, and Service Discovery.
+4. WHEN addressing `port-interest-crawler`'s KRX / Naver / yfinance access THEN design.md SHALL state that it must be outbound-only with no inbound exposure.
+5. WHEN addressing the Slack webhook call THEN design.md SHALL state that only outbound HTTPS is required and that there must be no separate inbound exposure.
+6. WHEN addressing operator access THEN design.md SHALL recommend using SSM Session Manager instead of directly exposing EC2 SSH.
+7. IF design.md does not recommend separating production / non-production VPCs THEN design.md SHALL state a policy of distinguishing environments within a single VPC via environment tags and subnet separation.
 
-### Requirement 6: 관측, 알림, 운영 Runbook
+### Requirement 5: Container images and CI/CD pipeline
 
-**Objective**: As 운영자, I want 로그 / 메트릭 / 알람 / Slack 알림 / Runbook 표준을 받기, so that 8개 MS의 장애 감지와 대응 절차가 일관된다.
-
-#### Acceptance Criteria
-
-1. WHEN design.md가 작성되면 THEN design.md SHALL 8개 MS의 로그를 CloudWatch Logs로 수집하는 표준 log group 명명 규칙을 포함해야 한다.
-2. WHEN 메트릭을 다루는 경우 THEN design.md SHALL CPU, memory, RDS connection, broker API error rate, Daily Batch step 실패 등 핵심 메트릭과 권고 alarm threshold를 포함해야 한다.
-3. WHEN Slack 통합을 다루는 경우 THEN design.md SHALL 기존 `port-view`의 `SlackNotificationService` 흐름을 유지하면서, AWS 측에서는 CloudWatch Alarm → SNS → Lambda → Slack webhook 또는 AWS Chatbot 후보를 비교하고 1순위 권고를 명시해야 한다.
-4. WHEN Daily Batch 실패 처리를 다루는 경우 THEN design.md SHALL `strategy_daily_batch_run`, `strategy_daily_batch_step_log` 테이블과 EventBridge / CloudWatch Alarm 연계 권고를 포함해야 한다.
-5. WHEN 운영 Runbook을 다루는 경우 THEN design.md SHALL 최소한 broker 토큰 만료 / 재발급, KIS 주문 실패, RDS failover, Daily Batch 실패 재실행, intraday monitor 중단 4가지 시나리오에 대한 절차 항목을 포함해야 한다.
-6. WHEN Runbook이 다루는 위험을 다루는 경우 THEN design.md SHALL live 환경에서 자동 재시도 금지가 필요한 항목(예: BUY/SELL 주문, fill sync)과 안전한 자동 재시도가 가능한 항목(예: 시세 조회, 전처리 idempotent step)을 구분해 명시해야 한다.
-
-### Requirement 7: 환경 분리, 비용, 단계적 마이그레이션 로드맵
-
-**Objective**: As 운영자, I want dev / paper / live 환경 분리와 비용 추정, 단계적 cutover 로드맵을 받기, so that 한 번에 모든 MS를 옮기는 위험을 피할 수 있다.
+**Objective**: As an operator, I want to define consistent container image build and deployment pipelines across the 8 MS, so that the code change → build → deploy flow is standardized.
 
 #### Acceptance Criteria
 
-1. WHEN design.md가 작성되면 THEN design.md SHALL 환경 구분(dev, paper, live)을 정의하고 각 환경에서 broker live 연결 허용 여부를 명시해야 한다.
-2. WHEN 비용을 다루는 경우 THEN design.md SHALL EC2, ECS Fargate, RDS, NAT Gateway, CloudWatch, Secrets Manager의 월간 비용 항목 후보 목록을 포함하되 실제 환율/가격은 추정 범위(low/high)로만 표기해야 한다.
-3. WHEN 단계적 cutover 로드맵을 다루는 경우 THEN design.md SHALL 최소한 다음 단계 순서를 권고해야 한다:
-   - Stage 1: 네트워크 / RDS / Secrets / ECR foundation
-   - Stage 2: `port_strategy_common` packaging + 1개 MS 파일럿(예: `port-interest-preprocessor` 또는 `port_strategy_research`)
-   - Stage 3: `port-marketconnector` (broker IP 등록 포함)
-   - Stage 4: `port_strategy_decision` + `port_strategy_execution` (paper 환경 우선)
-   - Stage 5: `port-view` 운영 콘솔 + Daily Batch 통합
-   - Stage 6: live cutover 및 legacy 로컬 운영 종료
-4. WHEN 각 stage를 다루는 경우 THEN design.md SHALL 진입 조건과 이탈(rollback) 조건을 포함해야 한다.
-5. WHEN live 환경 cutover를 다루는 경우 THEN design.md SHALL paper 환경에서 최소 N영업일 이상 검증을 권고하되 N 값은 운영자가 결정하는 placeholder로 둬야 한다.
+1. WHEN design.md is authored THEN design.md SHALL include the ECR repository naming convention (e.g., `port-marketconnector`, `port-view`, ...) for the MS among the 8 MS that are container-deployment targets.
+2. WHEN addressing the deployment of `port_strategy_common` THEN design.md SHALL state a first-choice recommendation between being packaged via git submodule or wheel/sdist in the other MS Dockerfiles, rather than as its own container.
+3. WHEN addressing CI/CD tools THEN design.md SHALL compare the CodePipeline + CodeBuild + CodeDeploy combination with the GitHub Actions + ECR + deployment script combination and state a first-choice recommendation with its rationale.
+4. WHEN addressing secret handling in the build stage THEN design.md SHALL state a policy of not baking secrets into the image at build time but injecting them at runtime via the IAM Role and Secrets Manager / Parameter Store.
+5. WHEN addressing per-environment deployment THEN design.md SHALL include a promotion flow for the dev / paper / live environments and a manual approval recommendation.
+6. IF `port-marketconnector` or another MS is recommended on an EC2 basis THEN design.md SHALL separately state, for that MS, deployment candidates based on AMI or systemd unit + S3 / CodeDeploy rather than container deployment.
 
-### Requirement 8: 본 spec 산출물의 안전 제약과 범위
+### Requirement 6: Observability, alerting, and operational Runbook
 
-**Objective**: As 운영자, I want 본 spec 작업이 코드 / 운영 데이터 / 기존 문서를 변경하지 않도록 명시적으로 제한하기, so that 8개 MS의 AGENTS.md 작업 규칙과 충돌하지 않는다.
+**Objective**: As an operator, I want to receive log / metric / alarm / Slack alert / Runbook standards, so that fault detection and response procedures across the 8 MS are consistent.
 
 #### Acceptance Criteria
 
-1. WHEN 본 spec이 산출물을 만드는 경우 THEN 산출물 SHALL `C:\Workspaces\port-view\.kiro\specs\01-aws-migration-foundation\` 하위의 `requirements.md`, `design.md`, `tasks.md`로만 한정되어야 한다.
-2. WHEN 본 spec 작업이 진행되는 동안 THE 작업 SHALL 8개 MS의 기존 `README.md`, `AGENTS.md`, `CHANGELOG.md`, `docs/**`, `docs/worklog/**` 파일을 수정하지 않아야 한다.
-3. WHEN 본 spec 작업이 진행되는 동안 THE 작업 SHALL 8개 MS의 Python / Java 소스 코드를 수정하지 않아야 한다.
-4. WHEN 본 spec 작업이 진행되는 동안 THE 작업 SHALL 실제 AWS 리소스를 생성하거나 변경하지 않아야 한다.
-5. WHEN 본 spec 작업이 진행되는 동안 THE 작업 SHALL 8개 MS의 어떤 entrypoint도 실행하지 않아야 한다(특히 broker API, Selenium/Chrome, KRX/Naver/yfinance, RDS/PostgreSQL DDL/DML, Daily Batch, intraday monitor 호출 금지).
-6. WHEN 본 spec이 secret을 다루는 경우 THE 산출물 SHALL 실제 password, token, app key, app secret, 계좌번호, webhook URL 값을 포함하지 않고 모두 `[REDACTED]`로 표기해야 한다.
-7. WHEN tasks.md가 작성되는 경우 THEN tasks.md SHALL 각 task가 운영자 1인이 단일 세션에서 검토하고 승인할 수 있는 작은 단위로 나뉘어야 하며, AWS 리소스 생성을 동반하는 task는 명시적으로 "approval required"로 표기되어야 한다.
+1. WHEN design.md is authored THEN design.md SHALL include a standard log group naming convention for collecting the logs of the 8 MS into CloudWatch Logs.
+2. WHEN addressing metrics THEN design.md SHALL include core metrics such as CPU, memory, RDS connection, broker API error rate, and Daily Batch step failure, along with recommended alarm thresholds.
+3. WHEN addressing Slack integration THEN design.md SHALL, while preserving the existing `port-view` `SlackNotificationService` flow, compare the candidates of CloudWatch Alarm → SNS → Lambda → Slack webhook and AWS Chatbot on the AWS side and state a first-choice recommendation.
+4. WHEN addressing Daily Batch failure handling THEN design.md SHALL include a recommendation to link the `strategy_daily_batch_run` and `strategy_daily_batch_step_log` tables with EventBridge / CloudWatch Alarm.
+5. WHEN addressing the operational Runbook THEN design.md SHALL include procedure items for at least 4 scenarios: broker token expiry / reissue, KIS order failure, RDS failover, Daily Batch failure re-execution, and intraday monitor interruption.
+6. WHEN addressing the risks covered by the Runbook THEN design.md SHALL distinguish and state the items that require prohibiting automatic retry in the live environment (e.g., BUY/SELL orders, fill sync) from the items where safe automatic retry is possible (e.g., quote lookup, idempotent preprocessing steps).
+
+### Requirement 7: Environment separation, cost, and phased migration roadmap
+
+**Objective**: As an operator, I want to receive dev / paper / live environment separation, cost estimation, and a phased cutover roadmap, so that I can avoid the risk of moving all MS at once.
+
+#### Acceptance Criteria
+
+1. WHEN design.md is authored THEN design.md SHALL define the environment distinctions (dev, paper, live) and state whether broker live connection is allowed in each environment.
+2. WHEN addressing cost THEN design.md SHALL include a candidate list of monthly cost items for EC2, ECS Fargate, RDS, NAT Gateway, CloudWatch, and Secrets Manager, but SHALL express actual exchange rates/prices only as estimate ranges (low/high).
+3. WHEN addressing the phased cutover roadmap THEN design.md SHALL recommend at least the following stage order:
+   - Stage 1: Network / RDS / Secrets / ECR foundation
+   - Stage 2: `port_strategy_common` packaging + one MS pilot (e.g., `port-interest-preprocessor` or `port_strategy_research`)
+   - Stage 3: `port-marketconnector` (including broker IP registration)
+   - Stage 4: `port_strategy_decision` + `port_strategy_execution` (paper environment first)
+   - Stage 5: `port-view` operations console + Daily Batch integration
+   - Stage 6: live cutover and shutdown of legacy local operation
+4. WHEN addressing each stage THEN design.md SHALL include entry conditions and exit (rollback) conditions.
+5. WHEN addressing the live environment cutover THEN design.md SHALL recommend at least N business days of validation in the paper environment, but the value of N SHALL be left as a placeholder for the operator to decide.
+
+### Requirement 8: Safety constraints and scope of this spec's artifacts
+
+**Objective**: As an operator, I want to explicitly restrict this spec's work from changing code / operational data / existing documents, so that it does not conflict with the AGENTS.md work rules of the 8 MS.
+
+#### Acceptance Criteria
+
+1. WHEN this spec produces artifacts THEN the artifacts SHALL be limited to only `requirements.md`, `design.md`, and `tasks.md` under `C:\Workspaces\port-view\.kiro\specs\01-aws-migration-foundation\`.
+2. WHILE this spec's work is in progress THE work SHALL NOT modify the existing `README.md`, `AGENTS.md`, `CHANGELOG.md`, `docs/**`, or `docs/worklog/**` files of the 8 MS.
+3. WHILE this spec's work is in progress THE work SHALL NOT modify the Python / Java source code of the 8 MS.
+4. WHILE this spec's work is in progress THE work SHALL NOT create or change any actual AWS resource.
+5. WHILE this spec's work is in progress THE work SHALL NOT execute any entrypoint of the 8 MS (in particular, calling broker APIs, Selenium/Chrome, KRX/Naver/yfinance, RDS/PostgreSQL DDL/DML, Daily Batch, or the intraday monitor is prohibited).
+6. WHEN this spec addresses a secret THE artifacts SHALL NOT include actual password, token, app key, app secret, account number, or webhook URL values, and SHALL mark them all as `[REDACTED]`.
+7. WHEN tasks.md is authored THEN tasks.md SHALL divide each task into a small unit that a single operator can review and approve in a single session, and any task that entails AWS resource creation SHALL be explicitly marked "approval required".

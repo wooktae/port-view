@@ -4,8 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * Connector 잔고 스냅샷 갱신 실행 옵션을 바인딩한다.
- * 운영 환경별 경로와 Python 실행 파일은 환경변수 또는 local 설정에서 주입하는 것을 기본으로 한다.
+ * Binds execution options for refreshing Connector Balance Snapshots.
+ * Paths and the Python executable for each production environment should be injected through
+ * environment variables or local configuration.
  */
 @Component
 @ConfigurationProperties(prefix = "portfolio.snapshot-refresh")
@@ -14,12 +15,12 @@ public class SnapshotRefreshProperties {
     private boolean enabled = true;
 
     /**
-     * 최신 snapshot이 이 분 수보다 오래됐으면 connector_balance.py 실행.
+     * Runs connector_balance.py when the latest Snapshot is older than this many minutes.
      */
     private long staleMinutes = 5L;
 
     /**
-     * connector_balance.py 1회 실행 timeout.
+     * Timeout for one connector_balance.py execution.
      */
     private long timeoutSeconds = 60L;
 

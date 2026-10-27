@@ -16,6 +16,7 @@ import my.portfolio.port_view.dto.strategy.ReportStrategyPageDto;
 import my.portfolio.port_view.service.OperatingResearchVersionProvider;
 import my.portfolio.port_view.service.ReportService;
 import my.portfolio.port_view.service.ResearchChampionPromotionService;
+import my.portfolio.port_view.util.ViewMessages;
 
 @Controller
 @RequestMapping("/strategy/reports")
@@ -60,7 +61,7 @@ public class StrategyReportController {
         model.addAttribute("versions", versions);
         model.addAttribute("selectedVersion", selectedVersion);
         model.addAttribute("operatingVersion", operatingVersion);
-        model.addAttribute("pageTitle", "백테스트 리포트");
+        model.addAttribute("pageTitle", ViewMessages.text("page.report.title"));
 
         return ViewNames.STRATEGY_REPORT;
     }
@@ -70,7 +71,7 @@ public class StrategyReportController {
         ReportStrategyPageDto page = reportService.getReportByRunId(runId);
 
         model.addAttribute("page", page);
-        model.addAttribute("pageTitle", "백테스트 리포트");
+        model.addAttribute("pageTitle", ViewMessages.text("page.report.title"));
 
         return ViewNames.STRATEGY_REPORT;
     }

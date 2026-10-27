@@ -23,6 +23,7 @@ public class OrderChainNodeDTO {
     private String requestStatusClass;
 
     private String orderMethod;
+    private String orderMethodLabel;
     private String orderPriceText;
     private String orderQtyText;
 

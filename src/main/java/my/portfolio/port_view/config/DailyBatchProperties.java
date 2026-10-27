@@ -4,24 +4,24 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * Daily Batch Pipeline 실행 설정.
+ * Daily Batch Pipeline execution configuration.
  *
- * application.properties 의 portfolio.batch.* 값을 바인딩한다.
+ * Binds the portfolio.batch.* values from application.properties.
  *
- * 목적:
- * - Python 실행 명령어 관리
- * - 각 Microservice 작업 디렉토리 관리
- * - timeout / log tail 길이 관리
- * - Daily Batch 실행 모드 / DB target / 실행 gate 관리
- * - Java 코드 내 로컬 workspace 경로 하드코딩 제거
- * - AWS Paper 로컬 실행 검증 시 주문성 step을 별도 gate로 차단
+ * Purpose:
+ * - Manage Python execution commands
+ * - Manage working directories for each Microservice
+ * - Manage timeout and log tail length
+ * - Manage Daily Batch execution mode, DB target, and execution gates
+ * - Eliminate hard-coded local workspace paths from Java code
+ * - Block order-related steps behind separate gates during local AWS Paper execution validation
  */
 @Component
 @ConfigurationProperties(prefix = "portfolio.batch")
 public class DailyBatchProperties {
 
     /**
-     * Python 실행 명령.
+     * Python execution command.
      *
      * local Windows:
      * - python
@@ -32,49 +32,49 @@ public class DailyBatchProperties {
     private String pythonExecutable = "python";
 
     /**
-     * 전체 workspace root.
+     * Root of the complete workspace.
      *
-     * application-local.properties 또는 환경변수로 지정한다.
+     * Specify through application-local.properties or an environment variable.
      */
     private String workspaceRoot = "";
 
     /**
-     * Market Connector 작업 디렉토리.
+     * Market Connector working directory.
      *
-     * application-local.properties 또는 환경변수로 지정한다.
+     * Specify through application-local.properties or an environment variable.
      */
     private String marketconnectorDir = "";
 
     /**
-     * Interest Crawler 작업 디렉토리.
+     * Interest Crawler working directory.
      *
-     * application-local.properties 또는 환경변수로 지정한다.
+     * Specify through application-local.properties or an environment variable.
      */
     private String interestCrawlerDir = "";
 
     /**
-     * Interest Preprocessor 작업 디렉토리.
+     * Interest Preprocessor working directory.
      *
-     * application-local.properties 또는 환경변수로 지정한다.
+     * Specify through application-local.properties or an environment variable.
      */
     private String preprocessorDir = "";
 
     /**
-     * Strategy Execution 작업 디렉토리.
+     * Strategy Execution working directory.
      *
-     * application-local.properties 또는 환경변수로 지정한다.
+     * Specify through application-local.properties or an environment variable.
      */
     private String executionDir = "";
 
     /**
-     * Daily Batch 기본 계좌번호.
+     * Default account number for Daily Batch.
      */
     private String defaultAccountNo = "";
 
     /**
-     * 실행 환경.
+     * Execution environment.
      *
-     * 예:
+     * Examples:
      * - local
      * - paper
      * - live
@@ -84,56 +84,56 @@ public class DailyBatchProperties {
     /**
      * Daily Batch DB target.
      *
-     * 예:
+     * Examples:
      * - local-fixture-db
      * - aws-paper-rds
      * - aws-live-rds
      *
-     * 주의:
-     * - aws-paper 검증에서는 로컬에서 실행하더라도 DB target은 aws-paper-rds 여야 한다.
+     * Caution:
+     * - During aws-paper validation, the DB target must be aws-paper-rds even when execution is local.
      */
     private String dbTarget = "local-fixture-db";
 
     /**
-     * Daily Batch 실행 모드.
+     * Daily Batch execution mode.
      *
-     * 예:
+     * Examples:
      * - local-file
      * - aws-stepfunctions
      *
      * local-file:
-     * - View 서버가 로컬 Python 파일을 ProcessBuilder로 실행한다.
+     * - The View server runs local Python files through ProcessBuilder.
      *
      * aws-stepfunctions:
-     * - View 서버가 AWS Step Functions 실행 상태를 조회하거나 StartExecution을 호출한다.
+     * - The View server queries AWS Step Functions execution state or calls StartExecution.
      */
     private String executionMode = "local-file";
 
     /**
-     * Daily Batch 실행 전체 gate.
+     * Master gate for Daily Batch execution.
      *
-     * false이면 Daily Pipeline 전체 실행 / 부분 실행 / 재실행을 서버단에서 차단한다.
+     * When false, the server blocks complete, partial, and retry Daily Pipeline execution.
      */
     private boolean executionEnabled = false;
 
     /**
-     * 로컬 파일 실행 gate.
+     * Local File execution gate.
      *
-     * false이면 ProcessBuilder 기반 Python 파일 실행을 차단한다.
+     * When false, blocks ProcessBuilder-based Python file execution.
      */
     private boolean localFileExecutionEnabled = false;
 
     /**
-     * AWS Step Functions 전체 실행 StartExecution gate.
+     * StartExecution gate for complete AWS Step Functions execution.
      *
-     * false이면 aws-stepfunctions mode에서도 전체 workflow 시작을 차단한다.
+     * When false, blocks starting the complete workflow even in aws-stepfunctions mode.
      */
     private boolean awsStepfunctionsStartEnabled = false;
 
     /**
-     * AWS Step Functions 개별 step 실행 gate.
+     * Gate for executing individual AWS Step Functions steps.
      *
-     * false이면 step-only workflow 또는 dispatcher 기반 개별 step 실행을 차단한다.
+     * When false, blocks individual step execution through a step-only workflow or dispatcher.
      */
     private boolean awsStepfunctionsStepStartEnabled = false;
 
@@ -145,16 +145,16 @@ public class DailyBatchProperties {
     /**
      * AWS Step Functions state machine ARN.
      *
-     * Step 1~11 safe trigger 또는 기본 Daily workflow용 ARN.
-     * 실제 값은 properties 파일에 직접 쓰지 않고 환경변수로 주입한다.
+     * ARN for the Steps 1~11 safe trigger or default Daily workflow.
+     * Inject the actual value through an environment variable rather than writing it directly in a properties file.
      */
     private String awsStepfunctionsStateMachineArn = "";
 
     /**
      * AWS Step Functions approval state machine ARN.
      *
-     * Step 12~17 승인형 workflow 전용 ARN.
-     * 실제 값은 properties 파일에 직접 쓰지 않고 환경변수로 주입한다.
+     * Dedicated ARN for the approval-gated Steps 12~17 workflow.
+     * Inject the actual value through an environment variable rather than writing it directly in a properties file.
      */
     private String awsStepfunctionsApprovalStateMachineArn = "";
 
@@ -164,77 +164,77 @@ public class DailyBatchProperties {
     private String awsStepfunctionsExecutionNamePrefix = "port-view-daily";
 
     /**
-     * 장중 포지션 점검 수동 실행 gate.
+     * Manual Intraday Position check gate.
      *
-     * false이면 /daily-batch/intraday-monitor/run 을 서버단에서 차단한다.
+     * When false, the server blocks /daily-batch/intraday-monitor/run.
      */
     private boolean intradayMonitorEnabled = false;
 
     /**
-     * Slack 테스트 / Slack 요약 재전송 같은 화면 액션 gate.
+     * Gate for view actions such as Slack test and Slack summary resend.
      *
-     * false이면 사용자가 Daily Batch 화면에서 Slack 액션을 직접 호출할 수 없다.
+     * When false, users cannot invoke Slack actions directly from the Daily Batch view.
      */
     private boolean slackActionEnabled = false;
 
     /**
-     * Daily Batch 완료 후 Slack summary 자동 전송 gate.
+     * Gate for automatically sending a Slack summary after Daily Batch completes.
      *
-     * false이면 Daily Batch 실행 완료 후 sendDailyBatchSummary를 호출하지 않는다.
+     * When false, sendDailyBatchSummary is not called after Daily Batch execution completes.
      */
     private boolean slackSummaryEnabled = false;
 
     /**
-     * AWS Paper 주문성 실행 gate.
+     * AWS Paper order-related execution gate.
      *
-     * false이면 아래 주문성 step을 서버단에서 차단한다.
+     * When false, the server blocks the order-related steps below.
      *
      * - Step 10 DAILY_AUTO_SELL
      * - Step 11 DAILY_AUTO_BUY
      * - Step 12 MARKETCONNECTOR_STRATEGY_ORDER_EXECUTE
      *
-     * Step 13~17은 주문 제출 이후 follow-up 성격이므로,
-     * range 실행에서 Step 12 이후를 열 때도 이 gate를 같이 확인한다.
+     * Steps 13~17 are post-submission follow-up, so this gate is also checked
+     * when a range execution enables Step 12 or later.
      */
     private boolean paperOrderEnabled = false;
 
     /**
-     * 로컬 파일 실행 허용 최소 step order.
+     * Minimum step order allowed for Local File execution.
      *
-     * AWS Paper 2차 검증 기본값:
+     * Default for the second AWS Paper validation:
      * - 1
      */
     private int minExecutableStepOrder = 1;
 
     /**
-     * 로컬 파일 실행 허용 최대 step order.
+     * Maximum step order allowed for Local File execution.
      *
-     * AWS Paper 2차 검증 기본값:
+     * Default for the second AWS Paper validation:
      * - 11
      *
-     * Step 12~17은 paperOrderEnabled=true 확인 후 별도 확장한다.
+     * Steps 12~17 are enabled separately after confirming paperOrderEnabled=true.
      */
     private int maxExecutableStepOrder = 11;
 
     /**
-     * 전체 1~17 실행 버튼 gate.
+     * Gate for the complete Steps 1~17 execution button.
      *
-     * false이면 local-file 실행이 켜져 있어도 전체 실행은 서버단에서 차단한다.
-     * 2차 검증에서는 range 실행을 먼저 사용한다.
+     * When false, the server blocks complete execution even if local-file execution is enabled.
+     * Use range execution first during the second validation.
      */
     private boolean fullPipelineExecutionEnabled = false;
 
     /**
-     * Python command 1개당 timeout.
+     * Timeout for each Python command.
      *
-     * 단위: minutes
+     * Unit: minutes
      */
     private long commandTimeoutMinutes = 60L;
 
     /**
-     * stdout/stderr tail 저장 길이.
+     * Stored stdout/stderr tail length.
      *
-     * DB에는 전체 로그를 저장하지 않고 마지막 N자만 저장한다.
+     * The DB stores only the final N characters rather than the complete log.
      */
     private int logTailLength = 8000;
 

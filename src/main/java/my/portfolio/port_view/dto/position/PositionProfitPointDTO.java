@@ -23,8 +23,8 @@ public class PositionProfitPointDTO {
     private String profitClass;
 
     /**
-     * CSS height 값.
-     * 예: 42 -> height: 42%
+     * CSS height value.
+     * Example: 42 -> height: 42%
      */
     private int barHeight;
 }
