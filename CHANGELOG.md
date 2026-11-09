@@ -13,6 +13,14 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
+## 2026-11-09 — CI/CD Repository Variable Recovery
+
+### Fixed
+
+Restored the missing `CANDIDATE_SECURITY_GROUP`, `CANDIDATE_SUBNETS`, and `AWS_ACCOUNT_ID` Repository Variables from the successful View Workflow of 2026-10-01. Verified each restored value against that baseline.
+
+The recovery reuses the existing AWS resources and preserves the Workflow, operating Runtime configuration, trading gates, and manual Production approval boundary. Resource identifiers and account values are omitted from this record.
+
 ## 2026-11-09 — Account Context Correction
 
 ### Fixed
