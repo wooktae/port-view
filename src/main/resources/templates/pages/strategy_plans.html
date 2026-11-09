@@ -15,12 +15,7 @@
 <body class="app-body">
 <div class="app-shell"
      th:with="
-        resolvedAccountNo=${page != null
-            and page.plans != null
-            and !#lists.isEmpty(page.plans)
-            and page.plans[0].accountNo() != null
-                ? page.plans[0].accountNo()
-                : '-'},
+        resolvedAccountNo=${accountNo},
         latestPlan=${page != null
             and page.plans != null
             and !#lists.isEmpty(page.plans)
@@ -67,7 +62,7 @@
 
                         <a class="strategy-detail-link"
                            th:if="${latestPlan != null}"
-                           th:href="@{/strategy/execution/plans/{planId}(planId=${latestPlan.id()})}"
+                           th:href="@{/strategy/execution/plans/{planId}(planId=${latestPlan.id()}, accountNo=${resolvedAccountNo})}"
                            th:text="#{strategyPlans.latest.view}">
                             View Latest Details →
                         </a>
@@ -246,7 +241,7 @@
                             </div>
 
                             <div class="recent-action">
-                                <a th:href="@{/strategy/execution/plans/{planId}(planId=${plan.id()})}"
+                                <a th:href="@{/strategy/execution/plans/{planId}(planId=${plan.id()}, accountNo=${resolvedAccountNo})}"
                                    th:text="#{strategyPlans.details}">
                                     Details
                                 </a>

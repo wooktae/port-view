@@ -16,7 +16,7 @@
 <div class="app-shell"
      th:with="resolvedAccountNo=${plan != null and plan.accountNo() != null ? plan.accountNo() : '-'}">
 
-    <aside th:replace="~{fragments/sidebar :: sidebar('strategy', ${resolvedAccountNo})}"></aside>
+    <aside th:replace="~{fragments/sidebar :: sidebar('strategy', ${accountNo})}"></aside>
 
     <main class="app-main dashboard-main strategy-detail-main">
         <header class="dashboard-page-title">
@@ -75,7 +75,7 @@
                         </span>
 
                         <a class="strategy-back-link"
-                           th:href="@{/strategy/execution/plans}"
+                           th:href="@{/strategy/execution/plans(accountNo=${accountNo})}"
                            th:text="#{strategyDetail.back}">
                             Back to List →
                         </a>
@@ -417,6 +417,7 @@
                                   class="submit-order-form">
 
                                 <input type="hidden" name="planId" th:value="${plan.id()}"/>
+                                <input type="hidden" name="accountNo" th:value="${accountNo}"/>
 
                                 <button type="submit"
                                         th:class="'submit-order-button ' + ${order.actionType() == 'BUY' ? 'buy' : 'sell'}">

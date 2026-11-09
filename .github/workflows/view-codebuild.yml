@@ -1,4 +1,4 @@
-﻿name: View CodeBuild
+name: View CodeBuild
 
 on:
   push:
@@ -33,6 +33,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Test task definition preparation
+        run: node --test .devops/ecs/prepare-task-definition.test.mjs
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -128,6 +131,9 @@ jobs:
     timeout-minutes: 20
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -173,23 +179,25 @@ jobs:
             --output json \
             > candidate-template.json
 
-          jq \
-            --arg image "${IMAGE_URI}" \
-            '
-            del(
-              .taskDefinitionArn,
-              .revision,
-              .status,
-              .requiresAttributes,
-              .compatibilities,
-              .registeredAt,
-              .registeredBy,
-              .deregisteredAt
-            )
-            | .containerDefinitions[0].image = $image
-            ' \
-            candidate-template.json \
-            > candidate-register.json
+          OPERATING_TASK_DEFINITION_ARN="$(
+            aws ecs describe-services \
+              --cluster "${ECS_CLUSTER}" \
+              --services portfolio-view-service \
+              --query 'services[0].taskDefinition' \
+              --output text
+          )"
+
+          test -n "${OPERATING_TASK_DEFINITION_ARN}"
+          test "${OPERATING_TASK_DEFINITION_ARN}" != "None"
+
+          aws ecs describe-task-definition \
+            --task-definition "${OPERATING_TASK_DEFINITION_ARN}" \
+            --query 'taskDefinition' \
+            --output json \
+            > account-source.json
+
+          node .devops/ecs/prepare-task-definition.mjs \
+            candidate-template.json candidate-register.json "${IMAGE_URI}" candidate account-source.json
 
           CANDIDATE_TASK_DEFINITION_ARN="$(
             aws ecs register-task-definition \
@@ -240,9 +248,13 @@ jobs:
           require_false PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_START_ENABLED
           require_false PORTFOLIO_BATCH_AWS_STEPFUNCTIONS_STEP_START_ENABLED
           require_false PORTFOLIO_BATCH_EXECUTION_ENABLED
+          require_false PORTFOLIO_BATCH_LOCAL_FILE_EXECUTION_ENABLED
           require_false PORTFOLIO_BATCH_PAPER_ORDER_ENABLED
           require_false PORTFOLIO_BATCH_FULL_PIPELINE_EXECUTION_ENABLED
           require_false PORTFOLIO_STRATEGY_EXECUTION_SUBMIT_ENABLED
+          require_false PORTFOLIO_SNAPSHOT_REFRESH_ENABLED
+          require_false PORTFOLIO_DASHBOARD_SNAPSHOT_REFRESH_ENABLED
+          require_false PORTFOLIO_ORDER_REFRESH_ENABLED
 
           echo "VIEW_CANDIDATE_SAFETY_GATES=SUCCESS"
 
@@ -393,6 +405,34 @@ jobs:
             fi
           done
 
+          DASHBOARD_HTML="$(
+            curl --fail --silent --show-error --connect-timeout 5 --max-time 30 \
+              "${BASE_URL}/dashboard"
+          )"
+          CURRENT_ACCOUNT="$(
+            grep -oE 'href="/dashboard\?accountNo=[0-9]{8}"' <<< "${DASHBOARD_HTML}" \
+              | cut -d= -f3 | tr -d '"'
+          )"
+          [[ "${CURRENT_ACCOUNT}" =~ ^[0-9]{8}$ ]]
+
+          ACCOUNT_PATHS=(
+            "/dashboard" "/balance-summary" "/positions" "/orders"
+            "/strategy/execution/plans" "/strategy/reports/latest"
+          )
+          for path in "${ACCOUNT_PATHS[@]}"; do
+            ACCOUNT_HTML="$(
+              curl --fail --silent --show-error --connect-timeout 5 --max-time 30 \
+                "${BASE_URL}${path}?accountNo=${CURRENT_ACCOUNT}"
+            )"
+            for menu in "${ACCOUNT_PATHS[@]}"; do
+              grep -Fq "href=\"${menu}?accountNo=${CURRENT_ACCOUNT}\"" <<< "${ACCOUNT_HTML}"
+            done
+            grep -Fq "lang=en&amp;accountNo=${CURRENT_ACCOUNT}" <<< "${ACCOUNT_HTML}"
+            grep -Fq "lang=ko&amp;accountNo=${CURRENT_ACCOUNT}" <<< "${ACCOUNT_HTML}"
+          done
+          unset CURRENT_ACCOUNT DASHBOARD_HTML ACCOUNT_HTML
+          echo "VIEW_ACCOUNT_CONTEXT_SMOKE=SUCCESS"
+
           RESEARCH_HTML="$(
             curl \
               --fail \
@@ -450,6 +490,9 @@ jobs:
     environment: production
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -519,23 +562,8 @@ jobs:
             --output json \
             > operating-template.json
 
-          jq \
-            --arg image "${IMAGE_URI}" \
-            '
-            del(
-              .taskDefinitionArn,
-              .revision,
-              .status,
-              .requiresAttributes,
-              .compatibilities,
-              .registeredAt,
-              .registeredBy,
-              .deregisteredAt
-            )
-            | .containerDefinitions[0].image = $image
-            ' \
-            operating-template.json \
-            > operating-register.json
+          node .devops/ecs/prepare-task-definition.mjs \
+            operating-template.json operating-register.json "${IMAGE_URI}" production
 
           NEW_OPERATING_TASK_DEFINITION_ARN="$(
             aws ecs register-task-definition \

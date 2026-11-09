@@ -364,6 +364,27 @@ OPS Mirror baseline tables:
 
 When adding or changing a configuration key, verify the properties, `@ConfigurationProperties`, README, and deployment environment-variable names together.
 
+### Account Context
+
+The View accepts an eight-digit ASCII account number. An omitted or blank `accountNo` uses the configured default; an explicit valid account remains selected across menu and language navigation.
+
+| Setting / Behavior | Value |
+| --- | --- |
+| View default | `PORTFOLIO_VIEW_ACCOUNT_DEFAULT_ACCOUNT_NO` selects `[REDACTED_SECRET_ARN]:PAPER_ACNT::` |
+| Batch override | An existing `PORTFOLIO_BATCH_DEFAULT_ACCOUNT_NO` Secret reference selects the same JSON key |
+| Invalid request account | HTTP 400 before account queries or actions; the error omits the supplied value |
+| Invalid or missing default | HTTP 503 when the default is needed; JSON Secret contents are not parsed in View |
+| Navigation | Strategy and Report queries retain their existing scope; sidebar navigation keeps the selected account |
+| Orders count | The displayed count remains the number of retrieved requests, limited to 100 |
+
+`.devops/ecs/prepare-task-definition.mjs` prepares registration input without calling AWS. Both Workflow paths select `PAPER_ACNT` while preserving explicit Secret version selectors. Candidate preparation replaces retired account settings with current operating Secret references and disables execution and local Refresh flags.
+
+The Batch default is used by local-file Run records and payloads. The production Step Functions path receives the validated request account from the Controller; its execution logic and gates are unchanged.
+
+Run the preparation tests with `node --test .devops/ecs/prepare-task-definition.test.mjs` and application tests with `./mvnw test`. Runtime validation must compare rendered account views with RDS at the same time because Snapshot values can change intraday.
+
+These source changes do not update running ECS tasks. Candidate execution and production registration, deployment, and restart require separate approval.
+
 ## Localization Infrastructure
 
 | Item | Value |
@@ -376,7 +397,7 @@ When adding or changing a configuration key, verify the properties, `@Configurat
 
 `LocaleConfig` provides the Spring `MessageSource`, cookie-backed locale resolution, and `LocaleChangeInterceptor`.
 
-The shared sidebar provides an `EN | KO` switch through `?lang=en` and `?lang=ko`. The selected locale persists through the locale cookie across View navigation.
+The shared sidebar provides an `EN | KO` switch through `lang` and the current `accountNo` query parameters. The selected locale persists through the locale cookie across View navigation.
 
 Task 1.5 migrates unambiguous Class B text in shared navigation, Dashboard, Balance, Positions, and Orders surfaces. Display-only Java status and unit mappings resolve through the same EN/KO bundles.
 

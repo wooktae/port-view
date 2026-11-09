@@ -5,10 +5,12 @@ import my.portfolio.port_view.common.ViewNames;
 import my.portfolio.port_view.service.StrategyExecutionSubmitService;
 import my.portfolio.port_view.service.StrategyExecutionViewService;
 import my.portfolio.port_view.util.ViewMessages;
+import my.portfolio.port_view.util.AccountNoResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,6 +22,12 @@ public class StrategyExecutionViewController {
 
     private final StrategyExecutionViewService service;
     private final StrategyExecutionSubmitService submitService;
+    private final AccountNoResolver accountNoResolver;
+
+    @ModelAttribute("accountNo")
+    public String navigationAccount(@RequestParam(required = false) String accountNo) {
+        return accountNoResolver.resolve(accountNo);
+    }
 
     @Value("${portfolio.strategy.execution.submit-enabled:false}")
     private boolean submitEnabled;
@@ -51,8 +59,10 @@ public class StrategyExecutionViewController {
     public String submitOrder(
             @PathVariable Long orderId,
             @RequestParam Long planId,
+            @RequestParam(required = false) String accountNo,
             RedirectAttributes redirectAttributes
     ) {
+        redirectAttributes.addAttribute("accountNo", accountNoResolver.resolve(accountNo));
         if (!submitEnabled) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",

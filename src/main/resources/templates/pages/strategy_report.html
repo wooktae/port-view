@@ -60,6 +60,7 @@
                             <form method="get"
                                   action="/strategy/reports/latest"
                                   class="report-version-form">
+                                <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
                                 <label for="strategyVersion" th:text="#{report.researchVersion}">Research Version</label>
                                 <div class="report-version-select-wrap">
                                     <select id="strategyVersion"
@@ -89,6 +90,7 @@
 
                                 <form method="post"
                                     action="/strategy/reports/promote">
+                                    <input type="hidden" name="accountNo" th:value="${resolvedAccountNo}"/>
                                     <input type="hidden"
                                         name="version"
                                         th:value="${selectedVersion}">

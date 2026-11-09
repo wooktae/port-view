@@ -29,6 +29,8 @@ Paths are relative to the repository root; build outputs and cache files are exc
 | `Dockerfile` | Container image build for ECS Fargate |
 | `.devops/codebuild/buildspec.yml` | CodeBuild Maven Test · Package · Docker build · ECR Push · Evidence recording |
 | `.github/workflows/view-codebuild.yml` | Main push/manual execution · CodeBuild · Candidate Smoke · approval-gated Production Promotion |
+| `.devops/ecs/prepare-task-definition.mjs` | Offline Task Definition preparation · account Secret key selection · Candidate safety flags |
+| `.devops/ecs/prepare-task-definition.test.mjs` | Synthetic preparation tests without AWS access |
 
 ### Change Checks
 
@@ -62,8 +64,8 @@ When changing `ViewNames`, verify Controller return values and template paths to
 | `PositionController.java` | `/positions` list and details |
 | `OrderController.java` | `/orders` list and details |
 | `DailyBatchController.java` | Daily Batch queries · local/AWS actions · locale-aware flash wrappers with raw error details preserved |
-| `StrategyExecutionViewController.java` | Execution Plan queries · submission actions · locale-aware result wrappers |
-| `StrategyReportController.java` | Latest · specific run · Research Version-selected Report · localized page title · production Version selection action |
+| `StrategyExecutionViewController.java` | Execution Plan queries · submission actions · validated navigation account retained independently of Plan ownership |
+| `StrategyReportController.java` | Version-selected and run Reports · production Version selection · validated navigation account |
 | `controller/*.java` | View Controller group including Strategy Daily |
 
 ### Change Checks
@@ -193,6 +195,7 @@ When changing configuration, verify the following together.
 | --- | --- |
 | `src/main/java/my/portfolio/port_view/util/*.java` | Amount · date · locale-aware label · dynamic Stock display fallback · CSS class · account resolution |
 | `ViewMessages.java` | Request- or explicit-locale lookup for View, Report, and Slack text plus non-persistent Stock display formatting |
+| `AccountNoResolver.java` | Eight-digit account validation · explicit selection or configured default · sanitized 400/503 failures |
 
 When changing a Util, verify the impact on display values and CSS classes across all views.
 
@@ -202,7 +205,7 @@ Do not expose account numbers verbatim in views or logs.
 
 | File · Path | Responsibility |
 | --- | --- |
-| `templates/fragments/sidebar.html` | Common navigation and `EN | KO` language switch |
+| `templates/fragments/sidebar.html` | Common navigation and `EN | KO` language switch preserving the selected account |
 | `templates/pages/dashboard.html` | Dashboard |
 | `templates/pages/balance-summary.html` | Balance |
 | `templates/pages/positions.html` | Position list |

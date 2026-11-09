@@ -208,7 +208,7 @@
                             <div class="section-label" th:text="#{dashboard.executionPlan}">Strategy Execution Plan</div>
                             <h2 th:text="#{dashboard.latestExecutionPlan}">Latest Strategy Execution Plan</h2>
                         </div>
-                        <a class="section-link" th:href="@{/strategy/execution/plans}" th:text="#{action.viewDetails}">
+                        <a class="section-link" th:href="@{/strategy/execution/plans(accountNo=${resolvedAccountNo})}" th:text="#{action.viewDetails}">
                             View Details
                         </a>
                     </div>
@@ -216,7 +216,7 @@
                     <article class="plan-card dashboard-plan-summary-card"
                              th:if="${latestExecutionPlan != null}">
                         <a class="dashboard-plan-summary-row"
-                           th:href="@{/strategy/execution/plans/{id}(id=${latestExecutionPlan.id()})}">
+                           th:href="@{/strategy/execution/plans/{id}(id=${latestExecutionPlan.id()}, accountNo=${resolvedAccountNo})}">
 
                             <div class="dashboard-plan-identity">
                                 <div class="plan-id">
@@ -296,7 +296,7 @@
 
                     <article class="plan-card dashboard-action-card"
                              th:if="${latestExecutionPlan == null}">
-                        <a class="dashboard-action-row" th:href="@{/strategy/execution/plans}">
+                        <a class="dashboard-action-row" th:href="@{/strategy/execution/plans(accountNo=${resolvedAccountNo})}">
                             <div class="dashboard-action-main">
                                 <div class="plan-id">
                                     <strong th:text="#{dashboard.noRecentDecision}">No Recent Strategy Decision</strong>
@@ -325,7 +325,7 @@
                             <div class="section-label" th:text="#{dashboard.backtestSummary}">Backtest Summary</div>
                             <h2 th:text="#{dashboard.latestPerformance}">Latest Strategy Performance</h2>
                         </div>
-                        <a class="section-link" th:href="@{/strategy/reports/latest}" th:text="#{dashboard.viewReport}">
+                        <a class="section-link" th:href="@{/strategy/reports/latest(accountNo=${resolvedAccountNo})}" th:text="#{dashboard.viewReport}">
                             View Report →
                         </a>
                     </div>

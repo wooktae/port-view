@@ -50,7 +50,7 @@
         <a class="sidebar-link"
            th:if="${@environment.getProperty('portfolio.view.menu.strategy-enabled', 'true') == 'true'}"
            th:classappend="${activeMenu == 'strategy'} ? ' active' : ''"
-           th:href="@{/strategy/execution/plans}">
+           th:href="@{/strategy/execution/plans(accountNo=${accountNo})}">
             <span class="sidebar-icon">◇</span>
             <span class="sidebar-text" th:text="#{nav.strategy}">Strategy Operations</span>
         </a>
@@ -66,7 +66,7 @@
         <a class="sidebar-link"
            th:if="${@environment.getProperty('portfolio.view.menu.report-enabled', 'true') == 'true'}"
            th:classappend="${activeMenu == 'report'} ? ' active' : ''"
-           th:href="@{/strategy/reports/latest}">
+           th:href="@{/strategy/reports/latest(accountNo=${accountNo})}">
             <span class="sidebar-icon">⌁</span>
             <span class="sidebar-text" th:text="#{nav.report}">Backtest Report</span>
         </a>
@@ -77,12 +77,14 @@
     <div class="sidebar-language-switch" role="group" aria-label="EN / KO">
         <a class="sidebar-language-link"
            href="?lang=en"
+           th:href="@{''(lang='en', accountNo=${accountNo})}"
            lang="en"
            hreflang="en"
            th:classappend="${#locale.language == 'en'} ? ' active' : ''">EN</a>
         <span class="sidebar-language-separator" aria-hidden="true">|</span>
         <a class="sidebar-language-link"
            href="?lang=ko"
+           th:href="@{''(lang='ko', accountNo=${accountNo})}"
            lang="ko"
            hreflang="ko"
            th:classappend="${#locale.language == 'ko'} ? ' active' : ''">KO</a>

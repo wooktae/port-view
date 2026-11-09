@@ -3,6 +3,7 @@ package my.portfolio.port_view.controller;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +18,7 @@ import my.portfolio.port_view.service.OperatingResearchVersionProvider;
 import my.portfolio.port_view.service.ReportService;
 import my.portfolio.port_view.service.ResearchChampionPromotionService;
 import my.portfolio.port_view.util.ViewMessages;
+import my.portfolio.port_view.util.AccountNoResolver;
 
 @Controller
 @RequestMapping("/strategy/reports")
@@ -25,15 +27,23 @@ public class StrategyReportController {
     private final ReportService reportService;
     private final OperatingResearchVersionProvider operatingResearchVersionProvider;
     private final ResearchChampionPromotionService researchChampionPromotionService;
+    private final AccountNoResolver accountNoResolver;
 
     public StrategyReportController(
             ReportService reportService,
             OperatingResearchVersionProvider operatingResearchVersionProvider,
-            ResearchChampionPromotionService researchChampionPromotionService
+            ResearchChampionPromotionService researchChampionPromotionService,
+            AccountNoResolver accountNoResolver
     ) {
         this.reportService = reportService;
         this.operatingResearchVersionProvider = operatingResearchVersionProvider;
         this.researchChampionPromotionService = researchChampionPromotionService;
+        this.accountNoResolver = accountNoResolver;
+    }
+
+    @ModelAttribute("accountNo")
+    public String navigationAccount(@RequestParam(required = false) String accountNo) {
+        return accountNoResolver.resolve(accountNo);
     }
 
     @GetMapping("/latest")
@@ -79,8 +89,10 @@ public class StrategyReportController {
     @PostMapping("/promote")
     public String promote(
             @RequestParam("version") String version,
+            @RequestParam(required = false) String accountNo,
             RedirectAttributes redirectAttributes
     ) {
+        redirectAttributes.addAttribute("accountNo", accountNoResolver.resolve(accountNo));
         ResearchChampionPromotionService.PromotionResult result =
                 researchChampionPromotionService.promoteChampion(version);
 

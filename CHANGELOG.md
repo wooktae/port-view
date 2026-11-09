@@ -13,6 +13,28 @@ This document records major changes to port-view code and documentation.
 | Detailed evidence | Reference `docs` or commits when needed |
 | Sensitive information | Do not record actual account numbers · secrets · tokens · ARNs · public IPs |
 
+## 2026-11-09 — Account Context Correction
+
+### Fixed
+
+| File / Area | Change |
+| --- | --- |
+| ECS preparation and Workflow | Select `PAPER_ACNT` for View and existing Batch defaults; Candidate account references come from the operating definition |
+| `AccountNoResolver` | Reject malformed request accounts and invalid defaults before use; omit values from errors |
+| Navigation and Strategy / Report Controllers | Preserve the selected account across menus, detail navigation, version forms, and language changes |
+
+### Validation
+
+| Item | Result |
+| --- | --- |
+| Preparation tests | 5 passed; key selection, pinned versions, Candidate gates, and retired account replacement |
+| Application tests | 10 passed; default and explicit accounts, invalid input, rendered navigation, Snapshot views, orders, and related fills |
+| Read-only checks | Candidate and operating definitions transformed in memory; current-account requests and linked fills verified in RDS |
+| Workflow and encoding | YAML parsed; UTF-8 without BOM and whitespace checks passed |
+| AWS changes | Not performed; Task registration, Candidate execution, and production rollout await approval |
+
+Orders count semantics and trading logic are unchanged. See [Account Context](README.md#account-context) for configuration and validation requirements.
+
 ## 2026-09-22 — Task 1.11 View Validation and Residual UI Remediation
 
 ### Changed
